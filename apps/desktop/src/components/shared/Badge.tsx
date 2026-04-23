@@ -8,11 +8,11 @@ const badgeVariants = cva("inline-flex items-center rounded-sm px-2 py-0.5 text-
   },
   variants: {
     variant: {
-      danger: "bg-danger-soft text-danger",
-      info: "bg-info-soft text-info",
-      neutral: "bg-muted text-secondary",
-      success: "bg-success-soft text-success",
-      warning: "bg-warning-soft text-warning",
+      danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
+      info: "bg-[var(--info-soft)] text-[var(--info-base)]",
+      neutral: "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
+      success: "bg-[var(--success-soft)] text-[var(--success-base)]",
+      warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
     },
   },
 });

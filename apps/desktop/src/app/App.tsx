@@ -14,8 +14,17 @@ export function App() {
     document.documentElement.dataset.theme = themeMode;
   }, [themeMode]);
 
+  useEffect(() => {
+    const handleNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setActiveRoute(customEvent.detail as typeof activeRoute);
+    };
+    window.addEventListener("navigate", handleNavigate);
+    return () => window.removeEventListener("navigate", handleNavigate);
+  }, [setActiveRoute]);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]">
       <AppSidebar activeRoute={activeRoute} onRouteChange={setActiveRoute} />
       <div className="min-w-0 flex-1 overflow-y-auto">
         <TopToolbar activeRoute={activeRoute} onToggleTheme={toggleTheme} themeMode={themeMode} />

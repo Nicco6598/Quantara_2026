@@ -1,124 +1,155 @@
-import { BookOpen, Calculator, CheckCircle2, TrendingUp } from "lucide-react";
-import { summarizeSal } from "@quantara/domain-utils";
+import { Calculator, CheckCircle2, FolderKanban, TrendingUp, Users } from "lucide-react";
 import { AlertListCard } from "@/components/cards/AlertListCard";
-import { BudgetDistributionCard } from "@/components/cards/BudgetDistributionCard";
-import { ForecastCard } from "@/components/cards/ForecastCard";
 import { KpiStatCard } from "@/components/cards/KpiStatCard";
-import { MapCard } from "@/components/cards/MapCard";
-import { OperationsMetricStrip } from "@/components/cards/OperationsMetricStrip";
-import { TimelineCard } from "@/components/cards/TimelineCard";
-import { WorkflowStepper } from "@/components/filters/WorkflowStepper";
-import { SplitDetailPanel } from "@/components/panels/SplitDetailPanel";
-import { DenseDataTable } from "@/components/tables/DenseDataTable";
+import { Button } from "@/components/shared/Button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { formatMoney } from "@/lib/formatters";
-import {
-  activeContract,
-  budgetCategories,
-  currentSal,
-  dashboardAlerts,
-  operationsMetrics,
-  projectRows,
-  siteWaypoints,
-  timelineLanes,
-} from "./demo-data";
+import { dashboardAlerts } from "@/features/dashboard/demo-data";
 
-export function DashboardScreen() {
-  const salSummary = summarizeSal(currentSal);
-
-  return (
-    <div className="flex min-h-[calc(100vh-5rem)]">
-      <main className="min-w-0 flex-1 p-6">
-        <div className="grid grid-cols-4 gap-4">
-          <KpiStatCard
-            detail="Totale approvato"
-            icon={<Calculator />}
-            label="Budget di progetto"
-            value={formatMoney(activeContract.contractualAmount)}
-          />
-          <KpiStatCard
-            detail="65,4% del budget"
-            icon={<BookOpen />}
-            label="Impegnato"
-            value={formatMoney({ amount: 16245300, currency: "EUR" })}
-          />
-          <KpiStatCard
-            detail="43,6% del budget"
-            icon={<TrendingUp />}
-            label="Eseguito SAL"
-            value={formatMoney(salSummary.finalTotal)}
-          />
-          <KpiStatCard
-            detail="SAL emesse"
-            icon={<CheckCircle2 />}
-            label="SAL approvate"
-            value="7 / 12"
-          />
-        </div>
-
-        <div className="mt-4 grid grid-cols-[1fr_1.35fr] gap-4">
-          <section className="rounded-md border border-subtle bg-card p-4 shadow-soft">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-secondary">Project Health</p>
-                <h2 className="mt-3 text-3xl font-semibold text-success">BUONO</h2>
-              </div>
-              <div className="flex size-28 items-center justify-center rounded-full border-[12px] border-success text-success">
-                43%
-              </div>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              <StatusLine label="Budget" value="In linea" />
-              <StatusLine label="Tempi" value="+5 giorni" warning />
-              <StatusLine label="Esecuzione" value="In linea" />
-              <StatusLine label="Materiali" value="Criticita" danger />
-            </div>
-          </section>
-
-          <ForecastCard cpi="0,94" endDate="12 Set 2025" impact="-1,3M" />
-        </div>
-
-        <div className="mt-4 grid grid-cols-[1.1fr_1fr] gap-4">
-          <AlertListCard alerts={dashboardAlerts} />
-          <BudgetDistributionCard categories={budgetCategories} />
-        </div>
-
-        <div className="mt-4">
-          <MapCard waypoints={siteWaypoints} />
-        </div>
-
-        <div className="mt-4">
-          <OperationsMetricStrip metrics={operationsMetrics} />
-        </div>
-
-        <div className="mt-4">
-          <WorkflowStepper />
-        </div>
-        <div className="mt-4">
-          <TimelineCard lanes={timelineLanes} />
-        </div>
-        <div className="mt-4">
-          <DenseDataTable rows={projectRows} />
-        </div>
-      </main>
-      <SplitDetailPanel summary={salSummary} />
-    </div>
-  );
-}
-
-type StatusLineProps = {
-  danger?: boolean;
-  label: string;
-  value: string;
-  warning?: boolean;
+const globalStats = {
+  totalProjects: 12,
+  totalBudget: 91450000,
+  activeProjects: 8,
+  completedProjects: 2,
+  atRiskProjects: 2,
+  criticalProjects: 0,
+  totalSal: 33,
+  approvedSal: 28,
 };
 
-function StatusLine({ danger, label, value, warning }: StatusLineProps) {
-  const tone = danger ? "danger" : warning ? "warning" : "success";
+const projectList = [
+  { id: "p1", name: "Linea AV/AC Milano-Verona", lot: "Lotto 3A", progress: 68, health: "success" as const, status: "In linea" },
+  { id: "p2", name: "Nodo di Firenze AV", lot: "Lotto 2B", progress: 72, health: "warning" as const, status: "Attenzione" },
+  { id: "p3", name: "Linea AV Napoli-Bari", lot: "Lotto 1C", progress: 45, health: "danger" as const, status: "Critico" },
+  { id: "p4", name: "Linea AV Genova-Ventimiglia", lot: "Lotto Unico", progress: 25, health: "success" as const, status: "In linea" },
+  { id: "p5", name: "Manutenzione Rete Nord", lot: "Programma 2024", progress: 15, health: "info" as const, status: "Monitoraggio" },
+];
+
+export function DashboardScreen() {
   return (
-    <div className="flex items-center justify-between rounded-sm bg-muted px-3 py-2">
-      <span className="text-secondary">{label}</span>
-      <StatusBadge label={value} tone={tone} />
+    <div className="flex min-h-[calc(100vh-5rem)]">
+      <main className="flex-1 p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Dashboard</h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            Panoramica consolidata di tutti i progetti
+          </p>
+        </div>
+
+        <div className="grid grid-cols-5 gap-3">
+          <KpiStatCard
+            detail="Progetti totali"
+            icon={<FolderKanban className="h-5 w-5" />}
+            label="Progetti"
+            value={globalStats.totalProjects.toString()}
+          />
+          <KpiStatCard
+            detail="Budget totale"
+            icon={<Calculator className="h-5 w-5" />}
+            label="Budget"
+            value="€ 91,45M"
+          />
+          <KpiStatCard
+            detail="In corso"
+            icon={<TrendingUp className="h-5 w-5" />}
+            label="Attivi"
+            value={globalStats.activeProjects.toString()}
+          />
+          <KpiStatCard
+            detail="Completati"
+            icon={<CheckCircle2 className="h-5 w-5" />}
+            label="Completati"
+            value={globalStats.completedProjects.toString()}
+          />
+          <KpiStatCard
+            detail="Team"
+            icon={<Users className="h-5 w-5" />}
+            label="Team"
+            value="5"
+          />
+        </div>
+
+        <div className="mt-4 grid grid-cols-[1fr_1fr] gap-4">
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-[var(--text-primary)]">Stato progetti</h2>
+            </div>
+            <div className="mt-4 flex items-center gap-8">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-[var(--success-base)]">{globalStats.activeProjects}</div>
+                <div className="text-xs text-[var(--text-secondary)]">In linea</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-[var(--warning-base)]">{globalStats.atRiskProjects}</div>
+                <div className="text-xs text-[var(--text-secondary)]">A rischio</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-[var(--danger-base)]">{globalStats.criticalProjects}</div>
+                <div className="text-xs text-[var(--text-secondary)]">Critici</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-[var(--info-base)]">{globalStats.completedProjects}</div>
+                <div className="text-xs text-[var(--text-secondary)]">Completati</div>
+              </div>
+            </div>
+          </div>
+
+          <AlertListCard alerts={dashboardAlerts} />
+        </div>
+
+        <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-[var(--text-primary)]">Tutti i progetti</h2>
+            <Button variant="outline" size="sm">
+              Vedi tutti
+            </Button>
+          </div>
+          <table className="mt-4 w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border-subtle)] text-left text-xs text-[var(--text-secondary)]">
+                <th className="pb-3 font-medium">Progetto</th>
+                <th className="pb-3 font-medium">Lotto</th>
+                <th className="pb-3 font-medium">Avanzamento</th>
+                <th className="pb-3 font-medium">Stato</th>
+                <th className="pb-3 font-medium">Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projectList.map((project) => (
+                <tr key={project.id} className="border-b border-[var(--border-subtle)]">
+                  <td className="py-3 font-medium text-[var(--text-primary)]">{project.name}</td>
+                  <td className="py-3 text-[var(--text-secondary)]">{project.lot}</td>
+                  <td className="py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-24 rounded-full bg-[var(--bg-muted)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--success-base)]"
+                          style={{ width: `${project.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-[var(--text-secondary)]">{project.progress}%</span>
+                    </div>
+                  </td>
+                  <td className="py-3">
+                    <StatusBadge
+                      label={project.status}
+                      tone={project.health}
+                    />
+                  </td>
+                  <td className="py-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.dispatchEvent(new CustomEvent("navigate", { detail: "project-detail" }))}
+                    >
+                      Apri
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </main>
     </div>
   );
 }

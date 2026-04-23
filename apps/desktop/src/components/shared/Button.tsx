@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[background,color,box-shadow,transform] duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] disabled:pointer-events-none disabled:opacity-50",
   {
     defaultVariants: {
       size: "default",
@@ -17,10 +17,10 @@ const buttonVariants = cva(
         sm: "h-9 px-3",
       },
       variant: {
-        default: "bg-primary text-primary-foreground shadow-soft hover:bg-primary-hover",
-        ghost: "hover:bg-muted text-secondary hover:text-foreground",
-        outline: "border border-subtle bg-surface text-foreground hover:bg-muted",
-        secondary: "bg-muted text-foreground hover:bg-muted-strong",
+        default: "bg-[var(--accent-primary)] text-white shadow-md hover:bg-[var(--accent-primary-hover)]",
+        ghost: "hover:bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+        outline: "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+        secondary: "bg-[var(--bg-muted)] text-[var(--text-primary)] hover:bg-[var(--bg-muted-strong)]",
       },
     },
   },

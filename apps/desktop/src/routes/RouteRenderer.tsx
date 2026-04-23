@@ -3,6 +3,7 @@ import { AccountingScreen } from "@/features/accounting/AccountingScreen";
 import { DashboardScreen } from "@/features/dashboard/DashboardScreen";
 import { MaterialsScreen } from "@/features/materials/MaterialsScreen";
 import { ProjectsScreen } from "@/features/projects/ProjectsScreen";
+import { ProjectDetailScreen } from "@/features/project-detail/ProjectDetailScreen";
 import { SalScreen } from "@/features/sal/SalScreen";
 import { TariffsScreen } from "@/features/tariffs/TariffsScreen";
 import { PlaceholderScreen } from "@/routes/PlaceholderScreen";
@@ -18,6 +19,10 @@ export function RouteRenderer({ activeRoute }: RouteRendererProps) {
 
   if (activeRoute === "projects") {
     return <ProjectsScreen />;
+  }
+
+  if (activeRoute === "project-detail") {
+    return <ProjectDetailScreen />;
   }
 
   if (activeRoute === "sal") {
