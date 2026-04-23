@@ -17,10 +17,14 @@ const buttonVariants = cva(
         sm: "h-9 px-3",
       },
       variant: {
-        default: "bg-[var(--accent-primary)] text-white shadow-md hover:bg-[var(--accent-primary-hover)]",
-        ghost: "hover:bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-        outline: "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
-        secondary: "bg-[var(--bg-muted)] text-[var(--text-primary)] hover:bg-[var(--bg-muted-strong)]",
+        default:
+          "bg-[var(--accent-primary)] text-white shadow-md hover:bg-[var(--accent-primary-hover)]",
+        ghost:
+          "hover:bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+        outline:
+          "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+        secondary:
+          "bg-[var(--bg-muted)] text-[var(--text-primary)] hover:bg-[var(--bg-muted-strong)]",
       },
     },
   },

@@ -44,8 +44,7 @@ export function clearPendingReleaseNotes() {
 }
 
 export function usePendingReleaseNotes() {
-  const [pendingReleaseNotes, setPendingReleaseNotes] =
-    useState<PendingReleaseNotes | null>(null);
+  const [pendingReleaseNotes, setPendingReleaseNotes] = useState<PendingReleaseNotes | null>(null);
 
   useEffect(() => {
     setPendingReleaseNotes(loadPendingReleaseNotes());

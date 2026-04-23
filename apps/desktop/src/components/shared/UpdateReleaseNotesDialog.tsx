@@ -18,6 +18,16 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
         .replace(/^\*\s*/, "• "),
     )
     .filter((line) => line.trim().length > 0);
+  const lineOccurrences = new Map<string, number>();
+  const renderedLines = lines.map((line) => {
+    const occurrence = lineOccurrences.get(line) ?? 0;
+    lineOccurrences.set(line, occurrence + 1);
+
+    return {
+      key: occurrence === 0 ? line : `${line}-${occurrence}`,
+      line,
+    };
+  });
 
   return (
     <div
@@ -54,8 +64,8 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
             <div className="text-sm font-semibold text-[var(--text-primary)]">Patch notes</div>
             <div className="mt-2 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
               {lines.length > 0 ? (
-                lines.map((line, index) => (
-                  <p key={`${line}-${index}`} className="whitespace-pre-wrap">
+                renderedLines.map(({ key, line }) => (
+                  <p key={key} className="whitespace-pre-wrap">
                     {line}
                   </p>
                 ))

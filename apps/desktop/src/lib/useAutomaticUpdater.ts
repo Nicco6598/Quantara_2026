@@ -45,14 +45,10 @@ export function useAutomaticUpdater() {
         await update.downloadAndInstall((event) => {
           switch (event.event) {
             case "Started":
-              console.info(
-                `Update download started: ${event.data.contentLength} bytes.`,
-              );
+              console.info(`Update download started: ${event.data.contentLength} bytes.`);
               break;
             case "Progress":
-              console.info(
-                `Update download progress: ${event.data.chunkLength} bytes received.`,
-              );
+              console.info(`Update download progress: ${event.data.chunkLength} bytes received.`);
               break;
             case "Finished":
               console.info("Update download finished.");

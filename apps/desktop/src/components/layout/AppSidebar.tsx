@@ -70,11 +70,7 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-base)]">
       <SidebarHeader />
       <SidebarProjectCard project={activeProject} />
-      <SidebarNav
-        activeRoute={activeRoute}
-        items={navItems}
-        onRouteChange={onRouteChange}
-      />
+      <SidebarNav activeRoute={activeRoute} items={navItems} onRouteChange={onRouteChange} />
       <div className="mt-auto flex flex-col gap-2 border-t border-[var(--border-subtle)] p-4">
         <SidebarUserCard />
         <SidebarBottomNav
@@ -142,7 +138,7 @@ function SidebarProjectCard({ project }: SidebarProjectCardProps) {
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold uppercase",
-            statusColor
+            statusColor,
           )}
         >
           <TrendingUp className="h-3 w-3" />
@@ -202,7 +198,7 @@ function NavItemComponent({ activeRoute, item, onRouteChange }: NavItemComponent
         "group flex h-10 w-full items-center justify-between rounded-md px-3 text-sm font-medium transition-all duration-150",
         isActive
           ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)]"
-          : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+          : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
       )}
       onClick={() => onRouteChange(item.route)}
       type="button"
@@ -213,7 +209,7 @@ function NavItemComponent({ activeRoute, item, onRouteChange }: NavItemComponent
             "h-4 w-4",
             isActive
               ? "text-[var(--sidebar-active-text)]"
-              : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
+              : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]",
           )}
         />
         {item.label}
@@ -224,7 +220,7 @@ function NavItemComponent({ activeRoute, item, onRouteChange }: NavItemComponent
             "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold",
             isActive
               ? "bg-[var(--accent-primary)] text-white"
-              : "bg-[var(--bg-muted)] text-[var(--text-secondary)]"
+              : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
           )}
         >
           {item.badge}

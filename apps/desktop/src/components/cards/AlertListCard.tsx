@@ -45,7 +45,9 @@ export function AlertListCard({ alerts }: AlertListCardProps) {
                   <Icon className="size-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-[var(--text-primary)]">{alert.title}</div>
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">
+                    {alert.title}
+                  </div>
                   <div className="text-xs text-[var(--text-secondary)]">{alert.trace}</div>
                 </div>
               </div>

@@ -35,7 +35,9 @@ export function ForecastCard({ cpi, endDate, impact }: ForecastCardProps) {
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">Forecast di Progetto</h2>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">Andamento CPI e proiezione finale</p>
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">
+            Andamento CPI e proiezione finale
+          </p>
         </div>
         <div className="flex items-center gap-2 rounded-md bg-[var(--bg-muted)] px-3 py-1.5">
           <span className="text-xs font-medium text-[var(--text-secondary)]">Fine stimata:</span>
@@ -45,7 +47,13 @@ export function ForecastCard({ cpi, endDate, impact }: ForecastCardProps) {
 
       <div className="mt-4">
         <div className="relative h-28">
-          <svg className="h-full w-full" viewBox="0 0 320 90">
+          <svg
+            aria-label="Grafico dell'andamento CPI degli ultimi mesi"
+            className="h-full w-full"
+            role="img"
+            viewBox="0 0 320 90"
+          >
+            <title>Grafico dell'andamento CPI degli ultimi mesi</title>
             <defs>
               <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--color-info-500)" stopOpacity="0.25" />
@@ -86,10 +94,10 @@ export function ForecastCard({ cpi, endDate, impact }: ForecastCardProps) {
               strokeLinejoin="round"
             />
 
-            {history.map((h, i) => (
-              <g key={i}>
+            {history.map((h, index) => (
+              <g key={h.month}>
                 <circle
-                  cx={i * 70 + 20}
+                  cx={index * 70 + 20}
                   cy={getY(h.value)}
                   r="5"
                   fill="var(--color-neutral-0)"
@@ -97,7 +105,7 @@ export function ForecastCard({ cpi, endDate, impact }: ForecastCardProps) {
                   strokeWidth="2"
                 />
                 <text
-                  x={i * 70 + 20}
+                  x={index * 70 + 20}
                   y="85"
                   fontSize="8"
                   fill="var(--color-neutral-500)"
@@ -111,21 +119,16 @@ export function ForecastCard({ cpi, endDate, impact }: ForecastCardProps) {
 
           <div className="absolute right-0 top-0 flex flex-col items-end">
             <span className="text-3xl font-bold text-[var(--text-primary)]">{cpi}</span>
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">CPI</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+              CPI
+            </span>
           </div>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
-        <MetricPill
-          label="CPI"
-          value={cpi}
-          status={cpiStatus}
-        />
-        <MetricPill
-          label="Fine prevista"
-          value={endDate}
-        />
+        <MetricPill label="CPI" value={cpi} status={cpiStatus} />
+        <MetricPill label="Fine prevista" value={endDate} />
         <MetricPill
           label="Variazione"
           value={impact}
@@ -155,7 +158,7 @@ function MetricPill({
     <div
       className={cn(
         "rounded-md px-3 py-2.5",
-        status ? statusStyles[status] : "bg-[var(--bg-muted)] text-[var(--text-primary)]"
+        status ? statusStyles[status] : "bg-[var(--bg-muted)] text-[var(--text-primary)]",
       )}
     >
       <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">

@@ -46,7 +46,9 @@ export function BudgetDistributionCard({ categories }: BudgetDistributionCardPro
                 <span className="truncate text-[var(--text-secondary)]">{category.label}</span>
               </div>
               <div className="text-right">
-                <div className="font-semibold text-[var(--text-primary)]">{category.percent.toFixed(1)}%</div>
+                <div className="font-semibold text-[var(--text-primary)]">
+                  {category.percent.toFixed(1)}%
+                </div>
                 <div className="text-xs text-[var(--text-secondary)]">
                   {formatMoney({ amount: category.amount, currency: "EUR" })}
                 </div>

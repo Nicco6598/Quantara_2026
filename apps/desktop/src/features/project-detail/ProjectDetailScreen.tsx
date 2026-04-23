@@ -1,4 +1,12 @@
-import { BookOpen, Calculator, CheckCircle2, ChevronRight, MapPin, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  BookOpen,
+  Calculator,
+  CheckCircle2,
+  ChevronRight,
+  MapPin,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import { ForecastCard } from "@/components/cards/ForecastCard";
 import { KpiStatCard } from "@/components/cards/KpiStatCard";
 import { MapCard } from "@/components/cards/MapCard";
@@ -6,10 +14,7 @@ import { TimelineCard } from "@/components/cards/TimelineCard";
 import { Button } from "@/components/shared/Button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { formatMoney } from "@/lib/formatters";
-import {
-  siteWaypoints,
-  timelineLanes,
-} from "@/features/dashboard/demo-data";
+import { siteWaypoints, timelineLanes } from "@/features/dashboard/demo-data";
 
 const projectData = {
   name: "Linea AV/AC Milano-Verona",
@@ -100,7 +105,13 @@ export function ProjectDetailScreen() {
           />
           <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 flex flex-col items-center justify-center">
             <div className="relative size-20 -mt-2">
-              <svg className="size-full -rotate-90" viewBox="0 0 36 36">
+              <svg
+                aria-label="Indicatore circolare del progresso del progetto"
+                className="size-full -rotate-90"
+                role="img"
+                viewBox="0 0 36 36"
+              >
+                <title>Indicatore circolare del progresso del progetto</title>
                 <circle
                   cx="18"
                   cy="18"
@@ -130,7 +141,11 @@ export function ProjectDetailScreen() {
 
         <div className="mt-4 grid grid-cols-[1fr_1fr] gap-4">
           <TimelineCard lanes={timelineLanes} />
-          <ForecastCard cpi={projectData.cpi} endDate={projectData.endDate} impact={projectData.forecastImpact} />
+          <ForecastCard
+            cpi={projectData.cpi}
+            endDate={projectData.endDate}
+            impact={projectData.forecastImpact}
+          />
         </div>
 
         <div className="mt-4 grid grid-cols-[1.2fr_1fr_1fr] gap-4">
@@ -145,13 +160,23 @@ export function ProjectDetailScreen() {
                 { label: "Armamento", date: "15 Giu 2024", status: "active" as const },
                 { label: "Elettrificazione", date: "15 Ago 2024", status: "planned" as const },
                 { label: "Collaudo", date: "12 Set 2024", status: "planned" as const },
-              ].map((milestone, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    milestone.status === "complete" ? "bg-[var(--success-base)]" :
-                    milestone.status === "active" ? "bg-[var(--info-base)]" : "bg-[var(--border-subtle)]"
-                  }`} />
-                  <span className="flex-1 text-sm text-[var(--text-primary)]">{milestone.label}</span>
+              ].map((milestone) => (
+                <div
+                  key={`${milestone.label}-${milestone.date}`}
+                  className="flex items-center gap-3"
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      milestone.status === "complete"
+                        ? "bg-[var(--success-base)]"
+                        : milestone.status === "active"
+                          ? "bg-[var(--info-base)]"
+                          : "bg-[var(--border-subtle)]"
+                    }`}
+                  />
+                  <span className="flex-1 text-sm text-[var(--text-primary)]">
+                    {milestone.label}
+                  </span>
                   <span className="text-xs text-[var(--text-secondary)]">{milestone.date}</span>
                 </div>
               ))}
@@ -169,7 +194,9 @@ export function ProjectDetailScreen() {
                     {member.initials}
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-[var(--text-primary)]">{member.name}</div>
+                    <div className="text-sm font-medium text-[var(--text-primary)]">
+                      {member.name}
+                    </div>
                     <div className="text-xs text-[var(--text-secondary)]">{member.role}</div>
                   </div>
                 </div>
@@ -181,7 +208,9 @@ export function ProjectDetailScreen() {
         <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-[var(--text-primary)]">Attivita recenti</h3>
-            <Button variant="ghost" size="sm">Vedi tutte</Button>
+            <Button variant="ghost" size="sm">
+              Vedi tutte
+            </Button>
           </div>
           <div className="mt-3 space-y-2">
             {recentActivities.map((activity) => (
@@ -215,25 +244,43 @@ export function ProjectDetailScreen() {
                 <td className="py-3 font-medium">SAL 8</td>
                 <td>01 - 30 Apr 2024</td>
                 <td className="font-medium">{formatMoney({ amount: 2156800, currency: "EUR" })}</td>
-                <td><StatusBadge label="Approvata" tone="success" /></td>
+                <td>
+                  <StatusBadge label="Approvata" tone="success" />
+                </td>
                 <td>20/05/2024</td>
-                <td><Button variant="ghost" size="sm">Visualizza</Button></td>
+                <td>
+                  <Button variant="ghost" size="sm">
+                    Visualizza
+                  </Button>
+                </td>
               </tr>
               <tr className="border-b border-[var(--border-subtle)]">
                 <td className="py-3 font-medium">SAL 7</td>
                 <td>16 - 31 Mar 2024</td>
                 <td className="font-medium">{formatMoney({ amount: 1785600, currency: "EUR" })}</td>
-                <td><StatusBadge label="Approvata" tone="success" /></td>
+                <td>
+                  <StatusBadge label="Approvata" tone="success" />
+                </td>
                 <td>15/04/2024</td>
-                <td><Button variant="ghost" size="sm">Visualizza</Button></td>
+                <td>
+                  <Button variant="ghost" size="sm">
+                    Visualizza
+                  </Button>
+                </td>
               </tr>
               <tr>
                 <td className="py-3 font-medium">SAL 6</td>
                 <td>01 - 15 Mar 2024</td>
                 <td className="font-medium">{formatMoney({ amount: 1245000, currency: "EUR" })}</td>
-                <td><StatusBadge label="Approvata" tone="success" /></td>
+                <td>
+                  <StatusBadge label="Approvata" tone="success" />
+                </td>
                 <td>18/03/2024</td>
-                <td><Button variant="ghost" size="sm">Visualizza</Button></td>
+                <td>
+                  <Button variant="ghost" size="sm">
+                    Visualizza
+                  </Button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -245,7 +292,9 @@ export function ProjectDetailScreen() {
         <div className="mt-4 space-y-4">
           <div>
             <span className="text-xs text-[var(--text-secondary)]">Inizio</span>
-            <p className="text-sm font-medium text-[var(--text-primary)]">{projectData.startDate}</p>
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {projectData.startDate}
+            </p>
           </div>
           <div>
             <span className="text-xs text-[var(--text-secondary)]">Fine previsto</span>
@@ -253,7 +302,9 @@ export function ProjectDetailScreen() {
           </div>
           <div>
             <span className="text-xs text-[var(--text-secondary)]">Ultimo aggiornamento</span>
-            <p className="text-sm font-medium text-[var(--text-primary)]">{projectData.lastUpdate}</p>
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {projectData.lastUpdate}
+            </p>
           </div>
           <div className="pt-4 border-t border-[var(--border-subtle)]">
             <span className="text-xs text-[var(--text-secondary)]">CPI</span>

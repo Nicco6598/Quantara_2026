@@ -43,7 +43,7 @@ export function MapCard({ waypoints }: MapCardProps) {
                       ? "border-[var(--info-base)] bg-[var(--info-base)] text-white"
                       : waypoint.status === "late"
                         ? "border-[var(--danger-base)] bg-[var(--danger-base)] text-white"
-                        : "border-[var(--text-secondary)] bg-[var(--surface-base)] text-[var(--text-secondary)]"
+                        : "border-[var(--text-secondary)] bg-[var(--surface-base)] text-[var(--text-secondary)]",
                 )}
                 style={{
                   left: `${pos.x}%`,

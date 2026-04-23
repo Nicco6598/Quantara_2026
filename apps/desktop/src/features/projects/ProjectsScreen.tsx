@@ -295,7 +295,15 @@ function ProjectTable() {
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: 'project-detail' }))}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new CustomEvent("navigate", { detail: "project-detail" }),
+                      )
+                    }
+                  >
                     Apri progetto
                   </Button>
                   <Button aria-label="Azioni progetto" size="icon" variant="ghost">

@@ -17,11 +17,46 @@ const globalStats = {
 };
 
 const projectList = [
-  { id: "p1", name: "Linea AV/AC Milano-Verona", lot: "Lotto 3A", progress: 68, health: "success" as const, status: "In linea" },
-  { id: "p2", name: "Nodo di Firenze AV", lot: "Lotto 2B", progress: 72, health: "warning" as const, status: "Attenzione" },
-  { id: "p3", name: "Linea AV Napoli-Bari", lot: "Lotto 1C", progress: 45, health: "danger" as const, status: "Critico" },
-  { id: "p4", name: "Linea AV Genova-Ventimiglia", lot: "Lotto Unico", progress: 25, health: "success" as const, status: "In linea" },
-  { id: "p5", name: "Manutenzione Rete Nord", lot: "Programma 2024", progress: 15, health: "info" as const, status: "Monitoraggio" },
+  {
+    id: "p1",
+    name: "Linea AV/AC Milano-Verona",
+    lot: "Lotto 3A",
+    progress: 68,
+    health: "success" as const,
+    status: "In linea",
+  },
+  {
+    id: "p2",
+    name: "Nodo di Firenze AV",
+    lot: "Lotto 2B",
+    progress: 72,
+    health: "warning" as const,
+    status: "Attenzione",
+  },
+  {
+    id: "p3",
+    name: "Linea AV Napoli-Bari",
+    lot: "Lotto 1C",
+    progress: 45,
+    health: "danger" as const,
+    status: "Critico",
+  },
+  {
+    id: "p4",
+    name: "Linea AV Genova-Ventimiglia",
+    lot: "Lotto Unico",
+    progress: 25,
+    health: "success" as const,
+    status: "In linea",
+  },
+  {
+    id: "p5",
+    name: "Manutenzione Rete Nord",
+    lot: "Programma 2024",
+    progress: 15,
+    health: "info" as const,
+    status: "Monitoraggio",
+  },
 ];
 
 export function DashboardScreen() {
@@ -60,12 +95,7 @@ export function DashboardScreen() {
             label="Completati"
             value={globalStats.completedProjects.toString()}
           />
-          <KpiStatCard
-            detail="Team"
-            icon={<Users className="h-5 w-5" />}
-            label="Team"
-            value="5"
-          />
+          <KpiStatCard detail="Team" icon={<Users className="h-5 w-5" />} label="Team" value="5" />
         </div>
 
         <div className="mt-4 grid grid-cols-[1fr_1fr] gap-4">
@@ -75,19 +105,27 @@ export function DashboardScreen() {
             </div>
             <div className="mt-4 flex items-center gap-8">
               <div className="text-center">
-                <div className="text-4xl font-bold text-[var(--success-base)]">{globalStats.activeProjects}</div>
+                <div className="text-4xl font-bold text-[var(--success-base)]">
+                  {globalStats.activeProjects}
+                </div>
                 <div className="text-xs text-[var(--text-secondary)]">In linea</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-[var(--warning-base)]">{globalStats.atRiskProjects}</div>
+                <div className="text-4xl font-bold text-[var(--warning-base)]">
+                  {globalStats.atRiskProjects}
+                </div>
                 <div className="text-xs text-[var(--text-secondary)]">A rischio</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-[var(--danger-base)]">{globalStats.criticalProjects}</div>
+                <div className="text-4xl font-bold text-[var(--danger-base)]">
+                  {globalStats.criticalProjects}
+                </div>
                 <div className="text-xs text-[var(--text-secondary)]">Critici</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-[var(--info-base)]">{globalStats.completedProjects}</div>
+                <div className="text-4xl font-bold text-[var(--info-base)]">
+                  {globalStats.completedProjects}
+                </div>
                 <div className="text-xs text-[var(--text-secondary)]">Completati</div>
               </div>
             </div>
@@ -126,20 +164,23 @@ export function DashboardScreen() {
                           style={{ width: `${project.progress}%` }}
                         />
                       </div>
-                      <span className="text-xs text-[var(--text-secondary)]">{project.progress}%</span>
+                      <span className="text-xs text-[var(--text-secondary)]">
+                        {project.progress}%
+                      </span>
                     </div>
                   </td>
                   <td className="py-3">
-                    <StatusBadge
-                      label={project.status}
-                      tone={project.health}
-                    />
+                    <StatusBadge label={project.status} tone={project.health} />
                   </td>
                   <td className="py-3">
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => window.dispatchEvent(new CustomEvent("navigate", { detail: "project-detail" }))}
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent("navigate", { detail: "project-detail" }),
+                        )
+                      }
                     >
                       Apri
                     </Button>

@@ -46,7 +46,9 @@ export function TimelineCard({ lanes }: TimelineCardProps) {
         <div className="flex min-w-[600px] flex-col gap-3">
           {lanes.map((lane) => (
             <div key={lane.id} className="flex items-center gap-4">
-              <span className="w-40 truncate text-sm font-medium text-[var(--text-primary)]">{lane.label}</span>
+              <span className="w-40 truncate text-sm font-medium text-[var(--text-primary)]">
+                {lane.label}
+              </span>
               <div className="flex-1">
                 <div className="h-3 w-full overflow-hidden rounded-full bg-[var(--bg-muted)]">
                   <div
@@ -54,7 +56,7 @@ export function TimelineCard({ lanes }: TimelineCardProps) {
                       "h-full rounded-full transition-all duration-500",
                       lane.status === "complete" && "bg-[var(--success-base)]",
                       lane.status === "active" && "bg-[var(--info-base)]",
-                      lane.status === "planned" && "bg-[var(--warning-base)]"
+                      lane.status === "planned" && "bg-[var(--warning-base)]",
                     )}
                     style={{
                       width: `${lane.endPercent - lane.startPercent}%`,
@@ -86,21 +88,13 @@ export function TimelineCard({ lanes }: TimelineCardProps) {
   );
 }
 
-function Milestone({
-  date,
-  label,
-  active,
-}: {
-  date: string;
-  label: string;
-  active?: boolean;
-}) {
+function Milestone({ date, label, active }: { date: string; label: string; active?: boolean }) {
   return (
     <div className="flex flex-col items-center">
       <div
         className={cn(
           "h-3 w-3 rounded-full border-2 bg-[var(--surface-base)]",
-          active ? "border-[var(--info-base)]" : "border-[var(--border-subtle)]"
+          active ? "border-[var(--info-base)]" : "border-[var(--border-subtle)]",
         )}
       />
       <span className="mt-1.5 text-xs font-semibold text-[var(--text-primary)]">{label}</span>

@@ -85,9 +85,7 @@ const pageActionsMap: Record<QuantaraRoute, PageAction[]> = {
     { icon: Filter, label: "Filtri", variant: "secondary", hasDropdown: true },
     { icon: Plus, label: "Nuovo Progetto", variant: "primary" },
   ],
-  "project-detail": [
-    { icon: Download, label: "Esporta", variant: "secondary" },
-  ],
+  "project-detail": [{ icon: Download, label: "Esporta", variant: "secondary" }],
   sal: [
     { icon: Filter, label: "Filtri", variant: "secondary", hasDropdown: true },
     { icon: Plus, label: "Nuova SAL", variant: "primary" },
@@ -158,13 +156,14 @@ function PageActions({ actions }: PageActionsProps) {
 
   return (
     <nav className="flex items-center gap-2 border-l border-[var(--border-subtle)] pl-4">
-      {actions.map((action, index) => (
+      {actions.map((action) => (
         <Button
-          key={index}
+          key={`${action.label}-${action.variant}`}
           variant={action.variant === "primary" ? "default" : "outline"}
           className={cn(
             "flex items-center gap-1.5",
-            action.variant === "ghost" && "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            action.variant === "ghost" &&
+              "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
           )}
         >
           <action.icon className="h-4 w-4" />
@@ -231,7 +230,7 @@ function IconButton({ icon: Icon, label, badge, onClick }: IconButtonProps) {
     <button
       className={cn(
         "group relative flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-[var(--text-secondary)] transition-all hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-        badge != null && "border border-[var(--border-subtle)]"
+        badge != null && "border border-[var(--border-subtle)]",
       )}
       onClick={onClick}
       title={label}

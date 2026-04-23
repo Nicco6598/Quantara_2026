@@ -24,7 +24,9 @@ export function OperationsMetricStrip({ metrics }: OperationsMetricStripProps) {
               </div>
               <StatusBadge label={metric.delta} tone={metric.tone} />
             </div>
-            <div className="mt-3 text-2xl font-semibold text-[var(--text-primary)]">{metric.value}</div>
+            <div className="mt-3 text-2xl font-semibold text-[var(--text-primary)]">
+              {metric.value}
+            </div>
             <div className="mt-1 text-xs text-[var(--text-secondary)]">{metric.label}</div>
           </div>
         );
