@@ -20,7 +20,7 @@ Status: in progress.
 
 ## Phase C - Projects, SAL and Contabilita
 
-Status: planned.
+Status: in progress.
 
 - Contract creation flow.
 - Tariff insertion flow.

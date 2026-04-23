@@ -19,5 +19,5 @@
 
 ## Planned parity work
 
-- Phase C: add SAL detail view with tabs, workflow, accounting rows and document panels.
+- Phase C: SAL route is now a generic SAL overview/list; dedicated SAL detail stays for a later route.
 - Phase D: add tariff and material split-view screens.

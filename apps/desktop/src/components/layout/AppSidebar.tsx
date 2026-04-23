@@ -28,7 +28,7 @@ type AppSidebarProps = {
 
 export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
   return (
-    <aside className="flex min-h-screen w-[264px] shrink-0 flex-col border-r border-subtle bg-sidebar p-4">
+    <aside className="flex h-screen w-[264px] shrink-0 flex-col border-r border-subtle bg-sidebar p-4">
       <div className="flex items-center gap-3 px-2 py-2">
         <div className="size-8 rounded-md bg-primary" />
         <div>

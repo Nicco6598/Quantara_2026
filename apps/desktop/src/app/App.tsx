@@ -15,10 +15,10 @@ export function App() {
   }, [themeMode]);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <AppSidebar activeRoute={activeRoute} onRouteChange={setActiveRoute} />
-      <div className="min-w-0 flex-1">
-        <TopToolbar onToggleTheme={toggleTheme} themeMode={themeMode} />
+      <div className="min-w-0 flex-1 overflow-y-auto">
+        <TopToolbar activeRoute={activeRoute} onToggleTheme={toggleTheme} themeMode={themeMode} />
         <RouteRenderer activeRoute={activeRoute} />
       </div>
     </div>
