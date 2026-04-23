@@ -1,8 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { UpdateExperienceDialog } from "@/components/shared/UpdateExperienceDialog";
 import { TopToolbar } from "@/components/layout/TopToolbar";
 import { UpdateReleaseNotesDialog } from "@/components/shared/UpdateReleaseNotesDialog";
 import { RouteRenderer } from "@/routes/RouteRenderer";
+import {
+  APP_UPDATE_AVAILABLE_EVENT,
+  dismissPendingAppUpdate,
+  installPendingAppUpdate,
+  type AvailableAppUpdate,
+  type UpdateInstallState,
+} from "@/lib/appUpdater";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAppStore, type QuantaraRoute } from "@/store/app-store";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
@@ -16,9 +24,16 @@ export function App() {
   const navigateForward = useAppStore((state) => state.navigateForward);
   const setActiveRoute = useAppStore((state) => state.setActiveRoute);
   const motionMode = useAppStore((state) => state.motionMode);
+  const showReleaseNotesAfterUpdate = useAppStore((state) => state.showReleaseNotesAfterUpdate);
   const themeMode = useAppStore((state) => state.themeMode);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
   const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
+  const [availableUpdate, setAvailableUpdate] = useState<AvailableAppUpdate | null>(null);
+  const [installState, setInstallState] = useState<
+    UpdateInstallState | { message: string; phase: "error" } | { phase: "idle" }
+  >({
+    phase: "idle",
+  });
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
@@ -38,8 +53,64 @@ export function App() {
     return () => window.removeEventListener("navigate", handleNavigate);
   }, [setActiveRoute]);
 
+  useEffect(() => {
+    const handleUpdateAvailable = (event: Event) => {
+      const customEvent = event as CustomEvent<AvailableAppUpdate>;
+      setAvailableUpdate(customEvent.detail);
+      setInstallState({
+        phase: "idle",
+      });
+    };
+
+    window.addEventListener(APP_UPDATE_AVAILABLE_EVENT, handleUpdateAvailable);
+    return () => window.removeEventListener(APP_UPDATE_AVAILABLE_EVENT, handleUpdateAvailable);
+  }, []);
+
+  const handleCloseUpdater = () => {
+    if (installState.phase === "downloading" || installState.phase === "installing") {
+      return;
+    }
+
+    dismissPendingAppUpdate();
+    setAvailableUpdate(null);
+    setInstallState({
+      phase: "idle",
+    });
+  };
+
+  const handleInstallUpdate = async () => {
+    setInstallState({
+      phase: "downloading",
+      downloadedBytes: 0,
+      totalBytes: null,
+    });
+
+    try {
+      await installPendingAppUpdate({
+        onStateChange: setInstallState,
+        showReleaseNotesAfterUpdate,
+      });
+    } catch (error) {
+      setInstallState({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Installazione update non completata correttamente.",
+        phase: "error",
+      });
+    }
+  };
+
   return (
     <div className="relative flex h-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]">
+      {availableUpdate ? (
+        <UpdateExperienceDialog
+          installState={installState}
+          onClose={handleCloseUpdater}
+          onInstall={handleInstallUpdate}
+          update={availableUpdate}
+        />
+      ) : null}
       {pendingReleaseNotes ? (
         <UpdateReleaseNotesDialog
           notes={pendingReleaseNotes}

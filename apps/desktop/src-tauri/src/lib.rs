@@ -7,6 +7,9 @@ mod models;
 mod updater;
 
 pub fn run() {
+    #[cfg(target_os = "windows")]
+    updater::windows_shell::reconcile();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())

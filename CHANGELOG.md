@@ -2,6 +2,12 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.31 - 2026-04-23
+
+- Replace the native updater prompt with a branded in-app release cockpit showing notes, progress and install state.
+- Repair Windows shell identity on startup so updated builds realign Start Menu and desktop shortcut icons with the current executable.
+- Sync desktop release metadata to the new updater flow and release version.
+
 ## 0.1.2 - 2026-04-23
 
 - Fix CI quality gate formatting and lint alignment.

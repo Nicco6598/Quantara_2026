@@ -1,15 +1,20 @@
-import { confirm } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { check } from "@tauri-apps/plugin-updater";
+import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import { storePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 
+export const APP_UPDATE_AVAILABLE_EVENT = "quantara:update-available";
+
+let pendingUpdate: Update | null = null;
+
+export type AvailableAppUpdate = {
+  checkedAt: string;
+  currentVersion: string;
+  notes: string;
+  version: string;
+};
+
 export type UpdateCheckResult =
-  | {
-      checkedAt: string;
-      kind: "available";
-      notes: string;
-      version: string;
-    }
+  | ({ kind: "available" } & AvailableAppUpdate)
   | {
       checkedAt: string;
       kind: "error";
@@ -30,9 +35,18 @@ type RunAppUpdateCheckOptions = {
   showReleaseNotesAfterUpdate?: boolean;
 };
 
+export type UpdateInstallState =
+  | {
+      downloadedBytes: number;
+      phase: "downloading";
+      totalBytes: number | null;
+    }
+  | {
+      phase: "installing";
+    };
+
 export async function runAppUpdateCheck({
   promptForInstall = true,
-  showReleaseNotesAfterUpdate = true,
 }: RunAppUpdateCheckOptions = {}): Promise<UpdateCheckResult> {
   const checkedAt = new Date().toISOString();
 
@@ -54,55 +68,28 @@ export async function runAppUpdateCheck({
       };
     }
 
-    const result = {
+    pendingUpdate = update;
+
+    const result: UpdateCheckResult = {
       checkedAt,
-      kind: "available" as const,
+      currentVersion: update.currentVersion,
+      kind: "available",
       notes: update.body?.trim() ?? "",
       version: update.version,
     };
 
-    if (!promptForInstall) {
-      return result;
+    if (promptForInstall && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent<AvailableAppUpdate>(APP_UPDATE_AVAILABLE_EVENT, {
+          detail: {
+            checkedAt,
+            currentVersion: update.currentVersion,
+            notes: update.body?.trim() ?? "",
+            version: update.version,
+          },
+        }),
+      );
     }
-
-    const confirmed = await confirm(
-      `E disponibile una nuova versione di Quantara (${update.version}). Vuoi installarla ora?`,
-      {
-        cancelLabel: "Dopo",
-        kind: "info",
-        okLabel: "Installa",
-        title: "Aggiornamento Quantara",
-      },
-    );
-
-    if (!confirmed) {
-      return result;
-    }
-
-    await update.downloadAndInstall((event) => {
-      switch (event.event) {
-        case "Started":
-          console.info(`Update download started: ${event.data.contentLength} bytes.`);
-          break;
-        case "Progress":
-          console.info(`Update download progress: ${event.data.chunkLength} bytes received.`);
-          break;
-        case "Finished":
-          console.info("Update download finished.");
-          break;
-      }
-    });
-
-    if (showReleaseNotesAfterUpdate) {
-      storePendingReleaseNotes({
-        body: result.notes,
-        currentVersion: update.currentVersion,
-        installedAt: new Date().toISOString(),
-        version: update.version,
-      });
-    }
-
-    await relaunch();
 
     return result;
   } catch (error) {
@@ -115,4 +102,63 @@ export async function runAppUpdateCheck({
           : "Il controllo aggiornamenti non e andato a buon fine.",
     };
   }
+}
+
+export async function installPendingAppUpdate({
+  onStateChange,
+  showReleaseNotesAfterUpdate = true,
+}: {
+  onStateChange?: (state: UpdateInstallState) => void;
+  showReleaseNotesAfterUpdate?: boolean;
+} = {}) {
+  if (!pendingUpdate) {
+    throw new Error("Nessun aggiornamento pronto per l'installazione.");
+  }
+
+  const update = pendingUpdate;
+  let totalBytes: number | null = null;
+  let downloadedBytes = 0;
+
+  await update.downloadAndInstall((event: DownloadEvent) => {
+    switch (event.event) {
+      case "Started":
+        totalBytes = event.data.contentLength ?? null;
+        downloadedBytes = 0;
+        onStateChange?.({
+          downloadedBytes,
+          phase: "downloading",
+          totalBytes,
+        });
+        break;
+      case "Progress":
+        downloadedBytes += event.data.chunkLength;
+        onStateChange?.({
+          downloadedBytes,
+          phase: "downloading",
+          totalBytes,
+        });
+        break;
+      case "Finished":
+        onStateChange?.({
+          phase: "installing",
+        });
+        break;
+    }
+  });
+
+  if (showReleaseNotesAfterUpdate) {
+    storePendingReleaseNotes({
+      body: update.body?.trim() ?? "",
+      currentVersion: update.currentVersion,
+      installedAt: new Date().toISOString(),
+      version: update.version,
+    });
+  }
+
+  pendingUpdate = null;
+  await relaunch();
+}
+
+export function dismissPendingAppUpdate() {
+  pendingUpdate = null;
 }
