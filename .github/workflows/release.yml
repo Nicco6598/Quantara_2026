@@ -1,0 +1,12 @@
+name: Release Draft
+
+on:
+  workflow_dispatch:
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: test -f CHANGELOG.md
+      - run: test -f .memory/RELEASE_CHECKLIST.md

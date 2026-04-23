@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@quantara/domain-utils": ["../../packages/domain-utils/src/index.ts"],
+      "@quantara/shared-types": ["../../packages/shared-types/src/index.ts"],
+      "@quantara/validation": ["../../packages/validation/src/index.ts"]
+    },
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src",
+    "vite.config.ts",
+    "../../packages/domain-utils/src",
+    "../../packages/shared-types/src"
+  ]
+}

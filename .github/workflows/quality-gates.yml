@@ -1,0 +1,12 @@
+name: Quality Gates
+
+on:
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: test -f .memory/EXECUTION_PHASES.md
+      - run: test -f docs/architecture/overview.md
