@@ -1,6 +1,6 @@
 {
   "name": "@quantara/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +17,9 @@
     "@quantara/ui-tokens": "workspace:*",
     "@radix-ui/react-slot": "1.2.4",
     "@tauri-apps/api": "2.10.1",
+    "@tauri-apps/plugin-dialog": "2.7.0",
+    "@tauri-apps/plugin-process": "2.3.1",
+    "@tauri-apps/plugin-updater": "2.10.1",
     "@tanstack/react-table": "8.21.3",
     "@tailwindcss/vite": "4.2.4",
     "class-variance-authority": "0.7.1",

@@ -1,0 +1,22 @@
+{
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "macOS": {
+      "dmg": {
+        "background": "assets/branding/macos/dmg-background.png",
+        "windowSize": {
+          "width": 800,
+          "height": 600
+        },
+        "appPosition": {
+          "x": 170,
+          "y": 220
+        },
+        "applicationFolderPosition": {
+          "x": 550,
+          "y": 220
+        }
+      }
+    }
+  }
+}

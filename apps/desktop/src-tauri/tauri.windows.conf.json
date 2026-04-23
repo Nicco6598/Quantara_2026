@@ -1,0 +1,26 @@
+{
+  "bundle": {
+    "targets": ["msi", "nsis"],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": true,
+        "headerImage": "assets/branding/windows/header.bmp",
+        "installerIcon": "icons/icon.ico",
+        "languages": ["English", "Italian"],
+        "sidebarImage": "assets/branding/windows/sidebar.bmp"
+      },
+      "wix": {
+        "bannerPath": "assets/branding/windows/banner.bmp",
+        "dialogImagePath": "assets/branding/windows/dialog.bmp",
+        "language": {
+          "en-US": {
+            "localePath": "wix/locales/en-US.wxl"
+          },
+          "it-IT": {
+            "localePath": "wix/locales/it-IT.wxl"
+          }
+        }
+      }
+    }
+  }
+}

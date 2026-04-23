@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "Default Quantara desktop capability",
   "windows": ["main"],
-  "permissions": ["core:default", "opener:default"]
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "opener:default",
+    "process:default",
+    "updater:default"
+  ]
 }

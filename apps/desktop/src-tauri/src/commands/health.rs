@@ -27,6 +27,6 @@ pub fn get_health_snapshot() -> HealthSnapshot {
         latest_patch_notes: format!("{}: {}", patch_notes.version, patch_notes.summary),
         schema_version: CURRENT_SCHEMA_VERSION,
         storage_engine: "sqlite",
-        updater_ready: false,
+        updater_ready: true,
     }
 }
