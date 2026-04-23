@@ -2,6 +2,11 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.2 - 2026-04-23
+
+- Fix CI quality gate formatting and lint alignment.
+- Keep release workflow tied to GitHub tags and updater artifacts.
+
 ## 0.1.1 - 2026-04-23
 
 - Add automatic updater flow with GitHub Releases.
