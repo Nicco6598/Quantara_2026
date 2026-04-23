@@ -29,3 +29,13 @@
   - `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml`
 - Dev server started at `http://127.0.0.1:1420` and browser verification found rendered
   content, expected key UI elements and no console errors.
+
+## 2026-04-23 - Phase B Dashboard
+
+- Added modular dashboard cards for alerts, forecast, budget distribution, map, timeline and
+  operations metrics.
+- Updated dashboard demo data with typed alert, budget, map, timeline and operations datasets.
+- Updated E2E smoke coverage to assert Phase B dashboard widgets render.
+- Browser checks:
+  - light mode dashboard has no console errors and no horizontal overflow at 1440x900;
+  - dark mode toggle renders Phase B widgets with no console errors and no horizontal overflow.

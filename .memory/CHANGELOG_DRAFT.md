@@ -9,3 +9,5 @@
 - Add SQLite migration baseline and Tauri command skeleton.
 - Add CI, tests and release readiness placeholders.
 - Add Playwright smoke configuration and verified browser render.
+- Add Phase B dashboard widgets for alerts, forecast, budget distribution, map, timeline and site
+  operations metrics.

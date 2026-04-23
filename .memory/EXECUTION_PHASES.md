@@ -2,37 +2,35 @@
 
 ## Current Phase
 
-Phase A - Foundations.
+Phase B - Dashboard System.
 
 ## Objectives
 
-- Scaffold repository and workspace.
-- Add desktop shell with sidebar, topbar, routing and base store.
-- Add centralized token system with light and dark themes.
-- Add shared contracts and initial accounting domain logic.
-- Add Tauri/Rust skeleton, migrations and CI minimum.
-- Initialize persistent memory files.
+- Expand the project dashboard with dense operational widgets.
+- Preserve legacy visual patterns: KPI row, health, forecast, alerts, map, timeline and data table.
+- Keep widgets modular and token-driven.
+- Verify light/dark theme behavior and no horizontal overflow with the right inspector open.
 
 ## Deliverables
 
-- pnpm workspace with app and packages.
-- Token source of truth in `packages/ui-tokens/src/tokens.css`.
-- React shell aligned with legacy visual patterns.
-- Accounting domain utilities for tariff priority and SAL totals.
-- SQLite migration baseline.
-- CI and test skeletons.
+- `AlertListCard`
+- `ForecastCard`
+- `BudgetDistributionCard`
+- `MapCard`
+- `TimelineCard`
+- `OperationsMetricStrip`
+- Updated E2E smoke coverage for Phase B widgets.
 
 ## Dependencies
 
-- Node 24.11.0 and pnpm 10.33.0.
-- Rust/Cargo toolchain compatible with Tauri 2.
-- Future phases require real import/export fixtures and client sample data.
+- Phase A shell and token system.
+- Legacy screenshots for dashboard parity.
+- Real project datasets are still needed before replacing demo data.
 
 ## Status
 
-Phase A foundation bootstrap complete for this session. The repository scaffold, shell UI,
-centralized tokens, accounting domain baseline, Tauri skeleton, CI files and tests are in place and
-verified.
+Phase B dashboard expansion in progress. Core dashboard widgets are implemented and visually
+checked at 1440x900 with the right inspector open.
 
 ## Decisions Taken
 
@@ -40,6 +38,9 @@ verified.
 - Token file is the only palette and theme source of truth.
 - OS rows are included in SAL but excluded from tender/subcontract discounts.
 - AI/OCR import is deferred until Phase C/D service boundaries are ready.
+- Dashboard widgets remain presentation-level components fed by typed dashboard data.
+- The dashboard uses two-column composition under the fixed right inspector to avoid cramped
+  three-column layouts on common desktop widths.
 
 ## Blockers
 
@@ -47,7 +48,7 @@ verified.
 
 ## Next Steps
 
-- Phase B: expand dashboard widgets for alerts, forecast, timeline, map and charts.
+- Finish Phase B with any remaining chart/detail polish requested after review.
 - Phase C preparation: design contract, tariff insertion and SAL accounting screens from the
   contabilità scaletta.
 - Add real import/export fixtures before implementing Excel/PDF pipelines.

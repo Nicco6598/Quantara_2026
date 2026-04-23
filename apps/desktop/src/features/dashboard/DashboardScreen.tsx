@@ -1,13 +1,27 @@
 import { BookOpen, Calculator, CheckCircle2, TrendingUp } from "lucide-react";
 import { summarizeSal } from "@quantara/domain-utils";
+import { AlertListCard } from "@/components/cards/AlertListCard";
+import { BudgetDistributionCard } from "@/components/cards/BudgetDistributionCard";
+import { ForecastCard } from "@/components/cards/ForecastCard";
 import { KpiStatCard } from "@/components/cards/KpiStatCard";
+import { MapCard } from "@/components/cards/MapCard";
+import { OperationsMetricStrip } from "@/components/cards/OperationsMetricStrip";
+import { TimelineCard } from "@/components/cards/TimelineCard";
 import { WorkflowStepper } from "@/components/filters/WorkflowStepper";
 import { SplitDetailPanel } from "@/components/panels/SplitDetailPanel";
 import { DenseDataTable } from "@/components/tables/DenseDataTable";
-import { DeltaBadge } from "@/components/shared/DeltaBadge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { formatMoney } from "@/lib/formatters";
-import { activeContract, currentSal, projectRows } from "./demo-data";
+import {
+  activeContract,
+  budgetCategories,
+  currentSal,
+  dashboardAlerts,
+  operationsMetrics,
+  projectRows,
+  siteWaypoints,
+  timelineLanes,
+} from "./demo-data";
 
 export function DashboardScreen() {
   const salSummary = summarizeSal(currentSal);
@@ -42,7 +56,7 @@ export function DashboardScreen() {
           />
         </div>
 
-        <div className="mt-4 grid grid-cols-[1fr_1.2fr] gap-4">
+        <div className="mt-4 grid grid-cols-[1fr_1.35fr] gap-4">
           <section className="rounded-md border border-subtle bg-card p-4 shadow-soft">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -61,24 +75,27 @@ export function DashboardScreen() {
             </div>
           </section>
 
-          <section className="rounded-md border border-subtle bg-card p-4 shadow-soft">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-secondary">Forecast di progetto</p>
-                <h2 className="mt-2 text-3xl font-semibold text-foreground">12 Set 2025</h2>
-              </div>
-              <DeltaBadge trend="down" value="-5,3%" />
-            </div>
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              <Metric label="Fine prevista" value="12 Set 2025" />
-              <Metric label="CPI" value="0,94" />
-              <Metric label="Scostamento" value="-1,3M" />
-            </div>
-          </section>
+          <ForecastCard cpi="0,94" endDate="12 Set 2025" impact="-1,3M" />
+        </div>
+
+        <div className="mt-4 grid grid-cols-[1.1fr_1fr] gap-4">
+          <AlertListCard alerts={dashboardAlerts} />
+          <BudgetDistributionCard categories={budgetCategories} />
+        </div>
+
+        <div className="mt-4">
+          <MapCard waypoints={siteWaypoints} />
+        </div>
+
+        <div className="mt-4">
+          <OperationsMetricStrip metrics={operationsMetrics} />
         </div>
 
         <div className="mt-4">
           <WorkflowStepper />
+        </div>
+        <div className="mt-4">
+          <TimelineCard lanes={timelineLanes} />
         </div>
         <div className="mt-4">
           <DenseDataTable rows={projectRows} />
@@ -102,20 +119,6 @@ function StatusLine({ danger, label, value, warning }: StatusLineProps) {
     <div className="flex items-center justify-between rounded-sm bg-muted px-3 py-2">
       <span className="text-secondary">{label}</span>
       <StatusBadge label={value} tone={tone} />
-    </div>
-  );
-}
-
-type MetricProps = {
-  label: string;
-  value: string;
-};
-
-function Metric({ label, value }: MetricProps) {
-  return (
-    <div className="rounded-md bg-muted p-3">
-      <p className="text-xs text-secondary">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
     </div>
   );
 }

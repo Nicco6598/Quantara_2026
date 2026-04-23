@@ -121,6 +121,118 @@ export const projectRows = [
   },
 ];
 
+export type AlertPriority = "critical" | "warning" | "info";
+
+export type DashboardAlert = {
+  dueLabel: string;
+  id: string;
+  priority: AlertPriority;
+  title: string;
+  trace: string;
+};
+
+export const dashboardAlerts: readonly DashboardAlert[] = [
+  {
+    dueLabel: "Critico",
+    id: "alert_budget",
+    priority: "critical",
+    title: "Sforamento budget previsto",
+    trace: "Previsione a fine superiore al budget del 5,3%",
+  },
+  {
+    dueLabel: "Attenzione",
+    id: "alert_delay",
+    priority: "warning",
+    title: "Ritardo attivita critiche",
+    trace: "Armamento - ritardo di 5 giorni",
+  },
+  {
+    dueLabel: "Attenzione",
+    id: "alert_materials",
+    priority: "warning",
+    title: "Materiali critici in esaurimento",
+    trace: "Binari 60E1 - disponibilita tra 6 giorni",
+  },
+  {
+    dueLabel: "Info",
+    id: "alert_sal",
+    priority: "info",
+    title: "SAL 8 in ritardo",
+    trace: "Prevista emissione tra 7 giorni",
+  },
+];
+
+export type BudgetCategory = {
+  amount: number;
+  label: string;
+  percent: number;
+  token: string;
+};
+
+export const budgetCategories: readonly BudgetCategory[] = [
+  { amount: 980000, label: "Opere civili", percent: 39.6, token: "var(--chart-2)" },
+  { amount: 625000, label: "Armamento", percent: 25.2, token: "var(--chart-3)" },
+  { amount: 427000, label: "Elettroferroviario", percent: 17.2, token: "var(--chart-4)" },
+  { amount: 278000, label: "Segnalamento", percent: 11.2, token: "var(--chart-1)" },
+  { amount: 168000, label: "Altre lavorazioni", percent: 6.8, token: "var(--chart-5)" },
+];
+
+export type SiteWaypoint = {
+  id: string;
+  km: string;
+  label: string;
+  status: "complete" | "active" | "late" | "planned";
+};
+
+export const siteWaypoints: readonly SiteWaypoint[] = [
+  { id: "km18", km: "Km 18", label: "Cantiere armamento", status: "complete" },
+  { id: "km24", km: "Km 24", label: "Nodo tecnico", status: "active" },
+  { id: "km29", km: "Km 29", label: "Interferenza", status: "late" },
+  { id: "km30", km: "Km 30", label: "Collaudo", status: "planned" },
+];
+
+export type TimelineLane = {
+  endPercent: number;
+  id: string;
+  label: string;
+  startPercent: number;
+  status: "complete" | "active" | "planned";
+};
+
+export const timelineLanes: readonly TimelineLane[] = [
+  {
+    endPercent: 33,
+    id: "exec",
+    label: "Progettazione esecutiva",
+    startPercent: 4,
+    status: "complete",
+  },
+  { endPercent: 62, id: "civil", label: "Opere civili", startPercent: 18, status: "active" },
+  { endPercent: 78, id: "arm", label: "Armamento", startPercent: 31, status: "active" },
+  {
+    endPercent: 88,
+    id: "electrical",
+    label: "Elettroferroviario",
+    startPercent: 44,
+    status: "planned",
+  },
+];
+
+export type OperationsMetric = {
+  delta: string;
+  label: string;
+  tone: "success" | "warning" | "danger" | "info";
+  value: string;
+};
+
+export const operationsMetrics: readonly OperationsMetric[] = [
+  { delta: "+2 oggi", label: "Operai in cantiere", tone: "info", value: "128" },
+  { delta: "+2 oggi", label: "Mezzi operativi", tone: "success", value: "26" },
+  { delta: "4 vs ieri", label: "Task completati", tone: "success", value: "18" },
+  { delta: "Nei prossimi 7 giorni", label: "Materiali in arrivo", tone: "warning", value: "12" },
+  { delta: "Per un totale di 5 giorni", label: "Ritardi attivi", tone: "danger", value: "3" },
+];
+
 function createAccountingRow(
   id: string,
   voiceId: AccountingRow["voiceId"],

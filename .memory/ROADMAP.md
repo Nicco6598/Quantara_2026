@@ -12,7 +12,7 @@ Status: foundation bootstrap complete for this session.
 
 ## Phase B - Dashboard System
 
-Status: planned.
+Status: in progress.
 
 - Dashboard widgets.
 - Alerts, forecast, timeline, map and chart cards.
