@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import logoSidebar from "@/assets/branding/logo-sidebar.png";
 import type { QuantaraRoute } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 
@@ -86,8 +87,8 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
 function SidebarHeader() {
   return (
     <div className="flex h-16 items-center gap-3 border-b border-[var(--border-subtle)] px-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--accent-primary)] shadow-md">
-        <span className="text-lg font-bold text-white">Q</span>
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] p-1.5 shadow-sm">
+        <img alt="Quantara" className="h-full w-full object-contain" src={logoSidebar} />
       </div>
       <div className="flex flex-col">
         <span className="text-base font-semibold text-[var(--text-primary)]">Quantara</span>
