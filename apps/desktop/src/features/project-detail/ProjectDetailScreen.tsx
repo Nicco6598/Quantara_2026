@@ -1,321 +1,352 @@
 import {
   BookOpen,
-  Calculator,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   MapPin,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { ForecastCard } from "@/components/cards/ForecastCard";
-import { KpiStatCard } from "@/components/cards/KpiStatCard";
-import { MapCard } from "@/components/cards/MapCard";
-import { TimelineCard } from "@/components/cards/TimelineCard";
+import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { formatMoney } from "@/lib/formatters";
-import { siteWaypoints, timelineLanes } from "@/features/dashboard/demo-data";
 
 const projectData = {
-  name: "Linea AV/AC Milano-Verona",
-  lot: "Lotto 3A",
-  location: "Tratta Verona Est",
-  progress: 68,
-  status: "active" as const,
-  health: "BUONO" as const,
-  healthTone: "success" as const,
   budget: { contractual: 26150000, committed: 16245300, executed: 11420000 },
   cpi: "0,94",
   endDate: "12 Set 2025",
   forecastImpact: "-1,3M",
-  startDate: "15 Gen 2024",
-  sal: { current: 8, total: 12, amount: 2156800 },
+  health: "BUONO" as const,
+  healthTone: "success" as const,
   lastUpdate: "21 Mag 2024",
+  location: "Tratta Verona Est",
+  lot: "Lotto 3A",
+  name: "Linea AV/AC Milano-Verona",
+  progress: 68,
+  sal: { amount: 2156800, current: 8, total: 12 },
+  startDate: "15 Gen 2024",
 };
 
+const milestoneRows = [
+  { date: "15 Mar 2024", label: "Fondazioni", status: "complete" as const },
+  { date: "15 Giu 2024", label: "Armamento", status: "active" as const },
+  { date: "15 Ago 2024", label: "Elettrificazione", status: "planned" as const },
+  { date: "12 Set 2024", label: "Collaudo", status: "planned" as const },
+] as const;
+
 const projectTeam = [
-  { name: "Marco Bianchi", role: "Project Manager", initials: "MB" },
-  { name: "Laura Rossi", role: "Direzione Lavori", initials: "LR" },
-  { name: "Giuseppe Verdi", role: "Responsabile Cantiere", initials: "GV" },
-  { name: "Anna Bianchi", role: "Responsabile QA", initials: "AB" },
-];
+  { initials: "MB", name: "Marco Bianchi", role: "Project Manager" },
+  { initials: "LR", name: "Laura Rossi", role: "Direzione Lavori" },
+  { initials: "GV", name: "Giuseppe Verdi", role: "Responsabile Cantiere" },
+  { initials: "AB", name: "Anna Bianchi", role: "Responsabile QA" },
+] as const;
 
 const recentActivities = [
-  { id: 1, text: "SAL 8 approvata da D. Verdi", date: "20/05/2024" },
-  { id: 2, text: "Aggiornamento progress - Armamento", date: "19/05/2024" },
-  { id: 3, text: "Materiale 60E1 consegnato - Km 24", date: "18/05/2024" },
-  { id: 4, text: "Richiesta OS #45 approvata", date: "17/05/2024" },
-];
+  { date: "20/05/2024", text: "SAL 8 approvata da D. Verdi" },
+  { date: "19/05/2024", text: "Aggiornamento progress armamento" },
+  { date: "18/05/2024", text: "Materiale 60E1 consegnato al km 24" },
+  { date: "17/05/2024", text: "Richiesta OS #45 approvata" },
+] as const;
+
+const salRows = [
+  {
+    amount: 2156800,
+    date: "20/05/2024",
+    period: "01 - 30 Apr 2024",
+    sal: "SAL 8",
+    status: "Approvata",
+  },
+  {
+    amount: 1785600,
+    date: "15/04/2024",
+    period: "16 - 31 Mar 2024",
+    sal: "SAL 7",
+    status: "Approvata",
+  },
+  {
+    amount: 1245000,
+    date: "18/03/2024",
+    period: "01 - 15 Mar 2024",
+    sal: "SAL 6",
+    status: "Approvata",
+  },
+] as const;
 
 export function ProjectDetailScreen() {
   return (
-    <div className="flex min-h-[calc(100vh-5rem)]">
-      <main className="flex-1 p-6">
-        <div className="flex items-start justify-between">
+    <main className="p-6 pb-8">
+      <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-              <span>Progetto</span>
-              <ChevronRight className="h-3 w-3" />
-              <span className="font-semibold text-[var(--text-primary)]">{projectData.name}</span>
+            <div className="flex items-center gap-2 text-xs text-secondary">
+              <span>Portfolio</span>
+              <ChevronRight className="size-3.5" />
+              <span>Progetti</span>
+              <ChevronRight className="size-3.5" />
+              <span className="font-semibold text-foreground">{projectData.name}</span>
             </div>
-            <h1 className="mt-2 text-2xl font-bold text-[var(--text-primary)]">
+
+            <h2 className="mt-3 text-[2rem] font-semibold tracking-tight text-foreground">
               {projectData.name}
-            </h1>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            </h2>
+            <p className="mt-2 text-sm text-secondary">
               {projectData.lot} · {projectData.location}
             </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <StatusBadge label={projectData.health} tone={projectData.healthTone} />
+              <Badge variant="info">
+                SAL {projectData.sal.current} / {projectData.sal.total}
+              </Badge>
+              <Badge variant="neutral">Ultimo aggiornamento {projectData.lastUpdate}</Badge>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <StatusBadge label={projectData.health} tone={projectData.healthTone} />
-            <Button variant="outline">
-              <MapPin className="h-4 w-4" />
+
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline">
+              <MapPin className="size-4" />
               Mappa
             </Button>
-            <Button>
-              <BookOpen className="h-4 w-4" />
+            <Button size="sm">
+              <BookOpen className="size-4" />
               Documenti
             </Button>
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-5 gap-3">
-          <KpiStatCard
+        <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricTile
             detail="Budget contrattuale"
-            icon={<Calculator className="h-5 w-5" />}
             label="Budget"
             value={formatMoney({ amount: projectData.budget.contractual, currency: "EUR" })}
           />
-          <KpiStatCard
-            detail="65,4% del budget"
-            icon={<BookOpen className="h-5 w-5" />}
+          <MetricTile
+            detail="Valore impegnato sul contratto"
             label="Impegnato"
             value={formatMoney({ amount: projectData.budget.committed, currency: "EUR" })}
           />
-          <KpiStatCard
-            detail="43,7% del budget"
-            icon={<TrendingUp className="h-5 w-5" />}
-            label="Eseguito"
-            value={formatMoney({ amount: projectData.budget.executed, currency: "EUR" })}
+          <MetricTile
+            detail="Ultima SAL approvata"
+            label="SAL corrente"
+            value={formatMoney({ amount: projectData.sal.amount, currency: "EUR" })}
           />
-          <KpiStatCard
-            detail="8 SAL approvate"
-            icon={<CheckCircle2 className="h-5 w-5" />}
-            label="SAL"
-            value={`${projectData.sal.current} / ${projectData.sal.total}`}
-          />
-          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 flex flex-col items-center justify-center">
-            <div className="relative size-20 -mt-2">
-              <svg
-                aria-label="Indicatore circolare del progresso del progetto"
-                className="size-full -rotate-90"
-                role="img"
-                viewBox="0 0 36 36"
-              >
-                <title>Indicatore circolare del progresso del progetto</title>
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="16"
-                  fill="none"
-                  stroke="var(--border-subtle)"
-                  strokeWidth="3"
-                />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="16"
-                  fill="none"
-                  stroke="var(--success-base)"
-                  strokeWidth="3"
-                  strokeDasharray={`${projectData.progress}, 100`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-[var(--text-primary)]">
-                {projectData.progress}%
-              </span>
-            </div>
-            <span className="text-xs text-[var(--text-secondary)] -mt-1">Avanzamento</span>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-[1fr_1fr] gap-4">
-          <TimelineCard lanes={timelineLanes} />
-          <ForecastCard
-            cpi={projectData.cpi}
-            endDate={projectData.endDate}
-            impact={projectData.forecastImpact}
+          <MetricTile
+            detail="Avanzamento fisico del lotto"
+            label="Progresso"
+            value={`${projectData.progress}%`}
           />
         </div>
+      </section>
 
-        <div className="mt-4 grid grid-cols-[1.2fr_1fr_1fr] gap-4">
-          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-[var(--text-primary)]">Timeline Milestone</h3>
-              <span className="text-xs text-[var(--text-secondary)]">Gantt</span>
+      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
+        <div className="space-y-6">
+          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="size-4 text-info" />
+              <h3 className="text-base font-semibold text-foreground">Milestone operative</h3>
             </div>
-            <div className="mt-4 space-y-3">
-              {[
-                { label: "Fondazioni", date: "15 Mar 2024", status: "complete" as const },
-                { label: "Armamento", date: "15 Giu 2024", status: "active" as const },
-                { label: "Elettrificazione", date: "15 Ago 2024", status: "planned" as const },
-                { label: "Collaudo", date: "12 Set 2024", status: "planned" as const },
-              ].map((milestone) => (
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {milestoneRows.map((row) => (
                 <div
-                  key={`${milestone.label}-${milestone.date}`}
-                  className="flex items-center gap-3"
+                  className="rounded-[22px] border border-subtle bg-muted/35 p-4"
+                  key={row.label}
                 >
                   <div
-                    className={`w-2 h-2 rounded-full ${
-                      milestone.status === "complete"
-                        ? "bg-[var(--success-base)]"
-                        : milestone.status === "active"
-                          ? "bg-[var(--info-base)]"
-                          : "bg-[var(--border-subtle)]"
+                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${
+                      row.status === "complete"
+                        ? "bg-success-soft text-success"
+                        : row.status === "active"
+                          ? "bg-info-soft text-info"
+                          : "bg-muted text-secondary"
                     }`}
-                  />
-                  <span className="flex-1 text-sm text-[var(--text-primary)]">
-                    {milestone.label}
-                  </span>
-                  <span className="text-xs text-[var(--text-secondary)]">{milestone.date}</span>
+                  >
+                    {row.status === "complete"
+                      ? "chiusa"
+                      : row.status === "active"
+                        ? "in corso"
+                        : "pianificata"}
+                  </div>
+                  <div className="mt-3 text-sm font-semibold text-foreground">{row.label}</div>
+                  <div className="mt-1 text-xs text-secondary">{row.date}</div>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
-          <MapCard waypoints={siteWaypoints} />
+          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="size-4 text-info" />
+              <h3 className="text-base font-semibold text-foreground">Economico ed esecuzione</h3>
+            </div>
 
-          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
-            <h3 className="font-semibold text-[var(--text-primary)]">Team progetto</h3>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                  Quadro economico
+                </div>
+                <dl className="mt-4 space-y-3">
+                  <SummaryLine
+                    label="Budget contrattuale"
+                    value={formatMoney({ amount: projectData.budget.contractual, currency: "EUR" })}
+                  />
+                  <SummaryLine
+                    label="Impegnato"
+                    value={formatMoney({ amount: projectData.budget.committed, currency: "EUR" })}
+                  />
+                  <SummaryLine
+                    label="Eseguito"
+                    value={formatMoney({ amount: projectData.budget.executed, currency: "EUR" })}
+                  />
+                </dl>
+              </div>
+
+              <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                  Forecast
+                </div>
+                <div className="mt-4 flex items-end justify-between gap-4">
+                  <div>
+                    <div className="text-xs text-secondary">Fine prevista</div>
+                    <div className="mt-1 text-lg font-semibold text-foreground">
+                      {projectData.endDate}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-secondary">Impatto</div>
+                    <div className="mt-1 flex items-center gap-1 text-lg font-semibold text-danger">
+                      <TrendingDown className="size-4" />
+                      {projectData.forecastImpact}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 border-t border-subtle pt-4">
+                  <div className="text-xs text-secondary">CPI</div>
+                  <div className="mt-1 text-xl font-semibold text-foreground">
+                    {projectData.cpi}
+                  </div>
+                  <div className="mt-1 text-xs text-danger">Sotto budget rispetto al piano</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="size-4 text-success" />
+                <h3 className="text-base font-semibold text-foreground">Registro SAL</h3>
+              </div>
+              <Button size="sm">Nuova SAL</Button>
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-[22px] border border-subtle">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                  <tr>
+                    <th className="px-4 py-3">SAL</th>
+                    <th className="px-4 py-3">Periodo</th>
+                    <th className="px-4 py-3">Importo</th>
+                    <th className="px-4 py-3">Stato</th>
+                    <th className="px-4 py-3">Approvata</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salRows.map((row) => (
+                    <tr className="border-t border-subtle" key={row.sal}>
+                      <td className="px-4 py-3 font-semibold text-foreground">{row.sal}</td>
+                      <td className="px-4 py-3 text-secondary">{row.period}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">
+                        {formatMoney({ amount: row.amount, currency: "EUR" })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge label={row.status} tone="success" />
+                      </td>
+                      <td className="px-4 py-3 text-secondary">{row.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-6">
+          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+            <div className="flex items-center gap-2">
+              <Clock3 className="size-4 text-info" />
+              <h3 className="text-base font-semibold text-foreground">Presidio rapido</h3>
+            </div>
+            <dl className="mt-5 space-y-3">
+              <SummaryLine label="Inizio" value={projectData.startDate} />
+              <SummaryLine label="Fine prevista" value={projectData.endDate} />
+              <SummaryLine label="Ultimo aggiornamento" value={projectData.lastUpdate} />
+              <SummaryLine
+                label="SAL emesse"
+                value={`${projectData.sal.current} / ${projectData.sal.total}`}
+              />
+            </dl>
+          </section>
+
+          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+            <div className="text-base font-semibold text-foreground">Team progetto</div>
             <div className="mt-4 space-y-3">
               {projectTeam.map((member) => (
-                <div key={member.initials} className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-primary)] text-xs font-bold text-white">
+                <div
+                  className="flex items-center gap-3 rounded-[20px] border border-subtle bg-muted/35 px-4 py-3"
+                  key={member.initials}
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary text-xs font-bold text-white">
                     {member.initials}
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-[var(--text-primary)]">
-                      {member.name}
-                    </div>
-                    <div className="text-xs text-[var(--text-secondary)]">{member.role}</div>
+                    <div className="text-sm font-semibold text-foreground">{member.name}</div>
+                    <div className="text-xs text-secondary">{member.role}</div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          </section>
 
-        <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-[var(--text-primary)]">Attivita recenti</h3>
-            <Button variant="ghost" size="sm">
-              Vedi tutte
-            </Button>
-          </div>
-          <div className="mt-3 space-y-2">
-            {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-3 text-sm">
-                <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
-                <span className="flex-1 text-[var(--text-primary)]">{activity.text}</span>
-                <span className="text-xs text-[var(--text-secondary)]">{activity.date}</span>
-              </div>
-            ))}
-          </div>
+          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+            <div className="text-base font-semibold text-foreground">Attivita recenti</div>
+            <div className="mt-4 space-y-3">
+              {recentActivities.map((activity) => (
+                <div
+                  className="rounded-[20px] border border-subtle bg-muted/35 px-4 py-3"
+                  key={activity.text}
+                >
+                  <div className="text-sm font-medium text-foreground">{activity.text}</div>
+                  <div className="mt-1 text-xs text-secondary">{activity.date}</div>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
+      </section>
+    </main>
+  );
+}
 
-        <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-[var(--text-primary)]">Dettaglio SAL</h3>
-            <Button size="sm">Nuova SAL</Button>
-          </div>
-          <table className="mt-4 w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border-subtle)] text-left text-xs text-[var(--text-secondary)]">
-                <th className="pb-2 font-medium">SAL</th>
-                <th className="pb-2 font-medium">Periodo</th>
-                <th className="pb-2 font-medium">Importo</th>
-                <th className="pb-2 font-medium">Stato</th>
-                <th className="pb-2 font-medium">Approvata</th>
-                <th className="pb-2 font-medium">Azioni</th>
-              </tr>
-            </thead>
-            <tbody className="text-[var(--text-primary)]">
-              <tr className="border-b border-[var(--border-subtle)]">
-                <td className="py-3 font-medium">SAL 8</td>
-                <td>01 - 30 Apr 2024</td>
-                <td className="font-medium">{formatMoney({ amount: 2156800, currency: "EUR" })}</td>
-                <td>
-                  <StatusBadge label="Approvata" tone="success" />
-                </td>
-                <td>20/05/2024</td>
-                <td>
-                  <Button variant="ghost" size="sm">
-                    Visualizza
-                  </Button>
-                </td>
-              </tr>
-              <tr className="border-b border-[var(--border-subtle)]">
-                <td className="py-3 font-medium">SAL 7</td>
-                <td>16 - 31 Mar 2024</td>
-                <td className="font-medium">{formatMoney({ amount: 1785600, currency: "EUR" })}</td>
-                <td>
-                  <StatusBadge label="Approvata" tone="success" />
-                </td>
-                <td>15/04/2024</td>
-                <td>
-                  <Button variant="ghost" size="sm">
-                    Visualizza
-                  </Button>
-                </td>
-              </tr>
-              <tr>
-                <td className="py-3 font-medium">SAL 6</td>
-                <td>01 - 15 Mar 2024</td>
-                <td className="font-medium">{formatMoney({ amount: 1245000, currency: "EUR" })}</td>
-                <td>
-                  <StatusBadge label="Approvata" tone="success" />
-                </td>
-                <td>18/03/2024</td>
-                <td>
-                  <Button variant="ghost" size="sm">
-                    Visualizza
-                  </Button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </main>
+function MetricTile({ detail, label, value }: { detail: string; label: string; value: string }) {
+  return (
+    <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+        {label}
+      </div>
+      <div className="mt-3 text-2xl font-semibold text-foreground">{value}</div>
+      <div className="mt-2 text-xs leading-5 text-secondary">{detail}</div>
+    </div>
+  );
+}
 
-      <aside className="w-72 border-l border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
-        <h3 className="font-semibold text-[var(--text-primary)]">Quick info</h3>
-        <div className="mt-4 space-y-4">
-          <div>
-            <span className="text-xs text-[var(--text-secondary)]">Inizio</span>
-            <p className="text-sm font-medium text-[var(--text-primary)]">
-              {projectData.startDate}
-            </p>
-          </div>
-          <div>
-            <span className="text-xs text-[var(--text-secondary)]">Fine previsto</span>
-            <p className="text-sm font-medium text-[var(--text-primary)]">{projectData.endDate}</p>
-          </div>
-          <div>
-            <span className="text-xs text-[var(--text-secondary)]">Ultimo aggiornamento</span>
-            <p className="text-sm font-medium text-[var(--text-primary)]">
-              {projectData.lastUpdate}
-            </p>
-          </div>
-          <div className="pt-4 border-t border-[var(--border-subtle)]">
-            <span className="text-xs text-[var(--text-secondary)]">CPI</span>
-            <p className="text-2xl font-bold text-[var(--text-primary)]">{projectData.cpi}</p>
-            <p className="text-xs text-[var(--danger-base)]">
-              <TrendingDown className="inline h-3 w-3" />
-              Sotto budget
-            </p>
-          </div>
-        </div>
-      </aside>
+function SummaryLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-subtle pb-3 last:border-b-0 last:pb-0">
+      <dt className="text-sm text-secondary">{label}</dt>
+      <dd className="text-sm font-semibold text-foreground">{value}</dd>
     </div>
   );
 }

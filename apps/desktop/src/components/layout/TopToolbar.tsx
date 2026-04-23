@@ -1,261 +1,274 @@
+import type { LucideIcon } from "lucide-react";
 import {
   Bell,
-  CalendarDays,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Filter,
-  HelpCircle,
   Moon,
   Plus,
-  RefreshCw,
   Search,
   Settings,
   Sun,
   UploadCloud,
+  Users,
 } from "lucide-react";
-import type { QuantaraRoute, ThemeMode } from "@/store/app-store";
+import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { cn } from "@/lib/utils";
+import type { QuantaraRoute, ThemeMode } from "@/store/app-store";
 
-interface RouteMeta {
-  subtitle: string;
+type RouteMeta = {
+  section: string;
   title: string;
-  description?: string;
-}
-
-const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
-  accounting: {
-    subtitle: "Contabilita",
-    title: "Stato Avanzamento",
-    description: "Gestione ribassi, ordini di servizio ed export",
-  },
-  dashboard: {
-    subtitle: "Panoramica",
-    title: "Dashboard",
-    description: "Visione consolidata di tutti i progetti",
-  },
-  materials: {
-    subtitle: "Magazzino",
-    title: "Materiali",
-    description: "Catalogo e gestione inventario",
-  },
-  projects: {
-    subtitle: "Portfolio",
-    title: "Progetti",
-    description: "Centro di controllo portfolio lavori",
-  },
-  "project-detail": {
-    subtitle: "Dettaglio",
-    title: "Progetto",
-    description: "Linea AV/AC Milano-Verona",
-  },
-  sal: {
-    subtitle: "Monitoraggio",
-    title: "SAL",
-    description: "Stati di avanzamento lavori",
-  },
-  tariffs: {
-    subtitle: "Reference",
-    title: "Tariffario",
-    description: "Tariffario Regionale Lombardia 2025",
-  },
 };
 
-interface PageAction {
-  icon: typeof Plus;
-  label: string;
-  variant: "primary" | "secondary" | "ghost";
+type PageAction = {
   hasDropdown?: boolean;
-}
+  icon: LucideIcon;
+  label: string;
+  variant: "outline" | "primary";
+};
+
+const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
+  accounting: { section: "Contabilita", title: "Stato Avanzamento" },
+  dashboard: { section: "Panoramica", title: "Dashboard" },
+  materials: { section: "Magazzino", title: "Materiali" },
+  "project-detail": { section: "Dettaglio", title: "Progetto" },
+  projects: { section: "Portfolio", title: "Progetti" },
+  sal: { section: "Monitoraggio", title: "SAL" },
+  settings: { section: "Sistema", title: "Impostazioni" },
+  tariffs: { section: "Reference", title: "Tariffario" },
+  team: { section: "Risorse", title: "Team" },
+};
 
 const pageActionsMap: Record<QuantaraRoute, PageAction[]> = {
   accounting: [
-    { icon: Filter, label: "Filtri", variant: "secondary", hasDropdown: true },
-    { icon: Download, label: "Esporta", variant: "secondary" },
+    { hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
+    { icon: Download, label: "Esporta", variant: "outline" },
   ],
-  dashboard: [
-    { icon: RefreshCw, label: "Aggiorna", variant: "secondary" },
-    { icon: Settings, label: "Configura", variant: "ghost" },
-  ],
+  dashboard: [{ icon: Settings, label: "Configura", variant: "outline" }],
   materials: [
-    { icon: UploadCloud, label: "Importa", variant: "secondary" },
-    { icon: Plus, label: "Nuovo Materiale", variant: "primary" },
+    { icon: UploadCloud, label: "Importa", variant: "outline" },
+    { icon: Plus, label: "Nuovo", variant: "primary" },
+  ],
+  "project-detail": [
+    { icon: Download, label: "Esporta", variant: "outline" },
+    { icon: Plus, label: "SAL", variant: "primary" },
   ],
   projects: [
-    { icon: Filter, label: "Filtri", variant: "secondary", hasDropdown: true },
-    { icon: Plus, label: "Nuovo Progetto", variant: "primary" },
+    { hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
+    { icon: Plus, label: "Nuovo", variant: "primary" },
   ],
-  "project-detail": [{ icon: Download, label: "Esporta", variant: "secondary" }],
   sal: [
-    { icon: Filter, label: "Filtri", variant: "secondary", hasDropdown: true },
+    { hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
     { icon: Plus, label: "Nuova SAL", variant: "primary" },
   ],
+  settings: [{ icon: Settings, label: "Preferenze", variant: "outline" }],
   tariffs: [
-    { icon: Download, label: "Scarica", variant: "secondary" },
-    { icon: UploadCloud, label: "Importa PDF", variant: "primary" },
+    { icon: Download, label: "Scarica", variant: "outline" },
+    { icon: UploadCloud, label: "Importa", variant: "primary" },
   ],
+  team: [{ icon: Users, label: "Ruoli", variant: "outline" }],
 };
 
 type TopToolbarProps = {
   activeRoute: QuantaraRoute;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  onNavigateBack: () => void;
+  onNavigateForward: () => void;
   onToggleTheme: () => void;
   themeMode: ThemeMode;
 };
 
-export function TopToolbar({ activeRoute, onToggleTheme, themeMode }: TopToolbarProps) {
+export function TopToolbar({
+  activeRoute,
+  canGoBack,
+  canGoForward,
+  onNavigateBack,
+  onNavigateForward,
+  onToggleTheme,
+  themeMode,
+}: TopToolbarProps) {
   const meta = routeMetaMap[activeRoute];
   const pageActions = pageActionsMap[activeRoute] ?? [];
 
   return (
-    <header className="sticky top-0 z-50 flex h-20 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-base)] px-6">
-      <div className="flex min-w-0 flex-1 items-center gap-8">
-        <PageTitle meta={meta} />
-        <PageActions actions={pageActions} />
-      </div>
-      <div className="flex shrink-0 items-center gap-4">
-        <GlobalSearch />
-        <UtilityDivider />
-        <UtilityButtons onToggleTheme={onToggleTheme} themeMode={themeMode} />
+    <header className="shell-topbar sticky top-0 z-40 border-b border-subtle/80 px-6 py-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <HistoryNavigator
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            onNavigateBack={onNavigateBack}
+            onNavigateForward={onNavigateForward}
+          />
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              <span>{meta.section}</span>
+              <span className="text-border">/</span>
+              <span>
+                {new Date().toLocaleDateString("it-IT", {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </span>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
+                {meta.title}
+              </h1>
+              {activeRoute === "projects" ? <Badge variant="info">3 alert</Badge> : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <GlobalSearch />
+          <PageActions actions={pageActions} />
+          <UtilityButtons onToggleTheme={onToggleTheme} themeMode={themeMode} />
+        </div>
       </div>
     </header>
   );
 }
 
-function PageTitle({ meta }: { meta: RouteMeta }) {
+function HistoryNavigator({
+  canGoBack,
+  canGoForward,
+  onNavigateBack,
+  onNavigateForward,
+}: {
+  canGoBack: boolean;
+  canGoForward: boolean;
+  onNavigateBack: () => void;
+  onNavigateForward: () => void;
+}) {
   return (
-    <div className="flex flex-col justify-center">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-widest text-[var(--text-secondary)]">
-          {meta.subtitle}
-        </span>
-        <span className="text-xs text-[var(--border-subtle)]">/</span>
-        <span className="text-xs text-[var(--text-secondary)]">
-          {new Date().toLocaleDateString("it-IT", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })}
-        </span>
-      </div>
-      <h1 className="text-xl font-semibold leading-tight text-[var(--text-primary)]">
-        {meta.title}
-      </h1>
-      {meta.description && (
-        <p className="text-xs text-[var(--text-secondary)]">{meta.description}</p>
-      )}
+    <div className="flex items-center gap-1 rounded-[18px] border border-subtle bg-card/92 p-1 shadow-soft">
+      <HistoryButton
+        disabled={!canGoBack}
+        icon={ChevronLeft}
+        label="Torna indietro"
+        onClick={onNavigateBack}
+      />
+      <HistoryButton
+        disabled={!canGoForward}
+        icon={ChevronRight}
+        label="Vai avanti"
+        onClick={onNavigateForward}
+      />
     </div>
   );
 }
 
-interface PageActionsProps {
-  actions: PageAction[];
-}
-
-function PageActions({ actions }: PageActionsProps) {
-  if (actions.length === 0) return null;
-
+function HistoryButton({
+  disabled,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  disabled: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <nav className="flex items-center gap-2 border-l border-[var(--border-subtle)] pl-4">
-      {actions.map((action) => (
-        <Button
-          key={`${action.label}-${action.variant}`}
-          variant={action.variant === "primary" ? "default" : "outline"}
-          className={cn(
-            "flex items-center gap-1.5",
-            action.variant === "ghost" &&
-              "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-          )}
-        >
-          <action.icon className="h-4 w-4" />
-          <span className="text-sm">{action.label}</span>
-          {action.hasDropdown && <ChevronDown className="h-3 w-3" />}
-        </Button>
-      ))}
-    </nav>
+    <button
+      className={cn(
+        "flex h-9 w-9 items-center justify-center rounded-[14px] transition-all",
+        disabled ? "cursor-not-allowed text-secondary/40" : "text-foreground hover:bg-muted",
+      )}
+      disabled={disabled}
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      <Icon className="size-4" />
+    </button>
   );
 }
 
 function GlobalSearch() {
   return (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+    <label className="relative block">
+      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
       <input
-        className="h-9 w-56 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-9 pr-8 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20"
+        className="h-10 w-[220px] rounded-[18px] border border-subtle bg-card/92 pl-10 pr-3 text-sm text-foreground outline-none transition-all duration-base placeholder:text-secondary focus:border-primary focus:ring-2 focus:ring-ring"
         placeholder="Cerca..."
         type="search"
       />
-      <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[var(--border-subtle)] bg-[var(--surface-base)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
-        ⌘K
-      </kbd>
+    </label>
+  );
+}
+
+function PageActions({ actions }: { actions: PageAction[] }) {
+  return (
+    <div className="flex items-center gap-2">
+      {actions.map((action) => (
+        <Button
+          className="gap-1.5 rounded-[18px]"
+          key={`${action.label}-${action.variant}`}
+          size="sm"
+          variant={action.variant === "primary" ? "default" : "outline"}
+        >
+          <action.icon className="size-4" />
+          <span>{action.label}</span>
+          {action.hasDropdown ? <ChevronDown className="size-3.5" /> : null}
+        </Button>
+      ))}
     </div>
   );
 }
 
-function UtilityDivider() {
-  return <div className="h-8 w-px bg-[var(--border-subtle)]" />;
-}
-
-interface UtilityButtonsProps {
+function UtilityButtons({
+  onToggleTheme,
+  themeMode,
+}: {
   onToggleTheme: () => void;
   themeMode: ThemeMode;
-}
-
-function UtilityButtons({ onToggleTheme, themeMode }: UtilityButtonsProps) {
+}) {
   const ThemeIcon = themeMode === "light" ? Moon : Sun;
 
   return (
-    <div className="flex items-center gap-1">
-      <IconButton icon={CalendarDays} label="Calendario" />
-      <IconButton icon={HelpCircle} label="Aiuto e documentazione" />
-      <IconButton icon={Bell} label="Notifiche" badge={3} />
+    <div className="flex items-center gap-1 rounded-[18px] border border-subtle bg-card/92 p-1 shadow-soft">
+      <IconButton badge={3} icon={Bell} label="Notifiche" />
       <IconButton
         icon={ThemeIcon}
         label={themeMode === "light" ? "Modo scuro" : "Modo chiaro"}
         onClick={onToggleTheme}
       />
-      <UserAvatar />
     </div>
   );
 }
 
-interface IconButtonProps {
-  icon: typeof Bell;
-  label: string;
+function IconButton({
+  badge,
+  icon: Icon,
+  label,
+  onClick,
+}: {
   badge?: number;
+  icon: LucideIcon;
+  label: string;
   onClick?: () => void;
-}
-
-function IconButton({ icon: Icon, label, badge, onClick }: IconButtonProps) {
+}) {
   return (
     <button
-      className={cn(
-        "group relative flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-[var(--text-secondary)] transition-all hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-        badge != null && "border border-[var(--border-subtle)]",
-      )}
+      className="relative flex h-9 w-9 items-center justify-center rounded-[14px] text-secondary transition-all hover:bg-muted hover:text-foreground"
       onClick={onClick}
       title={label}
       type="button"
     >
-      <Icon className="h-4 w-4" />
-      {badge != null && badge > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--danger-base)] px-1 text-[10px] font-bold text-white">
+      <Icon className="size-4" />
+      {badge != null && badge > 0 ? (
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
           {badge}
         </span>
-      )}
-    </button>
-  );
-}
-
-function UserAvatar() {
-  return (
-    <button
-      className="group flex h-9 w-9 items-center justify-center rounded-full border-2 border-transparent bg-[var(--bg-muted)] transition-all hover:border-[var(--accent-primary)]"
-      title="Profilo utente"
-      type="button"
-    >
-      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent-primary)] text-xs font-bold text-white">
-        MB
-      </div>
+      ) : null}
     </button>
   );
 }

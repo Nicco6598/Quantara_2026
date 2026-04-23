@@ -5,6 +5,7 @@ import { MaterialsScreen } from "@/features/materials/MaterialsScreen";
 import { ProjectsScreen } from "@/features/projects/ProjectsScreen";
 import { ProjectDetailScreen } from "@/features/project-detail/ProjectDetailScreen";
 import { SalScreen } from "@/features/sal/SalScreen";
+import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { TariffsScreen } from "@/features/tariffs/TariffsScreen";
 import { PlaceholderScreen } from "@/routes/PlaceholderScreen";
 
@@ -39,6 +40,14 @@ export function RouteRenderer({ activeRoute }: RouteRendererProps) {
 
   if (activeRoute === "materials") {
     return <MaterialsScreen />;
+  }
+
+  if (activeRoute === "team") {
+    return <PlaceholderScreen title="Team" />;
+  }
+
+  if (activeRoute === "settings") {
+    return <SettingsScreen />;
   }
 
   return <PlaceholderScreen title={activeRoute} />;

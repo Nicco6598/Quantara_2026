@@ -1,6 +1,6 @@
 {
   "name": "quantara",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -9,14 +9,16 @@
     "pnpm": "10.33.0"
   },
   "scripts": {
-    "build": "pnpm --filter @quantara/desktop build",
-    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "build": "pnpm version:sync && pnpm --filter @quantara/desktop build",
+    "check": "pnpm version:sync && pnpm typecheck && pnpm lint && pnpm test",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "version:check": "node scripts/sync-version.mjs --check",
+    "version:sync": "node scripts/sync-version.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.12",

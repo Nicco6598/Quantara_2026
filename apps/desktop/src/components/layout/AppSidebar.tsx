@@ -9,57 +9,40 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  TrendingUp,
   Users,
 } from "lucide-react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
-import type { QuantaraRoute } from "@/store/app-store";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
 import { cn } from "@/lib/utils";
+import type { QuantaraRoute } from "@/store/app-store";
 
-interface ProjectInfo {
-  id: string;
-  name: string;
-  lot: string;
-  location: string;
-  status: "active" | "pending" | "completed";
-  progress: number;
-}
-
-interface NavItem {
+type NavItem = {
+  badge?: string;
   icon: LucideIcon;
   label: string;
   route: QuantaraRoute;
-  badge?: number;
-}
-
-const activeProject: ProjectInfo = {
-  id: "p1",
-  name: "Linea AV/AC Milano-Verona",
-  lot: "Lotto 3A",
-  location: "Tratta Verona Est",
-  status: "active",
-  progress: 68,
 };
 
-const user = {
-  name: "Marco Bianchi",
-  initials: "MB",
-  role: "Project Manager",
-};
-
-const navItems: NavItem[] = [
+const primaryNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", route: "dashboard" },
-  { icon: FolderKanban, label: "Progetti", route: "projects", badge: 3 },
+  { badge: "3", icon: FolderKanban, label: "Progetti", route: "projects" },
   { icon: ClipboardList, label: "SAL", route: "sal" },
   { icon: BookOpen, label: "Tariffari", route: "tariffs" },
   { icon: Box, label: "Materiali", route: "materials" },
   { icon: BarChart3, label: "Contabilita", route: "accounting" },
 ];
 
-const bottomNavItems: NavItem[] = [
-  { icon: Users, label: "Team", route: "team" as QuantaraRoute },
-  { icon: Settings, label: "Impostazioni", route: "settings" as QuantaraRoute },
+const utilityNavItems: NavItem[] = [
+  { icon: Users, label: "Team", route: "team" },
+  { icon: Settings, label: "Impostazioni", route: "settings" },
 ];
+
+const activeProject = {
+  context: "Lotto 3A · Verona Est",
+  name: "Milano-Verona",
+  progress: 68,
+};
 
 type AppSidebarProps = {
   activeRoute: QuantaraRoute;
@@ -68,17 +51,16 @@ type AppSidebarProps = {
 
 export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-base)]">
-      <SidebarHeader />
-      <SidebarProjectCard project={activeProject} />
-      <SidebarNav activeRoute={activeRoute} items={navItems} onRouteChange={onRouteChange} />
-      <div className="mt-auto flex flex-col gap-2 border-t border-[var(--border-subtle)] p-4">
-        <SidebarUserCard />
-        <SidebarBottomNav
-          activeRoute={activeRoute}
-          items={bottomNavItems}
-          onRouteChange={onRouteChange}
-        />
+    <aside className="shell-sidebar flex h-screen w-[272px] shrink-0 flex-col border-r border-subtle/80 px-4 py-4">
+      <div>
+        <SidebarHeader />
+        <ActiveProjectStrip onOpen={() => onRouteChange("project-detail")} />
+        <SidebarNav activeRoute={activeRoute} items={primaryNavItems} onNavigate={onRouteChange} />
+      </div>
+
+      <div className="mt-4">
+        <SidebarNav activeRoute={activeRoute} items={utilityNavItems} onNavigate={onRouteChange} />
+        <SidebarFooter />
       </div>
     </aside>
   );
@@ -86,191 +68,138 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
 
 function SidebarHeader() {
   return (
-    <div className="flex h-16 items-center gap-3 border-b border-[var(--border-subtle)] px-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] p-1.5 shadow-sm">
+    <div className="flex items-center gap-3 px-1 pb-4">
+      <div className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-subtle bg-card p-2 shadow-soft">
         <img alt="Quantara" className="h-full w-full object-contain" src={logoSidebar} />
       </div>
-      <div className="flex flex-col">
-        <span className="text-base font-semibold text-[var(--text-primary)]">Quantara</span>
-        <span className="text-xs font-medium text-[var(--text-secondary)]">Rail Works</span>
-      </div>
-    </div>
-  );
-}
-
-interface SidebarProjectCardProps {
-  project: ProjectInfo;
-}
-
-function SidebarProjectCard({ project }: SidebarProjectCardProps) {
-  const statusColor =
-    project.status === "active"
-      ? "text-[var(--success-base)] bg-[var(--success-soft)]"
-      : project.status === "pending"
-        ? "text-[var(--warning-base)] bg-[var(--warning-soft)]"
-        : "text-[var(--text-secondary)] bg-[var(--bg-muted)]";
-
-  return (
-    <div className="m-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-          Progetto attivo
-        </span>
-        <ChevronRight className="h-3 w-3 text-[var(--text-secondary)]" />
-      </div>
-      <div className="mt-2 text-sm font-semibold leading-tight text-[var(--text-primary)]">
-        {project.name}
-      </div>
-      <div className="mt-1 text-xs text-[var(--text-secondary)]">
-        {project.lot} · {project.location}
-      </div>
-      <div className="mt-3 flex items-center gap-2">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--border-subtle)]">
-          <div
-            className="h-full rounded-full bg-[var(--success-base)] transition-all duration-500"
-            style={{ width: `${project.progress}%` }}
-          />
+      <div className="min-w-0">
+        <div className="truncate text-base font-semibold tracking-tight text-foreground">
+          Quantara
         </div>
-        <span className="text-xs font-semibold text-[var(--text-secondary)]">
-          {project.progress}%
-        </span>
-      </div>
-      <div className="mt-3 flex items-center justify-between">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold uppercase",
-            statusColor,
-          )}
-        >
-          <TrendingUp className="h-3 w-3" />
-          {project.status === "active" ? "Attivo" : "In attesa"}
-        </span>
-        <span className="text-xs text-[var(--text-secondary)]">Ultimo SAL: 15 Apr</span>
+        <div className="text-xs text-secondary">Rail operations</div>
       </div>
     </div>
   );
 }
 
-interface SidebarNavProps {
+function ActiveProjectStrip({ onOpen }: { onOpen: () => void }) {
+  return (
+    <section className="rounded-[22px] border border-subtle bg-card/92 px-4 py-3 shadow-soft">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+            Lotto attivo
+          </div>
+          <div className="mt-1 text-sm font-semibold text-foreground">{activeProject.name}</div>
+          <div className="text-xs text-secondary">{activeProject.context}</div>
+        </div>
+        <Badge variant="info">{activeProject.progress}%</Badge>
+      </div>
+
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-primary"
+          style={{ width: `${activeProject.progress}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex justify-end">
+        <Button onClick={onOpen} size="sm" variant="ghost">
+          Apri
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function SidebarNav({
+  activeRoute,
+  items,
+  onNavigate,
+}: {
   activeRoute: QuantaraRoute;
   items: NavItem[];
-  onRouteChange: (route: QuantaraRoute) => void;
-}
-
-function SidebarNav({ activeRoute, items, onRouteChange }: SidebarNavProps) {
+  onNavigate: (route: QuantaraRoute) => void;
+}) {
   return (
-    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2">
-      <NavSectionLabel label="Navigazione" />
+    <nav className="mt-4 space-y-2">
       {items.map((item) => (
-        <NavItemComponent
-          key={item.route}
-          activeRoute={activeRoute}
+        <SidebarNavItem
+          active={isRouteActive(item.route, activeRoute)}
           item={item}
-          onRouteChange={onRouteChange}
+          key={item.route}
+          onClick={() => onNavigate(item.route)}
         />
       ))}
     </nav>
   );
 }
 
-function NavSectionLabel({ label }: { label: string }) {
-  return (
-    <div className="mb-2 mt-1 px-3">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-interface NavItemComponentProps {
-  activeRoute: QuantaraRoute;
+function SidebarNavItem({
+  active,
+  item,
+  onClick,
+}: {
+  active: boolean;
   item: NavItem;
-  onRouteChange: (route: QuantaraRoute) => void;
-}
-
-function NavItemComponent({ activeRoute, item, onRouteChange }: NavItemComponentProps) {
-  const isActive = activeRoute === item.route;
+  onClick: () => void;
+}) {
   const Icon = item.icon;
 
   return (
     <button
       className={cn(
-        "group flex h-10 w-full items-center justify-between rounded-md px-3 text-sm font-medium transition-all duration-150",
-        isActive
-          ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)]"
-          : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+        "flex h-12 w-full items-center gap-3 rounded-[18px] border px-3 text-left transition-all duration-base",
+        active
+          ? "border-primary/20 bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base))] text-foreground shadow-soft"
+          : "border-subtle bg-card/76 text-secondary hover:border-border hover:bg-card hover:text-foreground",
       )}
-      onClick={() => onRouteChange(item.route)}
+      onClick={onClick}
       type="button"
     >
-      <span className="flex items-center gap-3">
-        <Icon
-          className={cn(
-            "h-4 w-4",
-            isActive
-              ? "text-[var(--sidebar-active-text)]"
-              : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]",
-          )}
-        />
-        {item.label}
+      <span
+        className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-2xl",
+          active ? "bg-primary text-white" : "bg-muted text-secondary",
+        )}
+      >
+        <Icon className="size-4" />
       </span>
-      {item.badge != null && item.badge > 0 && (
-        <span
-          className={cn(
-            "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold",
-            isActive
-              ? "bg-[var(--accent-primary)] text-white"
-              : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
-          )}
-        >
-          {item.badge}
-        </span>
-      )}
+      <span className="flex-1 text-sm font-medium">{item.label}</span>
+      {item.badge ? <Badge variant={active ? "info" : "neutral"}>{item.badge}</Badge> : null}
     </button>
   );
 }
 
-function SidebarUserCard() {
+function SidebarFooter() {
   return (
-    <div className="flex items-center justify-between rounded-md p-2 hover:bg-[var(--bg-muted)]">
+    <div className="mt-4 flex items-center justify-between rounded-[20px] border border-subtle bg-card/88 px-3 py-3 shadow-soft">
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent-primary)] text-sm font-bold text-white">
-          {user.initials}
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary text-xs font-bold text-white">
+          MB
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-medium text-[var(--text-primary)]">{user.name}</span>
-          <span className="text-xs text-[var(--text-secondary)]">{user.role}</span>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-foreground">Marco Bianchi</div>
+          <div className="text-xs text-secondary">Project Manager</div>
         </div>
       </div>
+
       <button
-        className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+        className="flex h-9 w-9 items-center justify-center rounded-2xl border border-subtle bg-muted text-secondary transition-colors hover:border-border hover:bg-card hover:text-foreground"
         title="Esci"
         type="button"
       >
-        <LogOut className="h-4 w-4" />
+        <LogOut className="size-4" />
       </button>
     </div>
   );
 }
 
-interface SidebarBottomNavProps {
-  activeRoute: QuantaraRoute;
-  items: NavItem[];
-  onRouteChange: (route: QuantaraRoute) => void;
-}
+function isRouteActive(itemRoute: QuantaraRoute, activeRoute: QuantaraRoute) {
+  if (itemRoute === "projects" && activeRoute === "project-detail") {
+    return true;
+  }
 
-function SidebarBottomNav({ activeRoute, items, onRouteChange }: SidebarBottomNavProps) {
-  return (
-    <div className="flex gap-1 border-t border-[var(--border-subtle)] pt-2">
-      {items.map((item) => (
-        <NavItemComponent
-          key={item.route}
-          activeRoute={activeRoute}
-          item={item}
-          onRouteChange={onRouteChange}
-        />
-      ))}
-    </div>
-  );
+  return itemRoute === activeRoute;
 }
