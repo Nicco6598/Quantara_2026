@@ -1,0 +1,326 @@
+use rusqlite::{Connection, OptionalExtension, params};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    db::migrations::apply_migrations, domain::accounting::Money, models::app_error::AppError,
+};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TariffPriorityRecord {
+    pub priority: i32,
+    pub reason: String,
+    pub tariff_book_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateContractRequest {
+    pub application_contract_code: String,
+    pub contractual_amount: f64,
+    pub framework_agreement_code: String,
+    pub id: String,
+    pub tariff_priorities: Vec<TariffPriorityRecord>,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContractRecord {
+    pub application_contract_code: String,
+    pub contractual_amount: Money,
+    pub framework_agreement_code: String,
+    pub id: String,
+    pub tariff_priorities: Vec<TariffPriorityRecord>,
+    pub title: String,
+}
+
+pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, AppError> {
+    apply_migrations(connection).map_err(to_database_error)?;
+
+    let mut statement = connection
+        .prepare(
+            "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
+             FROM contracts
+             ORDER BY updated_at DESC, title ASC",
+        )
+        .map_err(to_database_error)?;
+
+    let contracts = statement
+        .query_map([], map_contract_row)
+        .map_err(to_database_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(to_database_error)?;
+
+    contracts
+        .into_iter()
+        .map(|mut contract| {
+            contract.tariff_priorities = list_priorities(connection, &contract.id)?;
+            Ok(contract)
+        })
+        .collect()
+}
+
+pub fn get_contract(
+    connection: &Connection,
+    contract_id: &str,
+) -> Result<Option<ContractRecord>, AppError> {
+    apply_migrations(connection).map_err(to_database_error)?;
+
+    let mut contract = connection
+        .query_row(
+            "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
+             FROM contracts
+             WHERE id = ?1",
+            [contract_id],
+            map_contract_row,
+        )
+        .optional()
+        .map_err(to_database_error)?;
+
+    if let Some(contract) = &mut contract {
+        contract.tariff_priorities = list_priorities(connection, &contract.id)?;
+    }
+
+    Ok(contract)
+}
+
+pub fn create_contract(
+    connection: &mut Connection,
+    request: CreateContractRequest,
+) -> Result<ContractRecord, AppError> {
+    validate_contract_request(&request)?;
+    apply_migrations(connection).map_err(to_database_error)?;
+
+    let transaction = connection.transaction().map_err(to_database_error)?;
+    let amount_cents = money_to_cents(request.contractual_amount);
+
+    transaction
+        .execute(
+            "INSERT INTO contracts (
+                id,
+                title,
+                application_contract_code,
+                framework_agreement_code,
+                contractual_amount_cents
+             ) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                request.id,
+                request.title,
+                request.application_contract_code,
+                request.framework_agreement_code,
+                amount_cents
+            ],
+        )
+        .map_err(to_database_error)?;
+
+    for priority in &request.tariff_priorities {
+        transaction
+            .execute(
+                "INSERT INTO tariff_priorities (contract_id, tariff_book_id, priority, reason)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    request.id,
+                    priority.tariff_book_id,
+                    priority.priority,
+                    priority.reason
+                ],
+            )
+            .map_err(to_database_error)?;
+    }
+
+    transaction.commit().map_err(to_database_error)?;
+
+    get_contract(connection, &request.id)?
+        .ok_or_else(|| AppError::Database("created contract could not be reloaded".into()))
+}
+
+fn list_priorities(
+    connection: &Connection,
+    contract_id: &str,
+) -> Result<Vec<TariffPriorityRecord>, AppError> {
+    let mut statement = connection
+        .prepare(
+            "SELECT tariff_book_id, priority, reason
+             FROM tariff_priorities
+             WHERE contract_id = ?1
+             ORDER BY priority ASC, tariff_book_id ASC",
+        )
+        .map_err(to_database_error)?;
+
+    statement
+        .query_map([contract_id], |row| {
+            Ok(TariffPriorityRecord {
+                priority: row.get(1)?,
+                reason: row.get(2)?,
+                tariff_book_id: row.get(0)?,
+            })
+        })
+        .map_err(to_database_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(to_database_error)
+}
+
+fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord> {
+    let amount_cents: i64 = row.get(4)?;
+
+    Ok(ContractRecord {
+        application_contract_code: row.get(2)?,
+        contractual_amount: Money {
+            amount: cents_to_money(amount_cents),
+            currency: "EUR",
+        },
+        framework_agreement_code: row.get(3)?,
+        id: row.get(0)?,
+        tariff_priorities: Vec::new(),
+        title: row.get(1)?,
+    })
+}
+
+fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppError> {
+    if request.id.trim().is_empty()
+        || request.title.trim().is_empty()
+        || request.application_contract_code.trim().is_empty()
+        || request.framework_agreement_code.trim().is_empty()
+    {
+        return Err(AppError::Validation(
+            "contract id, title and codes are required".into(),
+        ));
+    }
+
+    if !request.contractual_amount.is_finite() || request.contractual_amount < 0.0 {
+        return Err(AppError::Validation(
+            "contractual amount must be a finite non-negative number".into(),
+        ));
+    }
+
+    if request.tariff_priorities.is_empty() {
+        return Err(AppError::Validation(
+            "at least one tariff priority is required".into(),
+        ));
+    }
+
+    for priority in &request.tariff_priorities {
+        if priority.priority < 1
+            || priority.tariff_book_id.trim().is_empty()
+            || priority.reason.trim().is_empty()
+        {
+            return Err(AppError::Validation(
+                "tariff priorities require positive priority, tariff book id and reason".into(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn money_to_cents(amount: f64) -> i64 {
+    (amount * 100.0).round() as i64
+}
+
+fn cents_to_money(amount_cents: i64) -> f64 {
+    amount_cents as f64 / 100.0
+}
+
+fn to_database_error(error: rusqlite::Error) -> AppError {
+    AppError::Database(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+
+    use crate::db::migrations::apply_migrations;
+
+    use super::{
+        CreateContractRequest, TariffPriorityRecord, create_contract, get_contract, list_contracts,
+    };
+
+    #[test]
+    fn creates_and_loads_contract_with_tariff_priorities() {
+        let mut connection = Connection::open_in_memory().expect("in-memory db");
+        seed_tariff_books(&connection);
+        let request = sample_contract();
+
+        let created = create_contract(&mut connection, request).expect("contract created");
+
+        assert_eq!(created.id, "contract_milano_verona");
+        assert_eq!(created.contractual_amount.amount, 26_150_000.25);
+        assert_eq!(created.tariff_priorities.len(), 2);
+
+        let contracts = list_contracts(&connection).expect("contracts listed");
+        assert_eq!(contracts.len(), 1);
+
+        let loaded = get_contract(&connection, "contract_milano_verona")
+            .expect("contract loaded")
+            .expect("contract present");
+        assert_eq!(loaded.title, "Linea AV/AC Milano-Verona");
+        assert_eq!(
+            loaded.tariff_priorities[0].tariff_book_id,
+            "tariff_lombardia_2025"
+        );
+    }
+
+    fn seed_tariff_books(connection: &Connection) {
+        apply_migrations(connection).expect("schema applied");
+        connection
+            .execute(
+                "INSERT INTO tariff_books (id, name, source_name, year, status)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                [
+                    "tariff_lombardia_2025",
+                    "Tariffario Lombardia 2025",
+                    "Regione Lombardia",
+                    "2025",
+                    "active",
+                ],
+            )
+            .expect("primary tariff book seeded");
+        connection
+            .execute(
+                "INSERT INTO tariff_books (id, name, source_name, year, status)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                [
+                    "tariff_rfi_2024",
+                    "Tariffario RFI 2024",
+                    "RFI",
+                    "2024",
+                    "fallback",
+                ],
+            )
+            .expect("fallback tariff book seeded");
+    }
+
+    #[test]
+    fn rejects_contract_without_tariff_priorities() {
+        let mut connection = Connection::open_in_memory().expect("in-memory db");
+        let mut request = sample_contract();
+        request.tariff_priorities = Vec::new();
+
+        let result = create_contract(&mut connection, request);
+
+        assert!(result.is_err());
+    }
+
+    fn sample_contract() -> CreateContractRequest {
+        CreateContractRequest {
+            application_contract_code: "CA-MV-001".into(),
+            contractual_amount: 26_150_000.25,
+            framework_agreement_code: "AQ-RFI-2026".into(),
+            id: "contract_milano_verona".into(),
+            tariff_priorities: vec![
+                TariffPriorityRecord {
+                    priority: 1,
+                    reason: "Tariffario contrattuale".into(),
+                    tariff_book_id: "tariff_lombardia_2025".into(),
+                },
+                TariffPriorityRecord {
+                    priority: 2,
+                    reason: "Fallback nazionale".into(),
+                    tariff_book_id: "tariff_rfi_2024".into(),
+                },
+            ],
+            title: "Linea AV/AC Milano-Verona".into(),
+        }
+    }
+}

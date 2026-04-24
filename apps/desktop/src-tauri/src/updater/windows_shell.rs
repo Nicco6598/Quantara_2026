@@ -2,14 +2,14 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use windows::core::{HSTRING, Interface};
 use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
 };
 use windows::Win32::UI::Shell::{
-    IShellLinkW, SHCNE_ASSOCCHANGED, SHCNF_IDLIST, SHChangeNotify, SetCurrentProcessExplicitAppUserModelID,
-    ShellLink,
+    IShellLinkW, SHCNE_ASSOCCHANGED, SHCNF_IDLIST, SHChangeNotify,
+    SetCurrentProcessExplicitAppUserModelID, ShellLink,
 };
+use windows::core::{HSTRING, Interface};
 
 const APP_USER_MODEL_ID: &str = "com.quantara.desktop";
 const PRODUCT_NAME: &str = "Quantara";
@@ -60,11 +60,15 @@ fn repair_shortcut(
         shell_link.SetIconLocation(&exe_value, 0)?;
 
         if let Some(working_dir) = exe_path.parent() {
-            shell_link.SetWorkingDirectory(&HSTRING::from(working_dir.to_string_lossy().into_owned()))?;
+            shell_link
+                .SetWorkingDirectory(&HSTRING::from(working_dir.to_string_lossy().into_owned()))?;
         }
 
         shell_link.SetDescription(&HSTRING::from(PRODUCT_NAME))?;
-        persist_file.Save(&HSTRING::from(shortcut_path.to_string_lossy().into_owned()), true)?;
+        persist_file.Save(
+            &HSTRING::from(shortcut_path.to_string_lossy().into_owned()),
+            true,
+        )?;
     }
 
     Ok(())

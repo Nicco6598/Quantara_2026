@@ -17,7 +17,12 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::health::get_health_snapshot,
-            commands::accounting::preview_sal_total
+            commands::accounting::preview_sal_total,
+            commands::contracts::list_contracts,
+            commands::contracts::get_contract,
+            commands::contracts::create_contract,
+            commands::tariffs::list_tariff_books,
+            commands::tariffs::create_tariff_book
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Quantara desktop");

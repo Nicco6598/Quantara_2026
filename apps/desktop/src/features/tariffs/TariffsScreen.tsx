@@ -1,6 +1,12 @@
 import { ChevronDown, Download, Filter, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import {
+  listDesktopTariffBooks,
+  type DesktopDataResult,
+  type DesktopTariffBook,
+} from "@/lib/desktopData";
 
 const tariffRows = [
   {
@@ -45,13 +51,15 @@ const tariffRows = [
   },
 ] as const;
 
-const summaryRows = [
-  { label: "Fonte", value: "Regione Lombardia" },
-  { label: "Anno", value: "2025" },
-  { label: "Import", value: "08/05/2024 10:32" },
-  { label: "Voci", value: "12.348" },
-  { label: "Parsing", value: "98,6%" },
-] as const;
+const fallbackTariffBook: DesktopTariffBook = {
+  id: "tariff_lombardia_2025",
+  name: "Tariffario Lombardia 2025",
+  sourceName: "Regione Lombardia",
+  status: "validated",
+  year: 2025,
+};
+
+const fallbackTariffBooks: DesktopTariffBook[] = [fallbackTariffBook];
 
 const anomalyRows = [
   { label: "23 anomalie da confermare", tone: "warning" as const },
@@ -60,6 +68,38 @@ const anomalyRows = [
 ] as const;
 
 export function TariffsScreen() {
+  const [tariffBooksState, setTariffBooksState] = useState<DesktopDataResult<DesktopTariffBook[]>>({
+    data: fallbackTariffBooks,
+    message: "Caricamento tariffari locali.",
+    source: "fallback",
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    listDesktopTariffBooks(fallbackTariffBooks).then((result) => {
+      if (active) {
+        setTariffBooksState(result);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedTariffBook = tariffBooksState.data[0] ?? fallbackTariffBook;
+  const summaryRows = useMemo(
+    () => [
+      { label: "Fonte", value: selectedTariffBook.sourceName },
+      { label: "Anno", value: String(selectedTariffBook.year) },
+      { label: "Origine", value: tariffBooksState.source === "desktop" ? "DB locale" : "Demo" },
+      { label: "Tariffari", value: String(tariffBooksState.data.length) },
+      { label: "Stato", value: selectedTariffBook.status },
+    ],
+    [selectedTariffBook, tariffBooksState.data.length, tariffBooksState.source],
+  );
+
   return (
     <main className="p-6 pb-8">
       <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
@@ -67,7 +107,11 @@ export function TariffsScreen() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="info">Reference base</Badge>
-              <span className="text-xs text-secondary">Import ufficiale validato</span>
+              <span className="text-xs text-secondary">
+                {tariffBooksState.source === "desktop"
+                  ? "Tariffari caricati dal database locale"
+                  : tariffBooksState.message}
+              </span>
             </div>
             <h2 className="mt-4 text-[2rem] font-semibold tracking-tight text-foreground">
               Tariffario letto come base operativa, non come archivio.
@@ -86,9 +130,27 @@ export function TariffsScreen() {
 
           <section className="rounded-[24px] border border-subtle bg-muted/35 p-5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-              Segnali tariffario
+              Tariffari locali
             </div>
             <div className="mt-4 space-y-3">
+              {tariffBooksState.data.map((row) => (
+                <div
+                  className="rounded-[20px] border border-subtle bg-card px-4 py-3"
+                  key={row.id}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-foreground">{row.name}</div>
+                      <div className="mt-1 text-xs text-secondary">
+                        {row.sourceName} · {row.year}
+                      </div>
+                    </div>
+                    <Badge variant={row.status === "active" ? "success" : "info"}>
+                      {row.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
               {anomalyRows.map((row) => (
                 <div
                   className="rounded-[20px] border border-subtle bg-card px-4 py-3"

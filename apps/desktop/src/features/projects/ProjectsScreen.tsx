@@ -17,10 +17,11 @@ import {
 } from "lucide-react";
 import type { Money } from "@quantara/shared-types";
 import { eur } from "@quantara/domain-utils";
-import { useDeferredValue, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
+import { listDesktopContracts, type DesktopContract, type DesktopDataResult } from "@/lib/desktopData";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -380,15 +381,40 @@ const laneMeta: Record<LaneTone, { description: string; label: string }> = {
   },
 };
 
-const projectIndex = new Map(portfolioProjects.map((project) => [project.id, project]));
-
 export function ProjectsScreen() {
+  const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
+    data: [],
+    message: "Caricamento contratti locali.",
+    source: "fallback",
+  });
   const [focus, setFocus] = useState<PortfolioFocus>("all");
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
+  const activeProjects =
+    contractsState.source === "desktop"
+      ? contractsState.data.map(mapContractToProject)
+      : portfolioProjects;
+  const projectIndex = useMemo(
+    () => new Map(activeProjects.map((project) => [project.id, project])),
+    [activeProjects],
+  );
 
-  const visibleProjects = portfolioProjects
+  useEffect(() => {
+    let active = true;
+
+    listDesktopContracts([]).then((result) => {
+      if (active) {
+        setContractsState(result);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const visibleProjects = activeProjects
     .filter(
       (project) => matchesFocus(project, focus) && matchesProjectSearch(project, deferredQuery),
     )
@@ -444,12 +470,12 @@ export function ProjectsScreen() {
   const managerLoad = buildManagerLoad(visibleProjects);
 
   const focusCounts = {
-    all: portfolioProjects.filter((project) => matchesProjectSearch(project, deferredQuery)).length,
-    critical: portfolioProjects.filter(
+    all: activeProjects.filter((project) => matchesProjectSearch(project, deferredQuery)).length,
+    critical: activeProjects.filter(
       (project) =>
         matchesFocus(project, "critical") && matchesProjectSearch(project, deferredQuery),
     ).length,
-    sal: portfolioProjects.filter(
+    sal: activeProjects.filter(
       (project) => matchesFocus(project, "sal") && matchesProjectSearch(project, deferredQuery),
     ).length,
   };
@@ -462,7 +488,10 @@ export function ProjectsScreen() {
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="info">Sala controllo portfolio</Badge>
               <span className="text-xs font-medium text-secondary">
-                Aggiornato alle 17:40 · {visibleProjects.length} lotti nel perimetro attivo
+                {contractsState.source === "desktop"
+                  ? "Contratti caricati dal database locale"
+                  : contractsState.message}{" "}
+                · {visibleProjects.length} lotti nel perimetro attivo
               </span>
               {isPending ? <Badge variant="warning">Filtri in aggiornamento</Badge> : null}
             </div>
@@ -546,13 +575,13 @@ export function ProjectsScreen() {
             </div>
           </div>
 
-          <ApprovalWindowPanel items={visibleApprovals} />
+          <ApprovalWindowPanel items={visibleApprovals} projectIndex={projectIndex} />
         </div>
       </section>
 
       <section className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
         <div className="space-y-6">
-          <PriorityQueuePanel items={visibleQueue} />
+          <PriorityQueuePanel items={visibleQueue} projectIndex={projectIndex} />
           <ManagerLoadPanel
             rows={managerLoad}
             totalManagers={new Set(visibleProjects.map((project) => project.manager)).size}
@@ -569,7 +598,35 @@ export function ProjectsScreen() {
   );
 }
 
-function ApprovalWindowPanel({ items }: { items: ApprovalItem[] }) {
+function mapContractToProject(contract: DesktopContract): PortfolioProject {
+  return {
+    budget: contract.contractualAmount,
+    forecastDeltaDays: 0,
+    healthLabel: "Da pianificare",
+    id: contract.id,
+    location: contract.frameworkAgreementCode,
+    lot: contract.applicationContractCode,
+    manager: "Da assegnare",
+    materialRisk: "Materiali da collegare",
+    nextMilestone: "Configurare SAL e tariffari",
+    phase: "Contratto locale",
+    progress: 0,
+    salDays: 14,
+    salState: "SAL da creare",
+    salValue: eur(0),
+    title: contract.title,
+    tone: "success",
+    variance: "0,0%",
+  };
+}
+
+function ApprovalWindowPanel({
+  items,
+  projectIndex,
+}: {
+  items: ApprovalItem[];
+  projectIndex: Map<string, PortfolioProject>;
+}) {
   const activeEscalations = items.filter((item) => item.tone === "danger").length;
 
   return (
@@ -711,7 +768,13 @@ function FocusChip({
   );
 }
 
-function PriorityQueuePanel({ items }: { items: PriorityItem[] }) {
+function PriorityQueuePanel({
+  items,
+  projectIndex,
+}: {
+  items: PriorityItem[];
+  projectIndex: Map<string, PortfolioProject>;
+}) {
   return (
     <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
       <div className="flex items-center justify-between gap-3">
