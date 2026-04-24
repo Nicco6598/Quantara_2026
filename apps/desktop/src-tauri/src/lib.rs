@@ -7,7 +7,7 @@ mod models;
 mod updater;
 
 pub fn run() {
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", not(debug_assertions)))]
     updater::windows_shell::reconcile();
 
     tauri::Builder::default()

@@ -34,21 +34,21 @@ export function UpdateExperienceDialog({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 p-4 backdrop-blur-xl"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/82 p-4 backdrop-blur-xl"
       role="dialog"
     >
-      <div className="relative w-full max-w-4xl overflow-hidden rounded-[30px] border border-white/12 bg-[var(--surface-base)] shadow-2xl">
+      <div className="update-modal-panel relative w-full max-w-4xl overflow-hidden rounded-[30px] border shadow-2xl">
         <div className="update-command-surface absolute inset-0" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-100/70 to-transparent" />
 
         <div className="relative z-10 p-5 md:p-7">
           <div className="flex items-start justify-between gap-4">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-cyan-300/25 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                <span className="update-modal-chip rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]">
                   Update cockpit
                 </span>
-                <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs text-white/78">
+                <span className="update-modal-chip-muted rounded-full border px-3 py-1 text-xs">
                   Da v{update.currentVersion} a v{update.version}
                 </span>
               </div>
@@ -56,7 +56,7 @@ export function UpdateExperienceDialog({
               <h2 className="mt-5 text-[2rem] font-semibold tracking-tight text-white md:text-[2.8rem]">
                 Nuova release pronta per il deploy locale.
               </h2>
-              <p className="mt-3 max-w-xl text-sm leading-7 text-white/72 md:text-[15px]">
+              <p className="update-modal-muted-text mt-3 max-w-xl text-sm leading-7 md:text-[15px]">
                 L&apos;updater ora usa un flusso dedicato dentro Quantara: patch notes leggibili,
                 stato download reale e installazione finale senza prompt generici del sistema.
               </p>
@@ -64,7 +64,7 @@ export function UpdateExperienceDialog({
 
             <button
               aria-label="Chiudi updater"
-              className="rounded-2xl border border-white/10 bg-white/5 p-2.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-2xl border border-white/20 bg-slate-950/70 p-2.5 text-slate-200 transition-colors hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isBusy}
               onClick={onClose}
               type="button"
@@ -74,29 +74,29 @@ export function UpdateExperienceDialog({
           </div>
 
           <div className="mt-7 grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-            <section className="overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/46 p-5">
+            <section className="update-modal-card overflow-hidden rounded-[26px] border p-5">
               <div className="flex flex-wrap items-center gap-3">
                 <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
                 <MetricPill icon={Clock3} label="Check" value={formatTimestamp(update.checkedAt)} />
                 <MetricPill icon={ShieldCheck} label="Canale" value="Stable" />
               </div>
 
-              <div className="mt-5 rounded-[22px] border border-white/8 bg-white/4 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/54">
+              <div className="mt-5 rounded-[22px] border border-white/14 bg-slate-950/60 p-4">
+                <div className="update-modal-subtle-text text-[11px] font-semibold uppercase tracking-[0.2em]">
                   Patch notes
                 </div>
-                <div className="mt-3 space-y-3 text-sm leading-7 text-white/82">
+                <div className="mt-3 space-y-3 text-sm leading-7">
                   {notes.length > 0 ? (
                     notes.map((note) => (
                       <div
-                        className="rounded-2xl border border-white/6 bg-black/14 px-4 py-3"
+                        className="update-modal-note rounded-2xl border px-4 py-3"
                         key={note.key}
                       >
                         {note.text}
                       </div>
                     ))
                   ) : (
-                    <p className="rounded-2xl border border-dashed border-white/10 px-4 py-4 text-white/62">
+                    <p className="update-modal-muted-text rounded-2xl border border-dashed border-white/18 px-4 py-4">
                       Nessuna nota release disponibile per questa build.
                     </p>
                   )}
@@ -104,7 +104,7 @@ export function UpdateExperienceDialog({
               </div>
             </section>
 
-            <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,18,34,0.92),rgba(7,12,24,0.98))] p-5">
+            <section className="update-modal-card-strong rounded-[26px] border p-5">
               <div className="flex items-center gap-3">
                 <div className="flex size-12 items-center justify-center rounded-2xl bg-cyan-400/12 text-cyan-100">
                   {installState.phase === "installing" ? (
@@ -118,7 +118,7 @@ export function UpdateExperienceDialog({
                   )}
                 </div>
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/54">
+                  <div className="update-modal-subtle-text text-[11px] font-semibold uppercase tracking-[0.2em]">
                     Deployment step
                   </div>
                   <div className="mt-1 text-lg font-semibold text-white">
@@ -127,12 +127,12 @@ export function UpdateExperienceDialog({
                 </div>
               </div>
 
-              <p className="mt-4 text-sm leading-7 text-white/68">
+              <p className="update-modal-muted-text mt-4 text-sm leading-7">
                 {getInstallDescription(installState)}
               </p>
 
-              <div className="mt-5 rounded-[22px] border border-white/8 bg-white/4 p-4">
-                <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.18em] text-white/56">
+              <div className="mt-5 rounded-[22px] border border-white/14 bg-slate-950/58 p-4">
+                <div className="update-modal-subtle-text flex items-center justify-between gap-3 text-xs uppercase tracking-[0.18em]">
                   <span>Pipeline</span>
                   <span>
                     {progress !== null
@@ -159,7 +159,7 @@ export function UpdateExperienceDialog({
                 </div>
 
                 {installState.phase === "downloading" ? (
-                  <div className="mt-3 text-sm text-white/72">
+                  <div className="update-modal-muted-text mt-3 text-sm">
                     {formatBytes(installState.downloadedBytes)}
                     {installState.totalBytes ? ` / ${formatBytes(installState.totalBytes)}` : ""}
                   </div>
@@ -172,7 +172,7 @@ export function UpdateExperienceDialog({
                 ) : null}
               </div>
 
-              <div className="mt-5 space-y-3 text-sm text-white/76">
+              <div className="update-modal-muted-text mt-5 space-y-3 text-sm">
                 <StepRow
                   active={installState.phase === "idle"}
                   label="Verifica release disponibile"
@@ -213,10 +213,10 @@ function MetricPill({
   value: string;
 }) {
   return (
-    <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/6 px-4 py-2 text-white/86">
+    <div className="update-modal-chip-muted inline-flex items-center gap-3 rounded-full border px-4 py-2">
       <Icon className="size-4 text-cyan-100" />
       <div>
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
+        <div className="update-modal-subtle-text text-[10px] font-semibold uppercase tracking-[0.18em]">
           {label}
         </div>
         <div className="text-sm font-medium">{value}</div>
@@ -231,7 +231,7 @@ function StepRow({ active, label }: { active: boolean; label: string }) {
       className={`flex items-center gap-3 rounded-2xl border px-3 py-3 transition-colors ${
         active
           ? "border-cyan-300/24 bg-cyan-400/10 text-white"
-          : "border-white/6 bg-white/3 text-white/62"
+          : "border-white/14 bg-slate-950/50 text-slate-300"
       }`}
     >
       <span
