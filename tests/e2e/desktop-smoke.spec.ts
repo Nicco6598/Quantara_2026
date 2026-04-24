@@ -39,9 +39,7 @@ test.describe("Quantara desktop web shell", () => {
       }),
     ).toBeVisible();
     await expect(page.getByText("Nuovo tariffario")).toBeVisible();
-    await expect(
-      page.getByText("Fornitura e posa binario tipo 60E1").first(),
-    ).toBeVisible();
+    await expect(page.getByText("Fornitura e posa binario tipo 60E1").first()).toBeVisible();
 
     await sidebar.getByRole("button", { name: "Materiali" }).click();
     await expect(

@@ -2,6 +2,12 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.40 - 2026-04-24
+
+- Accept user data input for projects management.
+- Implement clear SAL workflow with defined input steps and validation.
+- Prepare infrastructure to accept new data types in future releases.
+
 ## 0.1.32 - 2026-04-24
 
 - Add ad-hoc macOS code signing for test DMG builds so Gatekeeper no longer reports the app as damaged on Apple Silicon.

@@ -253,7 +253,11 @@ export async function selectTariffPdfMetadata(): Promise<TariffPdfMetadata | nul
 }
 
 function inferTariffMetadataFromPath(path: string): TariffPdfMetadata {
-  const fileName = path.split(/[\\/]/).pop()?.replace(/\.pdf$/i, "") ?? "Tariffario importato";
+  const fileName =
+    path
+      .split(/[\\/]/)
+      .pop()
+      ?.replace(/\.pdf$/i, "") ?? "Tariffario importato";
   const normalized = fileName.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   const yearMatch = normalized.match(/\b(20\d{2}|19\d{2})\b/);
   const year = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear();
