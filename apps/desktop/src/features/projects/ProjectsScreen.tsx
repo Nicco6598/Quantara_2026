@@ -26,7 +26,6 @@ import {
   deleteDesktopContract,
   listDesktopContracts,
   listDesktopTariffBooks,
-  updateDesktopContract,
   type DesktopContract,
   type DesktopDataResult,
 } from "@/lib/desktopData";
@@ -1669,7 +1668,7 @@ function WorkbenchRowDropdown({
       </Button>
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <button className="fixed inset-0 z-40 cursor-default" onClick={() => setIsOpen(false)} type="button" />
           <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-[14px] border border-subtle bg-card py-1 shadow-soft">
             <button
               className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
