@@ -8,5 +8,7 @@ pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<(
         [CURRENT_SCHEMA_VERSION],
     )?;
 
+    connection.execute_batch(include_str!("../../migrations/0002_tariff_voices.sql"))?;
+
     Ok(())
 }

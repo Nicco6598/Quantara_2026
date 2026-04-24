@@ -21,12 +21,27 @@ import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "r
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
-import { listDesktopContracts, type DesktopContract, type DesktopDataResult } from "@/lib/desktopData";
+import {
+  createDesktopContract,
+  deleteDesktopContract,
+  listDesktopContracts,
+  listDesktopTariffBooks,
+  updateDesktopContract,
+  type DesktopContract,
+  type DesktopDataResult,
+} from "@/lib/desktopData";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 type LaneTone = Extract<StatusTone, "success" | "warning" | "danger">;
 type PortfolioFocus = "all" | "critical" | "sal";
+type ProjectFormState = {
+  applicationContractCode: string;
+  contractualAmount: string;
+  frameworkAgreementCode: string;
+  tariffBookId: string;
+  title: string;
+};
 
 type PortfolioProject = {
   budget: Money;
@@ -381,12 +396,35 @@ const laneMeta: Record<LaneTone, { description: string; label: string }> = {
   },
 };
 
+const fallbackProjectTariffBook = {
+  id: "tariff_lombardia_2025",
+  name: "Tariffario Lombardia 2025",
+  sourceName: "Regione Lombardia",
+  status: "validated",
+  year: 2025,
+};
+
+const initialProjectForm: ProjectFormState = {
+  applicationContractCode: "",
+  contractualAmount: "",
+  frameworkAgreementCode: "",
+  tariffBookId: fallbackProjectTariffBook.id,
+  title: "",
+};
+
 export function ProjectsScreen() {
+  const [createState, setCreateState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [createMessage, setCreateMessage] = useState("");
   const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
     data: [],
     message: "Caricamento contratti locali.",
     source: "fallback",
   });
+  const [projectForm, setProjectForm] = useState<ProjectFormState>(initialProjectForm);
+  const [selectedContractId, setSelectedContractId] = useState("");
+  const [tariffBooksState, setTariffBooksState] = useState(
+    [fallbackProjectTariffBook],
+  );
   const [focus, setFocus] = useState<PortfolioFocus>("all");
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -403,9 +441,15 @@ export function ProjectsScreen() {
   useEffect(() => {
     let active = true;
 
-    listDesktopContracts([]).then((result) => {
+    Promise.all([listDesktopContracts([]), listDesktopTariffBooks([fallbackProjectTariffBook])]).then(([contracts, tariffBooks]) => {
       if (active) {
-        setContractsState(result);
+        setContractsState(contracts);
+        setTariffBooksState(tariffBooks.data);
+        setSelectedContractId(contracts.data[0]?.id ?? "");
+        setProjectForm((state) => ({
+          ...state,
+          tariffBookId: tariffBooks.data[0]?.id ?? state.tariffBookId,
+        }));
       }
     });
 
@@ -413,6 +457,118 @@ export function ProjectsScreen() {
       active = false;
     };
   }, []);
+
+  function buildContractRequest(contractId: string) {
+    const amount = Number(projectForm.contractualAmount.replace(",", "."));
+
+    if (
+      !projectForm.title.trim() ||
+      !projectForm.applicationContractCode.trim() ||
+      !projectForm.frameworkAgreementCode.trim() ||
+      !projectForm.tariffBookId ||
+      !Number.isFinite(amount) ||
+      amount < 0
+    ) {
+      return null;
+    }
+
+    return {
+      applicationContractCode: projectForm.applicationContractCode.trim(),
+      contractualAmount: amount,
+      frameworkAgreementCode: projectForm.frameworkAgreementCode.trim(),
+      id: contractId,
+      tariffPriorities: [
+        {
+          priority: 1,
+          reason: "Tariffario principale",
+          tariffBookId: projectForm.tariffBookId,
+        },
+      ],
+      title: projectForm.title.trim(),
+    };
+  }
+
+  async function handleCreateProject() {
+    setCreateState("saving");
+    setCreateMessage("");
+
+    const request = buildContractRequest(`contract_locale_${Date.now()}`);
+
+    if (!request) {
+      setCreateState("error");
+      setCreateMessage("Compila titolo, codici, importo e tariffario principale.");
+      return;
+    }
+
+    try {
+      const created = await createDesktopContract(request);
+
+      setContractsState((current) => ({
+        data: [created, ...current.data.filter((contract) => contract.id !== created.id)],
+        ...(current.source === "fallback"
+          ? { message: "Runtime browser: anteprima locale.", source: "fallback" }
+          : { source: "desktop" }),
+      }));
+      setSelectedContractId(created.id);
+      setCreateState("saved");
+      setCreateMessage(`${created.title} creato.`);
+      setProjectForm((state) => ({
+        ...initialProjectForm,
+        tariffBookId: state.tariffBookId,
+      }));
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function handleSelectProject(projectId: string) {
+    const contract = contractsState.data.find((item) => item.id === projectId);
+
+    if (!contract) {
+      setCreateState("error");
+      setCreateMessage("Modifica disponibile sui progetti locali creati nel database.");
+      return;
+    }
+
+    setSelectedContractId(contract.id);
+    setProjectForm({
+      applicationContractCode: contract.applicationContractCode,
+      contractualAmount: String(contract.contractualAmount.amount),
+      frameworkAgreementCode: contract.frameworkAgreementCode,
+      tariffBookId: contract.tariffPriorities[0]?.tariffBookId ?? tariffBooksState[0]?.id ?? "",
+      title: contract.title,
+    });
+    setCreateState("idle");
+    setCreateMessage(`${contract.title} selezionato per modifica.`);
+  }
+
+  async function handleDeleteFromDropdown(projectId: string) {
+    setCreateState("saving");
+    setCreateMessage("");
+
+    try {
+      const deletedContract = contractsState.data.find(
+        (contract) => contract.id === projectId,
+      );
+
+      await deleteDesktopContract(projectId);
+      setContractsState((current) => ({
+        data: current.data.filter((contract) => contract.id !== projectId),
+        ...(current.source === "fallback"
+          ? { message: "Runtime browser: eliminazione in anteprima.", source: "fallback" }
+          : { source: "desktop" }),
+      }));
+      if (selectedContractId === projectId) {
+        setSelectedContractId("");
+      }
+      setCreateState("saved");
+      setCreateMessage(`${deletedContract?.title ?? "Progetto"} eliminato.`);
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
 
   const visibleProjects = activeProjects
     .filter(
@@ -567,12 +723,89 @@ export function ProjectsScreen() {
                   <BriefcaseBusiness className="size-4" />
                   Nuova SAL
                 </Button>
-                <Button size="sm">
-                  <Plus className="size-4" />
-                  Nuovo progetto
-                </Button>
               </div>
             </div>
+
+            <form
+              className="mt-6 rounded-[24px] border border-subtle bg-card/86 p-4 shadow-soft"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreateProject();
+              }}
+            >
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+                <ProjectTextField
+                  label="Nome progetto"
+                  onChange={(value) => setProjectForm((state) => ({ ...state, title: value }))}
+                  placeholder="Linea AV/AC Milano-Verona"
+                  value={projectForm.title}
+                />
+                <ProjectTextField
+                  label="Contratto applicativo"
+                  onChange={(value) =>
+                    setProjectForm((state) => ({ ...state, applicationContractCode: value }))
+                  }
+                  placeholder="CA-MV-001"
+                  value={projectForm.applicationContractCode}
+                />
+                <ProjectTextField
+                  label="Accordo quadro"
+                  onChange={(value) =>
+                    setProjectForm((state) => ({ ...state, frameworkAgreementCode: value }))
+                  }
+                  placeholder="AQ-RFI-2026"
+                  value={projectForm.frameworkAgreementCode}
+                />
+                <ProjectTextField
+                  label="Importo"
+                  onChange={(value) =>
+                    setProjectForm((state) => ({ ...state, contractualAmount: value }))
+                  }
+                  placeholder="26150000"
+                  type="number"
+                  value={projectForm.contractualAmount}
+                />
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <label className="block min-w-[260px]">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                    Tariffario principale
+                  </span>
+                  <select
+                    className="mt-2 h-10 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+                    onChange={(event) =>
+                      setProjectForm((state) => ({ ...state, tariffBookId: event.target.value }))
+                    }
+                    value={projectForm.tariffBookId}
+                  >
+                    {tariffBooksState.map((book) => (
+                      <option key={book.id} value={book.id}>
+                        {book.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="flex flex-col gap-2 xl:items-end">
+                  {createMessage ? (
+                    <div
+                      className={`text-xs ${
+                        createState === "error" ? "text-danger" : "text-secondary"
+                      }`}
+                    >
+                      {createMessage}
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2 xl:justify-end">
+                    <Button disabled={createState === "saving"} type="submit">
+                      <Plus className="size-4" />
+                      {createState === "saving" ? "Salvataggio" : "Crea progetto"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </form>
           </div>
 
           <ApprovalWindowPanel items={visibleApprovals} projectIndex={projectIndex} />
@@ -588,12 +821,22 @@ export function ProjectsScreen() {
           />
         </div>
 
-        <PortfolioBoard projects={visibleProjects} />
+        <PortfolioBoard
+          onDeleteProject={handleDeleteFromDropdown}
+          onSelectProject={handleSelectProject}
+          projects={visibleProjects}
+        />
 
         <ControlRailPanel activities={visibleActivities} signals={controlSignals} />
       </section>
 
-      <ProjectsWorkbench projects={visibleProjects} query={query} />
+      <ProjectsWorkbench
+        onDeleteProject={handleDeleteFromDropdown}
+        onSelectProject={handleSelectProject}
+        projects={visibleProjects}
+        query={query}
+        selectedProjectId={selectedContractId}
+      />
     </main>
   );
 }
@@ -768,6 +1011,35 @@ function FocusChip({
   );
 }
 
+function ProjectTextField({
+  label,
+  onChange,
+  placeholder,
+  type = "text",
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  type?: "number" | "text";
+  value: string;
+}) {
+  return (
+    <label className="block min-w-[180px] flex-1">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+        {label}
+      </span>
+      <input
+        className="mt-2 h-10 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        type={type}
+        value={value}
+      />
+    </label>
+  );
+}
+
 function PriorityQueuePanel({
   items,
   projectIndex,
@@ -900,7 +1172,15 @@ function ManagerLoadPanel({
   );
 }
 
-function PortfolioBoard({ projects }: { projects: PortfolioProject[] }) {
+function PortfolioBoard({
+  onDeleteProject,
+  onSelectProject,
+  projects,
+}: {
+  onDeleteProject: (projectId: string) => void;
+  onSelectProject: (projectId: string) => void;
+  projects: PortfolioProject[];
+}) {
   return (
     <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
@@ -927,6 +1207,8 @@ function PortfolioBoard({ projects }: { projects: PortfolioProject[] }) {
           <PortfolioLane
             items={projects.filter((project) => project.tone === tone)}
             key={tone}
+            onDeleteProject={onDeleteProject}
+            onSelectProject={onSelectProject}
             tone={tone}
           />
         ))}
@@ -935,7 +1217,17 @@ function PortfolioBoard({ projects }: { projects: PortfolioProject[] }) {
   );
 }
 
-function PortfolioLane({ items, tone }: { items: PortfolioProject[]; tone: LaneTone }) {
+function PortfolioLane({
+  items,
+  onDeleteProject,
+  onSelectProject,
+  tone,
+}: {
+  items: PortfolioProject[];
+  onDeleteProject: (projectId: string) => void;
+  onSelectProject: (projectId: string) => void;
+  tone: LaneTone;
+}) {
   const palette = getTonePalette(tone);
   const meta = laneMeta[tone];
 
@@ -959,7 +1251,14 @@ function PortfolioLane({ items, tone }: { items: PortfolioProject[]; tone: LaneT
 
       <div className="mt-4 space-y-3">
         {items.length > 0 ? (
-          items.map((project) => <PortfolioLaneCard key={project.id} project={project} />)
+          items.map((project) => (
+            <PortfolioLaneCard
+              key={project.id}
+              onDelete={() => onDeleteProject(project.id)}
+              onSelect={() => onSelectProject(project.id)}
+              project={project}
+            />
+          ))
         ) : (
           <EmptyState
             description="Nessun lotto rientra in questa fascia con i filtri correnti."
@@ -971,7 +1270,15 @@ function PortfolioLane({ items, tone }: { items: PortfolioProject[]; tone: LaneT
   );
 }
 
-function PortfolioLaneCard({ project }: { project: PortfolioProject }) {
+function PortfolioLaneCard({
+  onDelete,
+  onSelect,
+  project,
+}: {
+  onDelete: () => void;
+  onSelect: () => void;
+  project: PortfolioProject;
+}) {
   const palette = getTonePalette(project.tone);
   const salTone = getSalTone(project);
 
@@ -1048,9 +1355,11 @@ function PortfolioLaneCard({ project }: { project: PortfolioProject }) {
         <Button onClick={openProjectDetail} size="sm">
           Apri dossier
         </Button>
-        <Button aria-label={`Azioni per ${project.title}`} size="icon" variant="ghost">
-          <MoreVertical className="size-4" />
-        </Button>
+        <WorkbenchRowDropdown
+          onDelete={onDelete}
+          onSelect={onSelect}
+          projectTitle={project.title}
+        />
       </div>
     </article>
   );
@@ -1162,7 +1471,19 @@ function ControlRailPanel({
   );
 }
 
-function ProjectsWorkbench({ projects, query }: { projects: PortfolioProject[]; query: string }) {
+function ProjectsWorkbench({
+  onDeleteProject,
+  onSelectProject,
+  projects,
+  query,
+  selectedProjectId,
+}: {
+  onDeleteProject: (projectId: string) => void;
+  onSelectProject: (projectId: string) => void;
+  projects: PortfolioProject[];
+  query: string;
+  selectedProjectId: string;
+}) {
   return (
     <section className="mt-6 overflow-hidden rounded-[28px] border border-subtle bg-card shadow-soft">
       <div className="flex flex-col gap-3 border-b border-subtle p-5 xl:flex-row xl:items-end xl:justify-between">
@@ -1193,7 +1514,15 @@ function ProjectsWorkbench({ projects, query }: { projects: PortfolioProject[]; 
 
       <div>
         {projects.length > 0 ? (
-          projects.map((project) => <WorkbenchRow key={project.id} project={project} />)
+          projects.map((project) => (
+            <WorkbenchRow
+              isSelected={project.id === selectedProjectId}
+              key={project.id}
+              onDeleteProject={onDeleteProject}
+              onSelectProject={onSelectProject}
+              project={project}
+            />
+          ))
         ) : (
           <div className="p-8">
             <EmptyState
@@ -1207,16 +1536,26 @@ function ProjectsWorkbench({ projects, query }: { projects: PortfolioProject[]; 
   );
 }
 
-function WorkbenchRow({ project }: { project: PortfolioProject }) {
+function WorkbenchRow({
+  isSelected,
+  onDeleteProject,
+  onSelectProject,
+  project,
+}: {
+  isSelected: boolean;
+  onDeleteProject: (projectId: string) => void;
+  onSelectProject: (projectId: string) => void;
+  project: PortfolioProject;
+}) {
   const palette = getTonePalette(project.tone);
   const salTone = getSalTone(project);
 
   return (
     <div
-      className="projects-workbench-row grid gap-4 border-t border-subtle px-5 py-4 xl:grid-cols-[1.7fr_1fr_1fr_1fr_1.1fr_auto] xl:items-center"
-      style={{
-        background: "linear-gradient(180deg, transparent, transparent)",
-      }}
+      className={cn(
+        "projects-workbench-row group relative grid gap-4 border-t border-subtle px-5 py-4 xl:grid-cols-[1.7fr_1fr_1fr_1fr_1.1fr_auto] xl:items-center",
+        isSelected ? "bg-primary/10" : "",
+      )}
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
@@ -1282,12 +1621,17 @@ function WorkbenchRow({ project }: { project: PortfolioProject }) {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button onClick={() => onSelectProject(project.id)} size="sm" variant="outline">
+          Modifica
+        </Button>
         <Button onClick={openProjectDetail} size="sm" variant="outline">
           Apri
         </Button>
-        <Button aria-label={`Azioni per ${project.title}`} size="icon" variant="ghost">
-          <MoreVertical className="size-4" />
-        </Button>
+        <WorkbenchRowDropdown
+          onDelete={() => onDeleteProject(project.id)}
+          onSelect={() => onSelectProject(project.id)}
+          projectTitle={project.title}
+        />
       </div>
     </div>
   );
@@ -1298,6 +1642,62 @@ function EmptyState({ description, title }: { description: string; title: string
     <div className="rounded-2xl border border-dashed border-subtle bg-muted/50 p-4">
       <div className="text-sm font-semibold text-foreground">{title}</div>
       <p className="mt-1 text-xs leading-5 text-secondary">{description}</p>
+    </div>
+  );
+}
+
+function WorkbenchRowDropdown({
+  onDelete,
+  onSelect,
+  projectTitle,
+}: {
+  onDelete: () => void;
+  onSelect: () => void;
+  projectTitle: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <Button
+        aria-expanded={isOpen}
+        aria-label={`Azioni per ${projectTitle}`}
+        onClick={() => setIsOpen(!isOpen)}
+        size="icon"
+        variant="ghost"
+      >
+        <MoreVertical className="size-4" />
+      </Button>
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-[14px] border border-subtle bg-card py-1 shadow-soft">
+            <button
+              className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+              onClick={() => {
+                onSelect();
+                setIsOpen(false);
+              }}
+              type="button"
+            >
+              Modifica
+            </button>
+            <button
+              className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-muted"
+              onClick={() => {
+                onDelete();
+                setIsOpen(false);
+              }}
+              type="button"
+            >
+              Elimina
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

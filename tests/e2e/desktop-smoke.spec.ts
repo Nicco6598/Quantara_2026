@@ -35,9 +35,10 @@ test.describe("Quantara desktop web shell", () => {
     await sidebar.getByRole("button", { name: "Tariffari" }).click();
     await expect(
       page.getByRole("heading", {
-        name: "Tariffario letto come base operativa, non come archivio.",
+        name: "Catalogo tariffari per ente, anno e progetto.",
       }),
     ).toBeVisible();
+    await expect(page.getByText("Nuovo tariffario")).toBeVisible();
     await expect(
       page.getByText("Fornitura e posa binario tipo 60E1").first(),
     ).toBeVisible();

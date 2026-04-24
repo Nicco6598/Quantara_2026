@@ -2,7 +2,7 @@ use tauri::AppHandle;
 
 use crate::{
     infrastructure::{
-        contract_repository::{ContractRecord, CreateContractRequest},
+        contract_repository::{ContractRecord, CreateContractRequest, UpdateContractRequest},
         local_storage::open_app_database,
     },
     models::app_error::AppError,
@@ -32,6 +32,30 @@ pub fn create_contract(
     let mut connection = open_app_database(&app).map_err(to_command_error)?;
 
     crate::infrastructure::contract_repository::create_contract(&mut connection, request)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn update_contract(
+    app: AppHandle,
+    contract_id: String,
+    request: UpdateContractRequest,
+) -> Result<ContractRecord, String> {
+    let mut connection = open_app_database(&app).map_err(to_command_error)?;
+
+    crate::infrastructure::contract_repository::update_contract(
+        &mut connection,
+        &contract_id,
+        request,
+    )
+    .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn delete_contract(app: AppHandle, contract_id: String) -> Result<(), String> {
+    let mut connection = open_app_database(&app).map_err(to_command_error)?;
+
+    crate::infrastructure::contract_repository::delete_contract(&mut connection, &contract_id)
         .map_err(to_command_error)
 }
 

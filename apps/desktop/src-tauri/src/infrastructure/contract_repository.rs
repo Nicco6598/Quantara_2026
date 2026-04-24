@@ -24,6 +24,8 @@ pub struct CreateContractRequest {
     pub title: String,
 }
 
+pub type UpdateContractRequest = CreateContractRequest;
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractRecord {
@@ -133,6 +135,89 @@ pub fn create_contract(
 
     get_contract(connection, &request.id)?
         .ok_or_else(|| AppError::Database("created contract could not be reloaded".into()))
+}
+
+pub fn update_contract(
+    connection: &mut Connection,
+    contract_id: &str,
+    request: UpdateContractRequest,
+) -> Result<ContractRecord, AppError> {
+    validate_contract_request(&request)?;
+    apply_migrations(connection).map_err(to_database_error)?;
+
+    let transaction = connection.transaction().map_err(to_database_error)?;
+    let amount_cents = money_to_cents(request.contractual_amount);
+
+    let updated = transaction
+        .execute(
+            "UPDATE contracts
+             SET title = ?1,
+                 application_contract_code = ?2,
+                 framework_agreement_code = ?3,
+                 contractual_amount_cents = ?4,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?5",
+            params![
+                request.title,
+                request.application_contract_code,
+                request.framework_agreement_code,
+                amount_cents,
+                contract_id
+            ],
+        )
+        .map_err(to_database_error)?;
+
+    if updated == 0 {
+        return Err(AppError::Database("contract not found".into()));
+    }
+
+    transaction
+        .execute(
+            "DELETE FROM tariff_priorities WHERE contract_id = ?1",
+            [contract_id],
+        )
+        .map_err(to_database_error)?;
+
+    for priority in &request.tariff_priorities {
+        transaction
+            .execute(
+                "INSERT INTO tariff_priorities (contract_id, tariff_book_id, priority, reason)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    contract_id,
+                    priority.tariff_book_id,
+                    priority.priority,
+                    priority.reason
+                ],
+            )
+            .map_err(to_database_error)?;
+    }
+
+    transaction.commit().map_err(to_database_error)?;
+
+    get_contract(connection, contract_id)?
+        .ok_or_else(|| AppError::Database("updated contract could not be reloaded".into()))
+}
+
+pub fn delete_contract(connection: &mut Connection, contract_id: &str) -> Result<(), AppError> {
+    apply_migrations(connection).map_err(to_database_error)?;
+
+    let transaction = connection.transaction().map_err(to_database_error)?;
+    transaction
+        .execute(
+            "DELETE FROM tariff_priorities WHERE contract_id = ?1",
+            [contract_id],
+        )
+        .map_err(to_database_error)?;
+    transaction
+        .execute("DELETE FROM sal_documents WHERE contract_id = ?1", [contract_id])
+        .map_err(to_database_error)?;
+    transaction
+        .execute("DELETE FROM contracts WHERE id = ?1", [contract_id])
+        .map_err(to_database_error)?;
+    transaction.commit().map_err(to_database_error)?;
+
+    Ok(())
 }
 
 fn list_priorities(
