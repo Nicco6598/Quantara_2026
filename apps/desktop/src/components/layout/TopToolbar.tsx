@@ -25,6 +25,7 @@ type RouteMeta = {
 };
 
 type PageAction = {
+  actionId: string;
   hasDropdown?: boolean;
   icon: LucideIcon;
   label: string;
@@ -45,32 +46,29 @@ const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
 
 const pageActionsMap: Record<QuantaraRoute, PageAction[]> = {
   accounting: [
-    { hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
-    { icon: Download, label: "Esporta", variant: "outline" },
+    { actionId: "filter", hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
+    { actionId: "export", icon: Download, label: "Esporta", variant: "outline" },
   ],
-  dashboard: [{ icon: Settings, label: "Configura", variant: "outline" }],
+  dashboard: [{ actionId: "settings", icon: Settings, label: "Configura", variant: "outline" }],
   materials: [
-    { icon: UploadCloud, label: "Importa", variant: "outline" },
-    { icon: Plus, label: "Nuovo", variant: "primary" },
+    { actionId: "import", icon: UploadCloud, label: "Importa", variant: "outline" },
+    { actionId: "new", icon: Plus, label: "Nuovo", variant: "primary" },
   ],
   "project-detail": [
-    { icon: Download, label: "Esporta", variant: "outline" },
-    { icon: Plus, label: "SAL", variant: "primary" },
+    { actionId: "export", icon: Download, label: "Esporta", variant: "outline" },
+    { actionId: "new-sal", icon: Plus, label: "SAL", variant: "primary" },
   ],
   projects: [
-    { hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
-    { icon: Plus, label: "Nuovo", variant: "primary" },
+    { actionId: "filter", hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
+    { actionId: "new-project", icon: Plus, label: "Nuovo", variant: "primary" },
   ],
-  sal: [
-    { hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
-    { icon: Plus, label: "Nuova SAL", variant: "primary" },
-  ],
-  settings: [{ icon: Settings, label: "Preferenze", variant: "outline" }],
+  sal: [{ actionId: "new-sal", icon: Plus, label: "Nuova SAL", variant: "primary" }],
+  settings: [{ actionId: "preferences", icon: Settings, label: "Preferenze", variant: "outline" }],
   tariffs: [
-    { icon: Download, label: "Scarica", variant: "outline" },
-    { icon: UploadCloud, label: "Importa", variant: "primary" },
+    { actionId: "export", icon: Download, label: "Scarica", variant: "outline" },
+    { actionId: "import", icon: UploadCloud, label: "Importa", variant: "primary" },
   ],
-  team: [{ icon: Users, label: "Ruoli", variant: "outline" }],
+  team: [{ actionId: "roles", icon: Users, label: "Ruoli", variant: "outline" }],
 };
 
 type TopToolbarProps = {
@@ -211,7 +209,14 @@ function PageActions({ actions }: { actions: PageAction[] }) {
       {actions.map((action) => (
         <Button
           className="gap-1.5 rounded-[18px]"
-          key={`${action.label}-${action.variant}`}
+          key={`${action.actionId}-${action.variant}`}
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent("topbar-action", {
+                detail: action.actionId,
+              }),
+            );
+          }}
           size="sm"
           variant={action.variant === "primary" ? "default" : "outline"}
         >

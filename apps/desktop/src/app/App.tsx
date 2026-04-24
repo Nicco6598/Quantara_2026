@@ -54,6 +54,29 @@ export function App() {
   }, [setActiveRoute]);
 
   useEffect(() => {
+    const handleTopbarAction = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+
+      if (customEvent.detail === "new-project") {
+        setActiveRoute("sal");
+        window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-project" }));
+        }, 0);
+      }
+
+      if (customEvent.detail === "new-sal") {
+        setActiveRoute("sal");
+        window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-sal" }));
+        }, 0);
+      }
+    };
+
+    window.addEventListener("topbar-action", handleTopbarAction);
+    return () => window.removeEventListener("topbar-action", handleTopbarAction);
+  }, [setActiveRoute]);
+
+  useEffect(() => {
     const handleUpdateAvailable = (event: Event) => {
       const customEvent = event as CustomEvent<AvailableAppUpdate>;
       setAvailableUpdate(customEvent.detail);

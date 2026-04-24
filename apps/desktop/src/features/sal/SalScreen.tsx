@@ -1,289 +1,1008 @@
-import { CalendarDays, Download, Filter, Search } from "lucide-react";
-import { eur } from "@quantara/domain-utils";
+import {
+  ArrowLeft,
+  ArrowRight,
+  FolderPlus,
+  Layers3,
+  Lock,
+  Plus,
+  ReceiptText,
+  Search,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import {
+  buildSalDocumentView,
+  createId,
+  normalizeDecimal,
+  surchargeOptions,
+  type SalDocumentView,
+  type SalLine,
+  type SalProject,
+  type SalSurchargeKind,
+  type SalTariffVoice,
+} from "@/features/sal/domain/sal-workflow";
 import { formatMoney } from "@/lib/formatters";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
-const salRows = [
-  {
-    amount: eur(2156800),
-    cumulative: eur(10842150),
-    deadline: "07 Mag 2024",
-    dossier: "Firma DL oggi",
-    period: "01 Apr 2024 - 30 Apr 2024",
-    progress: "43,6%",
-    project: "Linea AV/AC Milano-Verona",
-    sal: "SAL 8",
-    status: "Approvata",
-    tone: "success",
-  },
-  {
-    amount: eur(1985600),
-    cumulative: eur(7442600),
-    deadline: "14 Mag 2024",
-    dossier: "Check documentale",
-    period: "01 Apr 2024 - 30 Apr 2024",
-    progress: "68,0%",
-    project: "Nodo di Firenze AV",
-    sal: "SAL 6",
-    status: "In approvazione",
-    tone: "warning",
-  },
-  {
-    amount: eur(2890300),
-    cumulative: eur(12580400),
-    deadline: "20 Mag 2024",
-    dossier: "Extra-costi da riallineare",
-    period: "01 Apr 2024 - 30 Apr 2024",
-    progress: "72,0%",
-    project: "Linea AV Napoli-Bari",
-    sal: "SAL 7",
-    status: "In revisione",
-    tone: "danger",
-  },
-  {
-    amount: eur(842200),
-    cumulative: eur(2685400),
-    deadline: "28 Mag 2024",
-    dossier: "Bozza da completare",
-    period: "01 Apr 2024 - 30 Apr 2024",
-    progress: "25,0%",
-    project: "Linea AV Genova-Ventimiglia",
-    sal: "SAL 3",
-    status: "Bozza",
-    tone: "info",
-  },
-] as const;
+type SalModalStep = 1 | 2;
+type StatusFilter = "all" | "closed" | "draft";
+type GroupMode = "flat" | "project";
 
-const tabs = [
-  { label: "Tutte", value: "12" },
-  { label: "Bozze", value: "2" },
-  { label: "Revisione", value: "3" },
-  { label: "Approvate", value: "7" },
-] as const;
+type ProjectFormState = {
+  client: string;
+  description: string;
+  name: string;
+  year: string;
+};
 
-const dueRows = [
-  { deadline: "Oggi", label: "Firma DL · SAL 8 Milano-Verona", tone: "warning" },
-  { deadline: "24 ore", label: "Chiusura dossier · SAL 7 Napoli-Bari", tone: "danger" },
-  { deadline: "48 ore", label: "Conferma allegati · SAL 6 Firenze", tone: "warning" },
-] as const;
+type SalDraftState = {
+  date: string;
+  description: string;
+  notes: string;
+  projectId: string;
+  title: string;
+};
+
+type DraftLine = {
+  id: string;
+  quantity: string;
+  surcharge: SalSurchargeKind;
+  voiceId: string;
+};
+
+type VoiceFormState = {
+  category: string;
+  code: string;
+  description: string;
+  unit: string;
+  unitPrice: string;
+};
+
+const initialProjectForm: ProjectFormState = {
+  client: "",
+  description: "",
+  name: "",
+  year: String(new Date().getFullYear()),
+};
+
+const initialVoiceForm: VoiceFormState = {
+  category: "",
+  code: "",
+  description: "",
+  unit: "m",
+  unitPrice: "",
+};
+
+function createInitialDraft(projectId: string): SalDraftState {
+  return {
+    date: new Date().toISOString().slice(0, 10),
+    description: "",
+    notes: "",
+    projectId,
+    title: "",
+  };
+}
 
 export function SalScreen() {
+  const activeProjectId = useSalWorkflowStore((state) => state.activeProjectId);
+  const createClosedSal = useSalWorkflowStore((state) => state.createClosedSal);
+  const createProject = useSalWorkflowStore((state) => state.createProject);
+  const createTariffVoice = useSalWorkflowStore((state) => state.createTariffVoice);
+  const projects = useSalWorkflowStore((state) => state.projects);
+  const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
+  const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
+  const [groupMode, setGroupMode] = useState<GroupMode>("project");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [projectForm, setProjectForm] = useState<ProjectFormState>(initialProjectForm);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const projectById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects],
+  );
+  const salViews = useMemo(
+    () => salDocuments.map((sal) => buildSalDocumentView(sal, tariffVoices)),
+    [salDocuments, tariffVoices],
+  );
+  const visibleSals = useMemo(
+    () =>
+      salViews
+        .filter((sal) => {
+          const project = projectById.get(sal.projectId);
+          const searchValue = `${sal.title} ${sal.description} ${sal.date} ${project?.name ?? ""} ${
+            project?.client ?? ""
+          }`;
+          const matchesQuery = searchValue.toLowerCase().includes(query.trim().toLowerCase());
+          const matchesProject = projectFilter === "all" || sal.projectId === projectFilter;
+          const matchesStatus = statusFilter === "all" || sal.status === statusFilter;
+
+          return matchesQuery && matchesProject && matchesStatus;
+        })
+        .sort((left, right) => right.date.localeCompare(left.date)),
+    [projectById, projectFilter, query, salViews, statusFilter],
+  );
+  const groupedSals = useMemo(() => groupSalsByProject(visibleSals), [visibleSals]);
+  const totalVisibleAmount = visibleSals.reduce((sum, sal) => sum + sal.total, 0);
+  const closedCount = salViews.filter((sal) => sal.status === "closed").length;
+  const activeProject = projects.find((project) => project.id === activeProjectId) ?? projects[0];
+
+  useEffect(() => {
+    const handleWorkflowAction = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+
+      if (customEvent.detail === "new-sal") {
+        setIsModalOpen(true);
+      }
+    };
+
+    window.addEventListener("sal-workflow-action", handleWorkflowAction);
+    return () => window.removeEventListener("sal-workflow-action", handleWorkflowAction);
+  }, []);
+
+  function handleCreateProject() {
+    const year = Number(projectForm.year);
+
+    if (!projectForm.name.trim() || !Number.isInteger(year)) {
+      setMessage("Inserisci nome progetto e anno valido.");
+      return;
+    }
+
+    const project = createProject({
+      client: projectForm.client.trim(),
+      description: projectForm.description.trim(),
+      name: projectForm.name.trim(),
+      year,
+    });
+
+    setProjectForm(initialProjectForm);
+    setProjectFilter(project.id);
+    setMessage(`${project.name} creato. Ora puoi aprire + Nuova SAL.`);
+  }
+
   return (
     <main className="p-6 pb-8">
       <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-          <div>
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="info">Finestra approvativa</Badge>
-              <span className="text-xs text-secondary">Ultimo sync documentale 17:35</span>
+              <Badge variant="info">Registro SAL</Badge>
+              <span className="text-xs text-secondary">
+                {visibleSals.length} visibili · {projects.length} progetti · {tariffVoices.length}{" "}
+                voci tariffario
+              </span>
             </div>
             <h2 className="mt-4 text-[2rem] font-semibold tracking-tight text-foreground">
-              Stati avanzamento lavori sotto presidio operativo.
+              SAL filtrabili, raggruppate per progetto.
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-secondary">
-              Vista compatta su emissioni, cumulati, scadenze corte e criticita documentali. La
-              priorita qui e capire quali pratiche possono essere chiuse oggi e quali rischiano di
-              slittare.
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary">
+              La vista resta consultabile: filtri, gruppi e totali sono sempre a disposizione. La
+              creazione passa dalla modal collegata alla CTA in topbar.
             </p>
-
-            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <MetricTile label="SAL totale emesse" note="Da inizio progetto" value="€ 8,09M" />
-              <MetricTile label="Approvate" note="Ultimi 30 giorni" tone="success" value="7 / 12" />
-              <MetricTile
-                label="Da revisionare"
-                note="Richiedono azione"
-                tone="warning"
-                value="3"
-              />
-              <MetricTile
-                label="Emissioni previste"
-                note="Prossimi 14 giorni"
-                tone="info"
-                value="5"
-              />
-            </div>
           </div>
 
-          <section className="rounded-[24px] border border-subtle bg-muted/35 p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-              Coda 72 ore
-            </div>
-            <div className="mt-4 space-y-3">
-              {dueRows.map((row) => (
-                <div
-                  className="rounded-[20px] border border-subtle bg-card px-4 py-3"
-                  key={row.label}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-foreground">{row.label}</div>
-                    <Badge variant={row.tone}>{row.deadline}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <div className="grid gap-3 sm:grid-cols-3 xl:w-[480px]">
+            <MetricTile label="SAL totali" value={String(salViews.length)} />
+            <MetricTile label="Chiuse" tone="success" value={String(closedCount)} />
+            <MetricTile
+              label="Totale vista"
+              tone="success"
+              value={formatAmount(totalVisibleAmount)}
+            />
+          </div>
         </div>
       </section>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_320px]">
-        <section className="rounded-[28px] border border-subtle bg-card shadow-soft">
-          <div className="border-b border-subtle px-5 py-4">
-            <div className="flex flex-wrap items-center gap-2">
-              {tabs.map((tab, index) => (
-                <button
-                  className={
-                    index === 0
-                      ? "rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-white"
-                      : "rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-secondary"
-                  }
-                  key={tab.label}
-                  type="button"
-                >
-                  {tab.label} · {tab.value}
-                </button>
-              ))}
-            </div>
+      {message ? (
+        <div className="mt-4 rounded-[18px] border border-subtle bg-muted/50 px-4 py-3 text-sm text-foreground">
+          {message}
+        </div>
+      ) : null}
 
-            <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="relative block">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
-                  <input
-                    className="h-10 w-[260px] rounded-[18px] border border-subtle bg-card pl-10 pr-3 text-sm text-foreground outline-none transition-all duration-base placeholder:text-secondary focus:border-primary focus:ring-2 focus:ring-ring"
-                    placeholder="Cerca SAL o progetto"
-                    type="search"
-                  />
-                </label>
-                <Button size="sm" variant="outline">
-                  <Filter className="size-4" />
-                  Filtri
-                </Button>
-                <Button size="sm" variant="outline">
-                  <CalendarDays className="size-4" />
-                  Periodo
-                </Button>
-              </div>
-
-              <Button size="sm" variant="outline">
-                <Download className="size-4" />
-                Esporta
+      <section className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="space-y-6">
+          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+            <SectionTitle icon={FolderPlus} kicker="Setup" title="Nuovo progetto" />
+            <div className="mt-5 space-y-4">
+              <TextField
+                label="Nome progetto"
+                onChange={(value) => setProjectForm((state) => ({ ...state, name: value }))}
+                placeholder="Riqualificazione Via Roma"
+                value={projectForm.name}
+              />
+              <TextField
+                label="Anno"
+                onChange={(value) => setProjectForm((state) => ({ ...state, year: value }))}
+                placeholder="2026"
+                type="number"
+                value={projectForm.year}
+              />
+              <TextField
+                label="Committente"
+                onChange={(value) => setProjectForm((state) => ({ ...state, client: value }))}
+                placeholder="Comune di Milano"
+                value={projectForm.client}
+              />
+              <TextArea
+                label="Descrizione"
+                onChange={(value) => setProjectForm((state) => ({ ...state, description: value }))}
+                placeholder="Interventi principali"
+                value={projectForm.description}
+              />
+              <Button className="w-full" onClick={handleCreateProject} type="button">
+                Salva progetto
               </Button>
             </div>
-          </div>
-
-          <div className="overflow-hidden">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-                <tr>
-                  <th className="px-5 py-3">SAL</th>
-                  <th className="px-5 py-3">Progetto</th>
-                  <th className="px-5 py-3">Periodo</th>
-                  <th className="px-5 py-3">Importo</th>
-                  <th className="px-5 py-3">Cumulato</th>
-                  <th className="px-5 py-3">Dossier</th>
-                  <th className="px-5 py-3">Stato</th>
-                </tr>
-              </thead>
-              <tbody>
-                {salRows.map((row) => (
-                  <tr className="border-t border-subtle" key={row.sal}>
-                    <td className="px-5 py-4 font-semibold text-foreground">{row.sal}</td>
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-foreground">{row.project}</div>
-                      <div className="mt-1 text-xs text-secondary">Avanzamento {row.progress}</div>
-                    </td>
-                    <td className="px-5 py-4 text-secondary">{row.period}</td>
-                    <td className="px-5 py-4 font-semibold text-foreground">
-                      {formatMoney(row.amount)}
-                    </td>
-                    <td className="px-5 py-4 text-foreground">{formatMoney(row.cumulative)}</td>
-                    <td className="px-5 py-4">
-                      <div className="text-sm text-foreground">{row.dossier}</div>
-                      <div className="mt-1 text-xs text-secondary">Scadenza {row.deadline}</div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <StatusBadge label={row.status} tone={row.tone as StatusTone} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <div className="space-y-6">
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
-            <div className="text-base font-semibold text-foreground">Panoramica pratica</div>
-            <dl className="mt-5 space-y-3">
-              <SummaryLine label="Totali" value="12" />
-              <SummaryLine label="Approvate" value="7" />
-              <SummaryLine label="In revisione" value="3" />
-              <SummaryLine label="Bozze" value="2" />
-            </dl>
           </section>
 
           <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
-            <div className="text-base font-semibold text-foreground">Scadenze ravvicinate</div>
-            <div className="mt-4 space-y-3">
-              {salRows.slice(0, 3).map((row) => (
-                <div
-                  className="rounded-[20px] border border-subtle bg-muted/35 px-4 py-3"
-                  key={row.sal}
+            <SectionTitle icon={Layers3} kicker="Filtri" title="Perimetro vista" />
+            <div className="mt-5 space-y-4">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+                <input
+                  className="h-10 w-full rounded-[18px] border border-subtle bg-card pl-10 pr-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Cerca SAL o progetto"
+                  type="search"
+                  value={query}
+                />
+              </label>
+              <SelectField
+                label="Progetto"
+                onChange={setProjectFilter}
+                options={[
+                  { label: "Tutti i progetti", value: "all" },
+                  ...projects.map((project) => ({ label: project.name, value: project.id })),
+                ]}
+                value={projectFilter}
+              />
+              <SelectField
+                label="Stato"
+                onChange={(value) => setStatusFilter(value as StatusFilter)}
+                options={[
+                  { label: "Tutti gli stati", value: "all" },
+                  { label: "Chiuse", value: "closed" },
+                  { label: "Bozze", value: "draft" },
+                ]}
+                value={statusFilter}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={() => setGroupMode("project")}
+                  type="button"
+                  variant={groupMode === "project" ? "default" : "outline"}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-foreground">{row.sal}</div>
-                    <Badge variant={row.tone}>{row.status}</Badge>
-                  </div>
-                  <div className="mt-2 text-sm text-secondary">{row.project}</div>
-                  <div className="mt-2 text-xs font-medium text-foreground">{row.deadline}</div>
-                </div>
-              ))}
+                  Progetti
+                </Button>
+                <Button
+                  onClick={() => setGroupMode("flat")}
+                  type="button"
+                  variant={groupMode === "flat" ? "default" : "outline"}
+                >
+                  Lista
+                </Button>
+              </div>
+              <Button
+                className="w-full"
+                disabled={projects.length === 0}
+                onClick={() => setIsModalOpen(true)}
+                type="button"
+              >
+                <Plus className="size-4" />
+                Nuova SAL
+              </Button>
             </div>
           </section>
-        </div>
+        </aside>
+
+        <section className="rounded-[28px] border border-subtle bg-card shadow-soft">
+          <div className="flex flex-col gap-3 border-b border-subtle p-5 xl:flex-row xl:items-center xl:justify-between">
+            <SectionTitle icon={ReceiptText} kicker="Registro" title="SAL operative" />
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="neutral">{visibleSals.length} righe</Badge>
+              <Badge variant="success">{formatAmount(totalVisibleAmount)}</Badge>
+            </div>
+          </div>
+
+          {visibleSals.length === 0 ? (
+            <div className="p-8">
+              <EmptyState text="Nessuna SAL nel perimetro corrente. Crea un progetto, poi usa + Nuova SAL." />
+            </div>
+          ) : groupMode === "project" ? (
+            <div className="divide-y divide-subtle">
+              {groupedSals.map((group) => (
+                <ProjectSalGroup
+                  key={group.projectId}
+                  project={projectById.get(group.projectId)}
+                  sals={group.sals}
+                />
+              ))}
+            </div>
+          ) : (
+            <SalTable projectById={projectById} sals={visibleSals} />
+          )}
+        </section>
       </section>
+
+      {isModalOpen ? (
+        <CreateSalModal
+          activeProjectId={activeProject?.id ?? ""}
+          createClosedSal={createClosedSal}
+          createTariffVoice={createTariffVoice}
+          onClose={() => setIsModalOpen(false)}
+          onCreated={(sal) => {
+            setIsModalOpen(false);
+            setProjectFilter(sal.projectId);
+            setMessage(`${sal.title} chiusa e salvata nel registro.`);
+          }}
+          projects={projects}
+          tariffVoices={tariffVoices}
+        />
+      ) : null}
     </main>
   );
 }
 
-function MetricTile({
-  label,
-  note,
-  tone,
-  value,
+function CreateSalModal({
+  activeProjectId,
+  createClosedSal,
+  createTariffVoice,
+  onClose,
+  onCreated,
+  projects,
+  tariffVoices,
 }: {
-  label: string;
-  note: string;
-  tone?: "info" | "success" | "warning";
-  value: string;
+  activeProjectId: string;
+  createClosedSal: ReturnType<typeof useSalWorkflowStore.getState>["createClosedSal"];
+  createTariffVoice: ReturnType<typeof useSalWorkflowStore.getState>["createTariffVoice"];
+  onClose: () => void;
+  onCreated: (sal: { projectId: string; title: string }) => void;
+  projects: SalProject[];
+  tariffVoices: SalTariffVoice[];
 }) {
-  const toneClass =
-    tone === "warning"
-      ? "text-warning"
-      : tone === "success"
-        ? "text-success"
-        : tone === "info"
-          ? "text-info"
-          : "text-foreground";
+  const initialProjectId = activeProjectId || projects[0]?.id || "";
+  const [draft, setDraft] = useState<SalDraftState>(() => createInitialDraft(initialProjectId));
+  const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
+  const [error, setError] = useState("");
+  const [step, setStep] = useState<SalModalStep>(1);
+  const [voiceForm, setVoiceForm] = useState<VoiceFormState>(initialVoiceForm);
+  const selectedProject = projects.find((project) => project.id === draft.projectId);
+  const availableVoices = useMemo(
+    () =>
+      selectedProject
+        ? tariffVoices.filter((voice) => voice.projectYear === selectedProject.year)
+        : [],
+    [selectedProject, tariffVoices],
+  );
+  const voiceById = useMemo(
+    () => new Map(availableVoices.map((voice) => [voice.id, voice])),
+    [availableVoices],
+  );
+  const lineViews = useMemo(
+    () =>
+      draftLines.flatMap((line) => {
+        const voice = voiceById.get(line.voiceId);
+        const quantity = normalizeDecimal(line.quantity);
 
+        if (!voice || !Number.isFinite(quantity)) {
+          return [];
+        }
+
+        const surcharge = surchargeOptions.find((option) => option.kind === line.surcharge);
+        const multiplier = surcharge?.multiplier ?? 1;
+
+        return [
+          {
+            ...line,
+            lineTotal: Math.max(0, quantity) * voice.unitPrice * multiplier,
+            quantityValue: Math.max(0, quantity),
+            voice,
+          },
+        ];
+      }),
+    [draftLines, voiceById],
+  );
+  const total = lineViews.reduce((sum, line) => sum + line.lineTotal, 0);
+
+  function handleNext() {
+    if (!draft.title.trim() || !draft.projectId || !draft.date) {
+      setError("Inserisci nome SAL, data e progetto associato.");
+      return;
+    }
+
+    setError("");
+    setStep(2);
+  }
+
+  function handleAddDraftLine() {
+    setDraftLines((current) => [
+      ...current,
+      {
+        id: createId("draft_line"),
+        quantity: "0",
+        surcharge: "none",
+        voiceId: availableVoices[0]?.id ?? "",
+      },
+    ]);
+  }
+
+  function handleCreateVoice() {
+    if (!selectedProject) {
+      setError("Seleziona un progetto prima di creare una voce tariffario.");
+      return;
+    }
+
+    const unitPrice = normalizeDecimal(voiceForm.unitPrice);
+
+    if (
+      !voiceForm.code.trim() ||
+      !voiceForm.description.trim() ||
+      !voiceForm.unit.trim() ||
+      !Number.isFinite(unitPrice) ||
+      unitPrice < 0
+    ) {
+      setError("Completa codice, descrizione, unita e prezzo unitario della voce.");
+      return;
+    }
+
+    const voice = createTariffVoice({
+      category: voiceForm.category.trim() || `Tariffario ${selectedProject.year}`,
+      code: voiceForm.code.trim(),
+      description: voiceForm.description.trim(),
+      projectYear: selectedProject.year,
+      unit: voiceForm.unit.trim(),
+      unitPrice,
+    });
+
+    setVoiceForm(initialVoiceForm);
+    setDraftLines((current) => [
+      ...current,
+      { id: createId("draft_line"), quantity: "0", surcharge: "none", voiceId: voice.id },
+    ]);
+    setError("");
+  }
+
+  function handleCloseSal() {
+    if (!selectedProject) {
+      setError("Seleziona un progetto associato.");
+      return;
+    }
+
+    const lines: SalLine[] = lineViews.map((line) => ({
+      id: createId("sal_line"),
+      quantity: line.quantityValue,
+      surcharge: line.surcharge,
+      voiceId: line.voice.id,
+    }));
+
+    if (lines.length === 0) {
+      setError("Aggiungi almeno una voce valida prima di chiudere la SAL.");
+      return;
+    }
+
+    const sal = createClosedSal({
+      date: draft.date,
+      description: draft.description.trim(),
+      lines,
+      notes: draft.notes.trim(),
+      projectId: selectedProject.id,
+      title: draft.title.trim(),
+    });
+
+    onCreated(sal);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+      <button
+        aria-label="Chiudi modal"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <section className="relative max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[24px] border border-subtle bg-card shadow-panel">
+        <div className="flex items-center justify-between gap-4 border-b border-subtle px-5 py-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              Nuova SAL
+            </div>
+            <h3 className="mt-1 text-lg font-semibold text-foreground">
+              {step === 1 ? "Dati generali e progetto" : "Voci, quantita e maggiorazioni"}
+            </h3>
+          </div>
+          <button
+            className="flex size-9 items-center justify-center rounded-[14px] text-secondary transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="overflow-hidden">
+          <div
+            className="flex transition-transform duration-300 ease-out will-change-transform"
+            style={{ transform: `translate3d(${step === 1 ? "0" : "-50%"}, 0, 0)`, width: "200%" }}
+          >
+            <div className="w-1/2 shrink-0 p-5">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <TextField
+                  label="Nome SAL"
+                  onChange={(value) => setDraft((state) => ({ ...state, title: value }))}
+                  placeholder="SAL 1"
+                  value={draft.title}
+                />
+                <TextField
+                  label="Data"
+                  onChange={(value) => setDraft((state) => ({ ...state, date: value }))}
+                  type="date"
+                  value={draft.date}
+                />
+                <SelectField
+                  label="Progetto associato"
+                  onChange={(value) =>
+                    setDraft((state) => ({
+                      ...state,
+                      projectId: value,
+                    }))
+                  }
+                  options={projects.map((project) => ({
+                    label: `${project.name} · ${project.year}`,
+                    value: project.id,
+                  }))}
+                  value={draft.projectId}
+                />
+                <TextField
+                  label="Descrizione"
+                  onChange={(value) => setDraft((state) => ({ ...state, description: value }))}
+                  placeholder="Prima SAL - Opere stradali"
+                  value={draft.description}
+                />
+                <div className="lg:col-span-2">
+                  <TextArea
+                    label="Note"
+                    onChange={(value) => setDraft((state) => ({ ...state, notes: value }))}
+                    placeholder="Note operative"
+                    value={draft.notes}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="w-1/2 shrink-0 p-5">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+                <section className="min-w-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">Righe SAL</div>
+                      <div className="mt-1 text-xs text-secondary">
+                        Tariffario {selectedProject?.year ?? "-"} · totale {formatAmount(total)}
+                      </div>
+                    </div>
+                    <Button
+                      disabled={availableVoices.length === 0}
+                      onClick={handleAddDraftLine}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <Plus className="size-4" />
+                      Voce
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 max-h-[440px] space-y-3 overflow-y-auto pr-1">
+                    {draftLines.length > 0 ? (
+                      draftLines.map((line) => (
+                        <DraftLineEditor
+                          availableVoices={availableVoices}
+                          key={line.id}
+                          line={line}
+                          onRemove={() =>
+                            setDraftLines((current) =>
+                              current.filter((item) => item.id !== line.id),
+                            )
+                          }
+                          onUpdate={(patch) =>
+                            setDraftLines((current) =>
+                              current.map((item) =>
+                                item.id === line.id ? { ...item, ...patch } : item,
+                              ),
+                            )
+                          }
+                          voice={voiceById.get(line.voiceId)}
+                        />
+                      ))
+                    ) : (
+                      <EmptyState text="Aggiungi una voce dal tariffario. Se il tariffario e vuoto, crea una voce dal pannello a destra." />
+                    )}
+                  </div>
+                </section>
+
+                <aside className="rounded-[20px] border border-subtle bg-muted/35 p-4">
+                  <div className="text-sm font-semibold text-foreground">Nuova voce tariffario</div>
+                  <div className="mt-4 space-y-3">
+                    <TextField
+                      label="Codice"
+                      onChange={(value) => setVoiceForm((state) => ({ ...state, code: value }))}
+                      placeholder="01.01.001"
+                      value={voiceForm.code}
+                    />
+                    <TextField
+                      label="Descrizione"
+                      onChange={(value) =>
+                        setVoiceForm((state) => ({ ...state, description: value }))
+                      }
+                      placeholder="Scavo a sezione obbligata"
+                      value={voiceForm.description}
+                    />
+                    <TextField
+                      label="Categoria"
+                      onChange={(value) => setVoiceForm((state) => ({ ...state, category: value }))}
+                      placeholder="Scavi"
+                      value={voiceForm.category}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <TextField
+                        label="Unita"
+                        onChange={(value) => setVoiceForm((state) => ({ ...state, unit: value }))}
+                        placeholder="m3"
+                        value={voiceForm.unit}
+                      />
+                      <TextField
+                        label="Prezzo"
+                        onChange={(value) =>
+                          setVoiceForm((state) => ({ ...state, unitPrice: value }))
+                        }
+                        placeholder="25,60"
+                        value={voiceForm.unitPrice}
+                      />
+                    </div>
+                    <Button className="w-full" onClick={handleCreateVoice} type="button">
+                      <Plus className="size-4" />
+                      Aggiungi
+                    </Button>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {error ? <div className="px-5 pb-2 text-sm text-danger">{error}</div> : null}
+
+        <div className="flex items-center justify-between border-t border-subtle px-5 py-4">
+          <Button disabled={step === 1} onClick={() => setStep(1)} type="button" variant="outline">
+            <ArrowLeft className="size-4" />
+            Indietro
+          </Button>
+          <div className="text-sm font-semibold text-success">{formatAmount(total)}</div>
+          {step === 1 ? (
+            <Button disabled={projects.length === 0} onClick={handleNext} type="button">
+              Avanti
+              <ArrowRight className="size-4" />
+            </Button>
+          ) : (
+            <Button onClick={handleCloseSal} type="button">
+              <Lock className="size-4" />
+              Chiudi SAL
+            </Button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DraftLineEditor({
+  availableVoices,
+  line,
+  onRemove,
+  onUpdate,
+  voice,
+}: {
+  availableVoices: SalTariffVoice[];
+  line: DraftLine;
+  onRemove: () => void;
+  onUpdate: (patch: Partial<DraftLine>) => void;
+  voice: SalTariffVoice | undefined;
+}) {
+  const surcharge = surchargeOptions.find((option) => option.kind === line.surcharge);
+  const quantity = normalizeDecimal(line.quantity);
+  const total =
+    voice && Number.isFinite(quantity)
+      ? Math.max(0, quantity) * voice.unitPrice * (surcharge?.multiplier ?? 1)
+      : 0;
+
+  return (
+    <div className="rounded-[18px] border border-subtle bg-card p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_110px_150px_auto] lg:items-end">
+        <SelectField
+          label="Voce"
+          onChange={(value) => onUpdate({ voiceId: value })}
+          options={availableVoices.map((item) => ({
+            label: `${item.code} · ${item.description}`,
+            value: item.id,
+          }))}
+          value={line.voiceId}
+        />
+        <TextField
+          label="Quantita"
+          onChange={(value) => onUpdate({ quantity: value })}
+          type="number"
+          value={line.quantity}
+        />
+        <SelectField
+          label="Maggiorazione"
+          onChange={(value) => onUpdate({ surcharge: value as SalSurchargeKind })}
+          options={surchargeOptions.map((option) => ({
+            label: option.label,
+            value: option.kind,
+          }))}
+          value={line.surcharge}
+        />
+        <Button onClick={onRemove} size="icon" type="button" variant="ghost">
+          <X className="size-4" />
+        </Button>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <span className="text-secondary">
+          {voice ? `${formatAmount(voice.unitPrice)} / ${voice.unit}` : "Voce non selezionata"}
+        </span>
+        <span className="font-semibold text-foreground">{formatAmount(total)}</span>
+      </div>
+    </div>
+  );
+}
+
+function ProjectSalGroup({
+  project,
+  sals,
+}: {
+  project: SalProject | undefined;
+  sals: SalDocumentView[];
+}) {
+  const total = sals.reduce((sum, sal) => sum + sal.total, 0);
+
+  return (
+    <section className="p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">
+            {project?.name ?? "Progetto non trovato"}
+          </h3>
+          <div className="mt-1 text-xs text-secondary">
+            {project ? `${project.year} · ${project.client || "Committente non indicato"}` : "-"}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Badge variant="neutral">{sals.length} SAL</Badge>
+          <Badge variant="success">{formatAmount(total)}</Badge>
+        </div>
+      </div>
+      <SalTable projectById={new Map(project ? [[project.id, project]] : [])} sals={sals} />
+    </section>
+  );
+}
+
+function SalTable({
+  projectById,
+  sals,
+}: {
+  projectById: Map<string, SalProject>;
+  sals: SalDocumentView[];
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+        <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+          <tr>
+            <th className="px-5 py-3">SAL</th>
+            <th className="px-5 py-3">Progetto</th>
+            <th className="px-5 py-3">Data</th>
+            <th className="px-5 py-3">Voci</th>
+            <th className="px-5 py-3">Totale</th>
+            <th className="px-5 py-3">Stato</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sals.map((sal) => {
+            const project = projectById.get(sal.projectId);
+
+            return (
+              <tr className="border-t border-subtle" key={sal.id}>
+                <td className="px-5 py-4">
+                  <div className="font-semibold text-foreground">{sal.title}</div>
+                  <div className="mt-1 text-xs text-secondary">{sal.description || sal.notes}</div>
+                </td>
+                <td className="px-5 py-4 text-secondary">
+                  {project ? `${project.name} · ${project.year}` : sal.projectId}
+                </td>
+                <td className="px-5 py-4 text-secondary">{sal.date}</td>
+                <td className="px-5 py-4 text-foreground">{sal.lines.length}</td>
+                <td className="px-5 py-4 text-lg font-semibold text-foreground">
+                  {formatAmount(sal.total)}
+                </td>
+                <td className="px-5 py-4">
+                  <StatusBadge
+                    label={statusLabel(sal.status)}
+                    tone={sal.status === "closed" ? "success" : "info"}
+                  />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function groupSalsByProject(sals: SalDocumentView[]) {
+  const groups = new Map<string, SalDocumentView[]>();
+
+  for (const sal of sals) {
+    const current = groups.get(sal.projectId);
+
+    if (current) {
+      current.push(sal);
+    } else {
+      groups.set(sal.projectId, [sal]);
+    }
+  }
+
+  return [...groups.entries()].map(([projectId, grouped]) => ({
+    projectId,
+    sals: grouped,
+  }));
+}
+
+function SectionTitle({
+  icon: Icon,
+  kicker,
+  title,
+}: {
+  icon: LucideIcon;
+  kicker: string;
+  title: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-primary">
+        <Icon className="size-4" />
+      </span>
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+          {kicker}
+        </div>
+        <h3 className="mt-1 text-base font-semibold text-foreground">{title}</h3>
+      </div>
+    </div>
+  );
+}
+
+function MetricTile({ label, tone, value }: { label: string; tone?: "success"; value: string }) {
   return (
     <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
         {label}
       </div>
-      <div className={`mt-3 text-2xl font-semibold ${toneClass}`}>{value}</div>
-      <div className="mt-2 text-xs leading-5 text-secondary">{note}</div>
+      <div
+        className={`mt-3 truncate text-lg font-semibold ${
+          tone === "success" ? "text-success" : "text-foreground"
+        }`}
+      >
+        {value}
+      </div>
     </div>
   );
 }
 
-function SummaryLine({ label, value }: { label: string; value: string }) {
+function SelectField({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: { label: string; value: string }[];
+  value: string;
+}) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-subtle pb-3 last:border-b-0 last:pb-0">
-      <dt className="text-sm text-secondary">{label}</dt>
-      <dd className="text-sm font-semibold text-foreground">{value}</dd>
+    <label className="block">
+      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+        {label}
+      </span>
+      <select
+        className="mt-2 h-10 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TextField({
+  label,
+  onChange,
+  placeholder,
+  type = "text",
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: "date" | "number" | "text";
+  value: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+        {label}
+      </span>
+      <input
+        className="mt-2 h-10 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        type={type}
+        value={value}
+      />
+    </label>
+  );
+}
+
+function TextArea({
+  label,
+  onChange,
+  placeholder,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  value: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+        {label}
+      </span>
+      <textarea
+        className="mt-2 min-h-20 w-full resize-y rounded-[14px] border border-subtle bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        value={value}
+      />
+    </label>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-[18px] border border-dashed border-subtle bg-muted/35 p-4 text-sm leading-6 text-secondary">
+      {text}
     </div>
   );
+}
+
+function statusLabel(status: "closed" | "draft") {
+  return status === "closed" ? "Chiusa" : "Bozza";
+}
+
+function formatAmount(amount: number) {
+  return formatMoney({ amount, currency: "EUR" });
 }

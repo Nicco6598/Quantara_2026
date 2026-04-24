@@ -26,7 +26,6 @@ import {
   deleteDesktopContract,
   listDesktopContracts,
   listDesktopTariffBooks,
-  updateDesktopContract,
   type DesktopContract,
   type DesktopDataResult,
 } from "@/lib/desktopData";
@@ -422,9 +421,7 @@ export function ProjectsScreen() {
   });
   const [projectForm, setProjectForm] = useState<ProjectFormState>(initialProjectForm);
   const [selectedContractId, setSelectedContractId] = useState("");
-  const [tariffBooksState, setTariffBooksState] = useState(
-    [fallbackProjectTariffBook],
-  );
+  const [tariffBooksState, setTariffBooksState] = useState([fallbackProjectTariffBook]);
   const [focus, setFocus] = useState<PortfolioFocus>("all");
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -441,7 +438,10 @@ export function ProjectsScreen() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([listDesktopContracts([]), listDesktopTariffBooks([fallbackProjectTariffBook])]).then(([contracts, tariffBooks]) => {
+    Promise.all([
+      listDesktopContracts([]),
+      listDesktopTariffBooks([fallbackProjectTariffBook]),
+    ]).then(([contracts, tariffBooks]) => {
       if (active) {
         setContractsState(contracts);
         setTariffBooksState(tariffBooks.data);
@@ -548,9 +548,7 @@ export function ProjectsScreen() {
     setCreateMessage("");
 
     try {
-      const deletedContract = contractsState.data.find(
-        (contract) => contract.id === projectId,
-      );
+      const deletedContract = contractsState.data.find((contract) => contract.id === projectId);
 
       await deleteDesktopContract(projectId);
       setContractsState((current) => ({
@@ -1670,9 +1668,11 @@ function WorkbenchRowDropdown({
       </Button>
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40"
+          <button
+            aria-label="Chiudi menu azioni"
+            className="fixed inset-0 z-40 cursor-default"
             onClick={() => setIsOpen(false)}
+            type="button"
           />
           <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-[14px] border border-subtle bg-card py-1 shadow-soft">
             <button

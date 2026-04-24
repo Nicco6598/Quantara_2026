@@ -10,7 +10,6 @@ import {
   listDesktopTariffBooks,
   listDesktopTariffVoices,
   selectTariffPdfMetadata,
-  updateDesktopTariffBook,
   type DesktopContract,
   type DesktopDataResult,
   type DesktopTariffBook,
@@ -309,7 +308,10 @@ export function TariffsScreen() {
 
           <div className="grid gap-3 sm:grid-cols-3 xl:w-[420px]">
             <MetricTile label="Tariffari" value={String(tariffBooksState.data.length)} />
-            <MetricTile label="Enti" value={String(new Set(tariffBooksState.data.map((b) => b.sourceName)).size)} />
+            <MetricTile
+              label="Enti"
+              value={String(new Set(tariffBooksState.data.map((b) => b.sourceName)).size)}
+            />
             <MetricTile label="Anni" value={String(availableYears.length)} />
           </div>
         </div>
@@ -389,7 +391,9 @@ export function TariffsScreen() {
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="neutral">{visibleTariffBooks.length} visibili</Badge>
-                <Badge variant="info">{tariffBooksState.source === "desktop" ? "DB" : "Demo"}</Badge>
+                <Badge variant="info">
+                  {tariffBooksState.source === "desktop" ? "DB" : "Demo"}
+                </Badge>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -488,22 +492,19 @@ export function TariffsScreen() {
             <div className="mt-4 space-y-3">
               {voicesState.data.length > 0 ? (
                 voicesState.data.map((row) => (
-                <div
-                  className="rounded-[18px] border border-subtle bg-muted/35 p-3"
-                  key={row.id}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <Badge variant="neutral">{row.officialCode}</Badge>
-                    <Badge variant="info">{row.unitOfMeasure}</Badge>
+                  <div className="rounded-[18px] border border-subtle bg-muted/35 p-3" key={row.id}>
+                    <div className="flex items-center justify-between gap-3">
+                      <Badge variant="neutral">{row.officialCode}</Badge>
+                      <Badge variant="info">{row.unitOfMeasure}</Badge>
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-foreground">
+                      {row.description}
+                    </div>
+                    <div className="mt-1 text-xs text-secondary">
+                      {row.category} · € {row.unitPrice.toLocaleString("it-IT")} /{" "}
+                      {row.unitOfMeasure}
+                    </div>
                   </div>
-                  <div className="mt-2 text-sm font-semibold text-foreground">
-                    {row.description}
-                  </div>
-                  <div className="mt-1 text-xs text-secondary">
-                    {row.category} · € {row.unitPrice.toLocaleString("it-IT")} /{" "}
-                    {row.unitOfMeasure}
-                  </div>
-                </div>
                 ))
               ) : (
                 <div className="rounded-[18px] border border-dashed border-subtle bg-muted/35 p-4 text-sm text-secondary">
@@ -591,9 +592,7 @@ function TariffBookRow({
         <div className="mt-1 text-xs text-secondary">{book.sourceName}</div>
       </div>
       <div className="text-sm text-foreground">{book.year}</div>
-      <Badge variant={book.status === "active" ? "success" : "info"}>
-        {book.status}
-      </Badge>
+      <Badge variant={book.status === "active" ? "success" : "info"}>{book.status}</Badge>
       <button
         className="text-xs font-semibold text-secondary hover:text-primary"
         onClick={onSelect}
@@ -613,7 +612,12 @@ function TariffBookRow({
         </Button>
         {isOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+            <button
+              aria-label="Chiudi menu azioni"
+              className="fixed inset-0 z-40 cursor-default"
+              onClick={() => setIsOpen(false)}
+              type="button"
+            />
             <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-[14px] border border-subtle bg-card py-1 shadow-soft">
               <button
                 className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
