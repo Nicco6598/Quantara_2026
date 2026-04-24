@@ -2,6 +2,12 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.32 - 2026-04-24
+
+- Add ad-hoc macOS code signing for test DMG builds so Gatekeeper no longer reports the app as damaged on Apple Silicon.
+- Publish GitHub release notes from the matching `CHANGELOG.md` version section.
+- Keep the in-app post-update patch notes aligned with the release notes shown after restart.
+
 ## 0.1.31 - 2026-04-23
 
 - Replace the native updater prompt with a branded in-app release cockpit showing notes, progress and install state.

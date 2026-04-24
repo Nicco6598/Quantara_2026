@@ -92,6 +92,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare release notes
+        id: release_notes
+        run: pnpm release:notes
+
       - name: Build and release with Tauri
         uses: tauri-apps/tauri-action@v0
         env:
@@ -102,8 +106,8 @@ jobs:
           projectPath: apps/desktop
           tagName: app-v__VERSION__
           releaseName: "Quantara v__VERSION__"
-          generateReleaseNotes: true
-          releaseBody: "Patch notes for Quantara v__VERSION__."
+          generateReleaseNotes: false
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

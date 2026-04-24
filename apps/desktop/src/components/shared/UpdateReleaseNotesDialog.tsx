@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { CheckCircle2, Sparkles, X } from "lucide-react";
 import type { PendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { Button } from "@/components/shared/Button";
 
@@ -8,74 +8,77 @@ type UpdateReleaseNotesDialogProps = {
 };
 
 export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesDialogProps) {
-  const lines = notes.body
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .map((line) =>
-      line
-        .replace(/^#{1,3}\s+/, "")
-        .replace(/^- \s*/, "• ")
-        .replace(/^\*\s*/, "• "),
-    )
-    .filter((line) => line.trim().length > 0);
-  const lineOccurrences = new Map<string, number>();
-  const renderedLines = lines.map((line) => {
-    const occurrence = lineOccurrences.get(line) ?? 0;
-    lineOccurrences.set(line, occurrence + 1);
-
-    return {
-      key: occurrence === 0 ? line : `${line}-${occurrence}`,
-      line,
-    };
-  });
+  const releaseNotes = normalizeReleaseNotes(notes.body);
 
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 p-4 backdrop-blur-xl"
       role="dialog"
     >
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface-base)] shadow-2xl">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[var(--accent-primary)] via-cyan-300 to-emerald-300" />
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-6 py-5">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)]">
-              Aggiornamento installato
-            </div>
-            <h2 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">
-              Quantara {notes.version}
-            </h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Avviata il {new Date(notes.installedAt).toLocaleString("it-IT")}
-            </p>
-          </div>
-          <button
-            aria-label="Chiudi note di rilascio"
-            className="rounded-md p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-            onClick={onClose}
-            type="button"
-          >
-            <X className="size-5" />
-          </button>
-        </div>
+      <div className="relative w-full max-w-3xl overflow-hidden rounded-[30px] border border-white/12 bg-[var(--surface-base)] shadow-2xl">
+        <div className="update-command-surface absolute inset-0" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
 
-        <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
-          <div className="mb-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] p-4">
-            <div className="text-sm font-semibold text-[var(--text-primary)]">Patch notes</div>
-            <div className="mt-2 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
-              {lines.length > 0 ? (
-                renderedLines.map(({ key, line }) => (
-                  <p key={key} className="whitespace-pre-wrap">
-                    {line}
-                  </p>
+        <div className="relative z-10 p-5 md:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                  <CheckCircle2 className="size-3.5" />
+                  Aggiornamento installato
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs text-white/78">
+                  v{notes.currentVersion} {"->"} v{notes.version}
+                </span>
+              </div>
+
+              <h2 className="mt-5 text-3xl font-semibold text-white">Quantara {notes.version}</h2>
+              <p className="mt-2 text-sm leading-6 text-white/70">
+                Riavvio completato il {new Date(notes.installedAt).toLocaleString("it-IT")}.
+              </p>
+            </div>
+
+            <button
+              aria-label="Chiudi note di rilascio"
+              className="rounded-2xl border border-white/10 bg-white/5 p-2.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+              onClick={onClose}
+              type="button"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
+
+          <section className="mt-7 max-h-[58vh] overflow-y-auto rounded-[26px] border border-white/10 bg-slate-950/46 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-cyan-400/12 text-cyan-100">
+                <Sparkles className="size-5" />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-white/54">Patch notes</div>
+                <div className="mt-1 text-lg font-semibold text-white">Novita installate</div>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3 text-sm leading-7 text-white/82">
+              {releaseNotes.length > 0 ? (
+                releaseNotes.map((note) => (
+                  <div
+                    className="rounded-2xl border border-white/6 bg-black/14 px-4 py-3"
+                    key={note.key}
+                  >
+                    {note.text}
+                  </div>
                 ))
               ) : (
-                <p>Nessuna nota di rilascio disponibile per questa versione.</p>
+                <p className="rounded-2xl border border-dashed border-white/10 px-4 py-4 text-white/62">
+                  Nessuna nota di rilascio disponibile per questa versione.
+                </p>
               )}
             </div>
-          </div>
+          </section>
 
-          <div className="flex justify-end">
+          <div className="mt-5 flex justify-end">
             <Button onClick={onClose} type="button">
               Continua
             </Button>
@@ -84,4 +87,29 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
       </div>
     </div>
   );
+}
+
+function normalizeReleaseNotes(body: string) {
+  const values = body
+    .split("\n")
+    .map((line) => line.trim())
+    .map((line) =>
+      line
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^[-*]\s+/, "")
+        .trim(),
+    )
+    .filter(Boolean);
+
+  const occurrences = new Map<string, number>();
+
+  return values.map((text) => {
+    const current = occurrences.get(text) ?? 0;
+    occurrences.set(text, current + 1);
+
+    return {
+      key: current === 0 ? text : `${text}-${current}`,
+      text,
+    };
+  });
 }
