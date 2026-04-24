@@ -63,10 +63,7 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
             <div className="mt-5 space-y-3 text-sm leading-7">
               {releaseNotes.length > 0 ? (
                 releaseNotes.map((note) => (
-                  <div
-                    className="update-modal-note rounded-2xl border px-4 py-3"
-                    key={note.key}
-                  >
+                  <div className="update-modal-note rounded-2xl border px-4 py-3" key={note.key}>
                     {note.text}
                   </div>
                 ))
