@@ -713,7 +713,7 @@ export function ProjectsScreen() {
   }
 
   async function handleCommitMigrationPreview() {
-    if (!migrationPreview || !migrationPreview.validation.valid) {
+    if (!migrationPreview?.validation.valid) {
       return;
     }
 
@@ -957,9 +957,8 @@ export function ProjectsScreen() {
       <MigrationPanel
         action={migrationAction}
         isCommitDisabled={
-          !migrationPreview ||
-          !migrationPreview.validation.valid ||
-          migrationPreview.data.projects.length === 0 ||
+          !migrationPreview?.validation.valid ||
+          (migrationPreview?.data.projects.length ?? 0) === 0 ||
           migrationAction !== "idle"
         }
         isBusy={migrationAction !== "idle"}

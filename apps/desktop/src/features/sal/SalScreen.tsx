@@ -152,10 +152,6 @@ export function SalScreen() {
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? projects[0];
 
   useEffect(() => {
-    setPage(1);
-  }, [groupMode, projectFilter, query, statusFilter]);
-
-  useEffect(() => {
     const maxPage = groupMode === "project" ? groupedTotalPages : totalPages;
 
     if (maxPage > 0 && page > maxPage) {
@@ -278,7 +274,10 @@ export function SalScreen() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
                 <input
                   className="h-10 w-full rounded-[18px] border border-subtle bg-card pl-10 pr-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Cerca SAL o progetto"
                   type="search"
                   value={query}
@@ -286,7 +285,10 @@ export function SalScreen() {
               </label>
               <SelectField
                 label="Progetto"
-                onChange={setProjectFilter}
+                onChange={(value) => {
+                  setProjectFilter(value);
+                  setPage(1);
+                }}
                 options={[
                   { label: "Tutti i progetti", value: "all" },
                   ...projects.map((project) => ({ label: project.name, value: project.id })),
@@ -295,7 +297,10 @@ export function SalScreen() {
               />
               <SelectField
                 label="Stato"
-                onChange={(value) => setStatusFilter(value as StatusFilter)}
+                onChange={(value) => {
+                  setStatusFilter(value as StatusFilter);
+                  setPage(1);
+                }}
                 options={[
                   { label: "Tutti gli stati", value: "all" },
                   { label: "Chiuse", value: "closed" },
@@ -305,14 +310,20 @@ export function SalScreen() {
               />
               <div className="grid grid-cols-2 gap-2">
                 <Button
-                  onClick={() => setGroupMode("project")}
+                  onClick={() => {
+                    setGroupMode("project");
+                    setPage(1);
+                  }}
                   type="button"
                   variant={groupMode === "project" ? "default" : "outline"}
                 >
                   Progetti
                 </Button>
                 <Button
-                  onClick={() => setGroupMode("flat")}
+                  onClick={() => {
+                    setGroupMode("flat");
+                    setPage(1);
+                  }}
                   type="button"
                   variant={groupMode === "flat" ? "default" : "outline"}
                 >
