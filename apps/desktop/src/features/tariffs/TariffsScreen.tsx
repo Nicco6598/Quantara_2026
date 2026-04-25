@@ -1,8 +1,15 @@
 import { Download, FileUp, MoreVertical, Search } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import {
+  CommandPanel,
+  MetricTile,
+  ScreenShell,
+  SectionPanel,
+  SummaryLine,
+} from "@/components/shared/Screen";
 import {
   createDesktopTariffBook,
   deleteDesktopTariffBook,
@@ -184,7 +191,7 @@ export function TariffsScreen() {
     };
   }, [selectedTariffBook.id]);
 
-  async function handlePdfImport() {
+  const handlePdfImport = useCallback(async () => {
     const metadata = await selectTariffPdfMetadata();
 
     if (!metadata) {
@@ -204,7 +211,20 @@ export function TariffsScreen() {
         ? `${metadata.voices.length} voci lette dal PDF. Conferma ente e anno prima di salvare.`
         : "Metadata PDF precompilati. Nessuna voce prezzo rilevata automaticamente.",
     );
-  }
+  }, []);
+
+  useEffect(() => {
+    const handleWorkflowAction = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+
+      if (customEvent.detail === "import") {
+        void handlePdfImport();
+      }
+    };
+
+    window.addEventListener("tariff-workflow-action", handleWorkflowAction);
+    return () => window.removeEventListener("tariff-workflow-action", handleWorkflowAction);
+  }, [handlePdfImport]);
 
   function handleSelectTariffBook(book: DesktopTariffBook) {
     setSelectedTariffBookId(book.id);
@@ -285,8 +305,8 @@ export function TariffsScreen() {
   }
 
   return (
-    <main className="p-6 pb-8">
-      <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
+    <ScreenShell>
+      <CommandPanel>
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
@@ -315,10 +335,10 @@ export function TariffsScreen() {
             <MetricTile label="Anni" value={String(availableYears.length)} />
           </div>
         </div>
-      </section>
+      </CommandPanel>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_360px]">
-        <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+      <section className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_360px]">
+        <SectionPanel>
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
@@ -384,9 +404,9 @@ export function TariffsScreen() {
               {createState === "saving" ? "Salvataggio" : "Salva tariffario"}
             </Button>
           </form>
-        </section>
+        </SectionPanel>
 
-        <section className="rounded-[28px] border border-subtle bg-card shadow-soft">
+        <SectionPanel className="p-0">
           <div className="border-b border-subtle p-5">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
@@ -462,10 +482,10 @@ export function TariffsScreen() {
               </div>
             )}
           </div>
-        </section>
+        </SectionPanel>
 
         <aside className="space-y-6">
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="text-base font-semibold text-foreground">Dettaglio tariffario</div>
             <div className="mt-4 rounded-[22px] border border-subtle bg-muted/35 p-4">
               <Badge variant={selectedTariffBook.status === "active" ? "success" : "info"}>
@@ -480,9 +500,9 @@ export function TariffsScreen() {
                 <SummaryLine label="ID" value={selectedTariffBook.id} />
               </dl>
             </div>
-          </section>
+          </SectionPanel>
 
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="flex items-center justify-between">
               <div className="text-base font-semibold text-foreground">Voci tariffario</div>
               <Button size="icon" type="button" variant="outline">
@@ -512,30 +532,10 @@ export function TariffsScreen() {
                 </div>
               )}
             </div>
-          </section>
+          </SectionPanel>
         </aside>
       </section>
-    </main>
-  );
-}
-
-function MetricTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </div>
-      <div className="mt-3 text-2xl font-semibold text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-subtle pb-3 last:border-b-0 last:pb-0">
-      <dt className="text-sm text-secondary">{label}</dt>
-      <dd className="text-right text-sm font-semibold text-foreground">{value}</dd>
-    </div>
+    </ScreenShell>
   );
 }
 

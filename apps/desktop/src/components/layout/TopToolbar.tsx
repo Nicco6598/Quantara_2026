@@ -1,19 +1,19 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
+  BriefcaseBusiness,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Download,
+  FileUp,
   Filter,
   Moon,
   Plus,
   Search,
-  Settings,
   Sun,
   UploadCloud,
-  Users,
 } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,15 @@ type PageAction = {
   hasDropdown?: boolean;
   icon: LucideIcon;
   label: string;
+  menuItems?: PageActionMenuItem[];
   variant: "outline" | "primary";
+};
+
+type PageActionMenuItem = {
+  actionId: string;
+  description: string;
+  icon: LucideIcon;
+  label: string;
 };
 
 const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
@@ -44,31 +52,44 @@ const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
   team: { section: "Risorse", title: "Team" },
 };
 
-const pageActionsMap: Record<QuantaraRoute, PageAction[]> = {
-  accounting: [
-    { actionId: "filter", hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
-    { actionId: "export", icon: Download, label: "Esporta", variant: "outline" },
-  ],
-  dashboard: [{ actionId: "settings", icon: Settings, label: "Configura", variant: "outline" }],
-  materials: [
-    { actionId: "import", icon: UploadCloud, label: "Importa", variant: "outline" },
-    { actionId: "new", icon: Plus, label: "Nuovo", variant: "primary" },
-  ],
-  "project-detail": [
-    { actionId: "export", icon: Download, label: "Esporta", variant: "outline" },
-    { actionId: "new-sal", icon: Plus, label: "SAL", variant: "primary" },
-  ],
-  projects: [
-    { actionId: "filter", hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
-    { actionId: "new-project", icon: Plus, label: "Nuovo", variant: "primary" },
-  ],
-  sal: [{ actionId: "new-sal", icon: Plus, label: "Nuova SAL", variant: "primary" }],
-  settings: [{ actionId: "preferences", icon: Settings, label: "Preferenze", variant: "outline" }],
+const createMenuItems: PageActionMenuItem[] = [
+  {
+    actionId: "new-project",
+    description: "Crea contratto, importo e tariffario principale",
+    icon: BriefcaseBusiness,
+    label: "Progetto",
+  },
+  {
+    actionId: "new-sal",
+    description: "Apri la creazione guidata di uno stato avanzamento",
+    icon: Plus,
+    label: "SAL",
+  },
+  {
+    actionId: "import-tariff",
+    description: "Importa o prepara un tariffario da PDF",
+    icon: FileUp,
+    label: "Tariffario",
+  },
+];
+
+const commonPageActions: PageAction[] = [
+  { actionId: "filter", hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
+  {
+    actionId: "new",
+    hasDropdown: true,
+    icon: Plus,
+    label: "Nuovo",
+    menuItems: createMenuItems,
+    variant: "primary",
+  },
+];
+
+const routeActionOverrides: Partial<Record<QuantaraRoute, PageAction[]>> = {
   tariffs: [
-    { actionId: "export", icon: Download, label: "Scarica", variant: "outline" },
-    { actionId: "import", icon: UploadCloud, label: "Importa", variant: "primary" },
+    { actionId: "filter", hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
+    { actionId: "import-tariff", icon: UploadCloud, label: "Importa", variant: "primary" },
   ],
-  team: [{ actionId: "roles", icon: Users, label: "Ruoli", variant: "outline" }],
 };
 
 type TopToolbarProps = {
@@ -91,7 +112,7 @@ export function TopToolbar({
   themeMode,
 }: TopToolbarProps) {
   const meta = routeMetaMap[activeRoute];
-  const pageActions = pageActionsMap[activeRoute] ?? [];
+  const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
 
   return (
     <header className="shell-topbar sticky top-0 z-40 border-b border-subtle/80 px-6 py-3">
@@ -206,26 +227,85 @@ function GlobalSearch() {
 function PageActions({ actions }: { actions: PageAction[] }) {
   return (
     <div className="flex items-center gap-2">
-      {actions.map((action) => (
-        <Button
-          className="gap-1.5 rounded-[18px]"
-          key={`${action.actionId}-${action.variant}`}
-          onClick={() => {
-            window.dispatchEvent(
-              new CustomEvent("topbar-action", {
-                detail: action.actionId,
-              }),
-            );
-          }}
-          size="sm"
-          variant={action.variant === "primary" ? "default" : "outline"}
-        >
-          <action.icon className="size-4" />
-          <span>{action.label}</span>
-          {action.hasDropdown ? <ChevronDown className="size-3.5" /> : null}
-        </Button>
-      ))}
+      {actions.map((action) =>
+        action.menuItems ? (
+          <PageActionMenu action={action} key={`${action.actionId}-${action.variant}`} />
+        ) : (
+          <Button
+            className="gap-1.5 rounded-[18px]"
+            key={`${action.actionId}-${action.variant}`}
+            onClick={() => dispatchTopbarAction(action.actionId)}
+            size="sm"
+            variant={action.variant === "primary" ? "default" : "outline"}
+          >
+            <action.icon className="size-4" />
+            <span>{action.label}</span>
+            {action.hasDropdown ? <ChevronDown className="size-3.5" /> : null}
+          </Button>
+        ),
+      )}
     </div>
+  );
+}
+
+function PageActionMenu({ action }: { action: PageAction }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <Button
+        aria-expanded={isOpen}
+        className="gap-1.5 rounded-[18px]"
+        onClick={() => setIsOpen((current) => !current)}
+        size="sm"
+        variant={action.variant === "primary" ? "default" : "outline"}
+      >
+        <action.icon className="size-4" />
+        <span>{action.label}</span>
+        <ChevronDown className="size-3.5" />
+      </Button>
+      {isOpen ? (
+        <>
+          <button
+            aria-label="Chiudi menu topbar"
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={() => setIsOpen(false)}
+            type="button"
+          />
+          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-[18px] border border-subtle bg-card py-2 shadow-panel">
+            {action.menuItems?.map((item) => (
+              <button
+                className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                key={item.actionId}
+                onClick={() => {
+                  dispatchTopbarAction(item.actionId);
+                  setIsOpen(false);
+                }}
+                type="button"
+              >
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-muted text-primary">
+                  <item.icon className="size-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">{item.label}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-secondary">
+                    {item.description}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function dispatchTopbarAction(actionId: string) {
+  window.dispatchEvent(
+    new CustomEvent("topbar-action", {
+      detail: actionId,
+    }),
   );
 }
 

@@ -1,6 +1,7 @@
 import { AlertTriangle, FolderKanban, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import { CommandPanel, MetricTile, ScreenShell, SectionPanel } from "@/components/shared/Screen";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
 
 const overviewMetrics = [
@@ -117,8 +118,8 @@ const activityRows = [
 
 export function DashboardScreen() {
   return (
-    <main className="p-6 pb-8">
-      <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
+    <ScreenShell>
+      <CommandPanel>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_340px]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -135,13 +136,7 @@ export function DashboardScreen() {
 
             <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {overviewMetrics.map((metric) => (
-                <MetricTile
-                  detail={metric.detail}
-                  key={metric.label}
-                  label={metric.label}
-                  tone={metric.tone}
-                  value={metric.value}
-                />
+                <MetricTile {...metric} key={metric.label} />
               ))}
             </div>
           </div>
@@ -163,10 +158,10 @@ export function DashboardScreen() {
             </div>
           </section>
         </div>
-      </section>
+      </CommandPanel>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
-        <section className="rounded-[28px] border border-subtle bg-card shadow-soft">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
+        <SectionPanel className="p-0">
           <div className="flex flex-col gap-3 border-b border-subtle px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
@@ -202,10 +197,10 @@ export function DashboardScreen() {
               <ProjectRow key={row.id} row={row} />
             ))}
           </div>
-        </section>
+        </SectionPanel>
 
         <div className="space-y-6">
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="flex items-center gap-2">
               <FolderKanban className="size-4 text-info" />
               <h3 className="text-base font-semibold text-foreground">Distribuzione stato</h3>
@@ -221,9 +216,9 @@ export function DashboardScreen() {
                 />
               ))}
             </div>
-          </section>
+          </SectionPanel>
 
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="flex items-center gap-2">
               <AlertTriangle className="size-4 text-warning" />
               <h3 className="text-base font-semibold text-foreground">Feed operativo</h3>
@@ -238,43 +233,10 @@ export function DashboardScreen() {
                 </div>
               ))}
             </div>
-          </section>
+          </SectionPanel>
         </div>
       </section>
-    </main>
-  );
-}
-
-function MetricTile({
-  detail,
-  label,
-  tone,
-  value,
-}: {
-  detail: string;
-  label: string;
-  tone: StatusTone | "neutral";
-  value: string;
-}) {
-  const toneClass =
-    tone === "danger"
-      ? "text-danger"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "success"
-          ? "text-success"
-          : tone === "info"
-            ? "text-info"
-            : "text-foreground";
-
-  return (
-    <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </div>
-      <div className={`mt-3 text-2xl font-semibold ${toneClass}`}>{value}</div>
-      <p className="mt-2 text-xs leading-5 text-secondary">{detail}</p>
-    </div>
+    </ScreenShell>
   );
 }
 

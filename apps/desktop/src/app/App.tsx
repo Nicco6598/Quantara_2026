@@ -58,9 +58,11 @@ export function App() {
       const customEvent = event as CustomEvent<string>;
 
       if (customEvent.detail === "new-project") {
-        setActiveRoute("sal");
+        setActiveRoute("projects");
         window.setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-project" }));
+          window.dispatchEvent(
+            new CustomEvent("project-workflow-action", { detail: "new-project" }),
+          );
         }, 0);
       }
 
@@ -68,6 +70,13 @@ export function App() {
         setActiveRoute("sal");
         window.setTimeout(() => {
           window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-sal" }));
+        }, 0);
+      }
+
+      if (customEvent.detail === "import-tariff") {
+        setActiveRoute("tariffs");
+        window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("tariff-workflow-action", { detail: "import" }));
         }, 0);
       }
     };
@@ -103,9 +112,7 @@ export function App() {
 
   const handleInstallUpdate = async () => {
     setInstallState({
-      phase: "downloading",
-      downloadedBytes: 0,
-      totalBytes: null,
+      phase: "installing",
     });
 
     try {
@@ -125,7 +132,7 @@ export function App() {
   };
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]">
+    <div className="app-aura relative flex h-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]">
       {availableUpdate ? (
         <UpdateExperienceDialog
           installState={installState}

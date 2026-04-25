@@ -1,16 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
-  BriefcaseBusiness,
   CheckCircle2,
   ChevronRight,
   FileText,
   HardHat,
   Layers3,
-  ListFilter,
   MapPin,
   MoreVertical,
-  Plus,
   Search,
   Target,
   Wrench,
@@ -20,12 +17,16 @@ import { eur } from "@quantara/domain-utils";
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import { CommandPanel, ScreenShell, SectionPanel } from "@/components/shared/Screen";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
+import { CreateProjectModal } from "@/features/projects/dialogs/CreateProjectModal";
 import {
   createDesktopContract,
   deleteDesktopContract,
   listDesktopContracts,
   listDesktopTariffBooks,
+  updateDesktopContract,
+  type CreateDesktopContractRequest,
   type DesktopContract,
   type DesktopDataResult,
 } from "@/lib/desktopData";
@@ -34,12 +35,16 @@ import { cn } from "@/lib/utils";
 
 type LaneTone = Extract<StatusTone, "success" | "warning" | "danger">;
 type PortfolioFocus = "all" | "critical" | "sal";
-type ProjectFormState = {
-  applicationContractCode: string;
-  contractualAmount: string;
-  frameworkAgreementCode: string;
-  tariffBookId: string;
-  title: string;
+type ProjectsViewMode = "board" | "workbench";
+type ProjectEditState = {
+  contractId: string;
+  values: {
+    applicationContractCode: string;
+    contractualAmount: string;
+    frameworkAgreementCode: string;
+    tariffBookId: string;
+    title: string;
+  };
 };
 
 type PortfolioProject = {
@@ -403,14 +408,6 @@ const fallbackProjectTariffBook = {
   year: 2025,
 };
 
-const initialProjectForm: ProjectFormState = {
-  applicationContractCode: "",
-  contractualAmount: "",
-  frameworkAgreementCode: "",
-  tariffBookId: fallbackProjectTariffBook.id,
-  title: "",
-};
-
 export function ProjectsScreen() {
   const [createState, setCreateState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [createMessage, setCreateMessage] = useState("");
@@ -419,17 +416,22 @@ export function ProjectsScreen() {
     message: "Caricamento contratti locali.",
     source: "fallback",
   });
-  const [projectForm, setProjectForm] = useState<ProjectFormState>(initialProjectForm);
+  const [editingProject, setEditingProject] = useState<ProjectEditState | null>(null);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState("");
   const [tariffBooksState, setTariffBooksState] = useState([fallbackProjectTariffBook]);
   const [focus, setFocus] = useState<PortfolioFocus>("all");
   const [query, setQuery] = useState("");
+  const [viewMode, setViewMode] = useState<ProjectsViewMode>("board");
   const [isPending, startTransition] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
-  const activeProjects =
-    contractsState.source === "desktop"
-      ? contractsState.data.map(mapContractToProject)
-      : portfolioProjects;
+  const activeProjects = useMemo(
+    () =>
+      contractsState.source === "desktop"
+        ? contractsState.data.map(mapContractToProject)
+        : portfolioProjects,
+    [contractsState.data, contractsState.source],
+  );
   const projectIndex = useMemo(
     () => new Map(activeProjects.map((project) => [project.id, project])),
     [activeProjects],
@@ -446,10 +448,6 @@ export function ProjectsScreen() {
         setContractsState(contracts);
         setTariffBooksState(tariffBooks.data);
         setSelectedContractId(contracts.data[0]?.id ?? "");
-        setProjectForm((state) => ({
-          ...state,
-          tariffBookId: tariffBooks.data[0]?.id ?? state.tariffBookId,
-        }));
       }
     });
 
@@ -458,47 +456,40 @@ export function ProjectsScreen() {
     };
   }, []);
 
-  function buildContractRequest(contractId: string) {
-    const amount = Number(projectForm.contractualAmount.replace(",", "."));
+  useEffect(() => {
+    const handleTopbarAction = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
 
-    if (
-      !projectForm.title.trim() ||
-      !projectForm.applicationContractCode.trim() ||
-      !projectForm.frameworkAgreementCode.trim() ||
-      !projectForm.tariffBookId ||
-      !Number.isFinite(amount) ||
-      amount < 0
-    ) {
-      return null;
-    }
-
-    return {
-      applicationContractCode: projectForm.applicationContractCode.trim(),
-      contractualAmount: amount,
-      frameworkAgreementCode: projectForm.frameworkAgreementCode.trim(),
-      id: contractId,
-      tariffPriorities: [
-        {
-          priority: 1,
-          reason: "Tariffario principale",
-          tariffBookId: projectForm.tariffBookId,
-        },
-      ],
-      title: projectForm.title.trim(),
+      if (customEvent.detail === "new-project") {
+        setEditingProject(null);
+        setIsCreateProjectModalOpen(true);
+      }
     };
-  }
 
-  async function handleCreateProject() {
+    window.addEventListener("topbar-action", handleTopbarAction);
+    window.addEventListener("project-workflow-action", handleTopbarAction);
+    return () => {
+      window.removeEventListener("topbar-action", handleTopbarAction);
+      window.removeEventListener("project-workflow-action", handleTopbarAction);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyboardShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        setEditingProject(null);
+        setIsCreateProjectModalOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyboardShortcut);
+    return () => window.removeEventListener("keydown", handleKeyboardShortcut);
+  }, []);
+
+  async function handleCreateProject(request: CreateDesktopContractRequest) {
     setCreateState("saving");
     setCreateMessage("");
-
-    const request = buildContractRequest(`contract_locale_${Date.now()}`);
-
-    if (!request) {
-      setCreateState("error");
-      setCreateMessage("Compila titolo, codici, importo e tariffario principale.");
-      return;
-    }
 
     try {
       const created = await createDesktopContract(request);
@@ -512,13 +503,43 @@ export function ProjectsScreen() {
       setSelectedContractId(created.id);
       setCreateState("saved");
       setCreateMessage(`${created.title} creato.`);
-      setProjectForm((state) => ({
-        ...initialProjectForm,
-        tariffBookId: state.tariffBookId,
-      }));
+      return created;
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      return null;
+    }
+  }
+
+  async function handleUpdateProject(request: CreateDesktopContractRequest) {
+    if (!editingProject) {
+      return handleCreateProject(request);
+    }
+
+    setCreateState("saving");
+    setCreateMessage("");
+
+    try {
+      const updated = await updateDesktopContract(editingProject.contractId, {
+        ...request,
+        id: editingProject.contractId,
+      });
+
+      setContractsState((current) => ({
+        data: current.data.map((contract) => (contract.id === updated.id ? updated : contract)),
+        ...(current.source === "fallback"
+          ? { message: "Runtime browser: modifica in anteprima.", source: "fallback" }
+          : { source: "desktop" }),
+      }));
+      setSelectedContractId(updated.id);
+      setCreateState("saved");
+      setCreateMessage(`${updated.title} aggiornato.`);
+      setEditingProject(null);
+      return updated;
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+      return null;
     }
   }
 
@@ -532,15 +553,29 @@ export function ProjectsScreen() {
     }
 
     setSelectedContractId(contract.id);
-    setProjectForm({
-      applicationContractCode: contract.applicationContractCode,
-      contractualAmount: String(contract.contractualAmount.amount),
-      frameworkAgreementCode: contract.frameworkAgreementCode,
-      tariffBookId: contract.tariffPriorities[0]?.tariffBookId ?? tariffBooksState[0]?.id ?? "",
-      title: contract.title,
+    setEditingProject({
+      contractId: contract.id,
+      values: {
+        applicationContractCode: contract.applicationContractCode,
+        contractualAmount: String(contract.contractualAmount.amount),
+        frameworkAgreementCode: contract.frameworkAgreementCode,
+        tariffBookId: contract.tariffPriorities[0]?.tariffBookId ?? tariffBooksState[0]?.id ?? "",
+        title: contract.title,
+      },
     });
+    setIsCreateProjectModalOpen(true);
     setCreateState("idle");
-    setCreateMessage(`${contract.title} selezionato per modifica.`);
+    setCreateMessage("");
+  }
+
+  function handleOpenProject(project: PortfolioProject) {
+    try {
+      window.sessionStorage.setItem("quantara.selectedProjectDetail.v1", JSON.stringify(project));
+    } catch {
+      // Detail still opens with fallback content if storage is unavailable.
+    }
+
+    window.dispatchEvent(new CustomEvent("navigate", { detail: "project-detail" }));
   }
 
   async function handleDeleteFromDropdown(projectId: string) {
@@ -568,47 +603,63 @@ export function ProjectsScreen() {
     }
   }
 
-  const visibleProjects = activeProjects
-    .filter(
-      (project) => matchesFocus(project, focus) && matchesProjectSearch(project, deferredQuery),
-    )
-    .sort(compareProjects);
+  const visibleProjects = useMemo(
+    () =>
+      activeProjects
+        .filter(
+          (project) => matchesFocus(project, focus) && matchesProjectSearch(project, deferredQuery),
+        )
+        .sort(compareProjects),
+    [activeProjects, deferredQuery, focus],
+  );
 
-  const visibleQueue = priorityQueue.filter((item) => {
-    const project = projectIndex.get(item.projectId);
+  const visibleQueue = useMemo(
+    () =>
+      priorityQueue.filter((item) => {
+        const project = projectIndex.get(item.projectId);
 
-    if (!project || !matchesFocus(project, focus)) {
-      return false;
-    }
+        if (!project || !matchesFocus(project, focus)) {
+          return false;
+        }
 
-    return matchesSearch(
-      `${project.title} ${project.lot} ${project.location} ${item.title} ${item.detail} ${item.owner}`,
-      deferredQuery,
-    );
-  });
+        return matchesSearch(
+          `${project.title} ${project.lot} ${project.location} ${item.title} ${item.detail} ${item.owner}`,
+          deferredQuery,
+        );
+      }),
+    [deferredQuery, focus, projectIndex],
+  );
 
-  const visibleApprovals = approvalWindow.filter((item) => {
-    const project = projectIndex.get(item.projectId);
+  const visibleApprovals = useMemo(
+    () =>
+      approvalWindow.filter((item) => {
+        const project = projectIndex.get(item.projectId);
 
-    if (!project || !matchesFocus(project, focus)) {
-      return false;
-    }
+        if (!project || !matchesFocus(project, focus)) {
+          return false;
+        }
 
-    return matchesSearch(
-      `${project.title} ${project.lot} ${project.location} ${item.label} ${item.owner}`,
-      deferredQuery,
-    );
-  });
+        return matchesSearch(
+          `${project.title} ${project.lot} ${project.location} ${item.label} ${item.owner}`,
+          deferredQuery,
+        );
+      }),
+    [deferredQuery, focus, projectIndex],
+  );
 
-  const visibleActivities = activityFeed.filter((item) => {
-    const project = projectIndex.get(item.projectId);
+  const visibleActivities = useMemo(
+    () =>
+      activityFeed.filter((item) => {
+        const project = projectIndex.get(item.projectId);
 
-    if (!project || !matchesFocus(project, focus)) {
-      return false;
-    }
+        if (!project || !matchesFocus(project, focus)) {
+          return false;
+        }
 
-    return matchesSearch(`${project.title} ${item.label} ${item.detail}`, deferredQuery);
-  });
+        return matchesSearch(`${project.title} ${item.label} ${item.detail}`, deferredQuery);
+      }),
+    [deferredQuery, focus, projectIndex],
+  );
 
   const totalBudget = visibleProjects.reduce((sum, project) => sum + project.budget.amount, 0);
   const salExposure = visibleProjects.reduce((sum, project) => sum + project.salValue.amount, 0);
@@ -623,21 +674,45 @@ export function ProjectsScreen() {
 
   const managerLoad = buildManagerLoad(visibleProjects);
 
-  const focusCounts = {
-    all: activeProjects.filter((project) => matchesProjectSearch(project, deferredQuery)).length,
-    critical: activeProjects.filter(
-      (project) =>
-        matchesFocus(project, "critical") && matchesProjectSearch(project, deferredQuery),
-    ).length,
-    sal: activeProjects.filter(
-      (project) => matchesFocus(project, "sal") && matchesProjectSearch(project, deferredQuery),
-    ).length,
-  };
+  const focusCounts = useMemo(() => {
+    const counts: Record<PortfolioFocus, number> = { all: 0, critical: 0, sal: 0 };
+
+    for (const project of activeProjects) {
+      if (!matchesProjectSearch(project, deferredQuery)) {
+        continue;
+      }
+
+      counts.all += 1;
+
+      if (matchesFocus(project, "critical")) {
+        counts.critical += 1;
+      }
+
+      if (matchesFocus(project, "sal")) {
+        counts.sal += 1;
+      }
+    }
+
+    return counts;
+  }, [activeProjects, deferredQuery]);
 
   return (
-    <main className="p-6 pb-8">
-      <section className="projects-command-surface relative overflow-hidden rounded-[28px] border border-subtle shadow-panel">
-        <div className="relative z-10 grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <ScreenShell>
+      {createMessage ? (
+        <div
+          className={cn(
+            "mb-4 rounded-[18px] border px-4 py-3 text-sm font-medium shadow-soft",
+            createState === "error"
+              ? "border-danger/25 bg-danger/10 text-danger"
+              : "border-success/25 bg-success/10 text-success",
+          )}
+        >
+          {createMessage}
+        </div>
+      ) : null}
+
+      <CommandPanel className="p-0" variant="projects">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-6 md:p-8">
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="info">Sala controllo portfolio</Badge>
@@ -711,104 +786,12 @@ export function ProjectsScreen() {
                   />
                 </label>
               </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button size="sm" variant="outline">
-                  <ListFilter className="size-4" />
-                  Filtri avanzati
-                </Button>
-                <Button size="sm" variant="outline">
-                  <BriefcaseBusiness className="size-4" />
-                  Nuova SAL
-                </Button>
-              </div>
             </div>
-
-            <form
-              className="mt-6 rounded-[24px] border border-subtle bg-card/86 p-4 shadow-soft"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void handleCreateProject();
-              }}
-            >
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-                <ProjectTextField
-                  label="Nome progetto"
-                  onChange={(value) => setProjectForm((state) => ({ ...state, title: value }))}
-                  placeholder="Linea AV/AC Milano-Verona"
-                  value={projectForm.title}
-                />
-                <ProjectTextField
-                  label="Contratto applicativo"
-                  onChange={(value) =>
-                    setProjectForm((state) => ({ ...state, applicationContractCode: value }))
-                  }
-                  placeholder="CA-MV-001"
-                  value={projectForm.applicationContractCode}
-                />
-                <ProjectTextField
-                  label="Accordo quadro"
-                  onChange={(value) =>
-                    setProjectForm((state) => ({ ...state, frameworkAgreementCode: value }))
-                  }
-                  placeholder="AQ-RFI-2026"
-                  value={projectForm.frameworkAgreementCode}
-                />
-                <ProjectTextField
-                  label="Importo"
-                  onChange={(value) =>
-                    setProjectForm((state) => ({ ...state, contractualAmount: value }))
-                  }
-                  placeholder="26150000"
-                  type="number"
-                  value={projectForm.contractualAmount}
-                />
-              </div>
-
-              <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-                <label className="block min-w-[260px]">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-                    Tariffario principale
-                  </span>
-                  <select
-                    className="mt-2 h-10 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
-                    onChange={(event) =>
-                      setProjectForm((state) => ({ ...state, tariffBookId: event.target.value }))
-                    }
-                    value={projectForm.tariffBookId}
-                  >
-                    {tariffBooksState.map((book) => (
-                      <option key={book.id} value={book.id}>
-                        {book.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="flex flex-col gap-2 xl:items-end">
-                  {createMessage ? (
-                    <div
-                      className={`text-xs ${
-                        createState === "error" ? "text-danger" : "text-secondary"
-                      }`}
-                    >
-                      {createMessage}
-                    </div>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2 xl:justify-end">
-                    <Button disabled={createState === "saving"} type="submit">
-                      <Plus className="size-4" />
-                      {createState === "saving" ? "Salvataggio" : "Crea progetto"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </form>
           </div>
 
           <ApprovalWindowPanel items={visibleApprovals} projectIndex={projectIndex} />
         </div>
-      </section>
+      </CommandPanel>
 
       <section className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
         <div className="space-y-6">
@@ -819,23 +802,67 @@ export function ProjectsScreen() {
           />
         </div>
 
-        <PortfolioBoard
-          onDeleteProject={handleDeleteFromDropdown}
-          onSelectProject={handleSelectProject}
-          projects={visibleProjects}
-        />
+        <section className="min-w-0">
+          <div className="mb-4 flex flex-col gap-3 rounded-[24px] border border-subtle bg-card p-4 shadow-soft md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+                Vista operativa
+              </div>
+              <h3 className="mt-1 text-base font-semibold text-foreground">
+                {viewMode === "board" ? "Board per priorita" : "Registro progetti"}
+              </h3>
+            </div>
+            <div className="flex rounded-[18px] border border-subtle bg-muted/45 p-1">
+              <ViewModeButton
+                active={viewMode === "board"}
+                label="Board"
+                onClick={() => setViewMode("board")}
+              />
+              <ViewModeButton
+                active={viewMode === "workbench"}
+                label="Registro"
+                onClick={() => setViewMode("workbench")}
+              />
+            </div>
+          </div>
+
+          {viewMode === "board" ? (
+            <PortfolioBoard
+              onDeleteProject={handleDeleteFromDropdown}
+              onOpenProject={handleOpenProject}
+              onSelectProject={handleSelectProject}
+              projects={visibleProjects}
+            />
+          ) : (
+            <ProjectsWorkbench
+              onDeleteProject={handleDeleteFromDropdown}
+              onOpenProject={handleOpenProject}
+              onSelectProject={handleSelectProject}
+              projects={visibleProjects}
+              query={query}
+              selectedProjectId={selectedContractId}
+            />
+          )}
+        </section>
 
         <ControlRailPanel activities={visibleActivities} signals={controlSignals} />
       </section>
 
-      <ProjectsWorkbench
-        onDeleteProject={handleDeleteFromDropdown}
-        onSelectProject={handleSelectProject}
-        projects={visibleProjects}
-        query={query}
-        selectedProjectId={selectedContractId}
-      />
-    </main>
+      {isCreateProjectModalOpen ? (
+        <CreateProjectModal
+          defaultTariffBookId={tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id}
+          {...(editingProject ? { initialValues: editingProject.values } : {})}
+          isSaving={createState === "saving"}
+          onClose={() => {
+            setIsCreateProjectModalOpen(false);
+            setEditingProject(null);
+          }}
+          onCreate={editingProject ? handleUpdateProject : handleCreateProject}
+          submitLabel={editingProject ? "Salva modifiche" : "Crea progetto"}
+          tariffBooks={tariffBooksState}
+        />
+      ) : null}
+    </ScreenShell>
   );
 }
 
@@ -1009,32 +1036,26 @@ function FocusChip({
   );
 }
 
-function ProjectTextField({
+function ViewModeButton({
+  active,
   label,
-  onChange,
-  placeholder,
-  type = "text",
-  value,
+  onClick,
 }: {
+  active: boolean;
   label: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  type?: "number" | "text";
-  value: string;
+  onClick: () => void;
 }) {
   return (
-    <label className="block min-w-[180px] flex-1">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </span>
-      <input
-        className="mt-2 h-10 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        type={type}
-        value={value}
-      />
-    </label>
+    <button
+      className={cn(
+        "h-9 rounded-[14px] px-4 text-sm font-medium transition-colors",
+        active ? "bg-card text-foreground shadow-soft" : "text-secondary hover:text-foreground",
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      {label}
+    </button>
   );
 }
 
@@ -1046,7 +1067,7 @@ function PriorityQueuePanel({
   projectIndex: Map<string, PortfolioProject>;
 }) {
   return (
-    <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+    <SectionPanel>
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
@@ -1113,7 +1134,7 @@ function PriorityQueuePanel({
           />
         )}
       </div>
-    </section>
+    </SectionPanel>
   );
 }
 
@@ -1127,7 +1148,7 @@ function ManagerLoadPanel({
   const maxLoad = rows[0]?.count ?? 1;
 
   return (
-    <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+    <SectionPanel>
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
@@ -1166,21 +1187,23 @@ function ManagerLoadPanel({
           />
         )}
       </div>
-    </section>
+    </SectionPanel>
   );
 }
 
 function PortfolioBoard({
   onDeleteProject,
+  onOpenProject,
   onSelectProject,
   projects,
 }: {
   onDeleteProject: (projectId: string) => void;
+  onOpenProject: (project: PortfolioProject) => void;
   onSelectProject: (projectId: string) => void;
   projects: PortfolioProject[];
 }) {
   return (
-    <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+    <SectionPanel>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
@@ -1206,23 +1229,26 @@ function PortfolioBoard({
             items={projects.filter((project) => project.tone === tone)}
             key={tone}
             onDeleteProject={onDeleteProject}
+            onOpenProject={onOpenProject}
             onSelectProject={onSelectProject}
             tone={tone}
           />
         ))}
       </div>
-    </section>
+    </SectionPanel>
   );
 }
 
 function PortfolioLane({
   items,
   onDeleteProject,
+  onOpenProject,
   onSelectProject,
   tone,
 }: {
   items: PortfolioProject[];
   onDeleteProject: (projectId: string) => void;
+  onOpenProject: (project: PortfolioProject) => void;
   onSelectProject: (projectId: string) => void;
   tone: LaneTone;
 }) {
@@ -1253,6 +1279,7 @@ function PortfolioLane({
             <PortfolioLaneCard
               key={project.id}
               onDelete={() => onDeleteProject(project.id)}
+              onOpen={() => onOpenProject(project)}
               onSelect={() => onSelectProject(project.id)}
               project={project}
             />
@@ -1270,10 +1297,12 @@ function PortfolioLane({
 
 function PortfolioLaneCard({
   onDelete,
+  onOpen,
   onSelect,
   project,
 }: {
   onDelete: () => void;
+  onOpen: () => void;
   onSelect: () => void;
   project: PortfolioProject;
 }) {
@@ -1302,7 +1331,7 @@ function PortfolioLaneCard({
         <button
           aria-label={`Apri ${project.title}`}
           className="rounded-full p-2 text-secondary transition-colors hover:bg-muted hover:text-foreground"
-          onClick={openProjectDetail}
+          onClick={onOpen}
           type="button"
         >
           <ChevronRight className="size-4" />
@@ -1350,7 +1379,7 @@ function PortfolioLaneCard({
       </dl>
 
       <div className="mt-4 flex items-center gap-2">
-        <Button onClick={openProjectDetail} size="sm">
+        <Button onClick={onOpen} size="sm">
           Apri dossier
         </Button>
         <WorkbenchRowDropdown
@@ -1383,7 +1412,7 @@ function ControlRailPanel({
   signals: ControlSignal[];
 }) {
   return (
-    <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+    <SectionPanel>
       <div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
           Presidio trasversale
@@ -1465,25 +1494,27 @@ function ControlRailPanel({
           )}
         </div>
       </div>
-    </section>
+    </SectionPanel>
   );
 }
 
 function ProjectsWorkbench({
   onDeleteProject,
+  onOpenProject,
   onSelectProject,
   projects,
   query,
   selectedProjectId,
 }: {
   onDeleteProject: (projectId: string) => void;
+  onOpenProject: (project: PortfolioProject) => void;
   onSelectProject: (projectId: string) => void;
   projects: PortfolioProject[];
   query: string;
   selectedProjectId: string;
 }) {
   return (
-    <section className="mt-6 overflow-hidden rounded-[28px] border border-subtle bg-card shadow-soft">
+    <SectionPanel className="p-0">
       <div className="flex flex-col gap-3 border-b border-subtle p-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
@@ -1501,22 +1532,14 @@ function ProjectsWorkbench({
         </div>
       </div>
 
-      <div className="hidden grid-cols-[1.7fr_1fr_1fr_1fr_1.1fr_auto] gap-4 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary xl:grid">
-        <span>Progetto</span>
-        <span>Presidio</span>
-        <span>Economico</span>
-        <span>SAL</span>
-        <span>Forecast e progresso</span>
-        <span>Azioni</span>
-      </div>
-
-      <div>
+      <div className="space-y-3 p-4">
         {projects.length > 0 ? (
           projects.map((project) => (
             <WorkbenchRow
               isSelected={project.id === selectedProjectId}
               key={project.id}
               onDeleteProject={onDeleteProject}
+              onOpenProject={onOpenProject}
               onSelectProject={onSelectProject}
               project={project}
             />
@@ -1530,18 +1553,20 @@ function ProjectsWorkbench({
           </div>
         )}
       </div>
-    </section>
+    </SectionPanel>
   );
 }
 
 function WorkbenchRow({
   isSelected,
   onDeleteProject,
+  onOpenProject,
   onSelectProject,
   project,
 }: {
   isSelected: boolean;
   onDeleteProject: (projectId: string) => void;
+  onOpenProject: (project: PortfolioProject) => void;
   onSelectProject: (projectId: string) => void;
   project: PortfolioProject;
 }) {
@@ -1549,88 +1574,99 @@ function WorkbenchRow({
   const salTone = getSalTone(project);
 
   return (
-    <div
+    <article
       className={cn(
-        "projects-workbench-row group relative grid gap-4 border-t border-subtle px-5 py-4 xl:grid-cols-[1.7fr_1fr_1fr_1fr_1.1fr_auto] xl:items-center",
-        isSelected ? "bg-primary/10" : "",
+        "projects-workbench-row group relative rounded-[22px] border border-subtle bg-muted/30 p-4 transition-colors hover:bg-muted/50",
+        isSelected ? "border-primary bg-primary/10" : "",
       )}
     >
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="size-2 rounded-full" style={{ backgroundColor: palette.accent }} />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-            {project.phase}
-          </span>
-        </div>
-        <div className="mt-2 text-sm font-semibold text-foreground">{project.title}</div>
-        <div className="mt-1 text-xs text-secondary">
-          {project.lot} · {project.location}
-        </div>
-        <div className="mt-3 xl:hidden">
-          <StatusBadge label={project.healthLabel} tone={project.tone} />
-        </div>
-      </div>
-
-      <div>
-        <div className="text-sm font-semibold text-foreground">{project.manager}</div>
-        <div className="mt-1 text-xs leading-5 text-secondary">{project.materialRisk}</div>
-      </div>
-
-      <div>
-        <div className="text-sm font-semibold text-foreground">{formatMoney(project.budget)}</div>
-        <div
-          className={cn(
-            "mt-1 text-xs font-semibold",
-            project.variance.startsWith("+") ? "text-warning" : "text-success",
-          )}
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <button
+          className="min-w-0 flex-1 text-left"
+          onClick={() => onOpenProject(project)}
+          type="button"
         >
-          vs contratto {project.variance}
-        </div>
-      </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="size-2 rounded-full" style={{ backgroundColor: palette.accent }} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              {project.phase}
+            </span>
+            <StatusBadge label={project.healthLabel} tone={project.tone} />
+            <Badge variant={salTone}>{project.salState}</Badge>
+          </div>
+          <div className="mt-2 text-sm font-semibold text-foreground">{project.title}</div>
+          <div className="mt-1 text-xs text-secondary">
+            {project.lot} · {project.location} · {project.manager}
+          </div>
+        </button>
 
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge label={project.healthLabel} tone={project.tone} />
-          <Badge variant={salTone}>{project.salState}</Badge>
-        </div>
-        <div className="mt-2 text-sm font-semibold text-foreground">
-          {formatMoney(project.salValue)}
-        </div>
-        <div className="mt-1 text-xs text-secondary">{formatDueWindow(project.salDays)}</div>
-      </div>
-
-      <div>
-        <div className="text-sm font-semibold text-foreground">
-          {formatForecastDelta(project.forecastDeltaDays)}
-        </div>
-        <div className="mt-1 text-xs leading-5 text-secondary">{project.nextMilestone}</div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full"
-            style={{
-              backgroundColor: palette.accent,
-              width: `${project.progress}%`,
-            }}
+        <div className="grid min-w-0 gap-3 sm:grid-cols-3 xl:w-[430px]">
+          <WorkbenchMetric
+            detail={project.variance}
+            label="EAC"
+            value={formatMoney(project.budget)}
+          />
+          <WorkbenchMetric
+            detail={formatDueWindow(project.salDays)}
+            label="SAL"
+            value={formatMoney(project.salValue)}
+          />
+          <WorkbenchMetric
+            detail={project.nextMilestone}
+            label="Forecast"
+            value={formatForecastDelta(project.forecastDeltaDays)}
           />
         </div>
-        <div className="mt-1 text-xs font-medium text-secondary">
-          Avanzamento {formatPercent(project.progress)}
+
+        <div className="flex items-center gap-2 xl:justify-end">
+          <Button onClick={() => onSelectProject(project.id)} size="sm" variant="outline">
+            Modifica
+          </Button>
+          <Button onClick={() => onOpenProject(project)} size="sm" variant="outline">
+            Apri
+          </Button>
+          <WorkbenchRowDropdown
+            onDelete={() => onDeleteProject(project.id)}
+            onSelect={() => onSelectProject(project.id)}
+            projectTitle={project.title}
+          />
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button onClick={() => onSelectProject(project.id)} size="sm" variant="outline">
-          Modifica
-        </Button>
-        <Button onClick={openProjectDetail} size="sm" variant="outline">
-          Apri
-        </Button>
-        <WorkbenchRowDropdown
-          onDelete={() => onDeleteProject(project.id)}
-          onSelect={() => onSelectProject(project.id)}
-          projectTitle={project.title}
-        />
+      <div className="mt-4">
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="text-secondary">{project.materialRisk}</span>
+          <span className="font-medium text-secondary">
+            Avanzamento {formatPercent(project.progress)}
+          </span>
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full"
+            style={{ backgroundColor: palette.accent, width: `${project.progress}%` }}
+          />
+        </div>
       </div>
+    </article>
+  );
+}
+
+function WorkbenchMetric({
+  detail,
+  label,
+  value,
+}: {
+  detail: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-[16px] border border-subtle bg-card px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-sm font-semibold text-foreground">{value}</div>
+      <div className="mt-0.5 truncate text-xs text-secondary">{detail}</div>
     </div>
   );
 }
@@ -1875,8 +1911,4 @@ function getTonePalette(tone: StatusTone) {
     surface:
       "linear-gradient(180deg, color-mix(in srgb, var(--bg-muted) 56%, var(--surface-base)), var(--surface-base))",
   };
-}
-
-function openProjectDetail() {
-  window.dispatchEvent(new CustomEvent("navigate", { detail: "project-detail" }));
 }

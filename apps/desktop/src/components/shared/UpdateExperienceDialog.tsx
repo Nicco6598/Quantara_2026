@@ -1,13 +1,4 @@
-import {
-  ArrowUpRight,
-  CheckCircle2,
-  Clock3,
-  CloudDownload,
-  LoaderCircle,
-  ShieldCheck,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { CheckCircle2, Clock3, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/shared/Button";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
 
@@ -25,11 +16,7 @@ export function UpdateExperienceDialog({
   update,
 }: UpdateExperienceDialogProps) {
   const notes = normalizeNotes(update.notes);
-  const isBusy = installState.phase === "downloading" || installState.phase === "installing";
-  const progress =
-    installState.phase === "downloading" && installState.totalBytes && installState.totalBytes > 0
-      ? Math.min(100, Math.round((installState.downloadedBytes / installState.totalBytes) * 100))
-      : null;
+  const isBusy = installState.phase === "installing";
 
   return (
     <div
@@ -37,28 +24,28 @@ export function UpdateExperienceDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/82 p-4 backdrop-blur-xl"
       role="dialog"
     >
-      <div className="update-modal-panel relative w-full max-w-4xl overflow-hidden rounded-[30px] border shadow-2xl">
+      <div className="update-modal-panel relative w-full max-w-3xl overflow-hidden rounded-[24px] border shadow-2xl">
         <div className="update-command-surface absolute inset-0" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-100/70 to-transparent" />
 
-        <div className="relative z-10 p-5 md:p-7">
+        <div className="relative z-10 p-5 md:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="update-modal-chip rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]">
-                  Update cockpit
+                  Nuova versione
                 </span>
                 <span className="update-modal-chip-muted rounded-full border px-3 py-1 text-xs">
                   Da v{update.currentVersion} a v{update.version}
                 </span>
               </div>
 
-              <h2 className="mt-5 text-[2rem] font-semibold tracking-tight text-white md:text-[2.8rem]">
-                Nuova release pronta per il deploy locale.
+              <h2 className="mt-5 text-3xl font-semibold tracking-tight text-white md:text-[2.4rem]">
+                Aggiornamento pronto.
               </h2>
               <p className="update-modal-muted-text mt-3 max-w-xl text-sm leading-7 md:text-[15px]">
-                L&apos;updater ora usa un flusso dedicato dentro Quantara: patch notes leggibili,
-                stato download reale e installazione finale senza prompt generici del sistema.
+                Leggi cosa cambia, poi Quantara scarica la patch, installa e riavvia l&apos;app.
+                Alla riapertura vedrai solo la conferma di installazione completata.
               </p>
             </div>
 
@@ -73,129 +60,51 @@ export function UpdateExperienceDialog({
             </button>
           </div>
 
-          <div className="mt-7 grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-            <section className="update-modal-card overflow-hidden rounded-[26px] border p-5">
-              <div className="flex flex-wrap items-center gap-3">
-                <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
-                <MetricPill icon={Clock3} label="Check" value={formatTimestamp(update.checkedAt)} />
-                <MetricPill icon={ShieldCheck} label="Canale" value="Stable" />
-              </div>
+          <section className="update-modal-card mt-7 rounded-[22px] border p-4 md:p-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
+              <MetricPill icon={Clock3} label="Check" value={formatTimestamp(update.checkedAt)} />
+              <MetricPill icon={ShieldCheck} label="Canale" value="Stable" />
+            </div>
 
-              <div className="mt-5 rounded-[22px] border border-white/14 bg-slate-950/60 p-4">
-                <div className="update-modal-subtle-text text-[11px] font-semibold uppercase tracking-[0.2em]">
-                  Patch notes
-                </div>
-                <div className="mt-3 space-y-3 text-sm leading-7">
-                  {notes.length > 0 ? (
-                    notes.map((note) => (
-                      <div
-                        className="update-modal-note rounded-2xl border px-4 py-3"
-                        key={note.key}
-                      >
-                        {note.text}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="update-modal-muted-text rounded-2xl border border-dashed border-white/18 px-4 py-4">
-                      Nessuna nota release disponibile per questa build.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <section className="update-modal-card-strong rounded-[26px] border p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-cyan-400/12 text-cyan-100">
-                  {installState.phase === "installing" ? (
-                    <LoaderCircle className="size-5 animate-spin" />
-                  ) : installState.phase === "downloading" ? (
-                    <CloudDownload className="size-5" />
-                  ) : installState.phase === "error" ? (
-                    <ArrowUpRight className="size-5" />
-                  ) : (
-                    <CheckCircle2 className="size-5" />
-                  )}
-                </div>
-                <div>
-                  <div className="update-modal-subtle-text text-[11px] font-semibold uppercase tracking-[0.2em]">
-                    Deployment step
+            <div className="mt-5 max-h-[38vh] space-y-3 overflow-y-auto pr-1 text-sm leading-7">
+              {notes.length > 0 ? (
+                notes.map((note) => (
+                  <div className="update-modal-note rounded-2xl border px-4 py-3" key={note.key}>
+                    {note.text}
                   </div>
-                  <div className="mt-1 text-lg font-semibold text-white">
-                    {getInstallHeadline(installState.phase)}
-                  </div>
-                </div>
-              </div>
+                ))
+              ) : (
+                <p className="update-modal-muted-text rounded-2xl border border-dashed border-white/18 px-4 py-4">
+                  Nessuna nota release disponibile per questa build.
+                </p>
+              )}
+            </div>
+          </section>
 
-              <p className="update-modal-muted-text mt-4 text-sm leading-7">
-                {getInstallDescription(installState)}
-              </p>
+          {installState.phase === "error" ? (
+            <div className="mt-4 rounded-2xl border border-rose-400/18 bg-rose-400/10 px-4 py-3 text-sm leading-6 text-rose-100">
+              {installState.message}
+            </div>
+          ) : null}
 
-              <div className="mt-5 rounded-[22px] border border-white/14 bg-slate-950/58 p-4">
-                <div className="update-modal-subtle-text flex items-center justify-between gap-3 text-xs uppercase tracking-[0.18em]">
-                  <span>Pipeline</span>
-                  <span>
-                    {progress !== null
-                      ? `${progress}%`
-                      : installState.phase === "installing"
-                        ? "Finale"
-                        : "Pronta"}
-                  </span>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
-                  <div
-                    className={`h-full rounded-full bg-[linear-gradient(90deg,#67e8f9,#22c55e)] transition-[width] duration-300 ${
-                      installState.phase === "installing" ? "animate-pulse" : ""
-                    }`}
-                    style={{
-                      width:
-                        installState.phase === "idle"
-                          ? "12%"
-                          : installState.phase === "installing"
-                            ? "100%"
-                            : `${progress ?? 8}%`,
-                    }}
-                  />
-                </div>
-
-                {installState.phase === "downloading" ? (
-                  <div className="update-modal-muted-text mt-3 text-sm">
-                    {formatBytes(installState.downloadedBytes)}
-                    {installState.totalBytes ? ` / ${formatBytes(installState.totalBytes)}` : ""}
-                  </div>
-                ) : null}
-
-                {installState.phase === "error" ? (
-                  <div className="mt-3 rounded-2xl border border-rose-400/18 bg-rose-400/10 px-3 py-3 text-sm leading-6 text-rose-100">
-                    {installState.message}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="update-modal-muted-text mt-5 space-y-3 text-sm">
-                <StepRow
-                  active={installState.phase === "idle"}
-                  label="Verifica release disponibile"
-                />
-                <StepRow
-                  active={installState.phase === "downloading"}
-                  label="Download pacchetto firmato"
-                />
-                <StepRow
-                  active={installState.phase === "installing"}
-                  label="Installazione e riavvio app"
-                />
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Button disabled={isBusy} onClick={onInstall} type="button">
-                  {isBusy ? "Installazione in corso" : "Installa aggiornamento"}
-                </Button>
-                <Button disabled={isBusy} onClick={onClose} type="button" variant="secondary">
-                  Ricordamelo dopo
-                </Button>
-              </div>
-            </section>
+          <div className="mt-6 flex flex-wrap justify-end gap-3">
+            <Button disabled={isBusy} onClick={onClose} type="button" variant="secondary">
+              Piu tardi
+            </Button>
+            <Button disabled={isBusy} onClick={onInstall} type="button">
+              {isBusy ? (
+                <>
+                  <LoaderCircle className="size-4 animate-spin" />
+                  Installazione
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="size-4" />
+                  Aggiorna e riavvia
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </div>
@@ -225,23 +134,6 @@ function MetricPill({
   );
 }
 
-function StepRow({ active, label }: { active: boolean; label: string }) {
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-2xl border px-3 py-3 transition-colors ${
-        active
-          ? "border-cyan-300/24 bg-cyan-400/10 text-white"
-          : "border-white/14 bg-slate-950/50 text-slate-300"
-      }`}
-    >
-      <span
-        className={`block size-2.5 rounded-full ${active ? "bg-cyan-200 shadow-[0_0_16px_rgba(103,232,249,0.55)]" : "bg-white/24"}`}
-      />
-      <span>{label}</span>
-    </div>
-  );
-}
-
 function normalizeNotes(notes: string) {
   const values = notes
     .split("\n")
@@ -265,40 +157,6 @@ function normalizeNotes(notes: string) {
       text,
     };
   });
-}
-
-function getInstallHeadline(phase: UpdateExperienceDialogProps["installState"]["phase"]) {
-  switch (phase) {
-    case "downloading":
-      return "Download in esecuzione";
-    case "installing":
-      return "Installazione finale";
-    case "error":
-      return "Installazione interrotta";
-    default:
-      return "Pronta per l'update";
-  }
-}
-
-function getInstallDescription(installState: UpdateExperienceDialogProps["installState"]) {
-  switch (installState.phase) {
-    case "downloading":
-      return "Quantara sta scaricando il pacchetto firmato della release. La finestra resta sincronizzata con l'avanzamento reale.";
-    case "installing":
-      return "Il pacchetto e stato scaricato. Windows completa l'installazione e Quantara verra riavviata automaticamente.";
-    case "error":
-      return "L'update non e andato a buon fine. Puoi chiudere il pannello e rilanciare il check oppure tentare subito un nuovo deploy.";
-    default:
-      return "Patch notes, versione di partenza e stato rilascio sono gia pronti. Se procedi, il pacchetto viene installato senza aprire prompt nativi separati.";
-  }
-}
-
-function formatBytes(value: number) {
-  if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(0)} KB`;
-  }
-
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatTimestamp(value: string) {

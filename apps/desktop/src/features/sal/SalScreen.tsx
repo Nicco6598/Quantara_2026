@@ -9,10 +9,16 @@ import {
   Search,
   X,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import {
+  CommandPanel,
+  MetricTile,
+  ScreenShell,
+  SectionHeading,
+  SectionPanel,
+} from "@/components/shared/Screen";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import {
   buildSalDocumentView,
@@ -167,8 +173,8 @@ export function SalScreen() {
   }
 
   return (
-    <main className="p-6 pb-8">
-      <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
+    <ScreenShell>
+      <CommandPanel>
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
@@ -197,18 +203,18 @@ export function SalScreen() {
             />
           </div>
         </div>
-      </section>
+      </CommandPanel>
 
       {message ? (
-        <div className="mt-4 rounded-[18px] border border-subtle bg-muted/50 px-4 py-3 text-sm text-foreground">
+        <div className="rounded-[18px] border border-subtle bg-muted/50 px-4 py-3 text-sm text-foreground">
           {message}
         </div>
       ) : null}
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="space-y-6">
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
-            <SectionTitle icon={FolderPlus} kicker="Setup" title="Nuovo progetto" />
+          <SectionPanel>
+            <SectionHeading icon={FolderPlus} kicker="Setup" title="Nuovo progetto" />
             <div className="mt-5 space-y-4">
               <TextField
                 label="Nome progetto"
@@ -239,10 +245,10 @@ export function SalScreen() {
                 Salva progetto
               </Button>
             </div>
-          </section>
+          </SectionPanel>
 
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
-            <SectionTitle icon={Layers3} kicker="Filtri" title="Perimetro vista" />
+          <SectionPanel>
+            <SectionHeading icon={Layers3} kicker="Filtri" title="Perimetro vista" />
             <div className="mt-5 space-y-4">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
@@ -299,12 +305,12 @@ export function SalScreen() {
                 Nuova SAL
               </Button>
             </div>
-          </section>
+          </SectionPanel>
         </aside>
 
-        <section className="rounded-[28px] border border-subtle bg-card shadow-soft">
+        <SectionPanel className="p-0">
           <div className="flex flex-col gap-3 border-b border-subtle p-5 xl:flex-row xl:items-center xl:justify-between">
-            <SectionTitle icon={ReceiptText} kicker="Registro" title="SAL operative" />
+            <SectionHeading icon={ReceiptText} kicker="Registro" title="SAL operative" />
             <div className="flex flex-wrap gap-2">
               <Badge variant="neutral">{visibleSals.length} righe</Badge>
               <Badge variant="success">{formatAmount(totalVisibleAmount)}</Badge>
@@ -328,7 +334,7 @@ export function SalScreen() {
           ) : (
             <SalTable projectById={projectById} sals={visibleSals} />
           )}
-        </section>
+        </SectionPanel>
       </section>
 
       {isModalOpen ? (
@@ -346,7 +352,7 @@ export function SalScreen() {
           tariffVoices={tariffVoices}
         />
       ) : null}
-    </main>
+    </ScreenShell>
   );
 }
 
@@ -862,47 +868,6 @@ function groupSalsByProject(sals: SalDocumentView[]) {
     projectId,
     sals: grouped,
   }));
-}
-
-function SectionTitle({
-  icon: Icon,
-  kicker,
-  title,
-}: {
-  icon: LucideIcon;
-  kicker: string;
-  title: string;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-primary">
-        <Icon className="size-4" />
-      </span>
-      <div>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-          {kicker}
-        </div>
-        <h3 className="mt-1 text-base font-semibold text-foreground">{title}</h3>
-      </div>
-    </div>
-  );
-}
-
-function MetricTile({ label, tone, value }: { label: string; tone?: "success"; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </div>
-      <div
-        className={`mt-3 truncate text-lg font-semibold ${
-          tone === "success" ? "text-success" : "text-foreground"
-        }`}
-      >
-        {value}
-      </div>
-    </div>
-  );
 }
 
 function SelectField({

@@ -10,6 +10,13 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import {
+  CommandPanel,
+  MetricTile,
+  ScreenShell,
+  SectionPanel,
+  SummaryLine,
+} from "@/components/shared/Screen";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { formatMoney } from "@/lib/formatters";
 
@@ -27,6 +34,24 @@ const projectData = {
   progress: 68,
   sal: { amount: 2156800, current: 8, total: 12 },
   startDate: "15 Gen 2024",
+};
+
+type SelectedProjectDetail = {
+  budget: { amount: number; currency: "EUR" };
+  forecastDeltaDays: number;
+  healthLabel: string;
+  location: string;
+  lot: string;
+  manager: string;
+  materialRisk: string;
+  nextMilestone: string;
+  progress: number;
+  salDays: number;
+  salState: string;
+  salValue: { amount: number; currency: "EUR" };
+  title: string;
+  tone: "danger" | "success" | "warning";
+  variance: string;
 };
 
 const milestoneRows = [
@@ -75,9 +100,47 @@ const salRows = [
 ] as const;
 
 export function ProjectDetailScreen() {
+  const selectedProject = readSelectedProjectDetail();
+  const detail = selectedProject
+    ? {
+        budget: {
+          committed: Math.round(selectedProject.budget.amount * 0.62),
+          contractual: selectedProject.budget.amount,
+          executed: Math.round(selectedProject.budget.amount * (selectedProject.progress / 100)),
+        },
+        cpi: selectedProject.variance.startsWith("+") ? "0,94" : "1,03",
+        endDate:
+          selectedProject.forecastDeltaDays > 0
+            ? `+${selectedProject.forecastDeltaDays} gg forecast`
+            : "In linea con piano",
+        forecastImpact: selectedProject.variance,
+        health: selectedProject.healthLabel,
+        healthTone: selectedProject.tone,
+        lastUpdate: "Aggiornato ora",
+        location: selectedProject.location,
+        lot: selectedProject.lot,
+        manager: selectedProject.manager,
+        materialRisk: selectedProject.materialRisk,
+        name: selectedProject.title,
+        nextMilestone: selectedProject.nextMilestone,
+        progress: selectedProject.progress,
+        sal: {
+          amount: selectedProject.salValue.amount,
+          current: selectedProject.salState,
+          total: "portfolio",
+        },
+        startDate: "Da dossier progetto",
+      }
+    : {
+        ...projectData,
+        manager: "M. Bianchi",
+        materialRisk: "Binari 60E1 in conferma consegna",
+        nextMilestone: "Validazione costi indiretti",
+      };
+
   return (
-    <main className="p-6 pb-8">
-      <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
+    <ScreenShell>
+      <CommandPanel>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs text-secondary">
@@ -85,22 +148,20 @@ export function ProjectDetailScreen() {
               <ChevronRight className="size-3.5" />
               <span>Progetti</span>
               <ChevronRight className="size-3.5" />
-              <span className="font-semibold text-foreground">{projectData.name}</span>
+              <span className="font-semibold text-foreground">{detail.name}</span>
             </div>
 
             <h2 className="mt-3 text-[2rem] font-semibold tracking-tight text-foreground">
-              {projectData.name}
+              {detail.name}
             </h2>
             <p className="mt-2 text-sm text-secondary">
-              {projectData.lot} · {projectData.location}
+              {detail.lot} · {detail.location}
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <StatusBadge label={projectData.health} tone={projectData.healthTone} />
-              <Badge variant="info">
-                SAL {projectData.sal.current} / {projectData.sal.total}
-              </Badge>
-              <Badge variant="neutral">Ultimo aggiornamento {projectData.lastUpdate}</Badge>
+              <StatusBadge label={detail.health} tone={detail.healthTone} />
+              <Badge variant="info">{String(detail.sal.current)}</Badge>
+              <Badge variant="neutral">Ultimo aggiornamento {detail.lastUpdate}</Badge>
             </div>
           </div>
 
@@ -120,29 +181,29 @@ export function ProjectDetailScreen() {
           <MetricTile
             detail="Budget contrattuale"
             label="Budget"
-            value={formatMoney({ amount: projectData.budget.contractual, currency: "EUR" })}
+            value={formatMoney({ amount: detail.budget.contractual, currency: "EUR" })}
           />
           <MetricTile
             detail="Valore impegnato sul contratto"
             label="Impegnato"
-            value={formatMoney({ amount: projectData.budget.committed, currency: "EUR" })}
+            value={formatMoney({ amount: detail.budget.committed, currency: "EUR" })}
           />
           <MetricTile
             detail="Ultima SAL approvata"
             label="SAL corrente"
-            value={formatMoney({ amount: projectData.sal.amount, currency: "EUR" })}
+            value={formatMoney({ amount: detail.sal.amount, currency: "EUR" })}
           />
           <MetricTile
             detail="Avanzamento fisico del lotto"
             label="Progresso"
-            value={`${projectData.progress}%`}
+            value={`${detail.progress}%`}
           />
         </div>
-      </section>
+      </CommandPanel>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
         <div className="space-y-6">
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="flex items-center gap-2">
               <CalendarDays className="size-4 text-info" />
               <h3 className="text-base font-semibold text-foreground">Milestone operative</h3>
@@ -174,9 +235,9 @@ export function ProjectDetailScreen() {
                 </div>
               ))}
             </div>
-          </section>
+          </SectionPanel>
 
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="flex items-center gap-2">
               <TrendingUp className="size-4 text-info" />
               <h3 className="text-base font-semibold text-foreground">Economico ed esecuzione</h3>
@@ -190,15 +251,15 @@ export function ProjectDetailScreen() {
                 <dl className="mt-4 space-y-3">
                   <SummaryLine
                     label="Budget contrattuale"
-                    value={formatMoney({ amount: projectData.budget.contractual, currency: "EUR" })}
+                    value={formatMoney({ amount: detail.budget.contractual, currency: "EUR" })}
                   />
                   <SummaryLine
                     label="Impegnato"
-                    value={formatMoney({ amount: projectData.budget.committed, currency: "EUR" })}
+                    value={formatMoney({ amount: detail.budget.committed, currency: "EUR" })}
                   />
                   <SummaryLine
                     label="Eseguito"
-                    value={formatMoney({ amount: projectData.budget.executed, currency: "EUR" })}
+                    value={formatMoney({ amount: detail.budget.executed, currency: "EUR" })}
                   />
                 </dl>
               </div>
@@ -211,29 +272,27 @@ export function ProjectDetailScreen() {
                   <div>
                     <div className="text-xs text-secondary">Fine prevista</div>
                     <div className="mt-1 text-lg font-semibold text-foreground">
-                      {projectData.endDate}
+                      {detail.endDate}
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-secondary">Impatto</div>
                     <div className="mt-1 flex items-center gap-1 text-lg font-semibold text-danger">
                       <TrendingDown className="size-4" />
-                      {projectData.forecastImpact}
+                      {detail.forecastImpact}
                     </div>
                   </div>
                 </div>
                 <div className="mt-5 border-t border-subtle pt-4">
                   <div className="text-xs text-secondary">CPI</div>
-                  <div className="mt-1 text-xl font-semibold text-foreground">
-                    {projectData.cpi}
-                  </div>
+                  <div className="mt-1 text-xl font-semibold text-foreground">{detail.cpi}</div>
                   <div className="mt-1 text-xs text-danger">Sotto budget rispetto al piano</div>
                 </div>
               </div>
             </div>
-          </section>
+          </SectionPanel>
 
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="size-4 text-success" />
@@ -270,27 +329,27 @@ export function ProjectDetailScreen() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </SectionPanel>
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="flex items-center gap-2">
               <Clock3 className="size-4 text-info" />
               <h3 className="text-base font-semibold text-foreground">Presidio rapido</h3>
             </div>
             <dl className="mt-5 space-y-3">
-              <SummaryLine label="Inizio" value={projectData.startDate} />
-              <SummaryLine label="Fine prevista" value={projectData.endDate} />
-              <SummaryLine label="Ultimo aggiornamento" value={projectData.lastUpdate} />
-              <SummaryLine
-                label="SAL emesse"
-                value={`${projectData.sal.current} / ${projectData.sal.total}`}
-              />
+              <SummaryLine label="Inizio" value={detail.startDate} />
+              <SummaryLine label="Fine prevista" value={detail.endDate} />
+              <SummaryLine label="Ultimo aggiornamento" value={detail.lastUpdate} />
+              <SummaryLine label="SAL" value={String(detail.sal.current)} />
+              <SummaryLine label="Responsabile" value={detail.manager} />
+              <SummaryLine label="Prossima milestone" value={detail.nextMilestone} />
+              <SummaryLine label="Rischio materiale" value={detail.materialRisk} />
             </dl>
-          </section>
+          </SectionPanel>
 
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="text-base font-semibold text-foreground">Team progetto</div>
             <div className="mt-4 space-y-3">
               {projectTeam.map((member) => (
@@ -308,9 +367,9 @@ export function ProjectDetailScreen() {
                 </div>
               ))}
             </div>
-          </section>
+          </SectionPanel>
 
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="text-base font-semibold text-foreground">Attivita recenti</div>
             <div className="mt-4 space-y-3">
               {recentActivities.map((activity) => (
@@ -323,30 +382,23 @@ export function ProjectDetailScreen() {
                 </div>
               ))}
             </div>
-          </section>
+          </SectionPanel>
         </div>
       </section>
-    </main>
+    </ScreenShell>
   );
 }
 
-function MetricTile({ detail, label, value }: { detail: string; label: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </div>
-      <div className="mt-3 text-2xl font-semibold text-foreground">{value}</div>
-      <div className="mt-2 text-xs leading-5 text-secondary">{detail}</div>
-    </div>
-  );
-}
+function readSelectedProjectDetail(): SelectedProjectDetail | null {
+  try {
+    const rawValue = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
 
-function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-subtle pb-3 last:border-b-0 last:pb-0">
-      <dt className="text-sm text-secondary">{label}</dt>
-      <dd className="text-sm font-semibold text-foreground">{value}</dd>
-    </div>
-  );
+    if (!rawValue) {
+      return null;
+    }
+
+    return JSON.parse(rawValue) as SelectedProjectDetail;
+  } catch {
+    return null;
+  }
 }

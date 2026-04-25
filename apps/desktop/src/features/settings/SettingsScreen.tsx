@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import { CommandPanel, MetricTile, ScreenShell, SectionPanel } from "@/components/shared/Screen";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
@@ -42,9 +43,9 @@ export function SettingsScreen() {
   const releaseStatus = getReleaseStatus(updateState);
 
   return (
-    <main className="p-6 pb-8">
-      <section className="settings-command-surface relative overflow-hidden rounded-[28px] border border-subtle shadow-panel">
-        <div className="relative z-10 grid gap-6 p-6 md:p-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <ScreenShell>
+      <CommandPanel className="p-6 md:p-8" variant="settings">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="info">Sistema e release</Badge>
@@ -64,19 +65,19 @@ export function SettingsScreen() {
             </div>
 
             <div className="mt-6 grid gap-3 md:grid-cols-3">
-              <SettingsMetric
+              <MetricTile
                 detail="Aggiornata dal flusso di sync versione e usata per il rilascio desktop."
                 label="Versione installata"
                 tone="success"
                 value={`v${APP_VERSION}`}
               />
-              <SettingsMetric
+              <MetricTile
                 detail="Canale operativo collegato alla pipeline release del repository."
                 label="Canale"
                 tone="info"
                 value="Stable"
               />
-              <SettingsMetric
+              <MetricTile
                 detail={
                   updaterReady
                     ? "Il controllo nuove release e disponibile in questa build."
@@ -133,10 +134,10 @@ export function SettingsScreen() {
             ) : null}
           </section>
         </div>
-      </section>
+      </CommandPanel>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <SectionPanel>
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
               Esperienza
@@ -199,9 +200,9 @@ export function SettingsScreen() {
               />
             </PreferenceGroup>
           </div>
-        </section>
+        </SectionPanel>
 
-        <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+        <SectionPanel>
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
               Aggiornamenti
@@ -218,8 +219,8 @@ export function SettingsScreen() {
             />
             <ToggleRow
               checked={showReleaseNotesAfterUpdate}
-              description="Dopo l'installazione conserva il changelog per il dialog di rientro."
-              label="Mostra note release dopo update"
+              description="Dopo il riavvio mostra solo una conferma pulita di installazione completata."
+              label="Feedback post-update"
               onChange={setShowReleaseNotesAfterUpdate}
             />
           </div>
@@ -234,10 +235,10 @@ export function SettingsScreen() {
               root `package.json`, workspace desktop e metadati Tauri prima di check e build.
             </p>
           </div>
-        </section>
+        </SectionPanel>
       </section>
 
-      <section className="mt-6 rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+      <SectionPanel>
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
@@ -251,66 +252,33 @@ export function SettingsScreen() {
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SystemFact
+          <MetricTile
+            detail="Esportata dal modulo generato e allineata alla release root."
             label="Versione"
             value={`v${APP_VERSION}`}
-            note="Esportata dal modulo generato e allineata alla release root."
           />
-          <SystemFact
+          <MetricTile
+            detail="Il plugin updater viene interrogato solo nelle build distribuite."
             label="Runtime update"
             value={updaterReady ? "Desktop release" : "Sviluppo"}
-            note="Il plugin updater viene interrogato solo nelle build distribuite."
           />
-          <SystemFact
-            label="Note aggiornamento"
-            value={pendingReleaseNotes ? "Disponibili" : "Pulite"}
-            note={
+          <MetricTile
+            detail={
               pendingReleaseNotes
                 ? `Ultima release letta: v${pendingReleaseNotes.version}`
-                : "Nessun changelog in attesa di essere mostrato."
+                : "Nessun feedback post-update in attesa."
             }
+            label="Note aggiornamento"
+            value={pendingReleaseNotes ? "Disponibili" : "Pulite"}
           />
-          <SystemFact
+          <MetricTile
+            detail="Puoi sempre lanciare un controllo on demand dal pannello superiore."
             label="Check automatico"
             value={autoCheckUpdatesOnLaunch ? "Attivo" : "Manuale"}
-            note="Puoi sempre lanciare un controllo on demand dal pannello superiore."
           />
         </div>
-      </section>
-    </main>
-  );
-}
-
-function SettingsMetric({
-  detail,
-  label,
-  tone,
-  value,
-}: {
-  detail: string;
-  label: string;
-  tone: "danger" | "info" | "neutral" | "success" | "warning";
-  value: string;
-}) {
-  const toneClass =
-    tone === "danger"
-      ? "text-danger"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "success"
-          ? "text-success"
-          : tone === "info"
-            ? "text-info"
-            : "text-foreground";
-
-  return (
-    <div className="rounded-[22px] border border-subtle bg-card/88 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </div>
-      <div className={`mt-3 text-2xl font-semibold ${toneClass}`}>{value}</div>
-      <p className="mt-2 text-xs leading-5 text-secondary">{detail}</p>
-    </div>
+      </SectionPanel>
+    </ScreenShell>
   );
 }
 
@@ -424,18 +392,6 @@ function ToggleRow({
           }`}
         />
       </button>
-    </div>
-  );
-}
-
-function SystemFact({ label, note, value }: { label: string; note: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </div>
-      <div className="mt-3 text-base font-semibold text-foreground">{value}</div>
-      <p className="mt-2 text-sm leading-6 text-secondary">{note}</p>
     </div>
   );
 }

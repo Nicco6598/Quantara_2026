@@ -1,6 +1,13 @@
 import { Bell, Download, Filter, Package, Search, Truck } from "lucide-react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import {
+  CommandPanel,
+  MetricTile,
+  ScreenShell,
+  SectionPanel,
+  SummaryLine,
+} from "@/components/shared/Screen";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 
 const materialRows = [
@@ -79,8 +86,8 @@ const watchRows = [
 
 export function MaterialsScreen() {
   return (
-    <main className="p-6 pb-8">
-      <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
+    <ScreenShell>
+      <CommandPanel>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -98,12 +105,17 @@ export function MaterialsScreen() {
             </p>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <MetricTile label="Valore magazzino" note="Stock disponibile" value="€ 18,75M" />
-              <MetricTile label="Critici" note="Fuori soglia minima" tone="warning" value="8" />
-              <MetricTile label="In esaurimento" note="Entro 30 giorni" tone="warning" value="12" />
+              <MetricTile detail="Stock disponibile" label="Valore magazzino" value="€ 18,75M" />
+              <MetricTile detail="Fuori soglia minima" label="Critici" tone="warning" value="8" />
               <MetricTile
+                detail="Entro 30 giorni"
+                label="In esaurimento"
+                tone="warning"
+                value="12"
+              />
+              <MetricTile
+                detail="Fabbisogno 90 giorni"
                 label="Copertura media"
-                note="Fabbisogno 90 giorni"
                 tone="success"
                 value="78%"
               />
@@ -129,10 +141,10 @@ export function MaterialsScreen() {
             </div>
           </section>
         </div>
-      </section>
+      </CommandPanel>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_320px]">
-        <section className="rounded-[28px] border border-subtle bg-card shadow-soft">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_320px]">
+        <SectionPanel className="p-0">
           <div className="border-b border-subtle px-5 py-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
@@ -222,10 +234,10 @@ export function MaterialsScreen() {
               </tbody>
             </table>
           </div>
-        </section>
+        </SectionPanel>
 
         <div className="space-y-6">
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="flex items-center gap-2">
               <Package className="size-4 text-info" />
               <h3 className="text-base font-semibold text-foreground">Focus materiale</h3>
@@ -245,9 +257,9 @@ export function MaterialsScreen() {
                 <SummaryLine label="Copertura" value="82%" />
               </dl>
             </div>
-          </section>
+          </SectionPanel>
 
-          <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+          <SectionPanel>
             <div className="text-base font-semibold text-foreground">Azioni rapide</div>
             <div className="mt-4 grid gap-2">
               <Button size="sm" variant="outline">
@@ -263,49 +275,9 @@ export function MaterialsScreen() {
                 Crea ordine materiale
               </Button>
             </div>
-          </section>
+          </SectionPanel>
         </div>
       </section>
-    </main>
-  );
-}
-
-function MetricTile({
-  label,
-  note,
-  tone,
-  value,
-}: {
-  label: string;
-  note: string;
-  tone?: "info" | "success" | "warning";
-  value: string;
-}) {
-  const toneClass =
-    tone === "warning"
-      ? "text-warning"
-      : tone === "success"
-        ? "text-success"
-        : tone === "info"
-          ? "text-info"
-          : "text-foreground";
-
-  return (
-    <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </div>
-      <div className={`mt-3 text-2xl font-semibold ${toneClass}`}>{value}</div>
-      <div className="mt-2 text-xs leading-5 text-secondary">{note}</div>
-    </div>
-  );
-}
-
-function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-subtle pb-3 last:border-b-0 last:pb-0">
-      <dt className="text-sm text-secondary">{label}</dt>
-      <dd className="text-sm font-semibold text-foreground">{value}</dd>
-    </div>
+    </ScreenShell>
   );
 }

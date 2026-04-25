@@ -2,6 +2,15 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.41 - 2026-04-25
+
+- Rework the desktop screens around shared enterprise UI primitives for consistent spacing, panels, metrics and summary rows.
+- Improve Projects, Register and Project Detail UX with real project navigation, working edit flow, safer project creation validation and no tariff import inside the project modal.
+- Align Topbar actions across screens while keeping tariff import available only where it belongs.
+- Redesign the sidebar with a cleaner logo lockup, expandable project focus switcher, refined demo account block and generated app version.
+- Add subtle app-wide aura/grain depth, pointer cursors and GPU-friendly sidebar/interactive microinteractions.
+- Simplify the updater flow so patch notes are shown before install and the first relaunch only confirms the latest version is operational.
+
 ## 0.1.40 - 2026-04-24
 
 - Accept user data input for projects management.

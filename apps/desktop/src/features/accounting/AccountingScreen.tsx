@@ -2,6 +2,13 @@ import { Calculator, FileText, ShieldCheck } from "lucide-react";
 import { summarizeSal } from "@quantara/domain-utils";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import {
+  CommandPanel,
+  MetricTile,
+  ScreenShell,
+  SectionPanel,
+  SummaryLine,
+} from "@/components/shared/Screen";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { currentSal } from "@/features/dashboard/demo-data";
 import { formatMoney } from "@/lib/formatters";
@@ -29,8 +36,8 @@ const controlRows = [
 
 export function AccountingScreen() {
   return (
-    <main className="p-6 pb-8">
-      <section className="rounded-[28px] border border-subtle bg-card p-6 shadow-soft">
+    <ScreenShell>
+      <CommandPanel>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -48,23 +55,23 @@ export function AccountingScreen() {
             <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MetricTile
                 label="Totale finale"
-                note="Valore netto consolidato"
+                detail="Valore netto consolidato"
                 tone="success"
                 value={formatMoney(salSummary.finalTotal)}
               />
               <MetricTile
                 label="Lordo ribassabile"
-                note="Base su cui insistono i ribassi"
+                detail="Base su cui insistono i ribassi"
                 value={formatMoney(salSummary.grossDiscountable)}
               />
               <MetricTile
                 label="Dopo gara"
-                note="Dopo ribasso contrattuale"
+                detail="Dopo ribasso contrattuale"
                 value={formatMoney(salSummary.afterTenderAdjustment)}
               />
               <MetricTile
                 label="OS fuori ribasso"
-                note="Valori esclusi dalla scontistica"
+                detail="Valori esclusi dalla scontistica"
                 tone="info"
                 value={formatMoney(salSummary.safetyCosts)}
               />
@@ -91,10 +98,10 @@ export function AccountingScreen() {
             </div>
           </section>
         </div>
-      </section>
+      </CommandPanel>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <SectionPanel>
           <div className="flex items-center gap-2">
             <Calculator className="size-4 text-info" />
             <h3 className="text-base font-semibold text-foreground">Riepilogo economico SAL</h3>
@@ -121,9 +128,9 @@ export function AccountingScreen() {
               </div>
             </div>
           </div>
-        </section>
+        </SectionPanel>
 
-        <section className="rounded-[28px] border border-subtle bg-card p-5 shadow-soft">
+        <SectionPanel>
           <div className="flex items-center gap-2">
             <FileText className="size-4 text-info" />
             <h3 className="text-base font-semibold text-foreground">Pacchetto documentale</h3>
@@ -155,42 +162,8 @@ export function AccountingScreen() {
             </Button>
             <Button size="sm">Genera certificato pagamento</Button>
           </div>
-        </section>
+        </SectionPanel>
       </section>
-    </main>
-  );
-}
-
-function MetricTile({
-  label,
-  note,
-  tone,
-  value,
-}: {
-  label: string;
-  note: string;
-  tone?: "info" | "success";
-  value: string;
-}) {
-  const toneClass =
-    tone === "success" ? "text-success" : tone === "info" ? "text-info" : "text-foreground";
-
-  return (
-    <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-        {label}
-      </div>
-      <div className={`mt-3 text-2xl font-semibold ${toneClass}`}>{value}</div>
-      <div className="mt-2 text-xs leading-5 text-secondary">{note}</div>
-    </div>
-  );
-}
-
-function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-subtle pb-3 last:border-b-0 last:pb-0">
-      <dt className="text-sm text-secondary">{label}</dt>
-      <dd className="text-sm font-semibold text-foreground">{value}</dd>
-    </div>
+    </ScreenShell>
   );
 }

@@ -1,5 +1,5 @@
 import { relaunch } from "@tauri-apps/plugin-process";
-import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { storePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 
 export const APP_UPDATE_AVAILABLE_EVENT = "quantara:update-available";
@@ -37,9 +37,7 @@ type RunAppUpdateCheckOptions = {
 
 export type UpdateInstallState =
   | {
-      downloadedBytes: number;
       phase: "downloading";
-      totalBytes: number | null;
     }
   | {
       phase: "installing";
@@ -116,35 +114,11 @@ export async function installPendingAppUpdate({
   }
 
   const update = pendingUpdate;
-  let totalBytes: number | null = null;
-  let downloadedBytes = 0;
-
-  await update.downloadAndInstall((event: DownloadEvent) => {
-    switch (event.event) {
-      case "Started":
-        totalBytes = event.data.contentLength ?? null;
-        downloadedBytes = 0;
-        onStateChange?.({
-          downloadedBytes,
-          phase: "downloading",
-          totalBytes,
-        });
-        break;
-      case "Progress":
-        downloadedBytes += event.data.chunkLength;
-        onStateChange?.({
-          downloadedBytes,
-          phase: "downloading",
-          totalBytes,
-        });
-        break;
-      case "Finished":
-        onStateChange?.({
-          phase: "installing",
-        });
-        break;
-    }
+  onStateChange?.({
+    phase: "installing",
   });
+
+  await update.downloadAndInstall();
 
   if (showReleaseNotesAfterUpdate) {
     storePendingReleaseNotes({
