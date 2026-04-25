@@ -1,4 +1,11 @@
-export { addMoney, eur, multiplyMoney, roundCurrency } from "./money";
+export {
+  addMoney,
+  eur,
+  formatEuroDisplay,
+  multiplyMoney,
+  parseEuroAmount,
+  roundCurrency,
+} from "./money";
 export {
   calculateAccountingRowFinalPrice,
   resolveTariffVoice,

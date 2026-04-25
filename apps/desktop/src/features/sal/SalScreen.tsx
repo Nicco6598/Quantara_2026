@@ -19,13 +19,18 @@ import {
   SectionHeading,
   SectionPanel,
 } from "@/components/shared/Screen";
-import { StatusBadge } from "@/components/shared/StatusBadge";
+import {
+  groupSalsByProject,
+  PAGE_SIZE,
+  PaginationControls,
+  ProjectSalGroup,
+  SalTable,
+} from "@/features/sal/components/SalTables";
 import {
   buildSalDocumentView,
   createId,
   normalizeDecimal,
   surchargeOptions,
-  type SalDocumentView,
   type SalLine,
   type SalProject,
   type SalSurchargeKind,
@@ -104,6 +109,7 @@ export function SalScreen() {
   const [groupMode, setGroupMode] = useState<GroupMode>("project");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [page, setPage] = useState(1);
   const [projectFilter, setProjectFilter] = useState("all");
   const [projectForm, setProjectForm] = useState<ProjectFormState>(initialProjectForm);
   const [query, setQuery] = useState("");
@@ -134,10 +140,28 @@ export function SalScreen() {
         .sort((left, right) => right.date.localeCompare(left.date)),
     [projectById, projectFilter, query, salViews, statusFilter],
   );
+  const paginatedSals = useMemo(
+    () => visibleSals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [visibleSals, page],
+  );
+  const totalPages = Math.ceil(visibleSals.length / PAGE_SIZE);
   const groupedSals = useMemo(() => groupSalsByProject(visibleSals), [visibleSals]);
+  const groupedTotalPages = Math.ceil(groupedSals.length / PAGE_SIZE);
   const totalVisibleAmount = visibleSals.reduce((sum, sal) => sum + sal.total, 0);
   const closedCount = salViews.filter((sal) => sal.status === "closed").length;
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? projects[0];
+
+  useEffect(() => {
+    setPage(1);
+  }, [groupMode, projectFilter, query, statusFilter]);
+
+  useEffect(() => {
+    const maxPage = groupMode === "project" ? groupedTotalPages : totalPages;
+
+    if (maxPage > 0 && page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [groupMode, groupedTotalPages, page, totalPages]);
 
   useEffect(() => {
     const handleWorkflowAction = (event: Event) => {
@@ -322,17 +346,33 @@ export function SalScreen() {
               <EmptyState text="Nessuna SAL nel perimetro corrente. Crea un progetto, poi usa + Nuova SAL." />
             </div>
           ) : groupMode === "project" ? (
-            <div className="divide-y divide-subtle">
-              {groupedSals.map((group) => (
-                <ProjectSalGroup
-                  key={group.projectId}
-                  project={projectById.get(group.projectId)}
-                  sals={group.sals}
-                />
-              ))}
-            </div>
+            <>
+              <div className="divide-y divide-subtle">
+                {groupedSals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((group) => (
+                  <ProjectSalGroup
+                    key={group.projectId}
+                    project={projectById.get(group.projectId)}
+                    sals={group.sals}
+                  />
+                ))}
+              </div>
+              <PaginationControls
+                current={page}
+                total={groupedTotalPages}
+                totalItems={groupedSals.length}
+                onPageChange={setPage}
+              />
+            </>
           ) : (
-            <SalTable projectById={projectById} sals={visibleSals} />
+            <>
+              <SalTable projectById={projectById} sals={paginatedSals} />
+              <PaginationControls
+                current={page}
+                total={totalPages}
+                totalItems={visibleSals.length}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </SectionPanel>
       </section>
@@ -768,108 +808,6 @@ function DraftLineEditor({
   );
 }
 
-function ProjectSalGroup({
-  project,
-  sals,
-}: {
-  project: SalProject | undefined;
-  sals: SalDocumentView[];
-}) {
-  const total = sals.reduce((sum, sal) => sum + sal.total, 0);
-
-  return (
-    <section className="p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-foreground">
-            {project?.name ?? "Progetto non trovato"}
-          </h3>
-          <div className="mt-1 text-xs text-secondary">
-            {project ? `${project.year} · ${project.client || "Committente non indicato"}` : "-"}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Badge variant="neutral">{sals.length} SAL</Badge>
-          <Badge variant="success">{formatAmount(total)}</Badge>
-        </div>
-      </div>
-      <SalTable projectById={new Map(project ? [[project.id, project]] : [])} sals={sals} />
-    </section>
-  );
-}
-
-function SalTable({
-  projectById,
-  sals,
-}: {
-  projectById: Map<string, SalProject>;
-  sals: SalDocumentView[];
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-        <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-          <tr>
-            <th className="px-5 py-3">SAL</th>
-            <th className="px-5 py-3">Progetto</th>
-            <th className="px-5 py-3">Data</th>
-            <th className="px-5 py-3">Voci</th>
-            <th className="px-5 py-3">Totale</th>
-            <th className="px-5 py-3">Stato</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sals.map((sal) => {
-            const project = projectById.get(sal.projectId);
-
-            return (
-              <tr className="border-t border-subtle" key={sal.id}>
-                <td className="px-5 py-4">
-                  <div className="font-semibold text-foreground">{sal.title}</div>
-                  <div className="mt-1 text-xs text-secondary">{sal.description || sal.notes}</div>
-                </td>
-                <td className="px-5 py-4 text-secondary">
-                  {project ? `${project.name} · ${project.year}` : sal.projectId}
-                </td>
-                <td className="px-5 py-4 text-secondary">{sal.date}</td>
-                <td className="px-5 py-4 text-foreground">{sal.lines.length}</td>
-                <td className="px-5 py-4 text-lg font-semibold text-foreground">
-                  {formatAmount(sal.total)}
-                </td>
-                <td className="px-5 py-4">
-                  <StatusBadge
-                    label={statusLabel(sal.status)}
-                    tone={sal.status === "closed" ? "success" : "info"}
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function groupSalsByProject(sals: SalDocumentView[]) {
-  const groups = new Map<string, SalDocumentView[]>();
-
-  for (const sal of sals) {
-    const current = groups.get(sal.projectId);
-
-    if (current) {
-      current.push(sal);
-    } else {
-      groups.set(sal.projectId, [sal]);
-    }
-  }
-
-  return [...groups.entries()].map(([projectId, grouped]) => ({
-    projectId,
-    sals: grouped,
-  }));
-}
-
 function SelectField({
   label,
   onChange,
@@ -962,10 +900,6 @@ function EmptyState({ text }: { text: string }) {
       {text}
     </div>
   );
-}
-
-function statusLabel(status: "closed" | "draft") {
-  return status === "closed" ? "Chiusa" : "Bozza";
 }
 
 function formatAmount(amount: number) {

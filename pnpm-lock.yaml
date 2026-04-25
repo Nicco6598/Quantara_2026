@@ -29,6 +29,9 @@ importers:
       '@quantara/domain-utils':
         specifier: workspace:*
         version: link:../../packages/domain-utils
+      '@quantara/excel-import':
+        specifier: workspace:*
+        version: link:../../packages/excel-import
       '@quantara/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

@@ -11,8 +11,9 @@ import {
   type AvailableAppUpdate,
   type UpdateInstallState,
 } from "@/lib/appUpdater";
+import { useNavigate } from "@/hooks/useNavigate";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
-import { useAppStore, type QuantaraRoute } from "@/store/app-store";
+import { useAppStore } from "@/store/app-store";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 
 export function App() {
@@ -22,7 +23,7 @@ export function App() {
   const canGoForward = useAppStore((state) => state.canGoForward);
   const navigateBack = useAppStore((state) => state.navigateBack);
   const navigateForward = useAppStore((state) => state.navigateForward);
-  const setActiveRoute = useAppStore((state) => state.setActiveRoute);
+  const navigate = useNavigate();
   const motionMode = useAppStore((state) => state.motionMode);
   const showReleaseNotesAfterUpdate = useAppStore((state) => state.showReleaseNotesAfterUpdate);
   const themeMode = useAppStore((state) => state.themeMode);
@@ -44,46 +45,30 @@ export function App() {
     document.documentElement.dataset.motion = motionMode;
   }, [motionMode]);
 
-  useEffect(() => {
-    const handleNavigate = (e: Event) => {
-      const customEvent = e as CustomEvent<QuantaraRoute>;
-      setActiveRoute(customEvent.detail);
-    };
-    window.addEventListener("navigate", handleNavigate);
-    return () => window.removeEventListener("navigate", handleNavigate);
-  }, [setActiveRoute]);
+  function handleTopbarAction(actionId: string) {
+    if (actionId === "new-project") {
+      navigate("projects");
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("project-workflow-action", { detail: "new-project" }));
+      }, 0);
+      return;
+    }
 
-  useEffect(() => {
-    const handleTopbarAction = (event: Event) => {
-      const customEvent = event as CustomEvent<string>;
+    if (actionId === "new-sal") {
+      navigate("sal");
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-sal" }));
+      }, 0);
+      return;
+    }
 
-      if (customEvent.detail === "new-project") {
-        setActiveRoute("projects");
-        window.setTimeout(() => {
-          window.dispatchEvent(
-            new CustomEvent("project-workflow-action", { detail: "new-project" }),
-          );
-        }, 0);
-      }
-
-      if (customEvent.detail === "new-sal") {
-        setActiveRoute("sal");
-        window.setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-sal" }));
-        }, 0);
-      }
-
-      if (customEvent.detail === "import-tariff") {
-        setActiveRoute("tariffs");
-        window.setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("tariff-workflow-action", { detail: "import" }));
-        }, 0);
-      }
-    };
-
-    window.addEventListener("topbar-action", handleTopbarAction);
-    return () => window.removeEventListener("topbar-action", handleTopbarAction);
-  }, [setActiveRoute]);
+    if (actionId === "import-tariff") {
+      navigate("tariffs");
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("tariff-workflow-action", { detail: "import" }));
+      }, 0);
+    }
+  }
 
   useEffect(() => {
     const handleUpdateAvailable = (event: Event) => {
@@ -147,7 +132,7 @@ export function App() {
           onClose={dismissPendingReleaseNotes}
         />
       ) : null}
-      <AppSidebar activeRoute={activeRoute} onRouteChange={setActiveRoute} />
+      <AppSidebar activeRoute={activeRoute} onRouteChange={navigate} />
       <div className="min-w-0 flex-1 overflow-y-auto">
         <TopToolbar
           activeRoute={activeRoute}
@@ -155,6 +140,7 @@ export function App() {
           canGoForward={canGoForward}
           onNavigateBack={navigateBack}
           onNavigateForward={navigateForward}
+          onPageAction={handleTopbarAction}
           onToggleTheme={toggleTheme}
           themeMode={themeMode}
         />

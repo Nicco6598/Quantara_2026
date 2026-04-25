@@ -98,6 +98,7 @@ type TopToolbarProps = {
   canGoForward: boolean;
   onNavigateBack: () => void;
   onNavigateForward: () => void;
+  onPageAction: (actionId: string) => void;
   onToggleTheme: () => void;
   themeMode: ThemeMode;
 };
@@ -108,6 +109,7 @@ export function TopToolbar({
   canGoForward,
   onNavigateBack,
   onNavigateForward,
+  onPageAction,
   onToggleTheme,
   themeMode,
 }: TopToolbarProps) {
@@ -147,7 +149,7 @@ export function TopToolbar({
 
         <div className="flex shrink-0 items-center gap-2">
           <GlobalSearch />
-          <PageActions actions={pageActions} />
+          <PageActions actions={pageActions} onAction={onPageAction} />
           <UtilityButtons onToggleTheme={onToggleTheme} themeMode={themeMode} />
         </div>
       </div>
@@ -224,17 +226,27 @@ function GlobalSearch() {
   );
 }
 
-function PageActions({ actions }: { actions: PageAction[] }) {
+function PageActions({
+  actions,
+  onAction,
+}: {
+  actions: PageAction[];
+  onAction: (actionId: string) => void;
+}) {
   return (
     <div className="flex items-center gap-2">
       {actions.map((action) =>
         action.menuItems ? (
-          <PageActionMenu action={action} key={`${action.actionId}-${action.variant}`} />
+          <PageActionMenu
+            action={action}
+            key={`${action.actionId}-${action.variant}`}
+            onAction={onAction}
+          />
         ) : (
           <Button
             className="gap-1.5 rounded-[18px]"
             key={`${action.actionId}-${action.variant}`}
-            onClick={() => dispatchTopbarAction(action.actionId)}
+            onClick={() => onAction(action.actionId)}
             size="sm"
             variant={action.variant === "primary" ? "default" : "outline"}
           >
@@ -248,7 +260,13 @@ function PageActions({ actions }: { actions: PageAction[] }) {
   );
 }
 
-function PageActionMenu({ action }: { action: PageAction }) {
+function PageActionMenu({
+  action,
+  onAction,
+}: {
+  action: PageAction;
+  onAction: (actionId: string) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -278,7 +296,7 @@ function PageActionMenu({ action }: { action: PageAction }) {
                 className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted"
                 key={item.actionId}
                 onClick={() => {
-                  dispatchTopbarAction(item.actionId);
+                  onAction(item.actionId);
                   setIsOpen(false);
                 }}
                 type="button"
@@ -298,14 +316,6 @@ function PageActionMenu({ action }: { action: PageAction }) {
         </>
       ) : null}
     </div>
-  );
-}
-
-function dispatchTopbarAction(actionId: string) {
-  window.dispatchEvent(
-    new CustomEvent("topbar-action", {
-      detail: actionId,
-    }),
   );
 }
 

@@ -144,7 +144,10 @@ pub fn update_tariff_book(
         .ok_or_else(|| AppError::Database("updated tariff book could not be reloaded".into()))
 }
 
-pub fn delete_tariff_book(connection: &mut Connection, tariff_book_id: &str) -> Result<(), AppError> {
+pub fn delete_tariff_book(
+    connection: &mut Connection,
+    tariff_book_id: &str,
+) -> Result<(), AppError> {
     apply_migrations(connection).map_err(to_database_error)?;
 
     let transaction = connection.transaction().map_err(to_database_error)?;
@@ -203,7 +206,8 @@ pub fn import_tariff_pdf_preview(path: &Path) -> Result<TariffPdfImportPreview, 
     } else {
         extracted_text
     };
-    let year = infer_year(&source_text).unwrap_or_else(|| infer_year(&fallback_name).unwrap_or(2026));
+    let year =
+        infer_year(&source_text).unwrap_or_else(|| infer_year(&fallback_name).unwrap_or(2026));
     let source_name = infer_source_name(&source_text);
     let voices = parse_tariff_voices(&source_text, "tariff_import_preview");
 
@@ -354,7 +358,9 @@ fn extract_pdf_like_text(bytes: &[u8]) -> String {
         let printable: String = line
             .chars()
             .filter(|character| {
-                character.is_ascii_graphic() || character.is_ascii_whitespace() || !character.is_ascii()
+                character.is_ascii_graphic()
+                    || character.is_ascii_whitespace()
+                    || !character.is_ascii()
             })
             .collect();
         if printable.chars().any(|character| character.is_alphabetic()) && printable.len() > 8 {
@@ -375,16 +381,17 @@ fn parse_tariff_voices(text: &str, tariff_book_id: &str) -> Vec<TariffVoiceRecor
 fn parse_tariff_voice_line(line: &str, tariff_book_id: &str) -> Option<TariffVoiceRecord> {
     let compact_line = line.split_whitespace().collect::<Vec<_>>().join(" ");
     let parts = compact_line.split_whitespace().collect::<Vec<_>>();
-    let code = parts.first()?.trim_matches(|character: char| !character.is_alphanumeric() && character != '.');
+    let code = parts
+        .first()?
+        .trim_matches(|character: char| !character.is_alphanumeric() && character != '.');
 
-    if !code.contains('.') || code.len() < 5 {
+    if !is_supported_tariff_code(code) {
         return None;
     }
 
-    let price_token = parts
-        .iter()
-        .rev()
-        .find(|part| part.chars().any(|character| character.is_ascii_digit()) && part.contains(','))?;
+    let price_token = parts.iter().rev().find(|part| {
+        part.chars().any(|character| character.is_ascii_digit()) && part.contains(',')
+    })?;
     let price = parse_price(price_token)?;
     let price_index = parts
         .iter()
@@ -394,7 +401,11 @@ fn parse_tariff_voice_line(line: &str, tariff_book_id: &str) -> Option<TariffVoi
         .get(price_index.checked_sub(1)?)
         .copied()
         .filter(|part| !part.contains('€'))
-        .or_else(|| price_index.checked_sub(2).and_then(|index| parts.get(index).copied()))
+        .or_else(|| {
+            price_index
+                .checked_sub(2)
+                .and_then(|index| parts.get(index).copied())
+        })
         .unwrap_or("cad");
     let description = compact_line
         .replace(code, "")
@@ -426,6 +437,15 @@ fn parse_price(value: &str) -> Option<f64> {
         .to_string();
 
     normalized.parse::<f64>().ok()
+}
+
+fn is_supported_tariff_code(value: &str) -> bool {
+    let has_structured_segments = value.contains('.') && value.len() >= 5;
+    let is_rfi_code = value.len() == 6
+        && value.starts_with("50")
+        && value.chars().all(|char| char.is_ascii_digit());
+
+    has_structured_segments || is_rfi_code
 }
 
 fn infer_voice_category(description: &str) -> String {
@@ -540,8 +560,8 @@ mod tests {
         assert_eq!(tariff_books.len(), 1);
         assert_eq!(tariff_books[0].id, "tariff_lombardia_2025");
 
-        let voices = list_tariff_voices(&connection, "tariff_lombardia_2025")
-            .expect("tariff voices listed");
+        let voices =
+            list_tariff_voices(&connection, "tariff_lombardia_2025").expect("tariff voices listed");
         assert_eq!(voices.len(), 1);
         assert_eq!(voices[0].unit_price, 1250.0);
     }
@@ -576,5 +596,18 @@ mod tests {
         assert_eq!(voices[0].official_code, "03.C01.C10.035");
         assert_eq!(voices[0].unit_of_measure, "m");
         assert_eq!(voices[0].unit_price, 1250.0);
+    }
+
+    #[test]
+    fn parses_rfi_tariff_codes_from_text_lines() {
+        let voices = parse_tariff_voices(
+            "501234 Rimozione e posa apparecchiatura ferroviaria cad € 240,50",
+            "tariff_rfi",
+        );
+
+        assert_eq!(voices.len(), 1);
+        assert_eq!(voices[0].official_code, "501234");
+        assert_eq!(voices[0].unit_of_measure, "cad");
+        assert_eq!(voices[0].unit_price, 240.5);
     }
 }

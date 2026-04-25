@@ -1,64 +1,25 @@
 import { invoke } from "@tauri-apps/api/core";
+import type {
+  CreateDesktopContractRecordRequest,
+  CreateDesktopTariffBookRecordRequest,
+  DesktopContractRecord,
+  DesktopTariffBookRecord,
+  DesktopTariffPriorityRecord,
+  DesktopTariffVoiceRecord,
+  Money,
+  TariffPdfMetadataRecord,
+  UpdateDesktopTariffBookRecordRequest,
+} from "@quantara/shared-types";
 
-export type DesktopMoney = {
-  amount: number;
-  currency: "EUR";
-};
-
-export type DesktopTariffPriority = {
-  priority: number;
-  reason: string;
-  tariffBookId: string;
-};
-
-export type DesktopContract = {
-  applicationContractCode: string;
-  contractualAmount: DesktopMoney;
-  frameworkAgreementCode: string;
-  id: string;
-  tariffPriorities: DesktopTariffPriority[];
-  title: string;
-};
-
-export type CreateDesktopContractRequest = {
-  applicationContractCode: string;
-  contractualAmount: number;
-  frameworkAgreementCode: string;
-  id: string;
-  tariffPriorities: DesktopTariffPriority[];
-  title: string;
-};
-
-export type DesktopTariffBook = {
-  id: string;
-  name: string;
-  sourceName: string;
-  status: string;
-  year: number;
-};
-
-export type DesktopTariffVoice = {
-  category: string;
-  description: string;
-  id: string;
-  officialCode: string;
-  tariffBookId: string;
-  unitOfMeasure: string;
-  unitPrice: number;
-};
-
-export type CreateDesktopTariffBookRequest = DesktopTariffBook & {
-  voices?: DesktopTariffVoice[];
-};
-
-export type UpdateDesktopTariffBookRequest = Omit<DesktopTariffBook, "id">;
-
-export type TariffPdfMetadata = {
-  name: string;
-  sourceName: string;
-  voices: DesktopTariffVoice[];
-  year: number;
-};
+export type DesktopMoney = Money;
+export type DesktopTariffPriority = DesktopTariffPriorityRecord;
+export type DesktopContract = DesktopContractRecord;
+export type CreateDesktopContractRequest = CreateDesktopContractRecordRequest;
+export type DesktopTariffBook = DesktopTariffBookRecord;
+export type DesktopTariffVoice = DesktopTariffVoiceRecord;
+export type CreateDesktopTariffBookRequest = CreateDesktopTariffBookRecordRequest;
+export type UpdateDesktopTariffBookRequest = UpdateDesktopTariffBookRecordRequest;
+export type TariffPdfMetadata = TariffPdfMetadataRecord;
 
 export type DesktopDataResult<T> =
   | {

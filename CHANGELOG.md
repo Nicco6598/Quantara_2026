@@ -2,6 +2,15 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.42 - 2026-04-25
+
+- Add Excel migration workflow in Projects with standard template download, local export, `.xlsx` import preview, validation summary and commit for valid project contracts.
+- Add user feedback for migration actions, including loading states, disabled controls while busy, accessible status messages and reset for import previews.
+- Persist SAL workflow data through the existing `zustand` store pattern and split SAL table rendering into reusable table/group/pagination components.
+- Replace ad-hoc navigation events with a shared navigation hook and direct Topbar action callbacks.
+- Add shared desktop accounting types and Euro amount parsing helpers to reduce duplicated parsing and local type drift.
+- Extend tariff PDF preview parsing to support RFI-style `50XXXX` tariff codes.
+
 ## 0.1.41 - 2026-04-25
 
 - Rework the desktop screens around shared enterprise UI primitives for consistent spacing, panels, metrics and summary rows.

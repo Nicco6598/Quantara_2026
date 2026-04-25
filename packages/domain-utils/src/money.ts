@@ -10,6 +10,19 @@ export function roundCurrency(amount: number): number {
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 }
 
+export function parseEuroAmount(value: string): number {
+  const normalized = value.replace("€", "").replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+
+  return Number(normalized);
+}
+
+export function formatEuroDisplay(value: number): string {
+  return `€ ${value.toLocaleString("it-IT", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })}`;
+}
+
 export function addMoney(left: Money, right: Money): Money {
   assertSameCurrency(left, right);
   return { amount: roundCurrency(left.amount + right.amount), currency: left.currency };

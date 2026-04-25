@@ -1,4 +1,5 @@
 import { Download, FileUp, MoreVertical, Search } from "lucide-react";
+import { parseEuroAmount } from "@quantara/domain-utils";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
@@ -83,7 +84,7 @@ const fallbackTariffVoices: DesktopTariffVoice[] = tariffRows.map((row) => ({
   officialCode: row.code,
   tariffBookId: fallbackTariffBook.id,
   unitOfMeasure: row.unit,
-  unitPrice: Number(row.price.replace("€", "").replace(".", "").replace(",", ".").trim()),
+  unitPrice: parseEuroAmount(row.price),
 }));
 
 type TariffFormState = {

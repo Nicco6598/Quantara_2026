@@ -3,23 +3,36 @@ import {
   Bell,
   CheckCircle2,
   ChevronRight,
+  Download,
   FileText,
+  FileSpreadsheet,
   HardHat,
   Layers3,
+  Loader2,
   MapPin,
   MoreVertical,
   Search,
   Target,
+  Upload,
   Wrench,
 } from "lucide-react";
 import type { Money } from "@quantara/shared-types";
 import { eur } from "@quantara/domain-utils";
-import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  parseQuantaraMigrationWorkbook,
+  serializeQuantaraMigrationWorkbook,
+  validateQuantaraMigrationWorkbook,
+  type MigrationSheetName,
+  type MigrationValidationResult,
+  type QuantaraMigrationWorkbook,
+} from "@quantara/excel-import";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { CommandPanel, ScreenShell, SectionPanel } from "@/components/shared/Screen";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
 import { CreateProjectModal } from "@/features/projects/dialogs/CreateProjectModal";
+import { useNavigate } from "@/hooks/useNavigate";
 import {
   createDesktopContract,
   deleteDesktopContract,
@@ -36,6 +49,7 @@ import { cn } from "@/lib/utils";
 type LaneTone = Extract<StatusTone, "success" | "warning" | "danger">;
 type PortfolioFocus = "all" | "critical" | "sal";
 type ProjectsViewMode = "board" | "workbench";
+type MigrationAction = "commit" | "export" | "idle" | "import" | "template";
 type ProjectEditState = {
   contractId: string;
   values: {
@@ -45,6 +59,12 @@ type ProjectEditState = {
     tariffBookId: string;
     title: string;
   };
+};
+
+type MigrationPreview = {
+  fileName: string;
+  data: QuantaraMigrationWorkbook;
+  validation: MigrationValidationResult;
 };
 
 type PortfolioProject = {
@@ -409,6 +429,8 @@ const fallbackProjectTariffBook = {
 };
 
 export function ProjectsScreen() {
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [createState, setCreateState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [createMessage, setCreateMessage] = useState("");
   const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
@@ -421,13 +443,15 @@ export function ProjectsScreen() {
   const [selectedContractId, setSelectedContractId] = useState("");
   const [tariffBooksState, setTariffBooksState] = useState([fallbackProjectTariffBook]);
   const [focus, setFocus] = useState<PortfolioFocus>("all");
+  const [migrationAction, setMigrationAction] = useState<MigrationAction>("idle");
+  const [migrationPreview, setMigrationPreview] = useState<MigrationPreview | null>(null);
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<ProjectsViewMode>("board");
   const [isPending, startTransition] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
   const activeProjects = useMemo(
     () =>
-      contractsState.source === "desktop"
+      contractsState.source === "desktop" || contractsState.data.length > 0
         ? contractsState.data.map(mapContractToProject)
         : portfolioProjects,
     [contractsState.data, contractsState.source],
@@ -466,10 +490,8 @@ export function ProjectsScreen() {
       }
     };
 
-    window.addEventListener("topbar-action", handleTopbarAction);
     window.addEventListener("project-workflow-action", handleTopbarAction);
     return () => {
-      window.removeEventListener("topbar-action", handleTopbarAction);
       window.removeEventListener("project-workflow-action", handleTopbarAction);
     };
   }, []);
@@ -575,7 +597,7 @@ export function ProjectsScreen() {
       // Detail still opens with fallback content if storage is unavailable.
     }
 
-    window.dispatchEvent(new CustomEvent("navigate", { detail: "project-detail" }));
+    navigate("project-detail");
   }
 
   async function handleDeleteFromDropdown(projectId: string) {
@@ -600,6 +622,144 @@ export function ProjectsScreen() {
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleDownloadMigrationTemplate() {
+    setMigrationAction("template");
+    setCreateState("saving");
+    setCreateMessage("Preparazione template Excel standard...");
+
+    try {
+      await waitForUiPaint();
+      downloadWorkbook(
+        serializeQuantaraMigrationWorkbook({ materials: [], projects: [], sal: [] }),
+        "quantara-migration-template.xlsx",
+      );
+      setCreateState("saved");
+      setCreateMessage("Template Excel standard scaricato.");
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMigrationAction("idle");
+    }
+  }
+
+  async function handleExportMigrationWorkbook() {
+    setMigrationAction("export");
+    setCreateState("saving");
+    setCreateMessage("Preparazione export Excel...");
+
+    const data: QuantaraMigrationWorkbook = {
+      materials: [],
+      projects: contractsState.data.map((contract) => ({
+        applicationContractCode: contract.applicationContractCode,
+        client: "",
+        contractualAmount: contract.contractualAmount.amount,
+        description: "",
+        frameworkAgreementCode: contract.frameworkAgreementCode,
+        tariffBookId: contract.tariffPriorities[0]?.tariffBookId ?? "",
+        title: contract.title,
+        year: new Date().getFullYear(),
+      })),
+      sal: [],
+    };
+
+    try {
+      await waitForUiPaint();
+      downloadWorkbook(serializeQuantaraMigrationWorkbook(data), "quantara-projects-export.xlsx");
+      setCreateState("saved");
+      setCreateMessage(
+        data.projects.length > 0
+          ? `Export Excel completato: ${data.projects.length} progetti inclusi.`
+          : "Export Excel scaricato senza progetti locali. Usa il template per una migrazione pulita.",
+      );
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMigrationAction("idle");
+    }
+  }
+
+  async function handleImportMigrationFile(file: File) {
+    setMigrationAction("import");
+    setCreateState("saving");
+    setCreateMessage(`Lettura ${file.name}...`);
+
+    try {
+      const data = parseQuantaraMigrationWorkbook(await file.arrayBuffer());
+      const validation = validateQuantaraMigrationWorkbook(data);
+
+      setMigrationPreview({
+        data,
+        fileName: file.name,
+        validation,
+      });
+      setCreateState(validation.valid ? "saved" : "error");
+      setCreateMessage(
+        validation.valid
+          ? `${file.name}: ${validation.importableRows} righe pronte per l'import.`
+          : `${file.name}: correggi ${countValidationIssues(validation, "error")} errori prima del commit.`,
+      );
+    } catch (error) {
+      setMigrationPreview(null);
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMigrationAction("idle");
+    }
+  }
+
+  async function handleCommitMigrationPreview() {
+    if (!migrationPreview || !migrationPreview.validation.valid) {
+      return;
+    }
+
+    setMigrationAction("commit");
+    setCreateState("saving");
+    setCreateMessage("Commit migrazione in corso...");
+
+    try {
+      const timestamp = Date.now();
+      const createdContracts = await Promise.all(
+        migrationPreview.data.projects.map((project, index) =>
+          createDesktopContract({
+            applicationContractCode: project.applicationContractCode,
+            contractualAmount: project.contractualAmount,
+            frameworkAgreementCode: project.frameworkAgreementCode,
+            id: createMigrationId(project.title, timestamp, index),
+            tariffPriorities: [
+              {
+                priority: 1,
+                reason: "Import Excel",
+                tariffBookId:
+                  project.tariffBookId || tariffBooksState[0]?.id || fallbackProjectTariffBook.id,
+              },
+            ],
+            title: project.title,
+          }),
+        ),
+      );
+
+      setContractsState((current) => ({
+        data: mergeContracts(createdContracts, current.data),
+        ...(current.source === "fallback"
+          ? { message: "Runtime browser: import in anteprima.", source: "fallback" }
+          : { source: "desktop" }),
+      }));
+      setSelectedContractId(createdContracts[0]?.id ?? selectedContractId);
+      setMigrationPreview(null);
+      setCreateState("saved");
+      setCreateMessage(
+        `Import completato: ${createdContracts.length} progetti creati. SAL e materiali restano in preview.`,
+      );
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMigrationAction("idle");
     }
   }
 
@@ -706,6 +866,7 @@ export function ProjectsScreen() {
               ? "border-danger/25 bg-danger/10 text-danger"
               : "border-success/25 bg-success/10 text-success",
           )}
+          role="status"
         >
           {createMessage}
         </div>
@@ -793,6 +954,42 @@ export function ProjectsScreen() {
         </div>
       </CommandPanel>
 
+      <MigrationPanel
+        action={migrationAction}
+        isCommitDisabled={
+          !migrationPreview ||
+          !migrationPreview.validation.valid ||
+          migrationPreview.data.projects.length === 0 ||
+          migrationAction !== "idle"
+        }
+        isBusy={migrationAction !== "idle"}
+        onClearPreview={() => {
+          setMigrationPreview(null);
+          setCreateState("idle");
+          setCreateMessage("");
+        }}
+        onCommit={handleCommitMigrationPreview}
+        onDownloadTemplate={handleDownloadMigrationTemplate}
+        onExport={handleExportMigrationWorkbook}
+        onOpenFilePicker={() => fileInputRef.current?.click()}
+        preview={migrationPreview}
+      />
+      <input
+        accept=".xlsx"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+
+          if (file) {
+            void handleImportMigrationFile(file);
+          }
+
+          event.currentTarget.value = "";
+        }}
+        ref={fileInputRef}
+        type="file"
+      />
+
       <section className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <PriorityQueuePanel items={visibleQueue} projectIndex={projectIndex} />
@@ -866,6 +1063,193 @@ export function ProjectsScreen() {
   );
 }
 
+function MigrationPanel({
+  action,
+  isCommitDisabled,
+  isBusy,
+  onClearPreview,
+  onCommit,
+  onDownloadTemplate,
+  onExport,
+  onOpenFilePicker,
+  preview,
+}: {
+  action: MigrationAction;
+  isCommitDisabled: boolean;
+  isBusy: boolean;
+  onClearPreview: () => void;
+  onCommit: () => void;
+  onDownloadTemplate: () => void;
+  onExport: () => void;
+  onOpenFilePicker: () => void;
+  preview: MigrationPreview | null;
+}) {
+  const errors = preview ? countValidationIssues(preview.validation, "error") : 0;
+  const warnings = preview ? countValidationIssues(preview.validation, "warning") : 0;
+
+  return (
+    <SectionPanel aria-busy={isBusy} className="mt-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="info">Migrazione Excel</Badge>
+            {isBusy ? <Badge variant="warning">{formatMigrationAction(action)}</Badge> : null}
+            {preview ? (
+              <>
+                <Badge variant={errors > 0 ? "danger" : "success"}>
+                  {preview.validation.importableRows}/{preview.validation.rowCount} righe
+                </Badge>
+                {warnings > 0 ? <Badge variant="warning">{warnings} warning</Badge> : null}
+              </>
+            ) : null}
+          </div>
+          <h3 className="mt-3 text-lg font-semibold text-foreground">
+            Import progetti e template standard
+          </h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
+            Il workbook standard contiene Progetti, SAL e Materiali. In questa fase il commit crea i
+            contratti progetto validati; SAL e materiali vengono validati e conteggiati nella
+            preview.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={isBusy}
+            onClick={onDownloadTemplate}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {action === "template" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            Template
+          </Button>
+          <Button disabled={isBusy} onClick={onExport} size="sm" type="button" variant="outline">
+            {action === "export" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="size-4" />
+            )}
+            Export
+          </Button>
+          <Button
+            disabled={isBusy}
+            onClick={onOpenFilePicker}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {action === "import" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Upload className="size-4" />
+            )}
+            Importa
+          </Button>
+          <Button disabled={isCommitDisabled} onClick={onCommit} size="sm" type="button">
+            {action === "commit" ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Commit...
+              </>
+            ) : (
+              "Commit"
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {preview ? (
+        <div className="mt-5 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <div className="rounded-[18px] border border-subtle bg-muted/35 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 text-sm font-semibold text-foreground">
+                {preview.fileName}
+              </div>
+              <Button
+                disabled={isBusy}
+                onClick={onClearPreview}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                Reset
+              </Button>
+            </div>
+            <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
+              <PreviewMetric label="Progetti" value={String(preview.data.projects.length)} />
+              <PreviewMetric label="SAL" value={String(preview.data.sal.length)} />
+              <PreviewMetric label="Materiali" value={String(preview.data.materials.length)} />
+            </dl>
+          </div>
+
+          <div className="max-h-52 overflow-y-auto rounded-[18px] border border-subtle">
+            {preview.validation.issues.length > 0 ? (
+              preview.validation.issues.slice(0, 8).map((issue) => (
+                <div
+                  className="flex flex-col gap-1 border-b border-subtle px-4 py-3 last:border-b-0 md:flex-row md:items-center md:justify-between"
+                  key={`${issue.sheet}-${issue.rowIndex}-${issue.field}-${issue.message}`}
+                >
+                  <div className="text-sm font-medium text-foreground">
+                    {formatSheetName(issue.sheet)} riga {issue.rowIndex + 2} · {issue.field}
+                  </div>
+                  <div
+                    className={cn(
+                      "text-sm",
+                      issue.severity === "error" ? "text-danger" : "text-warning",
+                    )}
+                  >
+                    {issue.message}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-6 text-sm text-secondary">
+                Nessun errore di validazione nel workbook selezionato.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </SectionPanel>
+  );
+}
+
+function formatMigrationAction(action: MigrationAction) {
+  if (action === "template") {
+    return "Template in preparazione";
+  }
+
+  if (action === "export") {
+    return "Export in corso";
+  }
+
+  if (action === "import") {
+    return "Import in lettura";
+  }
+
+  if (action === "commit") {
+    return "Commit in corso";
+  }
+
+  return "Pronto";
+}
+
+function PreviewMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
+        {label}
+      </dt>
+      <dd className="mt-1 text-base font-semibold text-foreground">{value}</dd>
+    </div>
+  );
+}
+
 function mapContractToProject(contract: DesktopContract): PortfolioProject {
   return {
     budget: contract.contractualAmount,
@@ -886,6 +1270,64 @@ function mapContractToProject(contract: DesktopContract): PortfolioProject {
     tone: "success",
     variance: "0,0%",
   };
+}
+
+function mergeContracts(created: DesktopContract[], current: DesktopContract[]) {
+  const createdIds = new Set(created.map((contract) => contract.id));
+
+  return [...created, ...current.filter((contract) => !createdIds.has(contract.id))];
+}
+
+function createMigrationId(title: string, timestamp: number, index: number) {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 36);
+
+  return `migration_${slug || "project"}_${timestamp}_${index}`;
+}
+
+function countValidationIssues(
+  validation: MigrationValidationResult,
+  severity: "error" | "warning",
+) {
+  return validation.issues.filter((issue) => issue.severity === severity).length;
+}
+
+function formatSheetName(sheet: MigrationSheetName) {
+  if (sheet === "projects") {
+    return "Progetti";
+  }
+
+  if (sheet === "materials") {
+    return "Materiali";
+  }
+
+  return "SAL";
+}
+
+function waitForUiPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+function downloadWorkbook(bytes: Uint8Array, fileName: string) {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+
+  new Uint8Array(buffer).set(bytes);
+
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function ApprovalWindowPanel({

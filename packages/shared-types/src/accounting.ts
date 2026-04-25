@@ -27,6 +27,61 @@ export type ContractRecord = {
   tariffPriorities: readonly TariffPriority[];
 };
 
+export type DesktopTariffPriorityRecord = {
+  priority: number;
+  reason: string;
+  tariffBookId: string;
+};
+
+export type DesktopContractRecord = {
+  applicationContractCode: string;
+  contractualAmount: Money;
+  frameworkAgreementCode: string;
+  id: string;
+  tariffPriorities: DesktopTariffPriorityRecord[];
+  title: string;
+};
+
+export type CreateDesktopContractRecordRequest = {
+  applicationContractCode: string;
+  contractualAmount: number;
+  frameworkAgreementCode: string;
+  id: string;
+  tariffPriorities: DesktopTariffPriorityRecord[];
+  title: string;
+};
+
+export type DesktopTariffBookRecord = {
+  id: string;
+  name: string;
+  sourceName: string;
+  status: string;
+  year: number;
+};
+
+export type DesktopTariffVoiceRecord = {
+  category: string;
+  description: string;
+  id: string;
+  officialCode: string;
+  tariffBookId: string;
+  unitOfMeasure: string;
+  unitPrice: number;
+};
+
+export type CreateDesktopTariffBookRecordRequest = DesktopTariffBookRecord & {
+  voices?: DesktopTariffVoiceRecord[];
+};
+
+export type UpdateDesktopTariffBookRecordRequest = Omit<DesktopTariffBookRecord, "id">;
+
+export type TariffPdfMetadataRecord = {
+  name: string;
+  sourceName: string;
+  voices: DesktopTariffVoiceRecord[];
+  year: number;
+};
+
 export type TariffVoiceCategory =
   | "civil-works"
   | "armament"

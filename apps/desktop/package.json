@@ -1,6 +1,6 @@
 {
   "name": "@quantara/desktop",
-  "version": "0.1.41",
+  "version": "0.1.42",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@quantara/domain-utils": "workspace:*",
+    "@quantara/excel-import": "workspace:*",
     "@quantara/shared-types": "workspace:*",
     "@quantara/validation": "workspace:*",
     "@quantara/ui-tokens": "workspace:*",
