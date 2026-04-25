@@ -35,6 +35,9 @@ importers:
       '@quantara/ui-tokens':
         specifier: workspace:*
         version: link:../../packages/ui-tokens
+      '@quantara/validation':
+        specifier: workspace:*
+        version: link:../../packages/validation
       '@radix-ui/react-slot':
         specifier: 1.2.4
         version: 1.2.4(@types/react@19.2.14)(react@19.2.5)
