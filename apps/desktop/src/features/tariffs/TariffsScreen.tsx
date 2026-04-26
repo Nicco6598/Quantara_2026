@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import { useToast } from "@/components/shared/ToastProvider";
 import {
   CommandPanel,
   MetricTile,
@@ -102,6 +103,7 @@ const initialFormState: TariffFormState = {
 };
 
 export function TariffsScreen() {
+  const { notify } = useToast();
   const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
     data: fallbackContracts,
     message: "Runtime browser: dati dimostrativi.",
@@ -197,6 +199,11 @@ export function TariffsScreen() {
 
     if (!metadata) {
       setCreateMessage("Selezione PDF non disponibile in browser o annullata.");
+      notify({
+        message: "Selezione PDF non disponibile in browser o annullata.",
+        title: "Import tariffario",
+        tone: "warning",
+      });
       return;
     }
 
@@ -212,7 +219,15 @@ export function TariffsScreen() {
         ? `${metadata.voices.length} voci lette dal PDF. Conferma ente e anno prima di salvare.`
         : "Metadata PDF precompilati. Nessuna voce prezzo rilevata automaticamente.",
     );
-  }, []);
+    notify({
+      message:
+        metadata.voices.length > 0
+          ? `${metadata.voices.length} voci lette dal PDF.`
+          : "Metadata PDF precompilati senza voci prezzo rilevate.",
+      title: "PDF tariffario importato",
+      tone: metadata.voices.length > 0 ? "success" : "warning",
+    });
+  }, [notify]);
 
   useEffect(() => {
     const handleWorkflowAction = (event: Event) => {
@@ -250,6 +265,11 @@ export function TariffsScreen() {
     if (!formState.name.trim() || !formState.sourceName.trim() || !Number.isInteger(year)) {
       setCreateState("error");
       setCreateMessage("Compila nome, ente e anno tariffario.");
+      notify({
+        message: "Compila nome, ente e anno tariffario.",
+        title: "Tariffario non salvato",
+        tone: "warning",
+      });
       return;
     }
 
@@ -274,9 +294,19 @@ export function TariffsScreen() {
       setCreateMessage(`${created.name} salvato.`);
       setFormState(initialFormState);
       setImportedVoices([]);
+      notify({
+        message: `${created.name} salvato nel catalogo.`,
+        title: "Tariffario salvato",
+        tone: "success",
+      });
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Salvataggio tariffario non riuscito",
+        tone: "danger",
+      });
     }
   }
 
@@ -299,9 +329,19 @@ export function TariffsScreen() {
       }
       setCreateState("saved");
       setCreateMessage(`${deletedBook?.name ?? "Tariffario"} eliminato.`);
+      notify({
+        message: `${deletedBook?.name ?? "Tariffario"} eliminato dal catalogo.`,
+        title: "Tariffario eliminato",
+        tone: "success",
+      });
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Eliminazione tariffario non riuscita",
+        tone: "danger",
+      });
     }
   }
 

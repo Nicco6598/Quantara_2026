@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { CommandPalette } from "@/components/shared/CommandPalette";
+import { ShortcutHelpDialog } from "@/components/shared/ShortcutHelpDialog";
+import { ToastProvider, useToast } from "@/components/shared/ToastProvider";
 import { UpdateExperienceDialog } from "@/components/shared/UpdateExperienceDialog";
 import { TopToolbar } from "@/components/layout/TopToolbar";
 import { UpdateReleaseNotesDialog } from "@/components/shared/UpdateReleaseNotesDialog";
@@ -17,6 +20,14 @@ import { useAppStore } from "@/store/app-store";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 
 export function App() {
+  return (
+    <ToastProvider>
+      <AppShell />
+    </ToastProvider>
+  );
+}
+
+function AppShell() {
   useAutomaticUpdater();
   const activeRoute = useAppStore((state) => state.activeRoute);
   const canGoBack = useAppStore((state) => state.canGoBack);
@@ -24,11 +35,15 @@ export function App() {
   const navigateBack = useAppStore((state) => state.navigateBack);
   const navigateForward = useAppStore((state) => state.navigateForward);
   const navigate = useNavigate();
+  const { notify } = useToast();
   const motionMode = useAppStore((state) => state.motionMode);
   const showReleaseNotesAfterUpdate = useAppStore((state) => state.showReleaseNotesAfterUpdate);
   const themeMode = useAppStore((state) => state.themeMode);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
   const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [commandPaletteAnchor, setCommandPaletteAnchor] = useState<DOMRect | null>(null);
+  const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<AvailableAppUpdate | null>(null);
   const [installState, setInstallState] = useState<
     UpdateInstallState | { message: string; phase: "error" } | { phase: "idle" }
@@ -45,30 +60,130 @@ export function App() {
     document.documentElement.dataset.motion = motionMode;
   }, [motionMode]);
 
-  function handleTopbarAction(actionId: string) {
-    if (actionId === "new-project") {
-      navigate("projects");
-      window.setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("project-workflow-action", { detail: "new-project" }));
-      }, 0);
-      return;
-    }
+  const handleTopbarAction = useCallback(
+    (actionId: string) => {
+      if (actionId === "new-project") {
+        navigate("projects");
+        window.setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent("project-workflow-action", { detail: "new-project" }),
+          );
+        }, 0);
+        notify({
+          message: "Aperta la creazione guidata del progetto.",
+          title: "Nuovo progetto",
+          tone: "success",
+        });
+        return;
+      }
 
-    if (actionId === "new-sal") {
-      navigate("sal");
-      window.setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-sal" }));
-      }, 0);
-      return;
-    }
+      if (actionId === "new-sal") {
+        navigate("sal");
+        window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-sal" }));
+        }, 0);
+        notify({
+          message: "Aperta la creazione guidata del SAL.",
+          title: "Nuovo SAL",
+          tone: "success",
+        });
+        return;
+      }
 
-    if (actionId === "import-tariff") {
-      navigate("tariffs");
-      window.setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("tariff-workflow-action", { detail: "import" }));
-      }, 0);
-    }
-  }
+      if (actionId === "import-tariff") {
+        navigate("tariffs");
+        window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("tariff-workflow-action", { detail: "import" }));
+        }, 0);
+        notify({
+          message: "Pronta la schermata di importazione tariffario.",
+          title: "Import tariffario",
+          tone: "info",
+        });
+        return;
+      }
+
+      notify({
+        message: "I filtri globali saranno disponibili dalla command palette.",
+        title: "Filtri",
+        tone: "info",
+      });
+    },
+    [navigate, notify],
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable === true;
+      const key = event.key.toLowerCase();
+
+      if (import.meta.env.DEV && event.ctrlKey && event.shiftKey && key === "u") {
+        event.preventDefault();
+        setAvailableUpdate({
+          checkedAt: new Date().toISOString(),
+          currentVersion: "0.1.43",
+          notes: [
+            "Rework update modal theme-aware per tema chiaro e scuro.",
+            "Command palette agganciata alla searchbar della topbar.",
+            "Dashboard e dettaglio progetto collegati ai dati reali disponibili.",
+          ].join("\n"),
+          version: "0.1.44",
+        });
+        setInstallState({
+          phase: "idle",
+        });
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && key === "k") {
+        event.preventDefault();
+        const searchTrigger = document.querySelector<HTMLButtonElement>(
+          "[data-command-palette-anchor]",
+        );
+        setCommandPaletteAnchor(searchTrigger?.getBoundingClientRect() ?? null);
+        setIsCommandPaletteOpen(true);
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key === "/" && !isCommandPaletteOpen) {
+        event.preventDefault();
+        setIsShortcutHelpOpen(true);
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && key === "n") {
+        event.preventDefault();
+        handleTopbarAction(activeRoute === "sal" ? "new-sal" : "new-project");
+        return;
+      }
+
+      if (event.altKey && event.key === "ArrowLeft" && canGoBack && !isTyping) {
+        event.preventDefault();
+        navigateBack();
+        return;
+      }
+
+      if (event.altKey && event.key === "ArrowRight" && canGoForward && !isTyping) {
+        event.preventDefault();
+        navigateForward();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    activeRoute,
+    canGoBack,
+    canGoForward,
+    handleTopbarAction,
+    isCommandPaletteOpen,
+    navigateBack,
+    navigateForward,
+  ]);
 
   useEffect(() => {
     const handleUpdateAvailable = (event: Event) => {
@@ -132,12 +247,28 @@ export function App() {
           onClose={dismissPendingReleaseNotes}
         />
       ) : null}
+      <CommandPalette
+        anchorRect={commandPaletteAnchor}
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onPageAction={handleTopbarAction}
+        onRouteChange={navigate}
+        onToggleTheme={toggleTheme}
+        themeMode={themeMode}
+      />
+      {isShortcutHelpOpen ? (
+        <ShortcutHelpDialog onClose={() => setIsShortcutHelpOpen(false)} />
+      ) : null}
       <AppSidebar activeRoute={activeRoute} onRouteChange={navigate} />
       <div className="min-w-0 flex-1 overflow-y-auto">
         <TopToolbar
           activeRoute={activeRoute}
           canGoBack={canGoBack}
           canGoForward={canGoForward}
+          onOpenCommandPalette={(anchorRect) => {
+            setCommandPaletteAnchor(anchorRect);
+            setIsCommandPaletteOpen(true);
+          }}
           onNavigateBack={navigateBack}
           onNavigateForward={navigateForward}
           onPageAction={handleTopbarAction}

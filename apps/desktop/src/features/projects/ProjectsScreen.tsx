@@ -11,10 +11,13 @@ import {
   Loader2,
   MapPin,
   MoreVertical,
+  Pencil,
   Search,
   Target,
+  Trash2,
   Upload,
   Wrench,
+  X,
 } from "lucide-react";
 import type { Money } from "@quantara/shared-types";
 import { eur } from "@quantara/domain-utils";
@@ -31,6 +34,7 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { CommandPanel, ScreenShell, SectionPanel } from "@/components/shared/Screen";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
+import { useToast } from "@/components/shared/ToastProvider";
 import { CreateProjectModal } from "@/features/projects/dialogs/CreateProjectModal";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
@@ -61,13 +65,18 @@ type ProjectEditState = {
   };
 };
 
+type ProjectActionDialogState = {
+  mode: "actions" | "delete";
+  project: PortfolioProject;
+};
+
 type MigrationPreview = {
   fileName: string;
   data: QuantaraMigrationWorkbook;
   validation: MigrationValidationResult;
 };
 
-type PortfolioProject = {
+export type PortfolioProject = {
   budget: Money;
   forecastDeltaDays: number;
   healthLabel: string;
@@ -121,7 +130,7 @@ type ActivityItem = {
   tone: StatusTone;
 };
 
-const portfolioProjects: PortfolioProject[] = [
+export const portfolioProjects: PortfolioProject[] = [
   {
     budget: eur(26150000),
     forecastDeltaDays: 5,
@@ -430,6 +439,7 @@ const fallbackProjectTariffBook = {
 
 export function ProjectsScreen() {
   const navigate = useNavigate();
+  const { notify } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [createState, setCreateState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [createMessage, setCreateMessage] = useState("");
@@ -440,6 +450,9 @@ export function ProjectsScreen() {
   });
   const [editingProject, setEditingProject] = useState<ProjectEditState | null>(null);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [projectActionDialog, setProjectActionDialog] = useState<ProjectActionDialogState | null>(
+    null,
+  );
   const [selectedContractId, setSelectedContractId] = useState("");
   const [tariffBooksState, setTariffBooksState] = useState([fallbackProjectTariffBook]);
   const [focus, setFocus] = useState<PortfolioFocus>("all");
@@ -525,10 +538,20 @@ export function ProjectsScreen() {
       setSelectedContractId(created.id);
       setCreateState("saved");
       setCreateMessage(`${created.title} creato.`);
+      notify({
+        message: `${created.title} e pronto nel registro progetti.`,
+        title: "Progetto creato",
+        tone: "success",
+      });
       return created;
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Creazione non riuscita",
+        tone: "danger",
+      });
       return null;
     }
   }
@@ -557,10 +580,20 @@ export function ProjectsScreen() {
       setCreateState("saved");
       setCreateMessage(`${updated.title} aggiornato.`);
       setEditingProject(null);
+      notify({
+        message: `${updated.title} aggiornato correttamente.`,
+        title: "Progetto aggiornato",
+        tone: "success",
+      });
       return updated;
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Modifica non riuscita",
+        tone: "danger",
+      });
       return null;
     }
   }
@@ -571,6 +604,11 @@ export function ProjectsScreen() {
     if (!contract) {
       setCreateState("error");
       setCreateMessage("Modifica disponibile sui progetti locali creati nel database.");
+      notify({
+        message: "Puoi modificare solo i progetti locali creati nel database.",
+        title: "Modifica non disponibile",
+        tone: "warning",
+      });
       return;
     }
 
@@ -619,10 +657,38 @@ export function ProjectsScreen() {
       }
       setCreateState("saved");
       setCreateMessage(`${deletedContract?.title ?? "Progetto"} eliminato.`);
+      notify({
+        message: `${deletedContract?.title ?? "Progetto"} eliminato dal registro.`,
+        title: "Progetto eliminato",
+        tone: "success",
+      });
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Eliminazione non riuscita",
+        tone: "danger",
+      });
     }
+  }
+
+  function handleOpenProjectActions(project: PortfolioProject) {
+    setProjectActionDialog({ mode: "actions", project });
+  }
+
+  function handleEditFromActions(project: PortfolioProject) {
+    setProjectActionDialog(null);
+    handleSelectProject(project.id);
+  }
+
+  function handleAskDeleteFromActions(project: PortfolioProject) {
+    setProjectActionDialog({ mode: "delete", project });
+  }
+
+  async function handleConfirmDeleteFromActions(project: PortfolioProject) {
+    setProjectActionDialog(null);
+    await handleDeleteFromDropdown(project.id);
   }
 
   async function handleDownloadMigrationTemplate() {
@@ -638,9 +704,19 @@ export function ProjectsScreen() {
       );
       setCreateState("saved");
       setCreateMessage("Template Excel standard scaricato.");
+      notify({
+        message: "Template Excel standard scaricato.",
+        title: "Template migrazione",
+        tone: "success",
+      });
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Template non generato",
+        tone: "danger",
+      });
     } finally {
       setMigrationAction("idle");
     }
@@ -675,9 +751,22 @@ export function ProjectsScreen() {
           ? `Export Excel completato: ${data.projects.length} progetti inclusi.`
           : "Export Excel scaricato senza progetti locali. Usa il template per una migrazione pulita.",
       );
+      notify({
+        message:
+          data.projects.length > 0
+            ? `${data.projects.length} progetti inclusi nell'export.`
+            : "Export scaricato senza progetti locali.",
+        title: "Export Excel completato",
+        tone: "success",
+      });
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Export non riuscito",
+        tone: "danger",
+      });
     } finally {
       setMigrationAction("idle");
     }
@@ -703,10 +792,22 @@ export function ProjectsScreen() {
           ? `${file.name}: ${validation.importableRows} righe pronte per l'import.`
           : `${file.name}: correggi ${countValidationIssues(validation, "error")} errori prima del commit.`,
       );
+      notify({
+        message: validation.valid
+          ? `${validation.importableRows} righe pronte per l'import.`
+          : `${countValidationIssues(validation, "error")} errori da correggere prima del commit.`,
+        title: file.name,
+        tone: validation.valid ? "success" : "warning",
+      });
     } catch (error) {
       setMigrationPreview(null);
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Import Excel non riuscito",
+        tone: "danger",
+      });
     } finally {
       setMigrationAction("idle");
     }
@@ -755,9 +856,19 @@ export function ProjectsScreen() {
       setCreateMessage(
         `Import completato: ${createdContracts.length} progetti creati. SAL e materiali restano in preview.`,
       );
+      notify({
+        message: `${createdContracts.length} progetti creati. SAL e materiali restano in preview.`,
+        title: "Migrazione completata",
+        tone: "success",
+      });
     } catch (error) {
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Commit migrazione non riuscito",
+        tone: "danger",
+      });
     } finally {
       setMigrationAction("idle");
     }
@@ -1024,16 +1135,14 @@ export function ProjectsScreen() {
 
           {viewMode === "board" ? (
             <PortfolioBoard
-              onDeleteProject={handleDeleteFromDropdown}
               onOpenProject={handleOpenProject}
-              onSelectProject={handleSelectProject}
+              onOpenProjectActions={handleOpenProjectActions}
               projects={visibleProjects}
             />
           ) : (
             <ProjectsWorkbench
-              onDeleteProject={handleDeleteFromDropdown}
               onOpenProject={handleOpenProject}
-              onSelectProject={handleSelectProject}
+              onOpenProjectActions={handleOpenProjectActions}
               projects={visibleProjects}
               query={query}
               selectedProjectId={selectedContractId}
@@ -1056,6 +1165,20 @@ export function ProjectsScreen() {
           onCreate={editingProject ? handleUpdateProject : handleCreateProject}
           submitLabel={editingProject ? "Salva modifiche" : "Crea progetto"}
           tariffBooks={tariffBooksState}
+        />
+      ) : null}
+      {projectActionDialog ? (
+        <ProjectActionDialog
+          mode={projectActionDialog.mode}
+          onClose={() => setProjectActionDialog(null)}
+          onDelete={() => handleAskDeleteFromActions(projectActionDialog.project)}
+          onEdit={() => handleEditFromActions(projectActionDialog.project)}
+          onOpen={() => {
+            setProjectActionDialog(null);
+            handleOpenProject(projectActionDialog.project);
+          }}
+          onConfirmDelete={() => void handleConfirmDeleteFromActions(projectActionDialog.project)}
+          project={projectActionDialog.project}
         />
       ) : null}
     </ScreenShell>
@@ -1249,7 +1372,7 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function mapContractToProject(contract: DesktopContract): PortfolioProject {
+export function mapContractToProject(contract: DesktopContract): PortfolioProject {
   return {
     budget: contract.contractualAmount,
     forecastDeltaDays: 0,
@@ -1633,14 +1756,12 @@ function ManagerLoadPanel({
 }
 
 function PortfolioBoard({
-  onDeleteProject,
+  onOpenProjectActions,
   onOpenProject,
-  onSelectProject,
   projects,
 }: {
-  onDeleteProject: (projectId: string) => void;
+  onOpenProjectActions: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
-  onSelectProject: (projectId: string) => void;
   projects: PortfolioProject[];
 }) {
   return (
@@ -1669,9 +1790,8 @@ function PortfolioBoard({
           <PortfolioLane
             items={projects.filter((project) => project.tone === tone)}
             key={tone}
-            onDeleteProject={onDeleteProject}
+            onOpenProjectActions={onOpenProjectActions}
             onOpenProject={onOpenProject}
-            onSelectProject={onSelectProject}
             tone={tone}
           />
         ))}
@@ -1682,15 +1802,13 @@ function PortfolioBoard({
 
 function PortfolioLane({
   items,
-  onDeleteProject,
+  onOpenProjectActions,
   onOpenProject,
-  onSelectProject,
   tone,
 }: {
   items: PortfolioProject[];
-  onDeleteProject: (projectId: string) => void;
+  onOpenProjectActions: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
-  onSelectProject: (projectId: string) => void;
   tone: LaneTone;
 }) {
   const palette = getTonePalette(tone);
@@ -1719,9 +1837,8 @@ function PortfolioLane({
           items.map((project) => (
             <PortfolioLaneCard
               key={project.id}
-              onDelete={() => onDeleteProject(project.id)}
               onOpen={() => onOpenProject(project)}
-              onSelect={() => onSelectProject(project.id)}
+              onOpenActions={() => onOpenProjectActions(project)}
               project={project}
             />
           ))
@@ -1737,14 +1854,12 @@ function PortfolioLane({
 }
 
 function PortfolioLaneCard({
-  onDelete,
+  onOpenActions,
   onOpen,
-  onSelect,
   project,
 }: {
-  onDelete: () => void;
+  onOpenActions: () => void;
   onOpen: () => void;
-  onSelect: () => void;
   project: PortfolioProject;
 }) {
   const palette = getTonePalette(project.tone);
@@ -1823,11 +1938,15 @@ function PortfolioLaneCard({
         <Button onClick={onOpen} size="sm">
           Apri dossier
         </Button>
-        <WorkbenchRowDropdown
-          onDelete={onDelete}
-          onSelect={onSelect}
-          projectTitle={project.title}
-        />
+        <Button
+          aria-label={`Azioni per ${project.title}`}
+          onClick={onOpenActions}
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
+          <MoreVertical className="size-4" />
+        </Button>
       </div>
     </article>
   );
@@ -1940,16 +2059,14 @@ function ControlRailPanel({
 }
 
 function ProjectsWorkbench({
-  onDeleteProject,
+  onOpenProjectActions,
   onOpenProject,
-  onSelectProject,
   projects,
   query,
   selectedProjectId,
 }: {
-  onDeleteProject: (projectId: string) => void;
+  onOpenProjectActions: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
-  onSelectProject: (projectId: string) => void;
   projects: PortfolioProject[];
   query: string;
   selectedProjectId: string;
@@ -1979,9 +2096,8 @@ function ProjectsWorkbench({
             <WorkbenchRow
               isSelected={project.id === selectedProjectId}
               key={project.id}
-              onDeleteProject={onDeleteProject}
+              onOpenProjectActions={onOpenProjectActions}
               onOpenProject={onOpenProject}
-              onSelectProject={onSelectProject}
               project={project}
             />
           ))
@@ -2000,15 +2116,13 @@ function ProjectsWorkbench({
 
 function WorkbenchRow({
   isSelected,
-  onDeleteProject,
+  onOpenProjectActions,
   onOpenProject,
-  onSelectProject,
   project,
 }: {
   isSelected: boolean;
-  onDeleteProject: (projectId: string) => void;
+  onOpenProjectActions: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
-  onSelectProject: (projectId: string) => void;
   project: PortfolioProject;
 }) {
   const palette = getTonePalette(project.tone);
@@ -2060,17 +2174,18 @@ function WorkbenchRow({
         </div>
 
         <div className="flex items-center gap-2 xl:justify-end">
-          <Button onClick={() => onSelectProject(project.id)} size="sm" variant="outline">
-            Modifica
-          </Button>
           <Button onClick={() => onOpenProject(project)} size="sm" variant="outline">
-            Apri
+            Apri dossier
           </Button>
-          <WorkbenchRowDropdown
-            onDelete={() => onDeleteProject(project.id)}
-            onSelect={() => onSelectProject(project.id)}
-            projectTitle={project.title}
-          />
+          <Button
+            aria-label={`Azioni per ${project.title}`}
+            onClick={() => onOpenProjectActions(project)}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <MoreVertical className="size-4" />
+          </Button>
         </div>
       </div>
 
@@ -2121,61 +2236,160 @@ function EmptyState({ description, title }: { description: string; title: string
   );
 }
 
-function WorkbenchRowDropdown({
+function ProjectActionDialog({
+  mode,
+  onClose,
+  onConfirmDelete,
   onDelete,
-  onSelect,
-  projectTitle,
+  onEdit,
+  onOpen,
+  project,
 }: {
+  mode: "actions" | "delete";
+  onClose: () => void;
+  onConfirmDelete: () => void;
   onDelete: () => void;
-  onSelect: () => void;
-  projectTitle: string;
+  onEdit: () => void;
+  onOpen: () => void;
+  project: PortfolioProject;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const palette = getTonePalette(project.tone);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   return (
-    <div className="relative">
-      <Button
-        aria-expanded={isOpen}
-        aria-label={`Azioni per ${projectTitle}`}
-        onClick={() => setIsOpen(!isOpen)}
-        size="icon"
-        variant="ghost"
+    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/35 px-4 backdrop-blur-sm">
+      <button
+        aria-label="Chiudi azioni progetto"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <section
+        aria-label={mode === "delete" ? "Conferma eliminazione progetto" : "Azioni progetto"}
+        className="relative w-full max-w-lg rounded-[24px] border border-subtle bg-card p-5 shadow-panel"
       >
-        <MoreVertical className="size-4" />
-      </Button>
-      {isOpen && (
-        <>
-          <button
-            aria-label="Chiudi menu azioni"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setIsOpen(false)}
-            type="button"
-          />
-          <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-[14px] border border-subtle bg-card py-1 shadow-soft">
-            <button
-              className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
-              onClick={() => {
-                onSelect();
-                setIsOpen(false);
-              }}
-              type="button"
-            >
-              Modifica
-            </button>
-            <button
-              className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-muted"
-              onClick={() => {
-                onDelete();
-                setIsOpen(false);
-              }}
-              type="button"
-            >
-              Elimina
-            </button>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="size-2 rounded-full" style={{ backgroundColor: palette.accent }} />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-secondary">
+                {project.lot} · {project.location}
+              </span>
+              <StatusBadge label={project.healthLabel} tone={project.tone} />
+            </div>
+            <h3 className="mt-3 text-lg font-semibold text-foreground">{project.title}</h3>
+            <p className="mt-1 text-sm leading-6 text-secondary">{project.materialRisk}</p>
           </div>
-        </>
-      )}
+          <button
+            aria-label="Chiudi"
+            className="flex size-9 shrink-0 items-center justify-center rounded-[14px] text-secondary hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {mode === "delete" ? (
+          <div className="mt-5 rounded-[18px] border border-danger/25 bg-danger/10 p-4">
+            <div className="text-sm font-semibold text-danger">Eliminare questo progetto?</div>
+            <p className="mt-1 text-sm leading-6 text-secondary">
+              L'azione rimuove il contratto locale dal registro. I progetti demo non vengono
+              eliminati dal dataset fallback.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button onClick={onClose} size="sm" type="button" variant="outline">
+                Annulla
+              </Button>
+              <Button
+                className="border-danger/25 bg-danger text-white hover:bg-danger/90"
+                onClick={onConfirmDelete}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <Trash2 className="size-4" />
+                Elimina
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-2">
+            <ProjectActionButton
+              description="Apri la scheda completa con contesto operativo e indicatori."
+              icon={ChevronRight}
+              label="Apri dossier"
+              onClick={onOpen}
+            />
+            <ProjectActionButton
+              description="Modifica titolo, accordo quadro, contratto applicativo, importo e tariffario."
+              icon={Pencil}
+              label="Modifica progetto"
+              onClick={onEdit}
+            />
+            <ProjectActionButton
+              danger
+              description="Passa alla conferma prima di rimuovere il progetto locale."
+              icon={Trash2}
+              label="Elimina progetto"
+              onClick={onDelete}
+            />
+          </div>
+        )}
+      </section>
     </div>
+  );
+}
+
+function ProjectActionButton({
+  danger,
+  description,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  danger?: boolean;
+  description: string;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={cn(
+        "flex w-full items-start gap-3 rounded-[18px] border border-subtle bg-muted/35 p-3 text-left transition-colors hover:bg-muted",
+        danger && "border-danger/25 bg-danger/10 hover:bg-danger/15",
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      <span
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-[16px] bg-card text-primary",
+          danger && "text-danger",
+        )}
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span
+          className={cn("block text-sm font-semibold text-foreground", danger && "text-danger")}
+        >
+          {label}
+        </span>
+        <span className="mt-1 block text-xs leading-5 text-secondary">{description}</span>
+      </span>
+    </button>
   );
 }
 
@@ -2258,7 +2472,7 @@ function matchesSearch(value: string, query: string) {
   return query.length === 0 || value.toLowerCase().includes(query);
 }
 
-function formatDueWindow(days: number) {
+export function formatDueWindow(days: number) {
   if (days <= 0) {
     return "Oggi";
   }
@@ -2270,7 +2484,7 @@ function formatDueWindow(days: number) {
   return `${days} giorni`;
 }
 
-function formatForecastDelta(days: number) {
+export function formatForecastDelta(days: number) {
   if (days === 0) {
     return "In data";
   }
@@ -2282,7 +2496,7 @@ function formatForecastDelta(days: number) {
   return `+${days} gg`;
 }
 
-function getSalTone(project: PortfolioProject): StatusTone {
+export function getSalTone(project: PortfolioProject): StatusTone {
   if (project.salDays <= 1 || project.salState.toLowerCase().includes("blocc")) {
     return "danger";
   }

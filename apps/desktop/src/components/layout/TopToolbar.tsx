@@ -13,7 +13,7 @@ import {
   Sun,
   UploadCloud,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { cn } from "@/lib/utils";
@@ -96,6 +96,7 @@ type TopToolbarProps = {
   activeRoute: QuantaraRoute;
   canGoBack: boolean;
   canGoForward: boolean;
+  onOpenCommandPalette: (anchorRect: DOMRect) => void;
   onNavigateBack: () => void;
   onNavigateForward: () => void;
   onPageAction: (actionId: string) => void;
@@ -107,6 +108,7 @@ export function TopToolbar({
   activeRoute,
   canGoBack,
   canGoForward,
+  onOpenCommandPalette,
   onNavigateBack,
   onNavigateForward,
   onPageAction,
@@ -148,7 +150,7 @@ export function TopToolbar({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <GlobalSearch />
+          <GlobalSearch onOpen={onOpenCommandPalette} />
           <PageActions actions={pageActions} onAction={onPageAction} />
           <UtilityButtons onToggleTheme={onToggleTheme} themeMode={themeMode} />
         </div>
@@ -213,16 +215,29 @@ function HistoryButton({
   );
 }
 
-function GlobalSearch() {
+function GlobalSearch({ onOpen }: { onOpen: (anchorRect: DOMRect) => void }) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
   return (
-    <label className="relative block">
+    <button
+      className="relative block h-10 w-[220px] rounded-[18px] border border-subtle bg-card/92 pl-10 pr-3 text-left text-sm text-secondary outline-none transition-all duration-base hover:border-border hover:text-foreground focus:border-primary focus:ring-2 focus:ring-ring"
+      data-command-palette-anchor
+      onClick={() => {
+        const anchorRect = buttonRef.current?.getBoundingClientRect();
+
+        if (anchorRect) {
+          onOpen(anchorRect);
+        }
+      }}
+      ref={buttonRef}
+      type="button"
+    >
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
-      <input
-        className="h-10 w-[220px] rounded-[18px] border border-subtle bg-card/92 pl-10 pr-3 text-sm text-foreground outline-none transition-all duration-base placeholder:text-secondary focus:border-primary focus:ring-2 focus:ring-ring"
-        placeholder="Cerca..."
-        type="search"
-      />
-    </label>
+      <span>Cerca...</span>
+      <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded-[9px] border border-subtle bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-secondary">
+        Ctrl K
+      </kbd>
+    </button>
   );
 }
 

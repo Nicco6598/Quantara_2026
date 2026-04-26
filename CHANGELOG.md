@@ -2,6 +2,18 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.43 - 2026-04-26
+
+- Add a global command palette opened from the Topbar or `Ctrl+K`, now anchored to the actual Topbar search trigger as a compact popover instead of a detached panel near the sidebar.
+- Add application-wide keyboard shortcuts for contextual creation with `Ctrl+N`, shortcut help with `Ctrl+/`, shell history navigation with `Alt+ArrowLeft/Right` and Escape close behavior for shortcut surfaces.
+- Add a shared toast notification provider with typed tones, manual dismiss, optional actions and global event support, then wire feedback into Topbar actions, project CRUD, SAL and tariff workflows.
+- Convert the Topbar search field into a command palette trigger with a visible `Ctrl K` affordance.
+- Redesign update availability and post-install patch notes as centered, theme-aware modal dialogs with clearer release metadata, notes and primary actions in both light and dark mode.
+- Rework project actions so board/register rows use a fixed action dialog and delete confirmation instead of clipped inline dropdowns.
+- Connect Project Detail to the selected real project record, deriving budget, committed/executed values, SAL rows, milestones, team context and activity feed from that project.
+- Connect Dashboard portfolio rows and metrics to the real project list, including live budget totals, status distribution, escalation counts, SAL signals and project-detail navigation.
+- Prepare the QOL updates for manual verification without starting the preview server.
+
 ## 0.1.42 - 2026-04-25
 
 - Add Excel migration workflow in Projects with standard template download, local export, `.xlsx` import preview, validation summary and commit for valid project contracts.

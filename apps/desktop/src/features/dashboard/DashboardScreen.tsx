@@ -1,122 +1,42 @@
 import { AlertTriangle, FolderKanban, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { CommandPanel, MetricTile, ScreenShell, SectionPanel } from "@/components/shared/Screen";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
-
-const overviewMetrics = [
-  {
-    detail: "Budget complessivo dei lotti attivi nel perimetro corrente",
-    label: "EAC portafoglio",
-    tone: "info",
-    value: "€ 91,45M",
-  },
-  {
-    detail: "Cantieri con SAL, forecast e materiali sotto controllo operativo",
-    label: "Lotti attivi",
-    tone: "success",
-    value: "8",
-  },
-  {
-    detail: "Snodi che richiedono presidio nelle prossime 72 ore",
-    label: "Escalation",
-    tone: "warning",
-    value: "3",
-  },
-  {
-    detail: "Responsabili di commessa in carico sul portafoglio",
-    label: "PM operativi",
-    tone: "neutral",
-    value: "5",
-  },
-] as const;
-
-const projectRows = [
-  {
-    id: "milano-verona",
-    lot: "Lotto 3A · Verona Est",
-    milestone: "SAL 9 in emissione",
-    progress: 68,
-    project: "Linea AV/AC Milano-Verona",
-    sal: "€ 2,16M",
-    status: "In linea",
-    tone: "success",
-  },
-  {
-    id: "firenze-av",
-    lot: "Lotto 2B · Galleria Belvedere",
-    milestone: "Riprogrammare getto galleria",
-    progress: 72,
-    project: "Nodo di Firenze AV",
-    sal: "€ 1,99M",
-    status: "Attenzione",
-    tone: "warning",
-  },
-  {
-    id: "napoli-bari",
-    lot: "Lotto 1C · Tratta Orsara",
-    milestone: "Sbloccare quadro extra-costi",
-    progress: 45,
-    project: "Linea AV Napoli-Bari",
-    sal: "€ 2,89M",
-    status: "Critico",
-    tone: "danger",
-  },
-  {
-    id: "genova-ventimiglia",
-    lot: "Lotto Unico · Tratta Finale",
-    milestone: "Validazione piano interferenze",
-    progress: 25,
-    project: "Linea AV Genova-Ventimiglia",
-    sal: "€ 0,84M",
-    status: "In linea",
-    tone: "success",
-  },
-  {
-    id: "rete-nord",
-    lot: "Programma 2024 · Manutenzione",
-    milestone: "Ordine ricambi giugno",
-    progress: 15,
-    project: "Manutenzione Rete Nord",
-    sal: "€ 0,21M",
-    status: "Monitoraggio",
-    tone: "info",
-  },
-] as const;
-
-const daySignals = [
-  {
-    detail: "Napoli-Bari e Adriatica hanno documentazione SAL incompleta.",
-    label: "2 dossier bloccati",
-    tone: "danger",
-  },
-  {
-    detail: "Milano-Verona e Catania hanno milestone di firma nelle prossime 24 ore.",
-    label: "4 snodi ravvicinati",
-    tone: "warning",
-  },
-  {
-    detail: "Cinque lotti tengono curva lavori e materiali sopra soglia di sicurezza.",
-    label: "Presidio stabile",
-    tone: "success",
-  },
-] as const;
-
-const focusRows = [
-  { label: "In linea", tone: "success", value: "5" },
-  { label: "Sotto presidio", tone: "warning", value: "2" },
-  { label: "Escalation", tone: "danger", value: "1" },
-  { label: "Completati", tone: "info", value: "2" },
-] as const;
-
-const activityRows = [
-  "Verbale OS #45 caricato per Napoli-Bari",
-  "Firma SAL 9 richiesta a Direzione Lavori per Milano-Verona",
-  "Consegna quadri AT ripianificata sul Passante merci Catania",
-  "Scarpata sud validata dopo sopralluogo su Genova-Ventimiglia",
-] as const;
+import { listDesktopContracts } from "@/lib/desktopData";
+import { formatMoney } from "@/lib/formatters";
+import {
+  mapContractToProject,
+  portfolioProjects,
+  type PortfolioProject,
+} from "@/features/projects/ProjectsScreen";
 
 export function DashboardScreen() {
+  const [projects, setProjects] = useState<PortfolioProject[]>(portfolioProjects);
+
+  useEffect(() => {
+    let active = true;
+
+    listDesktopContracts([]).then((contracts) => {
+      if (!active) {
+        return;
+      }
+
+      const runtimeProjects = contracts.data.map(mapContractToProject);
+      setProjects(runtimeProjects.length > 0 ? runtimeProjects : portfolioProjects);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const overviewMetrics = useMemo(() => buildOverviewMetrics(projects), [projects]);
+  const daySignals = useMemo(() => buildDaySignals(projects), [projects]);
+  const focusRows = useMemo(() => buildFocusRows(projects), [projects]);
+  const activityRows = useMemo(() => buildActivityRows(projects), [projects]);
+
   return (
     <ScreenShell>
       <CommandPanel>
@@ -193,8 +113,8 @@ export function DashboardScreen() {
           </div>
 
           <div>
-            {projectRows.map((row) => (
-              <ProjectRow key={row.id} row={row} />
+            {projects.map((project) => (
+              <ProjectRow key={project.id} project={project} />
             ))}
           </div>
         </SectionPanel>
@@ -261,42 +181,50 @@ function SignalCard({ detail, label, tone }: { detail: string; label: string; to
   );
 }
 
-function ProjectRow({ row }: { row: (typeof projectRows)[number] }) {
+function ProjectRow({ project }: { project: PortfolioProject }) {
   return (
     <div className="grid gap-4 border-t border-subtle px-5 py-4 xl:grid-cols-[1.6fr_0.8fr_0.8fr_0.7fr_auto] xl:items-center">
       <div>
-        <div className="text-sm font-semibold text-foreground">{row.project}</div>
-        <div className="mt-1 text-xs text-secondary">{row.lot}</div>
+        <div className="text-sm font-semibold text-foreground">{project.title}</div>
+        <div className="mt-1 text-xs text-secondary">
+          {project.lot} · {project.location}
+        </div>
       </div>
-      <div className="text-sm text-foreground">{row.milestone}</div>
+      <div className="text-sm text-foreground">{project.nextMilestone}</div>
       <div>
-        <div className="text-sm font-semibold text-foreground">{row.sal}</div>
+        <div className="text-sm font-semibold text-foreground">{formatMoney(project.salValue)}</div>
         <div className="mt-1">
-          <StatusBadge label={row.status} tone={row.tone} />
+          <StatusBadge label={project.healthLabel} tone={project.tone} />
         </div>
       </div>
       <div>
-        <div className="text-sm font-semibold text-foreground">{row.progress}%</div>
+        <div className="text-sm font-semibold text-foreground">{project.progress}%</div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
           <div
             className={`h-full rounded-full ${
-              row.tone === "danger"
+              project.tone === "danger"
                 ? "bg-danger"
-                : row.tone === "warning"
+                : project.tone === "warning"
                   ? "bg-warning"
-                  : row.tone === "info"
-                    ? "bg-info"
-                    : "bg-success"
+                  : "bg-success"
             }`}
-            style={{ width: `${row.progress}%` }}
+            style={{ width: `${project.progress}%` }}
           />
         </div>
       </div>
       <div className="flex justify-start xl:justify-end">
         <Button
-          onClick={() =>
-            window.dispatchEvent(new CustomEvent("navigate", { detail: "project-detail" }))
-          }
+          onClick={() => {
+            try {
+              window.sessionStorage.setItem(
+                "quantara.selectedProjectDetail.v1",
+                JSON.stringify(project),
+              );
+            } catch {
+              // Detail opens with first available project if session storage is unavailable.
+            }
+            window.dispatchEvent(new CustomEvent("navigate", { detail: "project-detail" }));
+          }}
           size="sm"
           variant="outline"
         >
@@ -305,4 +233,89 @@ function ProjectRow({ row }: { row: (typeof projectRows)[number] }) {
       </div>
     </div>
   );
+}
+
+function buildOverviewMetrics(projects: PortfolioProject[]) {
+  const totalBudget = projects.reduce((total, project) => total + project.budget.amount, 0);
+  const escalationCount = projects.filter((project) => project.tone === "danger").length;
+  const managers = new Set(projects.map((project) => project.manager)).size;
+
+  return [
+    {
+      detail: "Budget complessivo dei lotti attivi nel perimetro corrente",
+      label: "EAC portafoglio",
+      tone: "info",
+      value: formatMoney({ amount: totalBudget, currency: "EUR" }),
+    },
+    {
+      detail: "Cantieri con SAL, forecast e materiali sotto controllo operativo",
+      label: "Lotti attivi",
+      tone: "success",
+      value: String(projects.length),
+    },
+    {
+      detail: "Progetti in stato critico o con SAL bloccata",
+      label: "Escalation",
+      tone: escalationCount > 0 ? "warning" : "success",
+      value: String(escalationCount),
+    },
+    {
+      detail: "Responsabili di commessa in carico sul portafoglio",
+      label: "PM operativi",
+      tone: "neutral",
+      value: String(managers),
+    },
+  ] as const;
+}
+
+function buildDaySignals(projects: PortfolioProject[]) {
+  const blocked = projects.filter((project) => project.tone === "danger");
+  const nearSal = projects.filter((project) => project.salDays <= 2);
+  const stable = projects.filter((project) => project.tone === "success");
+
+  return [
+    {
+      detail:
+        blocked.length > 0
+          ? blocked.map((project) => project.title).join(", ")
+          : "Nessun dossier bloccato nel perimetro corrente.",
+      label: `${blocked.length} dossier critici`,
+      tone: blocked.length > 0 ? "danger" : "success",
+    },
+    {
+      detail:
+        nearSal.length > 0
+          ? nearSal.map((project) => project.salState).join(", ")
+          : "Nessuna scadenza SAL nelle prossime 48 ore.",
+      label: `${nearSal.length} snodi ravvicinati`,
+      tone: nearSal.length > 0 ? "warning" : "success",
+    },
+    {
+      detail: `${stable.length} lotti tengono curva lavori e materiali sopra soglia di sicurezza.`,
+      label: "Presidio stabile",
+      tone: "success",
+    },
+  ] satisfies Array<{ detail: string; label: string; tone: StatusTone }>;
+}
+
+function buildFocusRows(projects: PortfolioProject[]) {
+  const success = projects.filter((project) => project.tone === "success").length;
+  const warning = projects.filter((project) => project.tone === "warning").length;
+  const danger = projects.filter((project) => project.tone === "danger").length;
+  const completed = projects.filter((project) => project.progress >= 90).length;
+
+  return [
+    { label: "In linea", tone: "success", value: String(success) },
+    { label: "Sotto presidio", tone: "warning", value: String(warning) },
+    { label: "Escalation", tone: "danger", value: String(danger) },
+    { label: "Completati", tone: "info", value: String(completed) },
+  ] satisfies Array<{ label: string; tone: StatusTone; value: string }>;
+}
+
+function buildActivityRows(projects: PortfolioProject[]) {
+  return projects
+    .slice()
+    .sort((left, right) => left.salDays - right.salDays)
+    .slice(0, 4)
+    .map((project) => `${project.salState} · ${project.title} · ${project.nextMilestone}`);
 }

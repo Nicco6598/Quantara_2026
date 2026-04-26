@@ -1,4 +1,5 @@
 import { CheckCircle2, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/shared/Button";
 import type { PendingReleaseNotes } from "@/lib/updateReleaseNotes";
 
@@ -8,59 +9,61 @@ type UpdateReleaseNotesDialogProps = {
 };
 
 export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesDialogProps) {
-  return (
+  return createPortal(
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/82 p-4 backdrop-blur-xl"
+      className="fixed inset-0 z-[210] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
       role="dialog"
     >
-      <div className="update-modal-panel relative w-full max-w-xl overflow-hidden rounded-[24px] border shadow-2xl">
-        <div className="update-command-surface absolute inset-0" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-100/70 to-transparent" />
-
-        <div className="relative z-10 p-5 md:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-400/16 px-3 py-1 text-xs font-semibold text-emerald-50">
-                  <CheckCircle2 className="size-3.5" />
-                  Aggiornamento installato
-                </span>
-                <span className="update-modal-chip-muted rounded-full border px-3 py-1 text-xs">
-                  v{notes.currentVersion} {"->"} v{notes.version}
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-3xl font-semibold text-white">Installazione completata.</h2>
-              <p className="update-modal-muted-text mt-2 max-w-md text-sm leading-6">
-                Ultima versione ora operativa. Riavvio completato il{" "}
-                {new Date(notes.installedAt).toLocaleString("it-IT")}.
-              </p>
+      <button
+        aria-label="Chiudi conferma aggiornamento"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <section className="relative max-h-[92vh] w-full max-w-xl overflow-hidden rounded-[24px] border border-subtle bg-card shadow-panel">
+        <div className="flex items-center justify-between gap-4 border-b border-subtle px-5 py-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              Aggiornamento installato
             </div>
-
-            <button
-              aria-label="Chiudi conferma aggiornamento"
-              className="rounded-2xl border border-white/20 bg-slate-950/70 p-2.5 text-slate-200 transition-colors hover:bg-slate-800 hover:text-white"
-              onClick={onClose}
-              type="button"
-            >
-              <X className="size-5" />
-            </button>
+            <h3 className="mt-1 text-lg font-semibold text-foreground">
+              v{notes.currentVersion} {"->"} v{notes.version}
+            </h3>
           </div>
+          <button
+            aria-label="Chiudi conferma aggiornamento"
+            className="flex size-9 items-center justify-center rounded-[14px] text-secondary transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
 
-          <section className="update-modal-card mt-7 rounded-[22px] border p-5">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-2xl bg-emerald-400/12 text-emerald-100">
+        <div className="p-5">
+          <div className="rounded-[22px] border border-subtle bg-muted/35 p-5">
+            <div className="flex items-start gap-4">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-success-soft text-success">
                 <CheckCircle2 className="size-5" />
               </div>
-              <div>
-                <div className="update-modal-subtle-text text-xs font-semibold">Stato app</div>
-                <div className="mt-1 text-lg font-semibold text-white">
-                  Quantara v{notes.version} risulta attiva.
+              <div className="min-w-0">
+                <div className="text-xl font-semibold text-foreground">
+                  Quantara v{notes.version} e attiva.
                 </div>
+                <p className="mt-2 text-sm leading-6 text-secondary">
+                  Riavvio completato il {new Date(notes.installedAt).toLocaleString("it-IT")}. Puoi
+                  continuare a lavorare dalla versione aggiornata.
+                </p>
               </div>
             </div>
-          </section>
+
+            {notes.body.trim() ? (
+              <div className="mt-5 rounded-[18px] border border-subtle bg-card px-4 py-3 text-sm leading-6 text-foreground">
+                {notes.body.trim()}
+              </div>
+            ) : null}
+          </div>
 
           <div className="mt-5 flex justify-end">
             <Button onClick={onClose} type="button">
@@ -68,7 +71,8 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </div>,
+    document.body,
   );
 }

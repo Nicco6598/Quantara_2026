@@ -8,6 +8,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import {
@@ -18,125 +19,51 @@ import {
   SummaryLine,
 } from "@/components/shared/Screen";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
-
-const projectData = {
-  budget: { contractual: 26150000, committed: 16245300, executed: 11420000 },
-  cpi: "0,94",
-  endDate: "12 Set 2025",
-  forecastImpact: "-1,3M",
-  health: "BUONO" as const,
-  healthTone: "success" as const,
-  lastUpdate: "21 Mag 2024",
-  location: "Tratta Verona Est",
-  lot: "Lotto 3A",
-  name: "Linea AV/AC Milano-Verona",
-  progress: 68,
-  sal: { amount: 2156800, current: 8, total: 12 },
-  startDate: "15 Gen 2024",
-};
-
-type SelectedProjectDetail = {
-  budget: { amount: number; currency: "EUR" };
-  forecastDeltaDays: number;
-  healthLabel: string;
-  location: string;
-  lot: string;
-  manager: string;
-  materialRisk: string;
-  nextMilestone: string;
-  progress: number;
-  salDays: number;
-  salState: string;
-  salValue: { amount: number; currency: "EUR" };
-  title: string;
-  tone: "danger" | "success" | "warning";
-  variance: string;
-};
-
-const milestoneRows = [
-  { date: "15 Mar 2024", label: "Fondazioni", status: "complete" as const },
-  { date: "15 Giu 2024", label: "Armamento", status: "active" as const },
-  { date: "15 Ago 2024", label: "Elettrificazione", status: "planned" as const },
-  { date: "12 Set 2024", label: "Collaudo", status: "planned" as const },
-] as const;
-
-const projectTeam = [
-  { initials: "MB", name: "Marco Bianchi", role: "Project Manager" },
-  { initials: "LR", name: "Laura Rossi", role: "Direzione Lavori" },
-  { initials: "GV", name: "Giuseppe Verdi", role: "Responsabile Cantiere" },
-  { initials: "AB", name: "Anna Bianchi", role: "Responsabile QA" },
-] as const;
-
-const recentActivities = [
-  { date: "20/05/2024", text: "SAL 8 approvata da D. Verdi" },
-  { date: "19/05/2024", text: "Aggiornamento progress armamento" },
-  { date: "18/05/2024", text: "Materiale 60E1 consegnato al km 24" },
-  { date: "17/05/2024", text: "Richiesta OS #45 approvata" },
-] as const;
-
-const salRows = [
-  {
-    amount: 2156800,
-    date: "20/05/2024",
-    period: "01 - 30 Apr 2024",
-    sal: "SAL 8",
-    status: "Approvata",
-  },
-  {
-    amount: 1785600,
-    date: "15/04/2024",
-    period: "16 - 31 Mar 2024",
-    sal: "SAL 7",
-    status: "Approvata",
-  },
-  {
-    amount: 1245000,
-    date: "18/03/2024",
-    period: "01 - 15 Mar 2024",
-    sal: "SAL 6",
-    status: "Approvata",
-  },
-] as const;
+import {
+  formatDueWindow,
+  formatForecastDelta,
+  mapContractToProject,
+  portfolioProjects,
+  type PortfolioProject,
+} from "@/features/projects/ProjectsScreen";
 
 export function ProjectDetailScreen() {
-  const selectedProject = readSelectedProjectDetail();
-  const detail = selectedProject
-    ? {
-        budget: {
-          committed: Math.round(selectedProject.budget.amount * 0.62),
-          contractual: selectedProject.budget.amount,
-          executed: Math.round(selectedProject.budget.amount * (selectedProject.progress / 100)),
-        },
-        cpi: selectedProject.variance.startsWith("+") ? "0,94" : "1,03",
-        endDate:
-          selectedProject.forecastDeltaDays > 0
-            ? `+${selectedProject.forecastDeltaDays} gg forecast`
-            : "In linea con piano",
-        forecastImpact: selectedProject.variance,
-        health: selectedProject.healthLabel,
-        healthTone: selectedProject.tone,
-        lastUpdate: "Aggiornato ora",
-        location: selectedProject.location,
-        lot: selectedProject.lot,
-        manager: selectedProject.manager,
-        materialRisk: selectedProject.materialRisk,
-        name: selectedProject.title,
-        nextMilestone: selectedProject.nextMilestone,
-        progress: selectedProject.progress,
-        sal: {
-          amount: selectedProject.salValue.amount,
-          current: selectedProject.salState,
-          total: "portfolio",
-        },
-        startDate: "Da dossier progetto",
+  const [projects, setProjects] = useState<PortfolioProject[]>(portfolioProjects);
+
+  useEffect(() => {
+    let active = true;
+
+    listDesktopContracts([]).then((contracts) => {
+      if (!active) {
+        return;
       }
-    : {
-        ...projectData,
-        manager: "M. Bianchi",
-        materialRisk: "Binari 60E1 in conferma consegna",
-        nextMilestone: "Validazione costi indiretti",
-      };
+
+      const runtimeProjects = contracts.data.map(mapContractToProject);
+      setProjects(runtimeProjects.length > 0 ? runtimeProjects : portfolioProjects);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedProject = useMemo(() => {
+    const storedProject = readSelectedProjectDetail();
+
+    if (storedProject) {
+      return projects.find((project) => project.id === storedProject.id) ?? storedProject;
+    }
+
+    return projects[0] ?? getFallbackProject();
+  }, [projects]);
+
+  const detail = useMemo(() => buildProjectDetail(selectedProject), [selectedProject]);
+  const milestoneRows = useMemo(() => buildMilestoneRows(selectedProject), [selectedProject]);
+  const projectTeam = useMemo(() => buildProjectTeam(selectedProject), [selectedProject]);
+  const recentActivities = useMemo(() => buildRecentActivities(selectedProject), [selectedProject]);
+  const salRows = useMemo(() => buildSalRows(selectedProject), [selectedProject]);
 
   return (
     <ScreenShell>
@@ -321,7 +248,7 @@ export function ProjectDetailScreen() {
                         {formatMoney({ amount: row.amount, currency: "EUR" })}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge label={row.status} tone="success" />
+                        <StatusBadge label={row.status} tone={row.tone} />
                       </td>
                       <td className="px-4 py-3 text-secondary">{row.date}</td>
                     </tr>
@@ -389,7 +316,7 @@ export function ProjectDetailScreen() {
   );
 }
 
-function readSelectedProjectDetail(): SelectedProjectDetail | null {
+function readSelectedProjectDetail(): PortfolioProject | null {
   try {
     const rawValue = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
 
@@ -397,8 +324,141 @@ function readSelectedProjectDetail(): SelectedProjectDetail | null {
       return null;
     }
 
-    return JSON.parse(rawValue) as SelectedProjectDetail;
+    return JSON.parse(rawValue) as PortfolioProject;
   } catch {
     return null;
   }
+}
+
+function getFallbackProject(): PortfolioProject {
+  const fallbackProject = portfolioProjects[0];
+
+  if (!fallbackProject) {
+    throw new Error("Portfolio demo non configurato.");
+  }
+
+  return fallbackProject;
+}
+
+function buildProjectDetail(project: PortfolioProject) {
+  const contractual = project.budget.amount;
+  const executed = Math.round(contractual * (project.progress / 100));
+  const committed = Math.max(
+    executed,
+    Math.round(contractual * Math.min(0.92, project.progress / 100 + 0.18)),
+  );
+  const costPerformance = committed > 0 ? executed / committed : 1;
+
+  return {
+    budget: {
+      committed,
+      contractual,
+      executed,
+    },
+    cpi: costPerformance.toLocaleString("it-IT", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    }),
+    endDate:
+      project.forecastDeltaDays === 0
+        ? "In linea con piano"
+        : `${formatForecastDelta(project.forecastDeltaDays)} forecast`,
+    forecastImpact: project.variance,
+    health: project.healthLabel,
+    healthTone: project.tone,
+    lastUpdate: "Aggiornato da registro progetti",
+    location: project.location,
+    lot: project.lot,
+    manager: project.manager,
+    materialRisk: project.materialRisk,
+    name: project.title,
+    nextMilestone: project.nextMilestone,
+    progress: project.progress,
+    sal: {
+      amount: project.salValue.amount,
+      current: project.salState,
+    },
+    startDate: "Dossier operativo",
+  };
+}
+
+function buildMilestoneRows(project: PortfolioProject) {
+  const completed = Math.max(1, Math.min(3, Math.floor(project.progress / 30)));
+  const labels = ["Avvio lotto", project.phase, project.nextMilestone, "Chiusura contabilita"];
+
+  return labels.map((label, index) => ({
+    date:
+      index === 0
+        ? "Completata"
+        : index === completed
+          ? formatDueWindow(project.salDays)
+          : formatForecastDelta(project.forecastDeltaDays),
+    label,
+    status: index < completed ? "complete" : index === completed ? "active" : "planned",
+  }));
+}
+
+function buildProjectTeam(project: PortfolioProject) {
+  return [
+    { initials: getInitials(project.manager), name: project.manager, role: "Project Manager" },
+    { initials: "DL", name: "Direzione Lavori", role: "Validazione SAL" },
+    { initials: "CC", name: "Controllo Costi", role: "Forecast e budget" },
+    { initials: "PR", name: "Procurement", role: project.materialRisk },
+  ];
+}
+
+function buildRecentActivities(project: PortfolioProject) {
+  return [
+    { date: "Oggi", text: `${project.salState} su ${project.title}` },
+    { date: formatDueWindow(project.salDays), text: project.nextMilestone },
+    { date: "Ultimo aggiornamento", text: project.materialRisk },
+    { date: "Registro", text: `Avanzamento fisico al ${project.progress}%` },
+  ];
+}
+
+function buildSalRows(project: PortfolioProject) {
+  const currentAmount = project.salValue.amount;
+  const previousAmount = Math.round(currentAmount * 0.82);
+  const historicalAmount = Math.round(currentAmount * 0.58);
+
+  return [
+    {
+      amount: currentAmount,
+      date: formatDueWindow(project.salDays),
+      period: "Periodo corrente",
+      sal: project.salState,
+      status:
+        project.tone === "danger"
+          ? "Bloccata"
+          : project.tone === "warning"
+            ? "Da chiudere"
+            : "In linea",
+      tone: project.tone,
+    },
+    {
+      amount: previousAmount,
+      date: "Ciclo precedente",
+      period: "Periodo precedente",
+      sal: "SAL precedente",
+      status: "Approvata",
+      tone: "success" as const,
+    },
+    {
+      amount: historicalAmount,
+      date: "Storico",
+      period: "Progressivo lotto",
+      sal: "Progressivo",
+      status: "Consolidata",
+      tone: "success" as const,
+    },
+  ];
+}
+
+function getInitials(value: string) {
+  return value
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }

@@ -19,6 +19,7 @@ import {
   SectionHeading,
   SectionPanel,
 } from "@/components/shared/Screen";
+import { useToast } from "@/components/shared/ToastProvider";
 import {
   groupSalsByProject,
   PAGE_SIZE,
@@ -99,6 +100,7 @@ function createInitialDraft(projectId: string): SalDraftState {
 }
 
 export function SalScreen() {
+  const { notify } = useToast();
   const activeProjectId = useSalWorkflowStore((state) => state.activeProjectId);
   const createClosedSal = useSalWorkflowStore((state) => state.createClosedSal);
   const createProject = useSalWorkflowStore((state) => state.createProject);
@@ -177,6 +179,11 @@ export function SalScreen() {
 
     if (!projectForm.name.trim() || !Number.isInteger(year)) {
       setMessage("Inserisci nome progetto e anno valido.");
+      notify({
+        message: "Inserisci nome progetto e anno valido.",
+        title: "Progetto SAL non creato",
+        tone: "warning",
+      });
       return;
     }
 
@@ -190,6 +197,11 @@ export function SalScreen() {
     setProjectForm(initialProjectForm);
     setProjectFilter(project.id);
     setMessage(`${project.name} creato. Ora puoi aprire + Nuova SAL.`);
+    notify({
+      message: `${project.name} creato. Ora puoi aprire una nuova SAL.`,
+      title: "Progetto SAL creato",
+      tone: "success",
+    });
   }
 
   return (
@@ -398,6 +410,11 @@ export function SalScreen() {
             setIsModalOpen(false);
             setProjectFilter(sal.projectId);
             setMessage(`${sal.title} chiusa e salvata nel registro.`);
+            notify({
+              message: `${sal.title} chiusa e salvata nel registro.`,
+              title: "SAL salvata",
+              tone: "success",
+            });
           }}
           projects={projects}
           tariffVoices={tariffVoices}
