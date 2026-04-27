@@ -2912,7 +2912,7 @@ dependencies = [
 
 [[package]]
 name = "quantara_desktop"
-version = "0.1.44"
+version = "0.1.50"
 dependencies = [
  "rusqlite",
  "serde",
