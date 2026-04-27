@@ -9,18 +9,17 @@ import {
   Filter,
   Moon,
   Plus,
+  RefreshCw,
   Search,
   Sun,
   UploadCloud,
 } from "lucide-react";
 import { useRef, useState } from "react";
-import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
 import { cn } from "@/lib/utils";
 import type { QuantaraRoute, ThemeMode } from "@/store/app-store";
 
 type RouteMeta = {
-  section: string;
+  dateLabel: string;
   title: string;
 };
 
@@ -41,14 +40,17 @@ type PageActionMenuItem = {
 };
 
 const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
-  accounting: { section: "Contabilita", title: "Stato Avanzamento" },
-  dashboard: { section: "Panoramica", title: "Dashboard" },
-  materials: { section: "Magazzino", title: "Materiali" },
-  "project-detail": { section: "Dettaglio", title: "Progetto" },
-  projects: { section: "Portfolio", title: "Progetti" },
-  settings: { section: "Sistema", title: "Impostazioni" },
-  tariffs: { section: "Reference", title: "Tariffario" },
-  team: { section: "Risorse", title: "Team" },
+  accounting: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Contabilità" },
+  dashboard: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Panoramica operativa" },
+  materials: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Materiali" },
+  "project-detail": {
+    dateLabel: "27 aprile 2025 · Aggiornato alle 17:40",
+    title: "Dettaglio progetto",
+  },
+  projects: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Progetti" },
+  settings: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Impostazioni" },
+  tariffs: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Tariffario" },
+  team: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Team" },
 };
 
 const createMenuItems: PageActionMenuItem[] = [
@@ -118,41 +120,39 @@ export function TopToolbar({
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
 
   return (
-    <header className="shell-topbar sticky top-0 z-40 border-b border-subtle/80 px-6 py-3">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
+    <header className="z-30 flex h-[88px] shrink-0 items-center justify-between gap-6 border-b border-[var(--border-subtle)] px-8">
+      <div className="flex min-w-0 items-center gap-4">
+        {activeRoute !== "dashboard" ? (
           <HistoryNavigator
             canGoBack={canGoBack}
             canGoForward={canGoForward}
             onNavigateBack={onNavigateBack}
             onNavigateForward={onNavigateForward}
           />
+        ) : null}
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-              <span>{meta.section}</span>
-              <span className="text-border">/</span>
-              <span>
-                {new Date().toLocaleDateString("it-IT", {
-                  day: "numeric",
-                  month: "short",
-                })}
-              </span>
-            </div>
-            <div className="mt-1 flex items-center gap-2">
-              <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
-                {meta.title}
-              </h1>
-              {activeRoute === "projects" ? <Badge variant="info">3 alert</Badge> : null}
-            </div>
+        <div className="min-w-0">
+          <h1 className="truncate text-[20px] font-bold leading-6 tracking-[-0.02em] text-[var(--text-primary)]">
+            {meta.title}
+          </h1>
+          <div className="mt-1.5 flex items-center gap-2.5">
+            <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+              {meta.dateLabel}
+            </span>
+            <span className="size-1.5 rounded-full bg-[var(--success-base)]" />
+            <span className="text-[11px] font-semibold text-[var(--success-base)]">
+              Sincronizzato
+            </span>
           </div>
         </div>
+      </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <GlobalSearch onOpen={onOpenCommandPalette} />
-          <PageActions actions={pageActions} onAction={onPageAction} />
-          <UtilityButtons onToggleTheme={onToggleTheme} themeMode={themeMode} />
-        </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <GlobalSearch onOpen={onOpenCommandPalette} />
+        <div className="mx-2 h-8 w-px bg-[var(--border-subtle)]" />
+        <PageActions actions={pageActions} onAction={onPageAction} />
+        <div className="mx-2 h-8 w-px bg-[var(--border-subtle)]" />
+        <UtilityButtons onToggleTheme={onToggleTheme} themeMode={themeMode} />
       </div>
     </header>
   );
@@ -170,13 +170,14 @@ function HistoryNavigator({
   onNavigateForward: () => void;
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-sm border border-subtle bg-card/92 p-1 shadow-soft">
+    <div className="flex items-center gap-1 rounded-xl bg-[var(--bg-muted)] p-1">
       <HistoryButton
         disabled={!canGoBack}
         icon={ChevronLeft}
         label="Torna indietro"
         onClick={onNavigateBack}
       />
+      <div className="h-4 w-px bg-[var(--border-subtle)]" />
       <HistoryButton
         disabled={!canGoForward}
         icon={ChevronRight}
@@ -201,8 +202,10 @@ function HistoryButton({
   return (
     <button
       className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-sm transition-all",
-        disabled ? "cursor-not-allowed text-secondary/40" : "text-foreground hover:bg-muted",
+        "flex size-8 items-center justify-center rounded-lg transition-all",
+        disabled
+          ? "cursor-not-allowed text-[var(--text-secondary)] opacity-40"
+          : "text-[var(--text-secondary)] hover:bg-[var(--surface-base)] hover:text-[var(--text-primary)] hover:shadow-sm",
       )}
       disabled={disabled}
       onClick={onClick}
@@ -219,7 +222,7 @@ function GlobalSearch({ onOpen }: { onOpen: (anchorRect: DOMRect) => void }) {
 
   return (
     <button
-      className="relative block h-10 w-[220px] rounded-sm border border-subtle bg-card/92 pl-10 pr-3 text-left text-sm text-secondary outline-none transition-all duration-base hover:border-border hover:text-foreground focus:border-primary focus:ring-2 focus:ring-ring"
+      className="relative hidden h-10 w-[320px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-14 text-left text-[13px] font-medium text-[var(--text-secondary)] outline-none transition-all hover:border-[var(--accent-primary)]/30 hover:bg-[var(--surface-base)] hover:text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] 2xl:block"
       data-command-palette-anchor
       onClick={() => {
         const anchorRect = buttonRef.current?.getBoundingClientRect();
@@ -231,10 +234,10 @@ function GlobalSearch({ onOpen }: { onOpen: (anchorRect: DOMRect) => void }) {
       ref={buttonRef}
       type="button"
     >
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+      <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
       <span>Cerca...</span>
-      <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm border border-subtle bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-secondary">
-        Ctrl K
+      <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-1 text-[10px] font-semibold text-[var(--text-secondary)]">
+        ⌘K
       </kbd>
     </button>
   );
@@ -248,28 +251,38 @@ function PageActions({
   onAction: (actionId: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      {actions.map((action) =>
-        action.menuItems ? (
-          <PageActionMenu
-            action={action}
-            key={`${action.actionId}-${action.variant}`}
-            onAction={onAction}
-          />
-        ) : (
-          <Button
-            className="gap-1.5 rounded-sm"
+    <div className="flex items-center gap-1.5">
+      {actions.map((action) => {
+        if (action.menuItems) {
+          return (
+            <PageActionMenu
+              action={action}
+              key={`${action.actionId}-${action.variant}`}
+              onAction={onAction}
+            />
+          );
+        }
+
+        const ActionIcon = action.icon;
+
+        return (
+          <button
+            className={cn(
+              "flex h-9 items-center gap-2 rounded-xl px-4 text-[13px] font-semibold transition-all",
+              action.variant === "outline"
+                ? "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]"
+                : "bg-[var(--accent-primary)] text-[var(--text-inverse)] hover:bg-[var(--accent-primary-hover)] active:scale-[0.98]",
+            )}
             key={`${action.actionId}-${action.variant}`}
             onClick={() => onAction(action.actionId)}
-            size="sm"
-            variant={action.variant === "primary" ? "default" : "outline"}
+            type="button"
           >
-            <action.icon className="size-4" />
+            <ActionIcon className="size-4" />
             <span>{action.label}</span>
-            {action.hasDropdown ? <ChevronDown className="size-3.5" /> : null}
-          </Button>
-        ),
-      )}
+            {action.hasDropdown ? <ChevronDown className="size-3.5 opacity-60" /> : null}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -283,20 +296,25 @@ function PageActionMenu({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const isPrimary = action.variant === "primary";
+  const ActionIcon = action.icon;
 
   return (
     <div className="relative">
-      <Button
+      <button
         aria-expanded={isOpen}
-        className={cn("gap-1.5 rounded-sm", isPrimary && "hue-button")}
+        className={cn(
+          "flex h-9 items-center gap-2 rounded-xl px-4 text-[13px] font-semibold transition-all",
+          isPrimary
+            ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] hover:bg-[var(--accent-primary-hover)] active:scale-[0.98]"
+            : "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]",
+        )}
         onClick={() => setIsOpen((current) => !current)}
-        size="sm"
-        variant={isPrimary ? "default" : "outline"}
+        type="button"
       >
-        <action.icon className="size-4" />
+        <ActionIcon className="size-4" />
         <span>{action.label}</span>
-        <ChevronDown className="size-3.5" />
-      </Button>
+        <ChevronDown className={cn("size-3.5 transition-transform", isOpen && "rotate-180")} />
+      </button>
       {isOpen ? (
         <>
           <button
@@ -305,28 +323,34 @@ function PageActionMenu({
             onClick={() => setIsOpen(false)}
             type="button"
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-sm border border-subtle bg-card py-2 shadow-panel">
-            {action.menuItems?.map((item) => (
-              <button
-                className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted"
-                key={item.actionId}
-                onClick={() => {
-                  onAction(item.actionId);
-                  setIsOpen(false);
-                }}
-                type="button"
-              >
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-sm bg-muted text-primary">
-                  <item.icon className="size-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-foreground">{item.label}</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-secondary">
-                    {item.description}
+          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1.5 shadow-xl">
+            {action.menuItems?.map((item) => {
+              const ItemIcon = item.icon;
+
+              return (
+                <button
+                  className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-muted)]"
+                  key={item.actionId}
+                  onClick={() => {
+                    onAction(item.actionId);
+                    setIsOpen(false);
+                  }}
+                  type="button"
+                >
+                  <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-muted-strong)] text-[var(--accent-primary)]">
+                    <ItemIcon className="size-4" />
                   </span>
-                </span>
-              </button>
-            ))}
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-semibold text-[var(--text-primary)]">
+                      {item.label}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-secondary)]">
+                      {item.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </>
       ) : null}
@@ -344,18 +368,19 @@ function UtilityButtons({
   const ThemeIcon = themeMode === "light" ? Moon : Sun;
 
   return (
-    <div className="flex items-center gap-1 rounded-sm border border-subtle bg-card/92 p-1 shadow-soft">
-      <IconButton badge={3} icon={Bell} label="Notifiche" />
-      <IconButton
+    <div className="flex items-center gap-1">
+      <UtilityButton badge={3} icon={Bell} label="Notifiche" />
+      <UtilityButton
         icon={ThemeIcon}
         label={themeMode === "light" ? "Modo scuro" : "Modo chiaro"}
         onClick={onToggleTheme}
       />
+      <UtilityButton icon={RefreshCw} label="Aggiorna" />
     </div>
   );
 }
 
-function IconButton({
+function UtilityButton({
   badge,
   icon: Icon,
   label,
@@ -368,14 +393,14 @@ function IconButton({
 }) {
   return (
     <button
-      className="relative flex h-9 w-9 items-center justify-center rounded-sm text-secondary transition-all hover:bg-muted hover:text-foreground"
+      className="relative flex size-9 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
       onClick={onClick}
       title={label}
       type="button"
     >
-      <Icon className="size-4" />
+      <Icon className="size-[18px]" />
       {badge != null && badge > 0 ? (
-        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+        <span className="absolute right-1 top-1 flex size-[16px] items-center justify-center rounded-full bg-[var(--accent-primary)] text-[9px] font-bold text-[var(--text-inverse)] ring-2 ring-[var(--surface-base)]">
           {badge}
         </span>
       ) : null}

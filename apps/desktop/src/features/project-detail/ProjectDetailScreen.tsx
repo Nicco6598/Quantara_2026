@@ -2,32 +2,21 @@ import {
   BookOpen,
   CalendarDays,
   CheckCircle2,
-  ChevronRight,
   Clock3,
   MapPin,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
-import {
-  CommandPanel,
-  MetricTile,
-  ScreenShell,
-  SectionPanel,
-  SummaryLine,
-} from "@/components/shared/Screen";
-import { StatusBadge } from "@/components/shared/StatusBadge";
+import { cn } from "@/lib/utils";
 import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
 import {
-  formatDueWindow,
-  formatForecastDelta,
   mapContractToProject,
   portfolioProjects,
   type PortfolioProject,
 } from "@/features/projects/ProjectsScreen";
+import { formatDueWindow, formatForecastDelta } from "@/features/projects/utils/projects-helpers";
 
 export function ProjectDetailScreen() {
   const [projects, setProjects] = useState<PortfolioProject[]>(portfolioProjects);
@@ -66,90 +55,134 @@ export function ProjectDetailScreen() {
   const salRows = useMemo(() => buildSalRows(selectedProject), [selectedProject]);
 
   return (
-    <ScreenShell>
-      <CommandPanel>
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <div className="pt-2">
+      {/* Hero - outside cards, like dashboard */}
+      <section>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
+            Dettaglio progetto
+          </span>
+          <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+            Portfolio · Progetti · {detail.name}
+          </span>
+        </div>
+        <div className="mt-3 flex items-end justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs text-secondary">
-              <span>Portfolio</span>
-              <ChevronRight className="size-3.5" />
-              <span>Progetti</span>
-              <ChevronRight className="size-3.5" />
-              <span className="font-semibold text-foreground">{detail.name}</span>
+            <div className="text-[18px] font-medium leading-none text-[var(--accent-primary)]">
+              {detail.lot} · {detail.location}
             </div>
-
-            <h2 className="mt-3 text-[2rem] font-semibold tracking-tight text-foreground">
+            <h2 className="mt-2 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
               {detail.name}
             </h2>
-            <p className="mt-2 text-sm text-secondary">
-              {detail.lot} · {detail.location}
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <StatusBadge label={detail.health} tone={detail.healthTone} />
-              <Badge variant="info">{String(detail.sal.current)}</Badge>
-              <Badge variant="neutral">Ultimo aggiornamento {detail.lastUpdate}</Badge>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
+                  detail.healthTone === "danger"
+                    ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                    : detail.healthTone === "warning"
+                      ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                      : "bg-[var(--success-soft)] text-[var(--success-base)]",
+                )}
+              >
+                {detail.health}
+              </span>
+              <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
+                {String(detail.sal.current)}
+              </span>
+              <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                Ultimo aggiornamento {detail.lastUpdate}
+              </span>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline">
+          <div className="flex items-center gap-2">
+            <button
+              className="flex h-10 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-[13px] font-semibold text-[var(--text-primary)] transition-all hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]"
+              type="button"
+            >
               <MapPin className="size-4" />
               Mappa
-            </Button>
-            <Button size="sm">
+            </button>
+            <button
+              className="flex h-10 items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 text-[13px] font-semibold text-[var(--text-inverse)] transition-all hover:bg-[var(--accent-primary-hover)] active:scale-[0.98]"
+              type="button"
+            >
               <BookOpen className="size-4" />
               Documenti
-            </Button>
+            </button>
           </div>
         </div>
+      </section>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <MetricTile
-            detail="Budget contrattuale"
-            label="Budget"
-            value={formatMoney({ amount: detail.budget.contractual, currency: "EUR" })}
-          />
-          <MetricTile
-            detail="Valore impegnato sul contratto"
-            label="Impegnato"
-            value={formatMoney({ amount: detail.budget.committed, currency: "EUR" })}
-          />
-          <MetricTile
-            detail="Ultima SAL approvata"
-            label="SAL corrente"
-            value={formatMoney({ amount: detail.sal.amount, currency: "EUR" })}
-          />
-          <MetricTile
-            detail="Avanzamento fisico del lotto"
-            label="Progresso"
-            value={`${detail.progress}%`}
-          />
-        </div>
-      </CommandPanel>
+      {/* Metrics - outside cards, like dashboard */}
+      <div className="mt-6 grid grid-cols-4 gap-4">
+        {[
+          {
+            detail: "Budget contrattuale",
+            label: "Budget",
+            value: formatMoney({ amount: detail.budget.contractual, currency: "EUR" }),
+          },
+          {
+            detail: "Valore impegnato sul contratto",
+            label: "Impegnato",
+            value: formatMoney({ amount: detail.budget.committed, currency: "EUR" }),
+          },
+          {
+            detail: "Ultima SAL approvata",
+            label: "SAL corrente",
+            value: formatMoney({ amount: detail.sal.amount, currency: "EUR" }),
+          },
+          {
+            detail: "Avanzamento fisico del lotto",
+            label: "Progresso",
+            value: `${detail.progress}%`,
+          },
+        ].map((metric) => (
+          <section
+            className="group min-h-[130px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]"
+            key={metric.label}
+          >
+            <div className="min-w-0">
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                {metric.label}
+              </div>
+              <div className="mt-2 text-[22px] font-semibold leading-none tracking-[-0.03em] text-[var(--text-primary)]">
+                {metric.value}
+              </div>
+              <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+                {metric.detail}
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
+      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
         <div className="space-y-6">
-          <SectionPanel>
-            <div className="flex items-center gap-2">
-              <CalendarDays className="size-4 text-info" />
-              <h3 className="text-base font-semibold text-foreground">Milestone operative</h3>
+          {/* Milestone */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div className="flex items-center gap-3">
+              <CalendarDays className="size-4 text-[var(--info-base)]" />
+              <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
+                Milestone operative
+              </h3>
             </div>
 
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {milestoneRows.map((row) => (
                 <div
-                  className="rounded-[22px] border border-subtle bg-muted/35 p-4"
+                  className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4"
                   key={row.label}
                 >
                   <div
-                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${
+                    className={cn(
+                      "inline-flex rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
                       row.status === "complete"
-                        ? "bg-success-soft text-success"
+                        ? "bg-[var(--success-soft)] text-[var(--success-base)]"
                         : row.status === "active"
-                          ? "bg-info-soft text-info"
-                          : "bg-muted text-secondary"
-                    }`}
+                          ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+                          : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+                    )}
                   >
                     {row.status === "complete"
                       ? "chiusa"
@@ -157,80 +190,103 @@ export function ProjectDetailScreen() {
                         ? "in corso"
                         : "pianificata"}
                   </div>
-                  <div className="mt-3 text-sm font-semibold text-foreground">{row.label}</div>
-                  <div className="mt-1 text-xs text-secondary">{row.date}</div>
+                  <div className="mt-3 text-[14px] font-medium text-[var(--text-primary)]">
+                    {row.label}
+                  </div>
+                  <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
+                    {row.date}
+                  </div>
                 </div>
               ))}
             </div>
-          </SectionPanel>
+          </section>
 
-          <SectionPanel>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="size-4 text-info" />
-              <h3 className="text-base font-semibold text-foreground">Economico ed esecuzione</h3>
+          {/* Economico */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div className="flex items-center gap-3">
+              <TrendingUp className="size-4 text-[var(--info-base)]" />
+              <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
+                Economico ed esecuzione
+              </h3>
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+              <div className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                   Quadro economico
                 </div>
                 <dl className="mt-4 space-y-3">
-                  <SummaryLine
+                  <SummaryRow
                     label="Budget contrattuale"
                     value={formatMoney({ amount: detail.budget.contractual, currency: "EUR" })}
                   />
-                  <SummaryLine
+                  <SummaryRow
                     label="Impegnato"
                     value={formatMoney({ amount: detail.budget.committed, currency: "EUR" })}
                   />
-                  <SummaryLine
+                  <SummaryRow
                     label="Eseguito"
                     value={formatMoney({ amount: detail.budget.executed, currency: "EUR" })}
                   />
                 </dl>
               </div>
 
-              <div className="rounded-[22px] border border-subtle bg-muted/35 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+              <div className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                   Forecast
                 </div>
                 <div className="mt-4 flex items-end justify-between gap-4">
                   <div>
-                    <div className="text-xs text-secondary">Fine prevista</div>
-                    <div className="mt-1 text-lg font-semibold text-foreground">
+                    <div className="text-[12px] font-medium text-[var(--text-secondary)]">
+                      Fine prevista
+                    </div>
+                    <div className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
                       {detail.endDate}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-secondary">Impatto</div>
-                    <div className="mt-1 flex items-center gap-1 text-lg font-semibold text-danger">
+                    <div className="text-[12px] font-medium text-[var(--text-secondary)]">
+                      Impatto
+                    </div>
+                    <div className="mt-1 flex items-center gap-1 text-[16px] font-semibold text-[var(--danger-base)]">
                       <TrendingDown className="size-4" />
                       {detail.forecastImpact}
                     </div>
                   </div>
                 </div>
-                <div className="mt-5 border-t border-subtle pt-4">
-                  <div className="text-xs text-secondary">CPI</div>
-                  <div className="mt-1 text-xl font-semibold text-foreground">{detail.cpi}</div>
-                  <div className="mt-1 text-xs text-danger">Sotto budget rispetto al piano</div>
+                <div className="mt-5 border-t border-[var(--border-subtle)]/80 pt-4">
+                  <div className="text-[12px] font-medium text-[var(--text-secondary)]">CPI</div>
+                  <div className="mt-1 text-[20px] font-semibold text-[var(--text-primary)]">
+                    {detail.cpi}
+                  </div>
+                  <div className="mt-1 text-[12px] font-medium text-[var(--danger-base)]">
+                    Sotto budget rispetto al piano
+                  </div>
                 </div>
               </div>
             </div>
-          </SectionPanel>
+          </section>
 
-          <SectionPanel>
+          {/* Registro SAL */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 text-success" />
-                <h3 className="text-base font-semibold text-foreground">Registro SAL</h3>
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="size-4 text-[var(--success-base)]" />
+                <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
+                  Registro SAL
+                </h3>
               </div>
-              <Button size="sm">Nuova SAL</Button>
+              <button
+                className="flex h-9 items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 text-[13px] font-semibold text-[var(--text-inverse)] transition-all hover:bg-[var(--accent-primary-hover)] active:scale-[0.98]"
+                type="button"
+              >
+                Nuova SAL
+              </button>
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-[22px] border border-subtle">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+            <div className="mt-5 overflow-hidden rounded-[16px] border border-[var(--border-subtle)]/80">
+              <table className="w-full border-collapse text-left text-[13px]">
+                <thead className="bg-[var(--bg-muted)] text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                   <tr>
                     <th className="px-4 py-3">SAL</th>
                     <th className="px-4 py-3">Periodo</th>
@@ -241,78 +297,115 @@ export function ProjectDetailScreen() {
                 </thead>
                 <tbody>
                   {salRows.map((row) => (
-                    <tr className="border-t border-subtle" key={row.sal}>
-                      <td className="px-4 py-3 font-semibold text-foreground">{row.sal}</td>
-                      <td className="px-4 py-3 text-secondary">{row.period}</td>
-                      <td className="px-4 py-3 font-semibold text-foreground">
+                    <tr className="border-t border-[var(--border-subtle)]/80" key={row.sal}>
+                      <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">
+                        {row.sal}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">{row.period}</td>
+                      <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">
                         {formatMoney({ amount: row.amount, currency: "EUR" })}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge label={row.status} tone={row.tone} />
+                        <span
+                          className={cn(
+                            "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
+                            row.tone === "danger"
+                              ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                              : row.tone === "warning"
+                                ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                                : "bg-[var(--success-soft)] text-[var(--success-base)]",
+                          )}
+                        >
+                          {row.status}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-secondary">{row.date}</td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">{row.date}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </SectionPanel>
+          </section>
         </div>
 
         <div className="space-y-6">
-          <SectionPanel>
-            <div className="flex items-center gap-2">
-              <Clock3 className="size-4 text-info" />
-              <h3 className="text-base font-semibold text-foreground">Presidio rapido</h3>
+          {/* Presidio rapido */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div className="flex items-center gap-3">
+              <Clock3 className="size-4 text-[var(--info-base)]" />
+              <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
+                Presidio rapido
+              </h3>
             </div>
             <dl className="mt-5 space-y-3">
-              <SummaryLine label="Inizio" value={detail.startDate} />
-              <SummaryLine label="Fine prevista" value={detail.endDate} />
-              <SummaryLine label="Ultimo aggiornamento" value={detail.lastUpdate} />
-              <SummaryLine label="SAL" value={String(detail.sal.current)} />
-              <SummaryLine label="Responsabile" value={detail.manager} />
-              <SummaryLine label="Prossima milestone" value={detail.nextMilestone} />
-              <SummaryLine label="Rischio materiale" value={detail.materialRisk} />
+              <SummaryRow label="Inizio" value={detail.startDate} />
+              <SummaryRow label="Fine prevista" value={detail.endDate} />
+              <SummaryRow label="Ultimo aggiornamento" value={detail.lastUpdate} />
+              <SummaryRow label="SAL" value={String(detail.sal.current)} />
+              <SummaryRow label="Responsabile" value={detail.manager} />
+              <SummaryRow label="Prossima milestone" value={detail.nextMilestone} />
+              <SummaryRow label="Rischio materiale" value={detail.materialRisk} />
             </dl>
-          </SectionPanel>
+          </section>
 
-          <SectionPanel>
-            <div className="text-base font-semibold text-foreground">Team progetto</div>
+          {/* Team progetto */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">Team progetto</h3>
             <div className="mt-4 space-y-3">
               {projectTeam.map((member) => (
                 <div
-                  className="flex items-center gap-3 rounded-[20px] border border-subtle bg-muted/35 px-4 py-3"
+                  className="flex items-center gap-3 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-4 py-3"
                   key={member.initials}
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary text-xs font-bold text-white">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[12px] font-bold text-[var(--text-inverse)]">
                     {member.initials}
                   </div>
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">{member.name}</div>
-                    <div className="text-xs text-secondary">{member.role}</div>
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                      {member.name}
+                    </div>
+                    <div className="truncate text-[12px] font-medium text-[var(--text-secondary)]">
+                      {member.role}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </SectionPanel>
+          </section>
 
-          <SectionPanel>
-            <div className="text-base font-semibold text-foreground">Attivita recenti</div>
+          {/* Attivita recenti */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
+              Attivita recenti
+            </h3>
             <div className="mt-4 space-y-3">
               {recentActivities.map((activity) => (
                 <div
-                  className="rounded-[20px] border border-subtle bg-muted/35 px-4 py-3"
+                  className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-4 py-3"
                   key={activity.text}
                 >
-                  <div className="text-sm font-medium text-foreground">{activity.text}</div>
-                  <div className="mt-1 text-xs text-secondary">{activity.date}</div>
+                  <div className="text-[13px] font-medium text-[var(--text-primary)]">
+                    {activity.text}
+                  </div>
+                  <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
+                    {activity.date}
+                  </div>
                 </div>
               ))}
             </div>
-          </SectionPanel>
+          </section>
         </div>
       </section>
-    </ScreenShell>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[12px] font-medium text-[var(--text-secondary)]">{label}</span>
+      <span className="text-[13px] font-semibold text-[var(--text-primary)]">{value}</span>
+    </div>
   );
 }
 

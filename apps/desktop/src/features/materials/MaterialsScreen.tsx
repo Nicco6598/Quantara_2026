@@ -1,13 +1,7 @@
 import { Bell, Download, Filter, Package, Search, Truck } from "lucide-react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import {
-  CommandPanel,
-  MetricTile,
-  ScreenShell,
-  SectionPanel,
-  SummaryLine,
-} from "@/components/shared/Screen";
+import { ScreenShell } from "@/components/shared/Screen";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 
 const materialRows = [
@@ -84,36 +78,66 @@ const watchRows = [
   { label: "Copertura media portfolio 78%", tone: "success" as const },
 ] as const;
 
+function MetricCard({
+  detail,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  detail: string;
+  label: string;
+  tone?: "danger" | "info" | "neutral" | "success" | "warning";
+  value: string;
+}) {
+  const toneClass = {
+    danger: "text-[var(--danger-base)]",
+    info: "text-[var(--info-base)]",
+    success: "text-[var(--success-base)]",
+    warning: "text-[var(--warning-base)]",
+    neutral: "text-[var(--text-primary)]",
+  }[tone];
+
+  return (
+    <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+        {label}
+      </div>
+      <div className={`mt-3 text-2xl font-semibold ${toneClass}`}>{value}</div>
+      <p className="mt-2 text-[12px] leading-5 text-[var(--text-secondary)]">{detail}</p>
+    </section>
+  );
+}
+
 export function MaterialsScreen() {
   return (
     <ScreenShell>
-      <CommandPanel>
+      <section>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="info">Supply watch</Badge>
-              <span className="text-xs text-secondary">
+              <span className="text-[12px] font-medium text-[var(--text-secondary)]">
                 Magazzino e cantieri sincronizzati 17:32
               </span>
             </div>
-            <h2 className="mt-4 text-[2rem] font-semibold tracking-tight text-foreground">
+            <h2 className="mt-4 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
               Materiali e coperture letti come flusso operativo.
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-secondary">
+            <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
               Niente inspector pesanti o pannelli decorativi: solo stock, impegni, fabbisogno e
               segnali di rischio per capire dove serve ordine, riallocazione o fornitura urgente.
             </p>
 
-            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <MetricTile detail="Stock disponibile" label="Valore magazzino" value="€ 18,75M" />
-              <MetricTile detail="Fuori soglia minima" label="Critici" tone="warning" value="8" />
-              <MetricTile
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard detail="Stock disponibile" label="Valore magazzino" value="€ 18,75M" />
+              <MetricCard detail="Fuori soglia minima" label="Critici" tone="warning" value="8" />
+              <MetricCard
                 detail="Entro 30 giorni"
                 label="In esaurimento"
                 tone="warning"
                 value="12"
               />
-              <MetricTile
+              <MetricCard
                 detail="Fabbisogno 90 giorni"
                 label="Copertura media"
                 tone="success"
@@ -122,18 +146,20 @@ export function MaterialsScreen() {
             </div>
           </div>
 
-          <section className="rounded-[24px] border border-subtle bg-muted/35 p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
               Alert supply
             </div>
             <div className="mt-4 space-y-3">
               {watchRows.map((row) => (
                 <div
-                  className="rounded-[20px] border border-subtle bg-card px-4 py-3"
+                  className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] px-4 py-3"
                   key={row.label}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium text-foreground">{row.label}</div>
+                    <div className="text-[14px] font-medium text-[var(--text-primary)]">
+                      {row.label}
+                    </div>
                     <Badge variant={row.tone}>{row.tone}</Badge>
                   </div>
                 </div>
@@ -141,19 +167,19 @@ export function MaterialsScreen() {
             </div>
           </section>
         </div>
-      </CommandPanel>
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_320px]">
-        <SectionPanel className="p-0">
-          <div className="border-b border-subtle px-5 py-4">
+        <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] shadow-none">
+          <div className="border-b border-[var(--border-subtle)]/80 px-5 py-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 {["Tutti", "Critici", "In esaurimento", "Strategici"].map((tab, index) => (
                   <button
                     className={
                       index === 0
-                        ? "rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-white"
-                        : "rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-secondary"
+                        ? "rounded-full bg-[var(--accent-primary)] px-3 py-1.5 text-[13px] font-semibold text-white"
+                        : "rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-[13px] font-medium text-[var(--text-secondary)]"
                     }
                     key={tab}
                     type="button"
@@ -165,9 +191,9 @@ export function MaterialsScreen() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <label className="relative block">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
                   <input
-                    className="h-10 w-[280px] rounded-[18px] border border-subtle bg-card pl-10 pr-3 text-sm text-foreground outline-none transition-all duration-base placeholder:text-secondary focus:border-primary focus:ring-2 focus:ring-ring"
+                    className="h-10 w-[280px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-[13px] text-[var(--text-primary)] outline-none transition-all duration-base placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                     placeholder="Cerca codice o descrizione"
                     type="search"
                   />
@@ -185,8 +211,8 @@ export function MaterialsScreen() {
           </div>
 
           <div className="overflow-hidden">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+            <table className="w-full border-collapse text-left text-[13px]">
+              <thead className="bg-[var(--bg-muted)] text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                 <tr>
                   <th className="px-5 py-3">Materiale</th>
                   <th className="px-5 py-3">Categoria</th>
@@ -199,28 +225,36 @@ export function MaterialsScreen() {
               </thead>
               <tbody>
                 {materialRows.map((row) => (
-                  <tr className="border-t border-subtle" key={row.code}>
+                  <tr className="border-t border-[var(--border-subtle)]/80" key={row.code}>
                     <td className="px-5 py-4">
-                      <div className="font-semibold text-foreground">{row.code}</div>
-                      <div className="mt-1 text-sm text-secondary">{row.description}</div>
-                      <div className="mt-1 text-xs text-secondary">{row.risk}</div>
+                      <div className="font-semibold text-[var(--text-primary)]">{row.code}</div>
+                      <div className="mt-1 text-[13px] text-[var(--text-secondary)]">
+                        {row.description}
+                      </div>
+                      <div className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                        {row.risk}
+                      </div>
                     </td>
-                    <td className="px-5 py-4 text-foreground">
+                    <td className="px-5 py-4 text-[var(--text-primary)]">
                       {row.category} · {row.unit}
                     </td>
-                    <td className="px-5 py-4 font-semibold text-foreground">{row.available}</td>
-                    <td className="px-5 py-4 text-foreground">{row.committed}</td>
-                    <td className="px-5 py-4 text-foreground">{row.demand}</td>
+                    <td className="px-5 py-4 font-semibold text-[var(--text-primary)]">
+                      {row.available}
+                    </td>
+                    <td className="px-5 py-4 text-[var(--text-primary)]">{row.committed}</td>
+                    <td className="px-5 py-4 text-[var(--text-primary)]">{row.demand}</td>
                     <td className="px-5 py-4">
-                      <div className="text-sm font-semibold text-foreground">{row.coverage}%</div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+                        {row.coverage}%
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
                         <div
                           className={`h-full rounded-full ${
                             row.tone === "danger"
-                              ? "bg-danger"
+                              ? "bg-[var(--danger-base)]"
                               : row.tone === "warning"
-                                ? "bg-warning"
-                                : "bg-success"
+                                ? "bg-[var(--warning-base)]"
+                                : "bg-[var(--success-base)]"
                           }`}
                           style={{ width: `${Math.min(row.coverage, 100)}%` }}
                         />
@@ -234,33 +268,55 @@ export function MaterialsScreen() {
               </tbody>
             </table>
           </div>
-        </SectionPanel>
+        </section>
 
         <div className="space-y-6">
-          <SectionPanel>
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
             <div className="flex items-center gap-2">
-              <Package className="size-4 text-info" />
-              <h3 className="text-base font-semibold text-foreground">Focus materiale</h3>
+              <Package className="size-4 text-[var(--info-base)]" />
+              <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
+                Focus materiale
+              </h3>
             </div>
-            <div className="mt-4 rounded-[22px] border border-subtle bg-muted/35 p-4">
+            <div className="mt-4 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-inset)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-foreground">BIN-60E1</div>
-                  <div className="mt-1 text-xs text-secondary">Binario tipo 60E1 · armamento</div>
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+                    BIN-60E1
+                  </div>
+                  <div className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                    Binario tipo 60E1 · armamento
+                  </div>
                 </div>
                 <StatusBadge label="Disponibile" tone="success" />
               </div>
               <dl className="mt-4 space-y-3">
-                <SummaryLine label="Disponibile" value="12.450 m" />
-                <SummaryLine label="Impegnato" value="8.750 m" />
-                <SummaryLine label="Fabbisogno 90g" value="15.200 m" />
-                <SummaryLine label="Copertura" value="82%" />
+                {(
+                  [
+                    ["Disponibile", "12.450 m"],
+                    ["Impegnato", "8.750 m"],
+                    ["Fabbisogno 90g", "15.200 m"],
+                    ["Copertura", "82%"],
+                  ] as const
+                ).map(([label, value]) => (
+                  <div
+                    className="flex items-center justify-between gap-4 border-b border-[var(--border-subtle)]/80 pb-3 last:border-b-0 last:pb-0"
+                    key={label}
+                  >
+                    <dt className="text-[13px] text-[var(--text-secondary)]">{label}</dt>
+                    <dd className="text-[13px] font-semibold text-[var(--text-primary)]">
+                      {value}
+                    </dd>
+                  </div>
+                ))}
               </dl>
             </div>
-          </SectionPanel>
+          </section>
 
-          <SectionPanel>
-            <div className="text-base font-semibold text-foreground">Azioni rapide</div>
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div className="text-[16px] font-semibold text-[var(--text-primary)]">
+              Azioni rapide
+            </div>
             <div className="mt-4 grid gap-2">
               <Button size="sm" variant="outline">
                 <Truck className="size-4" />
@@ -275,7 +331,7 @@ export function MaterialsScreen() {
                 Crea ordine materiale
               </Button>
             </div>
-          </SectionPanel>
+          </section>
         </div>
       </section>
     </ScreenShell>

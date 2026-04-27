@@ -9,6 +9,7 @@ import {
   Download,
   FileText,
   FileSpreadsheet,
+  FolderKanban,
   FolderOpen,
   HardHat,
   Layers3,
@@ -30,14 +31,13 @@ import {
   parseQuantaraMigrationWorkbook,
   serializeQuantaraMigrationWorkbook,
   validateQuantaraMigrationWorkbook,
-  type MigrationSheetName,
   type MigrationValidationResult,
   type QuantaraMigrationWorkbook,
 } from "@quantara/excel-import";
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { CommandPanel, ScreenShell, SectionPanel } from "@/components/shared/Screen";
+import { ScreenShell, SectionPanel } from "@/components/shared/Screen";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
 import { useToast } from "@/components/shared/ToastProvider";
 import { CreateProjectModal } from "@/features/projects/dialogs/CreateProjectModal";
@@ -58,6 +58,32 @@ import {
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+import {
+  buildManagerLoad,
+  compareProjects,
+  countValidationIssues,
+  createContractorId,
+  createDesktopVoiceKey,
+  createMigrationId,
+  downloadWorkbook,
+  formatDueWindow,
+  formatForecastDelta,
+  formatMigrationAction,
+  formatSheetName,
+  getSalTone,
+  getTonePalette,
+  isSalWindow,
+  matchesFocus,
+  matchesProjectSearch,
+  matchesSearch,
+  mergeContractorRegistry,
+  mergeContracts,
+  normalizeContractorName,
+  readStringList,
+  readStringRecord,
+  waitForUiPaint,
+  writeJson,
+} from "./utils/projects-helpers";
 
 type LaneTone = Extract<StatusTone, "success" | "warning" | "danger">;
 type PortfolioFocus = "all" | "critical" | "sal";
@@ -1149,10 +1175,10 @@ export function ProjectsScreen() {
       {createMessage ? (
         <div
           className={cn(
-            "mb-4 rounded-[18px] border px-4 py-3 text-sm font-medium shadow-soft",
+            "mb-4 rounded-[16px] border px-4 py-3 text-[13px] font-medium shadow-none",
             createState === "error"
-              ? "border-danger/25 bg-danger/10 text-danger"
-              : "border-success/25 bg-success/10 text-success",
+              ? "border-[var(--danger-base)]/25 bg-[var(--danger-soft)] text-[var(--danger-base)]"
+              : "border-[var(--success-base)]/25 bg-[var(--success-soft)] text-[var(--success-base)]",
           )}
           role="status"
         >
@@ -1161,122 +1187,111 @@ export function ProjectsScreen() {
       ) : null}
 
       {selectedContractor ? (
-        <>
-          <CommandPanel className="p-0" variant="projects">
-            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="p-6 md:p-8">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant="info">Cartella appaltatore</Badge>
-                  <span className="text-xs font-medium text-secondary">
-                    {contractsState.source === "desktop"
-                      ? "Contratti caricati dal database locale"
-                      : contractsState.message}{" "}
-                    · {selectedContractor.contractor} · {visibleProjects.length} lotti nel perimetro
-                    attivo
-                  </span>
-                  {isPending ? <Badge variant="warning">Filtri in aggiornamento</Badge> : null}
-                </div>
-
-                <div className="mt-5 max-w-3xl">
-                  <h2 className="text-[2rem] font-semibold tracking-tight text-foreground md:text-[2.35rem]">
-                    {selectedContractor.contractor}
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary md:text-[15px]">
-                    Cartella operativa dell'appaltatore: progetti, contratti, SAL e priorita sono
-                    filtrati su questo perimetro.
-                  </p>
-                </div>
-
-                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                  <PortfolioMetric
-                    label="Contratti / progetti"
-                    note="Elementi agganciati alla cartella appaltatore"
-                    value={`${visibleProjects.length}`}
-                  />
-                  <PortfolioMetric
-                    label="Valore contratti"
-                    note="Totale dei progetti nel perimetro corrente"
-                    value={formatMoney({ amount: totalBudget, currency: "EUR" })}
-                  />
-                  <PortfolioMetric
-                    label="Importo SAL in corsa"
-                    note={`${salWindowCount} lotti tra emissioni, firme e dossier aperti nei prossimi 7 giorni`}
-                    tone={salWindowCount > 0 ? "warning" : "success"}
-                    value={formatMoney({ amount: salExposure, currency: "EUR" })}
-                  />
-                  <PortfolioMetric
-                    label="Escalation"
-                    note="Cantieri con forecast e documentazione fuori soglia"
-                    tone={criticalCount > 0 ? "danger" : "success"}
-                    value={`${criticalCount} cantieri`}
-                  />
-                  <PortfolioMetric
-                    label="Avanzamento medio"
-                    note="Media ponderata sul portafoglio visibile"
-                    tone="success"
-                    value={formatPercent(averageProgress)}
-                  />
-                </div>
-
-                <div className="mt-7 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                  <div className="flex max-w-3xl flex-1 flex-col gap-3">
-                    <div className="flex flex-wrap gap-2">
-                      {focusOptions.map((option) => (
-                        <FocusChip
-                          active={focus === option.value}
-                          count={focusCounts[option.value]}
-                          key={option.value}
-                          label={option.label}
-                          onClick={() => startTransition(() => setFocus(option.value))}
-                        />
-                      ))}
-                    </div>
-
-                    <label className="relative block max-w-2xl">
-                      <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-secondary" />
-                      <input
-                        className="h-12 w-full rounded-2xl border border-subtle bg-card/90 pl-11 pr-4 text-sm text-foreground outline-none transition-all duration-base focus:border-primary focus:ring-2 focus:ring-ring"
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Cerca lotto, PM, milestone o materiale critico"
-                        type="search"
-                        value={query}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <aside className="border-t border-subtle/80 p-6 xl:border-l xl:border-t-0">
-                <Button
-                  onClick={() => {
-                    setSelectedContractorId(null);
-                    setQuery("");
-                    setFocus("all");
-                  }}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <ArrowLeft className="size-4" />
-                  Appaltatori
-                </Button>
-                <div className="mt-5 space-y-3">
-                  <PortfolioMetric
-                    label="SAL recenti"
-                    note="Ultime attivita della cartella"
-                    tone={folderRecentSals.length > 0 ? "warning" : "success"}
-                    value={`${folderRecentSals.length}`}
-                  />
-                  <PortfolioMetric
-                    label="Escalation"
-                    note="Progetti fuori soglia nella cartella"
-                    tone={criticalCount > 0 ? "danger" : "success"}
-                    value={`${criticalCount}`}
-                  />
-                </div>
-              </aside>
+        <div className="pt-2">
+          {/* Hero - outside cards, like dashboard */}
+          <section>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
+                Cartella appaltatore
+              </span>
+              <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+                {contractsState.source === "desktop"
+                  ? "Contratti caricati dal database locale"
+                  : contractsState.message}{" "}
+                · {selectedContractor.contractor} · {visibleProjects.length} lotti nel perimetro
+                attivo
+              </span>
+              {isPending ? (
+                <span className="rounded-[9px] bg-[var(--warning-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-base)]">
+                  Filtri in aggiornamento
+                </span>
+              ) : null}
             </div>
-          </CommandPanel>
+            <div className="mt-3 flex items-end justify-between gap-4">
+              <div>
+                <div className="text-[18px] font-medium leading-none text-[var(--accent-primary)]">
+                  {selectedContractor.contractor}
+                </div>
+                <h2 className="mt-2 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
+                  Cartella operativa dell'appaltatore.
+                </h2>
+                <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
+                  Progetti, contratti, SAL e priorita sono filtrati sul perimetro scelto.
+                </p>
+              </div>
+              <button
+                className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-[13px] font-semibold text-[var(--text-primary)] transition-all hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]"
+                onClick={() => {
+                  setSelectedContractorId(null);
+                  setQuery("");
+                  setFocus("all");
+                }}
+                type="button"
+              >
+                <ArrowLeft className="size-4" />
+                Appaltatori
+              </button>
+            </div>
+          </section>
+
+          {/* Metrics grid - outside cards, like dashboard */}
+          <div className="mt-6 grid grid-cols-5 gap-4">
+            <PortfolioMetric
+              detail="Elementi agganciati alla cartella appaltatore"
+              label="Contratti / progetti"
+              value={`${visibleProjects.length}`}
+            />
+            <PortfolioMetric
+              detail="Totale dei progetti nel perimetro corrente"
+              label="Valore contratti"
+              value={formatMoney({ amount: totalBudget, currency: "EUR" })}
+            />
+            <PortfolioMetric
+              detail={`${salWindowCount} lotti tra emissioni, firme e dossier aperti`}
+              label="Importo SAL in corsa"
+              tone={salWindowCount > 0 ? "warning" : "success"}
+              value={formatMoney({ amount: salExposure, currency: "EUR" })}
+            />
+            <PortfolioMetric
+              detail="Cantieri con forecast e documentazione fuori soglia"
+              label="Escalation"
+              tone={criticalCount > 0 ? "danger" : "success"}
+              value={`${criticalCount} cantieri`}
+            />
+            <PortfolioMetric
+              detail="Media ponderata sul portafoglio visibile"
+              label="Avanzamento medio"
+              tone="success"
+              value={formatPercent(averageProgress)}
+            />
+          </div>
+
+          {/* Focus chips + Search */}
+          <div className="mt-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="flex max-w-3xl flex-1 flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
+                {focusOptions.map((option) => (
+                  <FocusChip
+                    active={focus === option.value}
+                    count={focusCounts[option.value]}
+                    key={option.value}
+                    label={option.label}
+                    onClick={() => startTransition(() => setFocus(option.value))}
+                  />
+                ))}
+              </div>
+              <label className="relative block max-w-2xl">
+                <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+                <input
+                  className="h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-11 pr-4 text-[13px] font-medium text-[var(--text-primary)] outline-none transition-all hover:border-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Cerca lotto, PM, milestone o materiale critico"
+                  type="search"
+                  value={query}
+                />
+              </label>
+            </div>
+          </div>
 
           {folderRecentSals.length > 0 ? (
             <RecentSalsPanel
@@ -1310,11 +1325,9 @@ export function ProjectsScreen() {
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0];
-
               if (file) {
                 void handleImportMigrationFile(file);
               }
-
               event.currentTarget.value = "";
             }}
             ref={fileInputRef}
@@ -1323,16 +1336,16 @@ export function ProjectsScreen() {
 
           <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
             <section className="min-w-0">
-              <div className="mb-4 flex flex-col gap-3 rounded-[24px] border border-subtle bg-card p-4 shadow-soft md:flex-row md:items-center md:justify-between">
+              <div className="mb-4 flex flex-col gap-3 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-4 shadow-none md:flex-row md:items-center md:justify-between">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                     Progetti della cartella
                   </div>
-                  <h3 className="mt-1 text-base font-semibold text-foreground">
+                  <h3 className="mt-1 text-[15px] font-semibold text-[var(--text-primary)]">
                     {viewMode === "workbench" ? "Registro progetti" : "Board per priorita"}
                   </h3>
                 </div>
-                <div className="flex rounded-[18px] border border-subtle bg-muted/45 p-1">
+                <div className="flex rounded-xl bg-[var(--bg-muted)] p-1">
                   <ViewModeButton
                     active={viewMode === "workbench"}
                     label="Registro"
@@ -1373,51 +1386,50 @@ export function ProjectsScreen() {
               <ControlRailPanel activities={visibleActivities} signals={controlSignals} />
             </div>
           </section>
-        </>
+        </div>
       ) : (
-        <>
-          <CommandPanel className="p-0" variant="projects">
-            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="p-6 md:p-8">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant="info">Cartelle appaltatori</Badge>
-                  <span className="text-xs font-medium text-secondary">
-                    {contractsState.source === "desktop"
-                      ? "Contratti caricati dal database locale"
-                      : contractsState.message}{" "}
-                    · {contractorFolders.length} cartelle · {activeProjects.length} progetti
-                  </span>
-                </div>
-                <div className="mt-5 max-w-3xl">
-                  <h2 className="text-[2rem] font-semibold tracking-tight text-foreground md:text-[2.6rem]">
-                    Seleziona l'appaltatore e apri i suoi progetti.
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary md:text-[15px]">
-                    La pagina Progetti parte dalle cartelle appaltatore. Entrando in una cartella
-                    trovi board, registro e controlli filtrati sul perimetro scelto.
-                  </p>
-                </div>
-              </div>
-              <aside className="border-t border-subtle/80 p-6 xl:border-l xl:border-t-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
-                  Sintesi portfolio
-                </div>
-                <div className="mt-5 grid gap-3">
-                  <PortfolioMetric
-                    label="Appaltatori"
-                    note="Cartelle operative disponibili"
-                    value={`${contractorFolders.length}`}
-                  />
-                  <PortfolioMetric
-                    label="SAL recenti"
-                    note="Ultime attivita prima di entrare nel dettaglio"
-                    tone={recentSals.length > 0 ? "warning" : "success"}
-                    value={`${recentSals.length}`}
-                  />
-                </div>
-              </aside>
+        <div className="pt-2">
+          {/* Hero - outside cards, like dashboard */}
+          <section>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
+                Cartelle appaltatori
+              </span>
+              <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+                {contractsState.source === "desktop"
+                  ? "Contratti caricati dal database locale"
+                  : contractsState.message}{" "}
+                · {contractorFolders.length} cartelle · {activeProjects.length} progetti
+              </span>
             </div>
-          </CommandPanel>
+            <div className="mt-3">
+              <div className="text-[18px] font-medium leading-none text-[var(--accent-primary)]">
+                Portfolio progetti
+              </div>
+              <h2 className="mt-2 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
+                Seleziona l'appaltatore e apri i suoi progetti.
+              </h2>
+              <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
+                La pagina Progetti parte dalle cartelle appaltatore. Entrando in una cartella trovi
+                board, registro e controlli filtrati sul perimetro scelto.
+              </p>
+            </div>
+          </section>
+
+          {/* Metrics - outside cards, like dashboard */}
+          <div className="mt-6 grid grid-cols-2 gap-4 max-w-md">
+            <PortfolioMetric
+              detail="Cartelle operative disponibili"
+              label="Appaltatori"
+              value={`${contractorFolders.length}`}
+            />
+            <PortfolioMetric
+              detail="Ultime attivita prima di entrare nel dettaglio"
+              label="SAL recenti"
+              tone={recentSals.length > 0 ? "warning" : "success"}
+              value={`${recentSals.length}`}
+            />
+          </div>
 
           {recentSals.length > 0 ? (
             <RecentSalsPanel
@@ -1436,7 +1448,7 @@ export function ProjectsScreen() {
               setFocus("all");
             }}
           />
-        </>
+        </div>
       )}
 
       {isCreateProjectModalOpen ? (
@@ -1720,21 +1732,29 @@ function ContractorFoldersPanel({
     <SectionPanel className="mt-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
             Appaltatori
           </div>
-          <h3 className="mt-2 text-lg font-semibold text-foreground">Cartelle progetto</h3>
-          <p className="mt-1 text-sm text-secondary">
+          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
+            Cartelle progetto
+          </h3>
+          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
             Apri una cartella per vedere solo i progetti, i controlli e le priorita dell'appaltatore
             selezionato.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="neutral">{folders.length} cartelle</Badge>
-          <Button onClick={onOpenCreateContractor} size="sm" type="button">
+          <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+            {folders.length} cartelle
+          </span>
+          <button
+            className="flex h-9 items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 text-[13px] font-semibold text-[var(--text-inverse)] transition-all hover:bg-[var(--accent-primary-hover)] active:scale-[0.98]"
+            onClick={onOpenCreateContractor}
+            type="button"
+          >
             <Plus className="size-4" />
             Appaltatore
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -1745,29 +1765,36 @@ function ContractorFoldersPanel({
 
             return (
               <button
-                className="group rounded-[18px] border border-subtle bg-card p-4 text-left shadow-soft transition-colors hover:border-primary/40 hover:bg-muted/35"
+                className="group rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 text-left shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]"
                 key={folder.id}
                 onClick={() => onOpenFolder(folder.id)}
                 type="button"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-start gap-3">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] border border-subtle bg-muted text-primary">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted-strong)] text-[var(--accent-primary)]">
                       <FolderOpen className="size-5" />
                     </span>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-                        <Building2 className="size-4" />
+                      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                        <Building2 className="size-3.5" />
                         Appaltatore
                       </div>
-                      <h4 className="mt-1 truncate text-xl font-semibold text-foreground">
+                      <h4 className="mt-1 truncate text-[15px] font-semibold text-[var(--text-primary)]">
                         {folder.contractor}
                       </h4>
                     </div>
                   </div>
-                  <Badge variant={hasCriticalItems ? "warning" : "success"}>
+                  <span
+                    className={cn(
+                      "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
+                      hasCriticalItems
+                        ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                        : "bg-[var(--success-soft)] text-[var(--success-base)]",
+                    )}
+                  >
                     {hasCriticalItems ? "Presidio" : "Stabile"}
-                  </Badge>
+                  </span>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-4 gap-2">
@@ -1777,16 +1804,16 @@ function ContractorFoldersPanel({
                   <FolderMetric label="Alert" value={`${folder.criticalCount}`} />
                 </dl>
 
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-subtle pt-3">
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-3">
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
                       Valore
                     </div>
-                    <div className="mt-1 text-sm font-semibold text-foreground">
+                    <div className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">
                       {formatMoney({ amount: folder.budget, currency: "EUR" })}
                     </div>
                   </div>
-                  <ChevronRight className="size-4 text-primary transition-transform group-hover:translate-x-0.5" />
+                  <ChevronRight className="size-4 text-[var(--text-secondary)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--accent-primary)]" />
                 </div>
               </button>
             );
@@ -1806,11 +1833,13 @@ function ContractorFoldersPanel({
 
 function FolderMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-[12px] border border-subtle bg-muted/35 px-2.5 py-2">
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
+    <div className="min-w-0 rounded-[12px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-2.5 py-2">
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
         {label}
       </dt>
-      <dd className="mt-1 truncate text-sm font-semibold text-foreground">{value}</dd>
+      <dd className="mt-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -2292,26 +2321,6 @@ function CreateSalModal({
   );
 }
 
-function formatMigrationAction(action: MigrationAction) {
-  if (action === "template") {
-    return "Template in preparazione";
-  }
-
-  if (action === "export") {
-    return "Export in corso";
-  }
-
-  if (action === "import") {
-    return "Import in lettura";
-  }
-
-  if (action === "commit") {
-    return "Commit in corso";
-  }
-
-  return "Pronto";
-}
-
 function PreviewMetric({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -2352,12 +2361,6 @@ export function mapContractToProject(
   };
 }
 
-function mergeContracts(created: DesktopContract[], current: DesktopContract[]) {
-  const createdIds = new Set(created.map((contract) => contract.id));
-
-  return [...created, ...current.filter((contract) => !createdIds.has(contract.id))];
-}
-
 function mapDesktopVoiceToSalVoice(voice: DesktopTariffVoice, projectYear: number) {
   return {
     category: voice.category,
@@ -2384,62 +2387,6 @@ function buildFallbackTariffVoices(tariffBookId: string): DesktopTariffVoice[] {
   ];
 }
 
-function createDesktopVoiceKey(tariffBookId: string, voiceId: string) {
-  return `${tariffBookId}::${voiceId}`;
-}
-
-function createMigrationId(title: string, timestamp: number, index: number) {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 36);
-
-  return `migration_${slug || "project"}_${timestamp}_${index}`;
-}
-
-function countValidationIssues(
-  validation: MigrationValidationResult,
-  severity: "error" | "warning",
-) {
-  return validation.issues.filter((issue) => issue.severity === severity).length;
-}
-
-function formatSheetName(sheet: MigrationSheetName) {
-  if (sheet === "projects") {
-    return "Progetti";
-  }
-
-  if (sheet === "materials") {
-    return "Materiali";
-  }
-
-  return "SAL";
-}
-
-function waitForUiPaint() {
-  return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => resolve());
-  });
-}
-
-function downloadWorkbook(bytes: Uint8Array, fileName: string) {
-  const buffer = new ArrayBuffer(bytes.byteLength);
-
-  new Uint8Array(buffer).set(bytes);
-
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function ApprovalWindowPanel({
   compact = false,
   items,
@@ -2455,20 +2402,29 @@ function ApprovalWindowPanel({
     <aside
       className={
         compact
-          ? "rounded-[24px] border border-subtle bg-card p-5 shadow-soft"
-          : "relative border-t border-subtle/80 p-6 xl:border-l xl:border-t-0"
+          ? "rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none"
+          : "relative border-t border-[var(--border-subtle)]/80 p-6 xl:border-l xl:border-t-0"
       }
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
             Finestra 72 ore
           </div>
-          <h3 className="mt-2 text-lg font-semibold text-foreground">Approvazioni e snodi</h3>
+          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
+            Approvazioni e snodi
+          </h3>
         </div>
-        <Badge variant={activeEscalations > 0 ? "danger" : "success"}>
+        <span
+          className={cn(
+            "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
+            activeEscalations > 0
+              ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+              : "bg-[var(--success-soft)] text-[var(--success-base)]",
+          )}
+        >
           {activeEscalations} escalation
-        </Badge>
+        </span>
       </div>
 
       <div className="mt-5 space-y-3">
@@ -2530,34 +2486,52 @@ function ApprovalMeta({ label, value }: { label: string; value: string }) {
 }
 
 function PortfolioMetric({
+  detail,
+  icon: Icon,
   label,
-  note,
   tone,
   value,
 }: {
+  detail?: string;
+  icon?: LucideIcon;
   label: string;
-  note: string;
+  note?: string;
   tone?: StatusTone;
   value: string;
 }) {
-  const palette = getTonePalette(tone ?? "neutral");
+  const toneClass = {
+    danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
+    info: "bg-[var(--info-soft)] text-[var(--info-base)]",
+    neutral: "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+    success: "bg-[var(--success-soft)] text-[var(--success-base)]",
+    warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+  }[tone ?? "neutral"];
 
   return (
-    <div
-      className="rounded-2xl border p-4 backdrop-blur-sm"
-      style={{
-        background: tone
-          ? palette.panel
-          : "color-mix(in srgb, var(--surface-base) 88%, transparent)",
-        borderColor: tone
-          ? palette.border
-          : "color-mix(in srgb, var(--border-subtle) 84%, transparent)",
-      }}
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-secondary">{label}</p>
-      <div className="mt-3 text-2xl font-semibold text-foreground">{value}</div>
-      <p className="mt-2 text-xs leading-5 text-secondary">{note}</p>
-    </div>
+    <section className="group min-h-[130px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]">
+      <div className="flex items-start gap-4">
+        {Icon ? (
+          <div
+            className={`flex size-11 shrink-0 items-center justify-center rounded-full ${toneClass}`}
+          >
+            <Icon className="size-5" />
+          </div>
+        ) : null}
+        <div className="min-w-0">
+          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+            {label}
+          </div>
+          <div className="mt-2 text-[22px] font-semibold leading-none tracking-[-0.03em] text-[var(--text-primary)]">
+            {value}
+          </div>
+          {detail ? (
+            <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+              {detail}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -2575,10 +2549,10 @@ function FocusChip({
   return (
     <button
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-all duration-base",
+        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition-all",
         active
-          ? "border-primary bg-primary text-white shadow-soft"
-          : "border-subtle bg-card text-foreground hover:border-border hover:bg-muted",
+          ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-none"
+          : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]",
       )}
       onClick={onClick}
       type="button"
@@ -2587,7 +2561,9 @@ function FocusChip({
       <span
         className={cn(
           "inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
-          active ? "bg-white/16 text-white" : "bg-muted text-secondary",
+          active
+            ? "bg-white/16 text-white"
+            : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
         )}
       >
         {count}
@@ -2608,8 +2584,10 @@ function ViewModeButton({
   return (
     <button
       className={cn(
-        "h-9 rounded-[14px] px-4 text-sm font-medium transition-colors",
-        active ? "bg-card text-foreground shadow-soft" : "text-secondary hover:text-foreground",
+        "h-9 rounded-xl px-4 text-[13px] font-medium transition-colors",
+        active
+          ? "bg-[var(--surface-base)] text-[var(--text-primary)] shadow-none"
+          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
       )}
       onClick={onClick}
       type="button"
@@ -2630,16 +2608,23 @@ function PriorityQueuePanel({
     <SectionPanel>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
             Coda prioritaria
           </div>
-          <h3 className="mt-2 text-lg font-semibold text-foreground">
+          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
             Azioni che non possono aspettare
           </h3>
         </div>
-        <Badge variant={items.some((item) => item.tone === "danger") ? "danger" : "neutral"}>
+        <span
+          className={cn(
+            "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
+            items.some((item) => item.tone === "danger")
+              ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+              : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+          )}
+        >
           {items.length}
-        </Badge>
+        </span>
       </div>
 
       <div className="mt-5 space-y-3">
@@ -2711,12 +2696,16 @@ function ManagerLoadPanel({
     <SectionPanel>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
             Copertura PM
           </div>
-          <h3 className="mt-2 text-lg font-semibold text-foreground">Carico per responsabile</h3>
+          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
+            Carico per responsabile
+          </h3>
         </div>
-        <Badge variant="neutral">{totalManagers}</Badge>
+        <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+          {totalManagers}
+        </span>
       </div>
 
       <div className="mt-5 space-y-4">
@@ -2764,18 +2753,18 @@ function PortfolioBoard({
     <SectionPanel>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
             Board operativo
           </div>
-          <h3 className="mt-2 text-lg font-semibold text-foreground">
+          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
             Distribuzione per fascia di controllo
           </h3>
-          <p className="mt-1 text-sm text-secondary">
+          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
             Ogni colonna tiene insieme stato, forecast, SAL e materiale sensibile per scendere
             subito sul lotto giusto.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs font-medium text-secondary">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
           <MapPin className="size-4" />
           Portafoglio nazionale · vista per priorita
         </div>
@@ -2807,25 +2796,29 @@ function PortfolioLane({
   onOpenProject: (project: PortfolioProject) => void;
   tone: LaneTone;
 }) {
-  const palette = getTonePalette(tone);
   const meta = laneMeta[tone];
 
   return (
-    <section
-      className="rounded-[24px] border p-4"
-      style={{
-        background: palette.surface,
-        borderColor: palette.border,
-      }}
-    >
+    <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-4 shadow-none">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-secondary">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
             {meta.label}
           </div>
-          <p className="mt-2 text-sm text-secondary">{meta.description}</p>
+          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">{meta.description}</p>
         </div>
-        <Badge variant={tone}>{items.length}</Badge>
+        <span
+          className={cn(
+            "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
+            tone === "danger"
+              ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+              : tone === "warning"
+                ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                : "bg-[var(--success-soft)] text-[var(--success-base)]",
+          )}
+        >
+          {items.length}
+        </span>
       </div>
 
       <div className="mt-4 space-y-3">
@@ -2858,31 +2851,26 @@ function PortfolioLaneCard({
   onOpen: () => void;
   project: PortfolioProject;
 }) {
-  const palette = getTonePalette(project.tone);
   const salTone = getSalTone(project);
 
   return (
-    <article
-      className="rounded-[22px] border p-4 shadow-soft"
-      style={{
-        background: "color-mix(in srgb, var(--surface-base) 94%, transparent)",
-        borderColor: palette.border,
-      }}
-    >
+    <article className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-4 shadow-none transition hover:bg-[var(--surface-inset)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-secondary">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
             {project.phase}
           </div>
-          <h4 className="mt-2 text-sm font-semibold text-foreground">{project.title}</h4>
-          <p className="mt-1 text-xs text-secondary">
+          <h4 className="mt-2 text-[14px] font-medium text-[var(--text-primary)]">
+            {project.title}
+          </h4>
+          <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
             {project.lot} · {project.location}
           </p>
         </div>
 
         <button
           aria-label={`Apri ${project.title}`}
-          className="rounded-full p-2 text-secondary transition-colors hover:bg-muted hover:text-foreground"
+          className="flex size-8 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
           onClick={onOpen}
           type="button"
         >
@@ -2890,28 +2878,48 @@ function PortfolioLaneCard({
         </button>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <StatusBadge label={project.healthLabel} tone={project.tone} />
-        <Badge variant={salTone}>{project.salState}</Badge>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <span
+          className={cn("rounded-[9px] px-2.5 py-1 text-[11px] font-semibold", {
+            "bg-[var(--danger-soft)] text-[var(--danger-base)]": project.tone === "danger",
+            "bg-[var(--success-soft)] text-[var(--success-base)]": project.tone === "success",
+            "bg-[var(--warning-soft)] text-[var(--warning-base)]": project.tone === "warning",
+          })}
+        >
+          {project.healthLabel}
+        </span>
+        <span
+          className={cn("rounded-[9px] px-2.5 py-1 text-[11px] font-semibold", {
+            "bg-[var(--danger-soft)] text-[var(--danger-base)]": salTone === "danger",
+            "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]": salTone === "neutral",
+            "bg-[var(--warning-soft)] text-[var(--warning-base)]": salTone === "warning",
+          })}
+        >
+          {project.salState}
+        </span>
       </div>
 
-      <div className="mt-4">
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-secondary">Avanzamento</span>
-          <span className="font-semibold text-foreground">{formatPercent(project.progress)}</span>
+      <div className="mt-3">
+        <div className="flex items-center justify-between gap-3 text-[12px] font-medium">
+          <span className="text-[var(--text-secondary)]">Avanzamento</span>
+          <span className="text-[var(--text-primary)]">{formatPercent(project.progress)}</span>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
           <div
-            className="h-full rounded-full"
-            style={{
-              backgroundColor: palette.accent,
-              width: `${project.progress}%`,
-            }}
+            className={cn(
+              "h-full rounded-full",
+              project.tone === "danger"
+                ? "bg-[var(--danger-base)]"
+                : project.tone === "warning"
+                  ? "bg-[var(--warning-base)]"
+                  : "bg-[var(--info-base)]",
+            )}
+            style={{ width: `${project.progress}%` }}
           />
         </div>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3">
+      <dl className="mt-3 grid grid-cols-2 gap-2">
         <LaneMetric
           detail={`vs contratto ${project.variance}`}
           label="EAC"
@@ -2930,19 +2938,22 @@ function PortfolioLaneCard({
         <LaneMetric detail={project.materialRisk} label="Presidio" value={project.manager} />
       </dl>
 
-      <div className="mt-4 flex items-center gap-2">
-        <Button onClick={onOpen} size="sm">
-          Apri dossier
-        </Button>
-        <Button
-          aria-label={`Azioni per ${project.title}`}
-          onClick={onOpenActions}
-          size="icon"
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          className="flex h-9 items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 text-[12px] font-semibold text-[var(--text-inverse)] transition-all hover:bg-[var(--accent-primary-hover)] active:scale-[0.98]"
+          onClick={onOpen}
           type="button"
-          variant="ghost"
+        >
+          Apri dossier
+        </button>
+        <button
+          aria-label={`Azioni per ${project.title}`}
+          className="flex size-9 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+          onClick={onOpenActions}
+          type="button"
         >
           <MoreVertical className="size-4" />
-        </Button>
+        </button>
       </div>
     </article>
   );
@@ -2951,11 +2962,11 @@ function PortfolioLaneCard({
 function LaneMetric({ detail, label, value }: { detail: string; label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
         {label}
       </dt>
-      <dd className="mt-1 text-sm font-semibold text-foreground">{value}</dd>
-      <p className="mt-1 text-xs leading-5 text-secondary">{detail}</p>
+      <dd className="mt-0.5 text-[13px] font-semibold text-[var(--text-primary)]">{value}</dd>
+      <p className="mt-0.5 text-[11px] leading-4 text-[var(--text-secondary)]">{detail}</p>
     </div>
   );
 }
@@ -2970,10 +2981,12 @@ function ControlRailPanel({
   return (
     <SectionPanel>
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
           Presidio trasversale
         </div>
-        <h3 className="mt-2 text-lg font-semibold text-foreground">Segnali e feed operativo</h3>
+        <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
+          Segnali e feed operativo
+        </h3>
       </div>
 
       <div className="mt-5 space-y-3">
@@ -3069,20 +3082,28 @@ function ProjectsWorkbench({
 }) {
   return (
     <SectionPanel className="p-0">
-      <div className="flex flex-col gap-3 border-b border-subtle p-5 xl:flex-row xl:items-end xl:justify-between">
+      <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
             Registro operativo
           </div>
-          <h3 className="mt-2 text-lg font-semibold text-foreground">Workbench dei progetti</h3>
-          <p className="mt-1 text-sm text-secondary">
+          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
+            Workbench dei progetti
+          </h3>
+          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
             Riga per riga: presidio, EAC, SAL, forecast e rischio materiale.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge variant="neutral">{projects.length} visibili</Badge>
-          {query.trim().length > 0 ? <Badge variant="info">Filtro: {query.trim()}</Badge> : null}
+          <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+            {projects.length} visibili
+          </span>
+          {query.trim().length > 0 ? (
+            <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
+              Filtro: {query.trim()}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -3121,14 +3142,20 @@ function WorkbenchRow({
   onOpenProject: (project: PortfolioProject) => void;
   project: PortfolioProject;
 }) {
-  const palette = getTonePalette(project.tone);
   const salTone = getSalTone(project);
+
+  const toneClass =
+    project.tone === "warning"
+      ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+      : project.tone === "danger"
+        ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+        : "bg-[var(--success-soft)] text-[var(--success-base)]";
 
   return (
     <article
       className={cn(
-        "projects-workbench-row group relative rounded-[22px] border border-subtle bg-muted/30 p-4 transition-colors hover:bg-muted/50",
-        isSelected ? "border-primary bg-primary/10" : "",
+        "group relative rounded-[16px] border bg-[var(--surface-base)] p-4 shadow-none transition hover:bg-[var(--surface-inset)]",
+        isSelected ? "border-[var(--accent-primary)]/40" : "border-[var(--border-subtle)]/80",
       )}
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -3137,17 +3164,49 @@ function WorkbenchRow({
           onClick={() => onOpenProject(project)}
           type="button"
         >
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="size-2 rounded-full" style={{ backgroundColor: palette.accent }} />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-              {project.phase}
-            </span>
-            <StatusBadge label={project.healthLabel} tone={project.tone} />
-            <Badge variant={salTone}>{project.salState}</Badge>
-          </div>
-          <div className="mt-2 text-sm font-semibold text-foreground">{project.title}</div>
-          <div className="mt-1 text-xs text-secondary">
-            {project.lot} · {project.location} · {project.manager}
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-[12px]",
+                toneClass,
+              )}
+            >
+              <FolderKanban className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                  {project.phase}
+                </span>
+                <span
+                  className={cn("rounded-[9px] px-2.5 py-1 text-[11px] font-semibold", {
+                    "bg-[var(--danger-soft)] text-[var(--danger-base)]": project.tone === "danger",
+                    "bg-[var(--success-soft)] text-[var(--success-base)]":
+                      project.tone === "success",
+                    "bg-[var(--warning-soft)] text-[var(--warning-base)]":
+                      project.tone === "warning",
+                  })}
+                >
+                  {project.healthLabel}
+                </span>
+                <span
+                  className={cn("rounded-[9px] px-2.5 py-1 text-[11px] font-semibold", {
+                    "bg-[var(--danger-soft)] text-[var(--danger-base)]": salTone === "danger",
+                    "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]":
+                      salTone === "neutral",
+                    "bg-[var(--warning-soft)] text-[var(--warning-base)]": salTone === "warning",
+                  })}
+                >
+                  {project.salState}
+                </span>
+              </div>
+              <div className="mt-1 truncate text-[14px] font-medium text-[var(--text-primary)]">
+                {project.title}
+              </div>
+              <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+                {project.lot} · {project.location} · {project.manager}
+              </div>
+            </div>
           </div>
         </button>
 
@@ -3170,32 +3229,43 @@ function WorkbenchRow({
         </div>
 
         <div className="flex items-center gap-2 xl:justify-end">
-          <Button onClick={() => onOpenProject(project)} size="sm" variant="outline">
-            Apri dossier
-          </Button>
-          <Button
-            aria-label={`Azioni per ${project.title}`}
-            onClick={() => onOpenProjectActions(project)}
-            size="icon"
+          <button
+            className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-[12px] font-medium text-[var(--text-primary)] transition-all hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]"
+            onClick={() => onOpenProject(project)}
             type="button"
-            variant="ghost"
+          >
+            Apri dossier
+          </button>
+          <button
+            aria-label={`Azioni per ${project.title}`}
+            className="flex size-9 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+            onClick={() => onOpenProjectActions(project)}
+            type="button"
           >
             <MoreVertical className="size-4" />
-          </Button>
+          </button>
         </div>
       </div>
 
       <div className="mt-4">
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-secondary">{project.materialRisk}</span>
-          <span className="font-medium text-secondary">
-            Avanzamento {formatPercent(project.progress)}
+        <div className="flex items-center justify-between gap-3 text-[12px] font-medium">
+          <span className="text-[var(--text-secondary)]">{project.materialRisk}</span>
+          <span className="text-[var(--text-secondary)]">
+            Avanzamento{" "}
+            <span className="text-[var(--text-primary)]">{formatPercent(project.progress)}</span>
           </span>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
           <div
-            className="h-full rounded-full"
-            style={{ backgroundColor: palette.accent, width: `${project.progress}%` }}
+            className={cn(
+              "h-full rounded-full",
+              project.tone === "danger"
+                ? "bg-[var(--danger-base)]"
+                : project.tone === "warning"
+                  ? "bg-[var(--warning-base)]"
+                  : "bg-[var(--info-base)]",
+            )}
+            style={{ width: `${project.progress}%` }}
           />
         </div>
       </div>
@@ -3213,21 +3283,23 @@ function WorkbenchMetric({
   value: string;
 }) {
   return (
-    <div className="min-w-0 rounded-[16px] border border-subtle bg-card px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
+    <div className="min-w-0 rounded-[12px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold text-foreground">{value}</div>
-      <div className="mt-0.5 truncate text-xs text-secondary">{detail}</div>
+      <div className="mt-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">
+        {value}
+      </div>
+      <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">{detail}</div>
     </div>
   );
 }
 
 function EmptyState({ description, title }: { description: string; title: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-subtle bg-muted/50 p-4">
-      <div className="text-sm font-semibold text-foreground">{title}</div>
-      <p className="mt-1 text-xs leading-5 text-secondary">{description}</p>
+    <div className="rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] p-4">
+      <div className="text-[13px] font-semibold text-[var(--text-primary)]">{title}</div>
+      <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p>
     </div>
   );
 }
@@ -3249,8 +3321,6 @@ function ProjectActionDialog({
   onOpen: () => void;
   project: PortfolioProject;
 }) {
-  const palette = getTonePalette(project.tone);
-
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -3277,8 +3347,7 @@ function ProjectActionDialog({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="size-2 rounded-full" style={{ backgroundColor: palette.accent }} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-secondary">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                 {project.lot} · {project.location}
               </span>
               <StatusBadge label={project.healthLabel} tone={project.tone} />
@@ -3389,81 +3458,6 @@ function ProjectActionButton({
   );
 }
 
-function compareProjects(left: PortfolioProject, right: PortfolioProject): number {
-  const toneOrder: Record<LaneTone, number> = { danger: 0, warning: 1, success: 2 };
-
-  if (toneOrder[left.tone] !== toneOrder[right.tone]) {
-    return toneOrder[left.tone] - toneOrder[right.tone];
-  }
-
-  if (left.salDays !== right.salDays) {
-    return left.salDays - right.salDays;
-  }
-
-  return right.progress - left.progress;
-}
-
-function buildManagerLoad(projects: PortfolioProject[]) {
-  const managerMap = new Map<string, { count: number; urgentWindow: number }>();
-
-  for (const project of projects) {
-    const current = managerMap.get(project.manager);
-
-    if (!current) {
-      managerMap.set(project.manager, {
-        count: 1,
-        urgentWindow: project.salDays,
-      });
-      continue;
-    }
-
-    current.count += 1;
-    current.urgentWindow = Math.min(current.urgentWindow, project.salDays);
-  }
-
-  return [...managerMap.entries()]
-    .map(([name, value]) => ({
-      count: value.count,
-      name,
-      urgentWindow: value.urgentWindow,
-    }))
-    .sort((left, right) => {
-      if (left.count !== right.count) {
-        return right.count - left.count;
-      }
-
-      return left.urgentWindow - right.urgentWindow;
-    })
-    .slice(0, 4);
-}
-
-function matchesFocus(project: PortfolioProject, focus: PortfolioFocus) {
-  if (focus === "critical") {
-    return project.tone !== "success";
-  }
-
-  if (focus === "sal") {
-    return isSalWindow(project);
-  }
-
-  return true;
-}
-
-function isSalWindow(project: PortfolioProject) {
-  return (
-    project.salDays <= 7 ||
-    project.salState.toLowerCase().includes("blocc") ||
-    project.salState.toLowerCase().includes("document")
-  );
-}
-
-function matchesProjectSearch(project: PortfolioProject, query: string) {
-  return matchesSearch(
-    `${project.title} ${project.contractor} ${project.lot} ${project.location} ${project.manager} ${project.phase} ${project.materialRisk} ${project.nextMilestone}`,
-    query,
-  );
-}
-
 function buildContractorFolders(
   contractors: string[],
   projects: PortfolioProject[],
@@ -3532,189 +3526,6 @@ function buildContractorFolders(
   });
 }
 
-function normalizeContractorName(value: string) {
-  const normalized = value.trim();
-  const lowerValue = normalized.toLowerCase();
-
-  if (lowerValue.includes("rfi")) {
-    return "RFI";
-  }
-
-  if (lowerValue.includes("anas")) {
-    return "ANAS";
-  }
-
-  if (lowerValue.includes("regione marche") || lowerValue.includes("adriatica")) {
-    return "Regione Marche";
-  }
-
-  if (lowerValue.includes("regione")) {
-    return normalized;
-  }
-
-  return normalized || "Appaltatore da assegnare";
-}
-
-function createContractorId(contractor: string) {
-  return normalizeContractorName(contractor)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-function mergeContractorRegistry(current: string[], contractorName: string) {
-  const normalized = normalizeContractorName(contractorName);
-
-  if (
-    !normalized ||
-    current.some((item) => createContractorId(item) === createContractorId(normalized))
-  ) {
-    return current;
-  }
-
-  return [...current, normalized].sort((left, right) => left.localeCompare(right));
-}
-
-function readStringList(key: string) {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
-
-    return Array.isArray(parsed)
-      ? parsed
-          .filter((item): item is string => typeof item === "string")
-          .map(normalizeContractorName)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function readStringRecord(key: string) {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "{}");
-
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-        .map(([projectId, contractorName]) => [projectId, normalizeContractorName(contractorName)]),
-    );
-  } catch {
-    return {};
-  }
-}
-
-function writeJson(key: string, value: unknown) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Persistence is best-effort in browser preview mode.
-  }
-}
-
-function matchesSearch(value: string, query: string) {
-  return query.length === 0 || value.toLowerCase().includes(query);
-}
-
-export function formatDueWindow(days: number) {
-  if (days <= 0) {
-    return "Oggi";
-  }
-
-  if (days === 1) {
-    return "Domani";
-  }
-
-  return `${days} giorni`;
-}
-
-export function formatForecastDelta(days: number) {
-  if (days === 0) {
-    return "In data";
-  }
-
-  if (days < 0) {
-    return `${days} gg`;
-  }
-
-  return `+${days} gg`;
-}
-
-export function getSalTone(project: PortfolioProject): StatusTone {
-  if (project.salDays <= 1 || project.salState.toLowerCase().includes("blocc")) {
-    return "danger";
-  }
-
-  if (project.salDays <= 7 || project.salState.toLowerCase().includes("document")) {
-    return "warning";
-  }
-
-  return "neutral";
-}
-
-function getTonePalette(tone: StatusTone) {
-  if (tone === "danger") {
-    return {
-      accent: "var(--danger-base)",
-      border: "color-mix(in srgb, var(--danger-base) 16%, var(--border-subtle))",
-      panel:
-        "linear-gradient(180deg, color-mix(in srgb, var(--danger-soft) 72%, var(--surface-base)), var(--surface-base))",
-      soft: "var(--danger-soft)",
-      surface:
-        "linear-gradient(180deg, color-mix(in srgb, var(--danger-soft) 52%, var(--surface-base)), var(--surface-base))",
-    };
-  }
-
-  if (tone === "warning") {
-    return {
-      accent: "var(--warning-base)",
-      border: "color-mix(in srgb, var(--warning-base) 16%, var(--border-subtle))",
-      panel:
-        "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 78%, var(--surface-base)), var(--surface-base))",
-      soft: "var(--warning-soft)",
-      surface:
-        "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 56%, var(--surface-base)), var(--surface-base))",
-    };
-  }
-
-  if (tone === "success") {
-    return {
-      accent: "var(--success-base)",
-      border: "color-mix(in srgb, var(--success-base) 14%, var(--border-subtle))",
-      panel:
-        "linear-gradient(180deg, color-mix(in srgb, var(--success-soft) 78%, var(--surface-base)), var(--surface-base))",
-      soft: "var(--success-soft)",
-      surface:
-        "linear-gradient(180deg, color-mix(in srgb, var(--success-soft) 54%, var(--surface-base)), var(--surface-base))",
-    };
-  }
-
-  if (tone === "info") {
-    return {
-      accent: "var(--info-base)",
-      border: "color-mix(in srgb, var(--info-base) 14%, var(--border-subtle))",
-      panel:
-        "linear-gradient(180deg, color-mix(in srgb, var(--info-soft) 78%, var(--surface-base)), var(--surface-base))",
-      soft: "var(--info-soft)",
-      surface:
-        "linear-gradient(180deg, color-mix(in srgb, var(--info-soft) 54%, var(--surface-base)), var(--surface-base))",
-    };
-  }
-
-  return {
-    accent: "var(--text-secondary)",
-    border: "var(--border-subtle)",
-    panel:
-      "linear-gradient(180deg, color-mix(in srgb, var(--bg-muted) 74%, var(--surface-base)), var(--surface-base))",
-    soft: "var(--bg-muted)",
-    surface:
-      "linear-gradient(180deg, color-mix(in srgb, var(--bg-muted) 56%, var(--surface-base)), var(--surface-base))",
-  };
-}
-
 type RecentSalsPanelProps = {
   onOpenModal: () => void;
   projectIndex: Map<string, { name: string; year: number; client: string }>;
@@ -3726,19 +3537,25 @@ function RecentSalsPanel({ onOpenModal, projectIndex, sals }: RecentSalsPanelPro
     <SectionPanel className="mt-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-sm bg-primary/10">
-            <ClipboardList className="size-4 text-primary" />
+          <div className="flex size-8 items-center justify-center rounded-[10px] bg-[var(--accent-primary)]/10">
+            <ClipboardList className="size-4 text-[var(--accent-primary)]" />
           </div>
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
               Ultime attivita SAL
             </div>
-            <div className="text-sm font-medium text-foreground">{sals.length} SAL recenti</div>
+            <div className="text-[13px] font-medium text-[var(--text-primary)]">
+              {sals.length} SAL recenti
+            </div>
           </div>
         </div>
-        <Button onClick={onOpenModal} size="sm" type="button" variant="outline">
+        <button
+          className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-[12px] font-medium text-[var(--text-primary)] transition-all hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]"
+          onClick={onOpenModal}
+          type="button"
+        >
           Visualizza tutte
-        </Button>
+        </button>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {sals.map((sal) => {
@@ -3746,30 +3563,39 @@ function RecentSalsPanel({ onOpenModal, projectIndex, sals }: RecentSalsPanelPro
           return (
             <div
               key={sal.id}
-              className="rounded-[18px] border border-subtle bg-muted/35 p-3 transition-colors hover:bg-muted"
+              className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-3 shadow-none transition hover:bg-[var(--surface-inset)]"
             >
               <div className="flex items-center justify-between gap-2">
-                <Badge variant={sal.status === "closed" ? "success" : "warning"}>
+                <span
+                  className={cn(
+                    "rounded-[9px] px-2 py-0.5 text-[10px] font-semibold",
+                    sal.status === "closed"
+                      ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+                      : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+                  )}
+                >
                   {sal.status === "closed" ? "Chiusa" : "Bozza"}
-                </Badge>
-                <span className="text-[10px] font-medium text-secondary">
+                </span>
+                <span className="text-[10px] font-medium text-[var(--text-secondary)]">
                   {new Date(sal.closedAt || sal.date).toLocaleDateString("it-IT", {
                     day: "numeric",
                     month: "short",
                   })}
                 </span>
               </div>
-              <div className="mt-2 text-sm font-semibold text-foreground truncate">{sal.title}</div>
-              <div className="mt-2 space-y-1 text-xs text-secondary">
+              <div className="mt-2 truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                {sal.title}
+              </div>
+              <div className="mt-2 space-y-1 text-[11px] text-[var(--text-secondary)]">
                 <div className="truncate">
                   Appaltatore:{" "}
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-[var(--text-primary)]">
                     {project?.client || "Non assegnato"}
                   </span>
                 </div>
                 <div className="truncate">
                   Progetto:{" "}
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-[var(--text-primary)]">
                     {project ? `${project.name} (${project.year})` : "Progetto non trovato"}
                   </span>
                 </div>

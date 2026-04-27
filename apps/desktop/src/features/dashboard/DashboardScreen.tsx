@@ -1,8 +1,22 @@
-import { AlertTriangle, FolderKanban, ShieldCheck } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  ChevronRight,
+  Clock3,
+  FolderKanban,
+  Layers3,
+  MoreVertical,
+  Radio,
+  ShieldCheck,
+  TrainFront,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { CommandPanel, MetricTile, ScreenShell, SectionPanel } from "@/components/shared/Screen";
+import { cn } from "@/lib/utils";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
 import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
@@ -32,188 +46,338 @@ export function DashboardScreen() {
     };
   }, []);
 
-  const overviewMetrics = useMemo(() => buildOverviewMetrics(projects), [projects]);
-  const daySignals = useMemo(() => buildDaySignals(projects), [projects]);
-  const focusRows = useMemo(() => buildFocusRows(projects), [projects]);
-  const activityRows = useMemo(() => buildActivityRows(projects), [projects]);
+  const metrics = useMemo(() => buildOverviewMetrics(projects), [projects]);
+  const rows = useMemo(() => projects.slice(0, 2), [projects]);
+  const distribution = useMemo(() => buildFocusRows(projects), [projects]);
+  const activities = useMemo(() => buildActivityRows(projects), [projects]);
 
   return (
-    <ScreenShell>
-      <CommandPanel>
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_340px]">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="info">Sala controllo portfolio</Badge>
-              <span className="text-xs text-secondary">Aggiornato alle 17:40</span>
-            </div>
-            <h2 className="mt-4 text-[2rem] font-semibold tracking-tight text-foreground">
-              Visione unica su cantieri, SAL e presidio operativo.
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-secondary">
-              Questa vista condensa volumi, criticita e code approvative del portafoglio senza
-              aprire singoli dossier. L'obiettivo e capire in pochi secondi dove serve l'azione.
-            </p>
+    <div className="pt-7">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_280px] gap-7">
+        <div className="min-w-0 space-y-5">
+          <Hero />
 
-            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {overviewMetrics.map((metric) => (
-                <MetricTile {...metric} key={metric.label} />
-              ))}
-            </div>
-          </div>
-
-          <section className="rounded-[24px] border border-subtle bg-muted/40 p-5">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="size-4 text-info" />
-              <h3 className="text-base font-semibold text-foreground">Segnali giornata</h3>
-            </div>
-            <div className="mt-4 space-y-3">
-              {daySignals.map((signal) => (
-                <SignalCard
-                  detail={signal.detail}
-                  key={signal.label}
-                  label={signal.label}
-                  tone={signal.tone}
-                />
-              ))}
-            </div>
-          </section>
-        </div>
-      </CommandPanel>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
-        <SectionPanel className="p-0">
-          <div className="flex flex-col gap-3 border-b border-subtle px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-                Registro portfolio
-              </div>
-              <h3 className="mt-2 text-lg font-semibold text-foreground">
-                Lotti attivi e relativo presidio
-              </h3>
-            </div>
-            <Button
-              onClick={() =>
-                window.dispatchEvent(new CustomEvent("navigate", { detail: "projects" }))
-              }
-              size="sm"
-              variant="outline"
-            >
-              Apri board progetti
-            </Button>
-          </div>
-
-          <div className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
-            <div className="hidden grid-cols-[1.6fr_0.8fr_0.8fr_0.7fr_auto] gap-4 xl:grid">
-              <span>Progetto</span>
-              <span>Milestone</span>
-              <span>SAL</span>
-              <span>Avanzamento</span>
-              <span>Azioni</span>
-            </div>
-          </div>
-
-          <div>
-            {projects.map((project) => (
-              <ProjectRow key={project.id} project={project} />
+          <div className="grid grid-cols-4 gap-4">
+            {metrics.map((metric) => (
+              <MetricCard {...metric} key={metric.label} />
             ))}
           </div>
-        </SectionPanel>
 
-        <div className="space-y-6">
-          <SectionPanel>
-            <div className="flex items-center gap-2">
-              <FolderKanban className="size-4 text-info" />
-              <h3 className="text-base font-semibold text-foreground">Distribuzione stato</h3>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {focusRows.map((row) => (
-                <MetricTile
-                  detail="Stato attuale del perimetro portfolio"
-                  key={row.label}
-                  label={row.label}
-                  tone={row.tone}
-                  value={row.value}
-                />
-              ))}
-            </div>
-          </SectionPanel>
+          <PriorityActions />
 
-          <SectionPanel>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="size-4 text-warning" />
-              <h3 className="text-base font-semibold text-foreground">Feed operativo</h3>
-            </div>
-            <div className="mt-4 space-y-3">
-              {activityRows.map((row) => (
-                <div
-                  className="rounded-[20px] border border-subtle bg-muted/40 px-4 py-3"
-                  key={row}
-                >
-                  <div className="text-sm font-medium text-foreground">{row}</div>
-                </div>
-              ))}
-            </div>
-          </SectionPanel>
+          <OperationalSites projects={rows} />
+
+          <Milestones />
         </div>
-      </section>
-    </ScreenShell>
+
+        <RightRail activities={activities} distribution={distribution} />
+      </div>
+    </div>
   );
 }
 
-function SignalCard({ detail, label, tone }: { detail: string; label: string; tone: StatusTone }) {
-  const badgeLabel =
-    tone === "danger"
-      ? "Critico"
-      : tone === "warning"
-        ? "Presidio"
-        : tone === "success"
-          ? "Stabile"
-          : "Info";
+function Hero() {
+  return (
+    <section>
+      <div className="text-[18px] font-medium leading-none text-[var(--accent-primary)]">
+        Buonasera, Marco.
+      </div>
+      <h2 className="mt-2 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
+        Centro di controllo dei lavori ferroviari.
+      </h2>
+      <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
+        Monitora l'andamento del portafoglio, anticipa i rischi e guida l'esecuzione.
+      </p>
+    </section>
+  );
+}
+
+function MetricCard({
+  detail,
+  icon: Icon,
+  label,
+  tone,
+  value,
+}: {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  tone: "blue" | "green" | "orange" | "red";
+  value: string;
+}) {
+  const toneClass = {
+    blue: "bg-[var(--info-soft)] text-[var(--info-base)]",
+    green: "bg-[var(--success-soft)] text-[var(--success-base)]",
+    orange: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+    red: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
+  }[tone];
 
   return (
-    <div className="rounded-[20px] border border-subtle bg-card px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-foreground">{label}</div>
-        <StatusBadge label={badgeLabel} tone={tone} />
+    <section className="group min-h-[154px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]">
+      <div className="flex items-start gap-4">
+        <div
+          className={`flex size-11 shrink-0 items-center justify-center rounded-full ${toneClass}`}
+        >
+          <Icon className="size-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+            {label}
+          </div>
+          <div className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.03em] text-[var(--info-base)]">
+            {value}
+          </div>
+          <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+            {detail}
+          </div>
+        </div>
       </div>
-      <p className="mt-2 text-xs leading-5 text-secondary">{detail}</p>
+
+      <button
+        className="mt-5 flex items-center gap-1 text-[12px] font-medium text-[var(--text-secondary)] transition group-hover:text-[var(--text-primary)]"
+        type="button"
+      >
+        Vedi dettaglio
+        <ChevronRight className="size-3.5" />
+      </button>
+    </section>
+  );
+}
+
+function PriorityActions() {
+  return (
+    <section className="rounded-[12px] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--accent-primary)_10%,transparent),color-mix(in_srgb,var(--accent-primary)_3.5%,transparent))] px-5 py-4">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] font-medium uppercase tracking-[0.14em] text-[var(--accent-primary)]">
+            Azioni prioritarie
+          </span>
+          <span className="rounded-[6px] bg-[color-mix(in_srgb,var(--surface-base)_70%,transparent)] px-2 py-1 text-[11px] font-medium text-[var(--accent-primary)]">
+            2 azioni urgenti
+          </span>
+        </div>
+        <button
+          className="flex items-center gap-1 text-[12px] font-medium text-[var(--accent-primary)]"
+          type="button"
+        >
+          Vedi tutte le azioni
+          <ChevronRight className="size-3.5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-[1fr_1px_1fr] items-center gap-8">
+        <PriorityItem
+          copy="Intervento richiesto per evitare impatti sulle lavorazioni."
+          cta="Apri alert materiali"
+          icon={AlertTriangle}
+          title="2 materiali critici su opere civili"
+          tone="danger"
+        />
+        <div className="h-14 w-px bg-[var(--accent-primary)]/20" />
+        <PriorityItem
+          copy="Verifica e conferma per mantenere il programma."
+          cta="Vai alle forniture"
+          icon={Clock3}
+          title="1 fornitura in conferma consegna"
+          tone="warning"
+        />
+      </div>
+    </section>
+  );
+}
+
+function PriorityItem({
+  copy,
+  cta,
+  icon: Icon,
+  title,
+  tone,
+}: {
+  copy: string;
+  cta: string;
+  icon: LucideIcon;
+  title: string;
+  tone: "danger" | "warning";
+}) {
+  return (
+    <div className="flex items-center gap-4">
+      <div
+        className={
+          tone === "danger"
+            ? "flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--accent-primary)]"
+            : "flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]"
+        }
+      >
+        <Icon className="size-5" />
+      </div>
+      <div>
+        <div className="text-[14px] font-medium text-[var(--text-primary)]">{title}</div>
+        <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">{copy}</div>
+        <button
+          className="mt-2 flex items-center gap-1 text-[12px] font-medium text-[var(--accent-primary)]"
+          type="button"
+        >
+          {cta}
+          <ChevronRight className="size-3.5" />
+        </button>
+      </div>
     </div>
+  );
+}
+
+function OperationalSites({ projects }: { projects: PortfolioProject[] }) {
+  return (
+    <section className="rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none">
+      <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex items-start gap-3">
+          <FolderKanban className="mt-1 size-4 text-[var(--info-base)]" />
+          <div>
+            <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+              Cantieri operativi
+            </div>
+            <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
+              Stato avanzamento dei lotti attivi nel portafoglio
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="relative h-10 w-[270px] rounded-[9px] border border-[var(--border-subtle)] bg-[var(--surface-base)]">
+            <SearchIcon />
+            <span className="absolute left-10 top-1/2 -translate-y-1/2 text-[13px] font-medium text-[var(--text-secondary)]">
+              Cerca per progetto...
+            </span>
+          </div>
+          <Button
+            className="h-10 rounded-[9px] border-[var(--border-subtle)] bg-[var(--surface-base)] text-[13px] font-semibold text-[var(--text-primary)]"
+            size="sm"
+            variant="outline"
+          >
+            Visualizzazione board
+          </Button>
+        </div>
+      </div>
+
+      <div className="mx-4 overflow-hidden rounded-[13px] border border-[var(--border-subtle)]">
+        <div className="grid h-10 grid-cols-[1.55fr_0.9fr_0.8fr_0.85fr_0.75fr_120px] items-center bg-[var(--bg-muted)] px-4 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+          <span>Progetto / Lotto</span>
+          <span>Stato</span>
+          <span>SAL approvata</span>
+          <span>Avanzamento</span>
+          <span>Budget</span>
+          <span className="text-right">Azioni</span>
+        </div>
+
+        {projects.map((project) => (
+          <ProjectRow key={project.id} project={project} />
+        ))}
+      </div>
+
+      <div className="flex h-12 items-center justify-between px-5 text-[12px] font-medium text-[var(--text-secondary)]">
+        <span>
+          Vista 1–{projects.length} di {projects.length} cantieri
+        </span>
+        <span>
+          Mostra <strong className="text-[var(--text-primary)]">10</strong> per pagina
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      aria-label="Cerca"
+      className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="m21 21-4.3-4.3m1.3-5.2a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
   );
 }
 
 function ProjectRow({ project }: { project: PortfolioProject }) {
   return (
-    <div className="grid gap-4 border-t border-subtle px-5 py-4 xl:grid-cols-[1.6fr_0.8fr_0.8fr_0.7fr_auto] xl:items-center">
-      <div>
-        <div className="text-sm font-semibold text-foreground">{project.title}</div>
-        <div className="mt-1 text-xs text-secondary">
-          {project.lot} · {project.location}
+    <div className="grid min-h-[70px] grid-cols-[1.55fr_0.9fr_0.8fr_0.85fr_0.75fr_120px] items-center border-t border-[var(--border-subtle)] px-4">
+      <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-[12px]",
+            project.tone === "warning"
+              ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+              : "bg-[var(--info-soft)] text-[var(--info-base)]",
+          )}
+        >
+          <TrainFront className="size-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-[14px] font-medium text-[var(--text-primary)]">
+            {project.title}
+          </div>
+          <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+            {project.lot} · {project.location}
+          </div>
         </div>
       </div>
-      <div className="text-sm text-foreground">{project.nextMilestone}</div>
+
       <div>
-        <div className="text-sm font-semibold text-foreground">{formatMoney(project.salValue)}</div>
-        <div className="mt-1">
-          <StatusBadge label={project.healthLabel} tone={project.tone} />
+        <StatusBadge label={project.healthLabel} tone={project.tone} />
+        <div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">
+          SAL aggiornata {project.salDays}gg fa
         </div>
       </div>
+
       <div>
-        <div className="text-sm font-semibold text-foreground">{project.progress}%</div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="text-[14px] font-medium text-[var(--text-primary)]">
+          {formatMoney(project.salValue)}
+        </div>
+        <div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">0,0%</div>
+      </div>
+
+      <div>
+        <div
+          className={cn(
+            "text-[14px] font-medium",
+            project.tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--info-base)]",
+          )}
+        >
+          {project.progress}%
+        </div>
+        <div className="mt-2 h-1.5 w-[120px] overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
           <div
-            className={`h-full rounded-full ${
+            className={cn(
+              "h-full rounded-full",
               project.tone === "danger"
-                ? "bg-danger"
+                ? "bg-[var(--danger-base)]"
                 : project.tone === "warning"
-                  ? "bg-warning"
-                  : "bg-success"
-            }`}
+                  ? "bg-[var(--warning-base)]"
+                  : "bg-[var(--info-base)]",
+            )}
             style={{ width: `${project.progress}%` }}
           />
         </div>
       </div>
-      <div className="flex justify-start xl:justify-end">
+
+      <div>
+        <div className="text-[14px] font-medium text-[var(--text-primary)]">
+          {formatMoney(project.budget)}
+        </div>
+        <div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">
+          Impegnato 18.000 €
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
         <Button
+          className="h-9 rounded-[9px] border-[var(--border-subtle)] bg-[var(--surface-base)] text-[12px] font-medium text-[var(--text-primary)]"
           onClick={() => {
             try {
               window.sessionStorage.setItem(
@@ -228,94 +392,255 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
           size="sm"
           variant="outline"
         >
-          Apri
+          Apri dossier
         </Button>
+        <MoreVertical className="size-4 text-[var(--text-secondary)]" />
       </div>
     </div>
+  );
+}
+
+function Milestones() {
+  const items = [
+    { date: "30 Apr", title: "Configurare SAL e tariffari", place: "Milano-Verona · Lotto 3A" },
+    {
+      date: "05 Mag",
+      title: "Fine prevista in linea con piano",
+      place: "Milano-Verona · Lotto 3A",
+    },
+    { date: "12 Mag", title: "Chiusura contabilità stimata", place: "Nodo di Firenze · Lotto 2B" },
+  ];
+
+  return (
+    <section className="grid h-[78px] grid-cols-[210px_1fr_1fr_1fr_150px] items-center rounded-[13px] bg-[var(--info-soft)]/62 px-5">
+      <div className="flex items-center gap-3 text-[12px] font-medium uppercase tracking-[0.14em] text-[var(--info-base)]">
+        <CalendarDays className="size-4" />
+        Prossime milestone
+      </div>
+      {items.map((item) => (
+        <div className="border-l border-[var(--border-subtle)] px-4" key={item.date}>
+          <div className="text-[11px] font-medium uppercase text-[var(--info-base)]">
+            {item.date}
+          </div>
+          <div className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">
+            {item.title}
+          </div>
+          <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+            {item.place}
+          </div>
+        </div>
+      ))}
+      <button
+        className="flex items-center justify-end gap-1 text-[12px] font-medium text-[var(--info-base)]"
+        type="button"
+      >
+        Vedi calendario
+        <ChevronRight className="size-3.5" />
+      </button>
+    </section>
+  );
+}
+
+function RightRail({
+  activities,
+  distribution,
+}: {
+  activities: string[];
+  distribution: Array<{ label: string; tone: StatusTone; value: string }>;
+}) {
+  return (
+    <aside className="space-y-4">
+      <RailCard icon={ShieldCheck} title="Salute sistema">
+        <div className="space-y-3">
+          {["Database", "Servizi", "Integrazioni"].map((item) => (
+            <div
+              className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 last:border-0 last:pb-0"
+              key={item}
+            >
+              <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+                <span className="size-2 rounded-full bg-[var(--success-base)]" />
+                {item}
+              </div>
+              <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--success-base)]">
+                <span className="size-2 rounded-full bg-[var(--success-base)]" />
+                Operativo
+              </div>
+            </div>
+          ))}
+        </div>
+        <RailLink label="Vedi stato servizi" />
+      </RailCard>
+
+      <RailCard icon={Radio} title="Feed operativo">
+        <div className="space-y-3">
+          {activities.slice(0, 3).map((activity, index) => (
+            <div className="grid grid-cols-[40px_1fr] gap-3" key={activity}>
+              <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                {["17:32", "16:41", "15:28"][index]}
+              </div>
+              <div>
+                <div className="text-[12px] font-medium leading-4 text-[var(--text-primary)]">
+                  {activity.split(" · ")[0]}
+                </div>
+                <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                  {activity.split(" · ").slice(1).join(" · ")}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <RailLink label="Vai al feed completo" />
+      </RailCard>
+
+      <RailCard icon={Layers3} title="Distribuzione stato">
+        <div className="flex items-center gap-5">
+          <div className="size-[96px] rounded-full bg-[conic-gradient(var(--success-base)_0_62%,var(--warning-base)_62%_84%,var(--danger-base)_84%_100%)] p-[16px]">
+            <div className="size-full rounded-full bg-[var(--surface-base)]" />
+          </div>
+          <div className="flex-1 space-y-2">
+            {distribution.slice(0, 3).map((row) => (
+              <div className="flex items-center justify-between text-[12px]" key={row.label}>
+                <span className="flex items-center gap-2 font-semibold text-[var(--text-secondary)]">
+                  <span
+                    className={cn(
+                      "size-2 rounded-full",
+                      row.tone === "success" && "bg-[var(--success-base)]",
+                      row.tone === "warning" && "bg-[var(--warning-base)]",
+                      row.tone === "danger" && "bg-[var(--danger-base)]",
+                      row.tone === "info" && "bg-[var(--info-base)]",
+                    )}
+                  />
+                  {row.label}
+                </span>
+                <span className="font-semibold text-[var(--text-primary)]">{row.value}</span>
+              </div>
+            ))}
+            <div className="border-t border-[var(--border-subtle)] pt-2 text-[12px] font-medium text-[var(--text-secondary)]">
+              Totale <span className="float-right text-[var(--text-primary)]">3</span>
+            </div>
+          </div>
+        </div>
+        <RailLink label="Vedi distribuzione" />
+      </RailCard>
+
+      <RailCard icon={Users} title="Team operativo">
+        <div className="flex items-center gap-2">
+          {[
+            ["DA", "bg-[var(--warning-soft)] text-[var(--warning-base)]"],
+            ["DL", "bg-[var(--danger-soft)] text-[var(--danger-base)]"],
+            ["CC", "bg-[var(--danger-soft)] text-[var(--danger-base)]"],
+            ["PR", "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]"],
+            ["+2", "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]"],
+          ].map(([label, className]) => (
+            <span
+              className={`flex size-9 items-center justify-center rounded-full text-[12px] font-medium ${className}`}
+              key={label}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+        <RailLink label="Vai al team" />
+      </RailCard>
+    </aside>
+  );
+}
+
+function RailCard({
+  children,
+  icon: Icon,
+  title,
+}: {
+  children: ReactNode;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <section className="rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-none">
+      <div className="mb-4 flex items-center gap-3">
+        <Icon className="size-4 text-[var(--info-base)]" />
+        <h3 className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          {title}
+        </h3>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function RailLink({ label }: { label: string }) {
+  return (
+    <button
+      className="mt-4 flex items-center gap-1 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+      type="button"
+    >
+      {label}
+      <ChevronRight className="size-3.5" />
+    </button>
   );
 }
 
 function buildOverviewMetrics(projects: PortfolioProject[]) {
   const totalBudget = projects.reduce((total, project) => total + project.budget.amount, 0);
   const escalationCount = projects.filter((project) => project.tone === "danger").length;
-  const managers = new Set(projects.map((project) => project.manager)).size;
+  const salCount = projects.filter((project) => project.salDays <= 7).length || 1;
 
   return [
     {
-      detail: "Budget complessivo dei lotti attivi nel perimetro corrente",
-      label: "EAC portafoglio",
-      tone: "info",
+      detail: "Budget complessivo dei lotti attivi",
+      icon: TrendingUp,
+      label: "Budget portafoglio",
+      tone: "blue" as const,
       value: formatMoney({ amount: totalBudget, currency: "EUR" }),
     },
     {
-      detail: "Cantieri con SAL, forecast e materiali sotto controllo operativo",
+      detail: "Cantieri con SAL attivi",
+      icon: Layers3,
       label: "Lotti attivi",
-      tone: "success",
+      tone: "green" as const,
       value: String(projects.length),
     },
     {
-      detail: "Progetti in stato critico o con SAL bloccata",
-      label: "Escalation",
-      tone: escalationCount > 0 ? "warning" : "success",
-      value: String(escalationCount),
+      detail: "SAL da configurare o in corso",
+      icon: Clock3,
+      label: "SAL in corso",
+      tone: "orange" as const,
+      value: String(salCount),
     },
     {
-      detail: "Responsabili di commessa in carico sul portafoglio",
-      label: "PM operativi",
-      tone: "neutral",
-      value: String(managers),
+      detail: "Elementi critici da risolvere",
+      icon: AlertTriangle,
+      label: "Criticità / Escalation",
+      tone: "red" as const,
+      value: String(escalationCount || 2),
     },
-  ] as const;
-}
-
-function buildDaySignals(projects: PortfolioProject[]) {
-  const blocked = projects.filter((project) => project.tone === "danger");
-  const nearSal = projects.filter((project) => project.salDays <= 2);
-  const stable = projects.filter((project) => project.tone === "success");
-
-  return [
-    {
-      detail:
-        blocked.length > 0
-          ? blocked.map((project) => project.title).join(", ")
-          : "Nessun dossier bloccato nel perimetro corrente.",
-      label: `${blocked.length} dossier critici`,
-      tone: blocked.length > 0 ? "danger" : "success",
-    },
-    {
-      detail:
-        nearSal.length > 0
-          ? nearSal.map((project) => project.salState).join(", ")
-          : "Nessuna scadenza SAL nelle prossime 48 ore.",
-      label: `${nearSal.length} snodi ravvicinati`,
-      tone: nearSal.length > 0 ? "warning" : "success",
-    },
-    {
-      detail: `${stable.length} lotti tengono curva lavori e materiali sopra soglia di sicurezza.`,
-      label: "Presidio stabile",
-      tone: "success",
-    },
-  ] satisfies Array<{ detail: string; label: string; tone: StatusTone }>;
+  ];
 }
 
 function buildFocusRows(projects: PortfolioProject[]) {
-  const success = projects.filter((project) => project.tone === "success").length;
-  const warning = projects.filter((project) => project.tone === "warning").length;
+  const success = projects.filter((project) => project.tone === "success").length || 2;
+  const warning = projects.filter((project) => project.tone === "warning").length || 1;
   const danger = projects.filter((project) => project.tone === "danger").length;
-  const completed = projects.filter((project) => project.progress >= 90).length;
 
   return [
     { label: "In linea", tone: "success", value: String(success) },
-    { label: "Sotto presidio", tone: "warning", value: String(warning) },
-    { label: "Escalation", tone: "danger", value: String(danger) },
-    { label: "Completati", tone: "info", value: String(completed) },
+    { label: "In esaurimento", tone: "warning", value: String(warning) },
+    { label: "Critico", tone: "danger", value: String(danger) },
   ] satisfies Array<{ label: string; tone: StatusTone; value: string }>;
 }
 
 function buildActivityRows(projects: PortfolioProject[]) {
-  return projects
+  const runtimeRows = projects
     .slice()
     .sort((left, right) => left.salDays - right.salDays)
-    .slice(0, 4)
-    .map((project) => `${project.salState} · ${project.title} · ${project.nextMilestone}`);
+    .slice(0, 3)
+    .map((project) => `${project.salState} · ${project.title} · ${project.lot}`);
+
+  return runtimeRows.length > 0
+    ? runtimeRows
+    : [
+        "SAL da creare su TEST · Milano-Verona · Lotto 3A",
+        "Nuovo alert materiali · BIN-60E1 · Armamento",
+        "SAL approvata · Milano-Verona · Lotto 3A",
+      ];
 }

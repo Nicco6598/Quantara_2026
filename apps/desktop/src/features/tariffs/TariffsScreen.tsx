@@ -5,13 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
-import {
-  CommandPanel,
-  MetricTile,
-  ScreenShell,
-  SectionPanel,
-  SummaryLine,
-} from "@/components/shared/Screen";
+import { MetricTile, ScreenShell, SectionPanel, SummaryLine } from "@/components/shared/Screen";
 import {
   createDesktopTariffBook,
   deleteDesktopTariffBook,
@@ -347,45 +341,45 @@ export function TariffsScreen() {
 
   return (
     <ScreenShell>
-      <CommandPanel>
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="info">Catalogo tariffari</Badge>
-              <span className="text-xs text-secondary">
-                {tariffBooksState.source === "desktop"
-                  ? "Archivio locale SQLite"
-                  : tariffBooksState.message}
-              </span>
-            </div>
-            <h2 className="mt-4 text-[2rem] font-semibold tracking-tight text-foreground">
-              Catalogo tariffari per ente, anno e progetto.
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary">
-              Qui gestisci basi prezzi e provenienza. Le voci di dettaglio restano collegate al
-              tariffario selezionato, mentre progetto e anno filtrano il catalogo realmente.
-            </p>
+      <section className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="info">Catalogo tariffari</Badge>
+            <span className="text-xs text-[var(--text-secondary)]">
+              {tariffBooksState.source === "desktop"
+                ? "Archivio locale SQLite"
+                : tariffBooksState.message}
+            </span>
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 xl:w-[420px]">
-            <MetricTile label="Tariffari" value={String(tariffBooksState.data.length)} />
-            <MetricTile
-              label="Enti"
-              value={String(new Set(tariffBooksState.data.map((b) => b.sourceName)).size)}
-            />
-            <MetricTile label="Anni" value={String(availableYears.length)} />
-          </div>
+          <h2 className="mt-4 text-[2rem] font-semibold tracking-tight text-[var(--text-primary)]">
+            Catalogo tariffari per ente, anno e progetto.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
+            Qui gestisci basi prezzi e provenienza. Le voci di dettaglio restano collegate al
+            tariffario selezionato, mentre progetto e anno filtrano il catalogo realmente.
+          </p>
         </div>
-      </CommandPanel>
 
-      <section className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_360px]">
+        <div className="grid gap-3 sm:grid-cols-3 xl:w-[420px]">
+          <MetricTile label="Tariffari" value={String(tariffBooksState.data.length)} />
+          <MetricTile
+            label="Enti"
+            value={String(new Set(tariffBooksState.data.map((b) => b.sourceName)).size)}
+          />
+          <MetricTile label="Anni" value={String(availableYears.length)} />
+        </div>
+      </section>
+
+      <section className="mt-6 grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_360px]">
         <SectionPanel>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                 Nuovo tariffario
               </div>
-              <h3 className="mt-2 text-lg font-semibold text-foreground">Dati sorgente</h3>
+              <h3 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+                Dati sorgente
+              </h3>
             </div>
             <Button onClick={handlePdfImport} size="icon" type="button" variant="outline">
               <FileUp className="size-4" />
@@ -414,11 +408,11 @@ export function TariffsScreen() {
                 value={formState.year}
               />
               <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+                <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                   Stato
                 </span>
                 <select
-                  className="mt-2 h-10 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+                  className="mt-2 h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   onChange={(event) =>
                     setFormState((state) => ({ ...state, status: event.target.value }))
                   }
@@ -434,7 +428,9 @@ export function TariffsScreen() {
             {createMessage ? (
               <p
                 className={`text-xs leading-5 ${
-                  createState === "error" ? "text-danger" : "text-secondary"
+                  createState === "error"
+                    ? "text-[var(--danger-base)]"
+                    : "text-[var(--text-secondary)]"
                 }`}
               >
                 {createMessage}
@@ -448,7 +444,7 @@ export function TariffsScreen() {
         </SectionPanel>
 
         <SectionPanel className="p-0">
-          <div className="border-b border-subtle p-5">
+          <div className="border-b border-[var(--border-subtle)]/80 p-5">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="neutral">{visibleTariffBooks.length} visibili</Badge>
@@ -459,7 +455,7 @@ export function TariffsScreen() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <select
-                  className="h-10 rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground"
+                  className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)]"
                   onChange={(event) => setYearFilter(event.target.value)}
                   value={yearFilter}
                 >
@@ -471,7 +467,7 @@ export function TariffsScreen() {
                   ))}
                 </select>
                 <select
-                  className="h-10 rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground"
+                  className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)]"
                   onChange={(event) => setProjectFilter(event.target.value)}
                   value={projectFilter}
                 >
@@ -483,7 +479,7 @@ export function TariffsScreen() {
                   ))}
                 </select>
                 <select
-                  className="h-10 rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground"
+                  className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)]"
                   onChange={(event) => setStatusFilter(event.target.value)}
                   value={statusFilter}
                 >
@@ -493,9 +489,9 @@ export function TariffsScreen() {
                   <option value="validated">validated</option>
                 </select>
                 <label className="relative block">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
                   <input
-                    className="h-10 w-[240px] rounded-[18px] border border-subtle bg-card pl-10 pr-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+                    className="h-10 w-[240px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Cerca ente o nome"
                     type="search"
@@ -506,7 +502,7 @@ export function TariffsScreen() {
             </div>
           </div>
 
-          <div className="divide-y divide-subtle">
+          <div className="divide-y divide-[var(--border-subtle)]/80">
             {visibleTariffBooks.length > 0 ? (
               visibleTariffBooks.map((book) => (
                 <TariffBookRow
@@ -518,7 +514,7 @@ export function TariffsScreen() {
                 />
               ))
             ) : (
-              <div className="p-8 text-sm text-secondary">
+              <div className="p-8 text-sm text-[var(--text-secondary)]">
                 Nessun tariffario nel filtro corrente.
               </div>
             )}
@@ -527,12 +523,14 @@ export function TariffsScreen() {
 
         <aside className="space-y-6">
           <SectionPanel>
-            <div className="text-base font-semibold text-foreground">Dettaglio tariffario</div>
-            <div className="mt-4 rounded-[22px] border border-subtle bg-muted/35 p-4">
+            <div className="text-[16px] font-semibold text-[var(--text-primary)]">
+              Dettaglio tariffario
+            </div>
+            <div className="mt-4 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
               <Badge variant={selectedTariffBook.status === "active" ? "success" : "info"}>
                 {selectedTariffBook.status}
               </Badge>
-              <div className="mt-3 text-sm font-semibold text-foreground">
+              <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
                 {selectedTariffBook.name}
               </div>
               <dl className="mt-4 space-y-3">
@@ -545,7 +543,9 @@ export function TariffsScreen() {
 
           <SectionPanel>
             <div className="flex items-center justify-between">
-              <div className="text-base font-semibold text-foreground">Voci tariffario</div>
+              <div className="text-[16px] font-semibold text-[var(--text-primary)]">
+                Voci tariffario
+              </div>
               <Button size="icon" type="button" variant="outline">
                 <Download className="size-4" />
               </Button>
@@ -553,22 +553,25 @@ export function TariffsScreen() {
             <div className="mt-4 space-y-3">
               {voicesState.data.length > 0 ? (
                 voicesState.data.map((row) => (
-                  <div className="rounded-[18px] border border-subtle bg-muted/35 p-3" key={row.id}>
+                  <div
+                    className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-3"
+                    key={row.id}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <Badge variant="neutral">{row.officialCode}</Badge>
                       <Badge variant="info">{row.unitOfMeasure}</Badge>
                     </div>
-                    <div className="mt-2 text-sm font-semibold text-foreground">
+                    <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
                       {row.description}
                     </div>
-                    <div className="mt-1 text-xs text-secondary">
+                    <div className="mt-1 text-xs text-[var(--text-secondary)]">
                       {row.category} · € {row.unitPrice.toLocaleString("it-IT")} /{" "}
                       {row.unitOfMeasure}
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="rounded-[18px] border border-dashed border-subtle bg-muted/35 p-4 text-sm text-secondary">
+                <div className="rounded-[16px] border border-dashed border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4 text-sm text-[var(--text-secondary)]">
                   Nessuna voce collegata. Importa un PDF o salva un tariffario con voci rilevate.
                 </div>
               )}
@@ -595,11 +598,11 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+      <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="mt-2 h-10 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+        className="mt-2 h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -624,18 +627,18 @@ function TariffBookRow({
 
   return (
     <div
-      className={`group relative flex items-center gap-4 border-b border-subtle px-5 py-4 transition-colors hover:bg-muted/60 ${
-        isSelected ? "bg-primary/10" : ""
+      className={`group relative flex items-center gap-4 border-b border-[var(--border-subtle)]/80 px-5 py-4 transition-colors hover:bg-[var(--bg-muted-strong)] ${
+        isSelected ? "bg-[var(--accent-primary)]/10" : ""
       }`}
     >
       <div className="min-w-0 flex-1">
-        <div className="font-semibold text-foreground">{book.name}</div>
-        <div className="mt-1 text-xs text-secondary">{book.sourceName}</div>
+        <div className="font-semibold text-[var(--text-primary)]">{book.name}</div>
+        <div className="mt-1 text-xs text-[var(--text-secondary)]">{book.sourceName}</div>
       </div>
-      <div className="text-sm text-foreground">{book.year}</div>
+      <div className="text-sm text-[var(--text-primary)]">{book.year}</div>
       <Badge variant={book.status === "active" ? "success" : "info"}>{book.status}</Badge>
       <button
-        className="text-xs font-semibold text-secondary hover:text-primary"
+        className="text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-primary)]"
         onClick={onSelect}
         type="button"
       >
@@ -659,9 +662,9 @@ function TariffBookRow({
               onClick={() => setIsOpen(false)}
               type="button"
             />
-            <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-[14px] border border-subtle bg-card py-1 shadow-soft">
+            <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-[14px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] py-1 shadow-none">
               <button
-                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                className="w-full px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
                 onClick={() => {
                   onSelect();
                   setIsOpen(false);
@@ -671,7 +674,7 @@ function TariffBookRow({
                 Modifica
               </button>
               <button
-                className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-muted"
+                className="w-full px-3 py-2 text-left text-sm text-[var(--danger-base)] hover:bg-[var(--bg-muted)]"
                 onClick={() => {
                   onDelete();
                   setIsOpen(false);

@@ -7,6 +7,7 @@ import { ProjectDetailScreen } from "@/features/project-detail/ProjectDetailScre
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { TariffsScreen } from "@/features/tariffs/TariffsScreen";
 import { PlaceholderScreen } from "@/routes/PlaceholderScreen";
+import { TeamScreen } from "@/features/team/TeamScreen";
 
 type RouteRendererProps = {
   activeRoute: QuantaraRoute;
@@ -38,7 +39,7 @@ export function RouteRenderer({ activeRoute }: RouteRendererProps) {
   }
 
   if (activeRoute === "team") {
-    return <PlaceholderScreen title="Team" />;
+    return <TeamScreen />;
   }
 
   if (activeRoute === "settings") {

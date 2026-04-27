@@ -1,11 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { CheckCircle2, Clock3, Moon, RefreshCcw, Sparkles, Sun, WandSparkles } from "lucide-react";
-import type { ReactNode } from "react";
 import { useState } from "react";
-import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
-import { CommandPanel, MetricTile, ScreenShell, SectionPanel } from "@/components/shared/Screen";
-import { StatusBadge } from "@/components/shared/StatusBadge";
+import { cn } from "@/lib/utils";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
@@ -43,260 +39,296 @@ export function SettingsScreen() {
   const releaseStatus = getReleaseStatus(updateState);
 
   return (
-    <ScreenShell>
-      <CommandPanel className="p-6 md:p-8" variant="settings">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="info">Sistema e release</Badge>
-              <span className="text-xs font-medium text-secondary">
-                Versione esposta dal pacchetto applicativo sincronizzato con la release root
+    <div className="pt-2">
+      {/* Hero - outside cards, like dashboard */}
+      <section>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+            Impostazioni
+          </span>
+          <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+            Build v{APP_VERSION} · {updaterReady ? "Desktop release" : "Sviluppo"}
+          </span>
+        </div>
+        <div className="mt-3">
+          <h2 className="text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
+            Configurazione applicazione
+          </h2>
+          <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
+            Preferenze operative, stato updater e identita della build. Le modifiche vengono
+            applicate immediatamente.
+          </p>
+        </div>
+      </section>
+
+      {/* Version info - outside cards */}
+      <div className="mt-6 grid grid-cols-3 gap-4">
+        {[
+          {
+            detail: "Sync versione e rilascio desktop",
+            label: "Versione installata",
+            tone: "success" as const,
+            value: `v${APP_VERSION}`,
+          },
+          {
+            detail: "Canale operativo collegato alla pipeline release",
+            label: "Canale",
+            tone: "info" as const,
+            value: "Stable",
+          },
+          {
+            detail: updaterReady
+              ? "Check live disponibile in questa build"
+              : "Check live non eseguito in sviluppo",
+            label: "Updater",
+            tone: updaterReady ? ("success" as const) : ("neutral" as const),
+            value: updaterReady ? "Pronto" : "Solo release",
+          },
+        ].map((metric) => (
+          <section
+            className="group min-h-[130px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]"
+            key={metric.label}
+          >
+            <div className="min-w-0">
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                {metric.label}
+              </div>
+              <div className="mt-2 text-[22px] font-semibold leading-none tracking-[-0.03em] text-[var(--text-primary)]">
+                {metric.value}
+              </div>
+              <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+                {metric.detail}
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* Main content */}
+      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Left column - Release check */}
+        <div className="space-y-6">
+          {/* Release updater */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                  Aggiornamenti
+                </div>
+                <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
+                  Controllo release
+                </h3>
+              </div>
+              <span
+                className={cn(
+                  "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
+                  releaseStatus.tone === "success"
+                    ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+                    : releaseStatus.tone === "warning"
+                      ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                      : releaseStatus.tone === "danger"
+                        ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                        : releaseStatus.tone === "info"
+                          ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+                          : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+                )}
+              >
+                {releaseStatus.label}
               </span>
             </div>
 
-            <div className="mt-5 max-w-3xl">
-              <h2 className="text-[2rem] font-semibold tracking-tight text-foreground md:text-[2.6rem]">
-                Impostazioni operative dell&apos;app desktop.
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary md:text-[15px]">
-                Qui restano insieme preferenze utili, stato updater e identita della build.
-                Versione, Tauri updater e note di release seguono un solo flusso di rilascio.
-              </p>
-            </div>
-
-            <div className="mt-6 grid gap-3 md:grid-cols-3">
-              <MetricTile
-                detail="Aggiornata dal flusso di sync versione e usata per il rilascio desktop."
-                label="Versione installata"
-                tone="success"
-                value={`v${APP_VERSION}`}
-              />
-              <MetricTile
-                detail="Canale operativo collegato alla pipeline release del repository."
-                label="Canale"
-                tone="info"
-                value="Stable"
-              />
-              <MetricTile
-                detail={
-                  updaterReady
-                    ? "Il controllo nuove release e disponibile in questa build."
-                    : "In sviluppo la UI resta visibile ma il check live non viene eseguito."
-                }
-                label="Updater"
-                tone={updaterReady ? "warning" : "neutral"}
-                value={updaterReady ? "Pronto" : "Solo release"}
-              />
-            </div>
-          </div>
-
-          <section className="rounded-[24px] border border-subtle bg-card/92 p-5 shadow-soft">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
-                  Stato release
-                </div>
-                <h3 className="mt-2 text-lg font-semibold text-foreground">
-                  Verifica nuove versioni
-                </h3>
-              </div>
-              <StatusBadge label={releaseStatus.label} tone={releaseStatus.tone} />
-            </div>
-
-            <p className="mt-4 text-sm leading-6 text-secondary">{releaseStatus.description}</p>
+            <p className="mt-3 text-[13px] leading-5 text-[var(--text-secondary)]">
+              {releaseStatus.description}
+            </p>
 
             {releaseStatus.checkedAt ? (
-              <div className="mt-3 flex items-center gap-2 text-xs text-secondary">
+              <div className="mt-3 flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
                 <Clock3 className="size-3.5" />
                 Ultimo controllo {formatTimestamp(releaseStatus.checkedAt)}
               </div>
             ) : null}
 
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                className={cn(
+                  "flex h-9 items-center gap-2 rounded-xl px-4 text-[13px] font-semibold transition-all",
+                  isCheckingUpdates
+                    ? "bg-[var(--bg-muted)] text-[var(--text-secondary)]"
+                    : "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]",
+                )}
                 disabled={isCheckingUpdates}
                 onClick={handleCheckForUpdates}
-                size="sm"
-                variant="outline"
+                type="button"
               >
-                <RefreshCcw className="size-4" />
-                {isCheckingUpdates ? "Verifica in corso" : "Verifica nuove versioni disponibili"}
-              </Button>
+                <RefreshCcw className={cn("size-4", isCheckingUpdates && "animate-spin")} />
+                {isCheckingUpdates ? "Verifica in corso..." : "Verifica disponibilita"}
+              </button>
             </div>
 
             {releaseStatus.notes ? (
-              <div className="mt-5 rounded-2xl border border-subtle bg-muted/45 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              <div className="mt-4 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                   Note rilevate
                 </div>
-                <p className="mt-2 text-sm leading-6 text-foreground">{releaseStatus.notes}</p>
+                <p className="mt-2 text-[13px] leading-5 text-[var(--text-primary)]">
+                  {releaseStatus.notes}
+                </p>
               </div>
             ) : null}
           </section>
+
+          {/* Build info */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                  Build
+                </div>
+                <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
+                  Catena versione
+                </h3>
+              </div>
+              {pendingReleaseNotes ? (
+                <span className="rounded-[9px] bg-[var(--warning-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-base)]">
+                  Note release in sospeso
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-4 flex items-start gap-3 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success-base)]" />
+              <div>
+                <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+                  Catena di versione attiva
+                </div>
+                <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
+                  La UI legge APP_VERSION, rigenerata dal flusso pnpm version:sync che riallinea
+                  root package.json, workspace desktop e metadati Tauri prima di check e build.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <InfoTile
+                label="Runtime update"
+                value={updaterReady ? "Desktop release" : "Sviluppo"}
+              />
+              <InfoTile
+                label="Note aggiornamento"
+                value={
+                  pendingReleaseNotes ? `v${pendingReleaseNotes.version}` : "Nessuna in sospeso"
+                }
+              />
+              <InfoTile
+                label="Check automatico"
+                value={autoCheckUpdatesOnLaunch ? "Attivo" : "Manuale"}
+              />
+              <InfoTile
+                label="Release feedback"
+                value={showReleaseNotesAfterUpdate ? "Abilitato" : "Disabilitato"}
+              />
+            </div>
+          </section>
         </div>
-      </CommandPanel>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <SectionPanel>
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
-              Esperienza
+        {/* Right column - Preferences */}
+        <div className="space-y-6">
+          {/* Theme */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                Interfaccia
+              </div>
+              <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">Tema</h3>
+              <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
+                Trattamento cromatico della shell.
+              </p>
             </div>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">
-              Preferenze di interfaccia
-            </h3>
-            <p className="mt-1 text-sm text-secondary">
-              Impostazioni leggere che cambiano il comportamento della shell senza aggiungere altro
-              chrome.
-            </p>
-          </div>
-
-          <div className="mt-5 space-y-5">
-            <PreferenceGroup
-              description="Seleziona il trattamento cromatico base della shell."
-              label="Tema"
-            >
-              <ModeSelector<ThemeMode>
-                onChange={setThemeMode}
-                options={[
-                  {
-                    description: "Superfici chiare e piu contrasto sui pannelli.",
-                    icon: Sun,
-                    label: "Chiaro",
-                    value: "light",
-                  },
-                  {
-                    description: "Superfici scure per ambienti a bassa luminosita.",
-                    icon: Moon,
-                    label: "Scuro",
-                    value: "dark",
-                  },
-                ]}
-                value={themeMode}
-              />
-            </PreferenceGroup>
-
-            <PreferenceGroup
-              description="Riduce transizioni e micro-animazioni della shell."
-              label="Movimento"
-            >
-              <ModeSelector<MotionMode>
-                onChange={setMotionMode}
-                options={[
-                  {
-                    description: "Mantiene tutte le transizioni della UI.",
-                    icon: Sparkles,
-                    label: "Completo",
-                    value: "full",
-                  },
-                  {
-                    description: "Taglia gli effetti non essenziali sulle superfici.",
-                    icon: WandSparkles,
-                    label: "Ridotto",
-                    value: "reduced",
-                  },
-                ]}
-                value={motionMode}
-              />
-            </PreferenceGroup>
-          </div>
-        </SectionPanel>
-
-        <SectionPanel>
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
-              Aggiornamenti
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">Regole di release</h3>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <ToggleRow
-              checked={autoCheckUpdatesOnLaunch}
-              description="Esegue un check automatico quando la build desktop di release si avvia."
-              label="Controllo automatico all'avvio"
-              onChange={setAutoCheckUpdatesOnLaunch}
+            <ModeSelector<ThemeMode>
+              onChange={setThemeMode}
+              options={[
+                { description: "Superfici chiare", icon: Sun, label: "Chiaro", value: "light" },
+                { description: "Superfici scure", icon: Moon, label: "Scuro", value: "dark" },
+              ]}
+              value={themeMode}
             />
-            <ToggleRow
-              checked={showReleaseNotesAfterUpdate}
-              description="Dopo il riavvio mostra solo una conferma pulita di installazione completata."
-              label="Feedback post-update"
-              onChange={setShowReleaseNotesAfterUpdate}
-            />
-          </div>
+          </section>
 
-          <div className="mt-6 rounded-[22px] border border-subtle bg-muted/40 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <CheckCircle2 className="size-4 text-success" />
-              Catena versione
+          {/* Motion */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                Esperienza
+              </div>
+              <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
+                Movimento
+              </h3>
+              <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
+                Transizioni e micro-animazioni della shell.
+              </p>
             </div>
-            <p className="mt-2 text-sm leading-6 text-secondary">
-              La UI legge `APP_VERSION`, rigenerata dal flusso `pnpm version:sync` che riallinea
-              root `package.json`, workspace desktop e metadati Tauri prima di check e build.
-            </p>
-          </div>
-        </SectionPanel>
+            <ModeSelector<MotionMode>
+              onChange={setMotionMode}
+              options={[
+                {
+                  description: "Tutte le transizioni",
+                  icon: Sparkles,
+                  label: "Completo",
+                  value: "full",
+                },
+                {
+                  description: "Effetti ridotti",
+                  icon: WandSparkles,
+                  label: "Ridotto",
+                  value: "reduced",
+                },
+              ]}
+              value={motionMode}
+            />
+          </section>
+
+          {/* Release rules */}
+          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                Release
+              </div>
+              <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
+                Regole di aggiornamento
+              </h3>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <ToggleRow
+                checked={autoCheckUpdatesOnLaunch}
+                description="Check automatico all'avvio della build desktop."
+                label="Auto-check all'avvio"
+                onChange={setAutoCheckUpdatesOnLaunch}
+              />
+              <ToggleRow
+                checked={showReleaseNotesAfterUpdate}
+                description="Mostra conferma di installazione dopo il riavvio."
+                label="Feedback post-update"
+                onChange={setShowReleaseNotesAfterUpdate}
+              />
+            </div>
+          </section>
+        </div>
       </section>
-
-      <SectionPanel>
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
-              Identita build
-            </div>
-            <h3 className="mt-2 text-lg font-semibold text-foreground">
-              Stato applicazione e pipeline
-            </h3>
-          </div>
-          {pendingReleaseNotes ? <Badge variant="warning">Note release in sospeso</Badge> : null}
-        </div>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricTile
-            detail="Esportata dal modulo generato e allineata alla release root."
-            label="Versione"
-            value={`v${APP_VERSION}`}
-          />
-          <MetricTile
-            detail="Il plugin updater viene interrogato solo nelle build distribuite."
-            label="Runtime update"
-            value={updaterReady ? "Desktop release" : "Sviluppo"}
-          />
-          <MetricTile
-            detail={
-              pendingReleaseNotes
-                ? `Ultima release letta: v${pendingReleaseNotes.version}`
-                : "Nessun feedback post-update in attesa."
-            }
-            label="Note aggiornamento"
-            value={pendingReleaseNotes ? "Disponibili" : "Pulite"}
-          />
-          <MetricTile
-            detail="Puoi sempre lanciare un controllo on demand dal pannello superiore."
-            label="Check automatico"
-            value={autoCheckUpdatesOnLaunch ? "Attivo" : "Manuale"}
-          />
-        </div>
-      </SectionPanel>
-    </ScreenShell>
+    </div>
   );
 }
 
-function PreferenceGroup({
-  children,
-  description,
-  label,
-}: {
-  children: ReactNode;
-  description: string;
-  label: string;
-}) {
+function InfoTile({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-[24px] border border-subtle bg-muted/35 p-4">
-      <div className="text-sm font-semibold text-foreground">{label}</div>
-      <p className="mt-1 text-sm leading-6 text-secondary">{description}</p>
-      <div className="mt-4">{children}</div>
-    </section>
+    <div className="rounded-[12px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-3 py-2.5">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -315,7 +347,7 @@ function ModeSelector<TValue extends string>({
   value: TValue;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="mt-4 grid gap-2">
       {options.map((option) => {
         const active = value === option.value;
         const Icon = option.icon;
@@ -323,34 +355,37 @@ function ModeSelector<TValue extends string>({
         return (
           <button
             aria-pressed={active}
-            className={`rounded-[20px] border p-4 text-left transition-all ${
+            className={cn(
+              "flex items-center gap-3 rounded-xl border p-3 text-left transition-all",
               active
-                ? "border-primary bg-card shadow-soft"
-                : "border-subtle bg-card/70 hover:border-primary/40 hover:bg-card"
-            }`}
+                ? "border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/5"
+                : "border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] hover:border-[var(--accent-primary)]/20 hover:bg-[var(--bg-muted-strong)]",
+            )}
             key={option.value}
             onClick={() => onChange(option.value)}
             type="button"
           >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`flex size-10 items-center justify-center rounded-2xl ${
-                    active ? "bg-primary/12 text-primary" : "bg-muted text-secondary"
-                  }`}
-                >
-                  <Icon className="size-4" />
-                </span>
-                <div>
-                  <div className="text-sm font-semibold text-foreground">{option.label}</div>
-                  <div className="mt-1 text-xs text-secondary">
-                    {active ? "Attivo" : "Disponibile"}
-                  </div>
-                </div>
+            <span
+              className={cn(
+                "flex size-9 items-center justify-center rounded-lg transition-all",
+                active
+                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                  : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+              )}
+            >
+              <Icon className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+                {option.label}
               </div>
-              {active ? <Badge variant="info">Selezionato</Badge> : null}
+              <div className="text-[11px] text-[var(--text-secondary)]">{option.description}</div>
             </div>
-            <p className="mt-3 text-sm leading-6 text-secondary">{option.description}</p>
+            {active ? (
+              <span className="rounded-[9px] bg-[var(--accent-primary)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)]">
+                Attivo
+              </span>
+            ) : null}
           </button>
         );
       })}
@@ -370,26 +405,28 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-[22px] border border-subtle bg-muted/35 px-4 py-4">
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-4 py-3">
       <div className="min-w-0">
-        <div className="text-sm font-semibold text-foreground">{label}</div>
-        <p className="mt-1 text-sm leading-6 text-secondary">{description}</p>
+        <div className="text-[13px] font-semibold text-[var(--text-primary)]">{label}</div>
+        <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">{description}</p>
       </div>
       <button
         aria-checked={checked}
-        className={`relative mt-1 flex h-7 w-12 shrink-0 items-center rounded-full border transition-all ${
+        className={cn(
+          "relative mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border transition-all",
           checked
-            ? "border-primary bg-primary"
-            : "border-subtle bg-card text-secondary hover:border-primary/40"
-        }`}
+            ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]"
+            : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
+        )}
         onClick={() => onChange(!checked)}
         role="switch"
         type="button"
       >
         <span
-          className={`mx-1 block size-5 rounded-full bg-white shadow-soft transition-transform ${
-            checked ? "translate-x-5" : "translate-x-0"
-          }`}
+          className={cn(
+            "mx-0.5 block size-5 rounded-full bg-[var(--surface-base)] shadow-sm transition-transform",
+            checked ? "translate-x-5" : "translate-x-0",
+          )}
         />
       </button>
     </div>
@@ -400,8 +437,7 @@ function getReleaseStatus(state: UpdateViewState) {
   if (state.kind === "idle") {
     return {
       checkedAt: null,
-      description:
-        "Nessun controllo manuale eseguito in questa sessione. Puoi verificare nuove release quando vuoi.",
+      description: "Nessun controllo eseguito in questa sessione.",
       label: "In attesa",
       notes: "",
       tone: "neutral" as const,
@@ -411,7 +447,7 @@ function getReleaseStatus(state: UpdateViewState) {
   if (state.kind === "up-to-date") {
     return {
       checkedAt: state.checkedAt,
-      description: "La build installata risulta allineata all'ultima release disponibile.",
+      description: "Build allineata all'ultima release disponibile.",
       label: "Aggiornato",
       notes: "",
       tone: "success" as const,
@@ -421,7 +457,7 @@ function getReleaseStatus(state: UpdateViewState) {
   if (state.kind === "available") {
     return {
       checkedAt: state.checkedAt,
-      description: `E disponibile Quantara ${state.version}. Se hai rimandato l'installazione, puoi rilanciare il check da qui.`,
+      description: `Quantara ${state.version} disponibile per installazione.`,
       label: "Nuova release",
       notes: state.notes,
       tone: "warning" as const,
@@ -441,7 +477,7 @@ function getReleaseStatus(state: UpdateViewState) {
   return {
     checkedAt: state.checkedAt,
     description: state.message,
-    label: "Check fallito",
+    label: "Errore",
     notes: "",
     tone: "danger" as const,
   };

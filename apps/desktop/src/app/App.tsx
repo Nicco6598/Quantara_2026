@@ -29,6 +29,7 @@ export function App() {
 
 function AppShell() {
   useAutomaticUpdater();
+
   const activeRoute = useAppStore((state) => state.activeRoute);
   const canGoBack = useAppStore((state) => state.canGoBack);
   const canGoForward = useAppStore((state) => state.canGoForward);
@@ -233,7 +234,10 @@ function AppShell() {
   };
 
   return (
-    <div className="app-aura relative flex h-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)]">
+    <div
+      className="relative flex h-screen overflow-hidden bg-[var(--bg-app-accent)] [font-family:var(--font-sans)] text-[var(--text-primary)]"
+      style={{ fontFamily: "var(--font-sans)" }}
+    >
       {availableUpdate ? (
         <UpdateExperienceDialog
           installState={installState}
@@ -242,12 +246,14 @@ function AppShell() {
           update={availableUpdate}
         />
       ) : null}
+
       {pendingReleaseNotes ? (
         <UpdateReleaseNotesDialog
           notes={pendingReleaseNotes}
           onClose={dismissPendingReleaseNotes}
         />
       ) : null}
+
       <CommandPalette
         anchorRect={commandPaletteAnchor}
         isOpen={isCommandPaletteOpen}
@@ -257,27 +263,37 @@ function AppShell() {
         onToggleTheme={toggleTheme}
         themeMode={themeMode}
       />
+
       {isShortcutHelpOpen ? (
         <ShortcutHelpDialog onClose={() => setIsShortcutHelpOpen(false)} />
       ) : null}
+
       <AppSidebar activeRoute={activeRoute} onRouteChange={navigate} />
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        <TopToolbar
-          activeRoute={activeRoute}
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          onOpenCommandPalette={(anchorRect) => {
-            setCommandPaletteAnchor(anchorRect);
-            setIsCommandPaletteOpen(true);
-          }}
-          onNavigateBack={navigateBack}
-          onNavigateForward={navigateForward}
-          onPageAction={handleTopbarAction}
-          onToggleTheme={toggleTheme}
-          themeMode={themeMode}
-        />
-        <RouteRenderer activeRoute={activeRoute} />
-      </div>
+
+      <main className="min-w-0 flex-1 overflow-hidden p-[14px] pl-[16px]">
+        <section className="flex h-full min-w-0 overflow-hidden rounded-[18px] bg-[var(--surface-base)] shadow-none ring-1 ring-[color-mix(in_srgb,var(--surface-base)_72%,var(--accent-primary)_28%)]">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopToolbar
+              activeRoute={activeRoute}
+              canGoBack={canGoBack}
+              canGoForward={canGoForward}
+              onOpenCommandPalette={(anchorRect) => {
+                setCommandPaletteAnchor(anchorRect);
+                setIsCommandPaletteOpen(true);
+              }}
+              onNavigateBack={navigateBack}
+              onNavigateForward={navigateForward}
+              onPageAction={handleTopbarAction}
+              onToggleTheme={toggleTheme}
+              themeMode={themeMode}
+            />
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+              <RouteRenderer activeRoute={activeRoute} />
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

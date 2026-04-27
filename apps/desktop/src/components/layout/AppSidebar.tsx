@@ -1,20 +1,18 @@
+import { useCallback, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  Bell,
   BookOpen,
   Box,
-  ChevronsUpDown,
-  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   FolderKanban,
   LayoutDashboard,
-  ShieldCheck,
   Settings,
   Users,
 } from "lucide-react";
-import { useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
-import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
 import { APP_VERSION } from "@/generated/appVersion";
 import { cn } from "@/lib/utils";
 import type { QuantaraRoute } from "@/store/app-store";
@@ -29,179 +27,126 @@ type NavItem = {
 const primaryNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", route: "dashboard" },
   { badge: "3", icon: FolderKanban, label: "Progetti", route: "projects" },
-  { icon: BookOpen, label: "Tariffari", route: "tariffs" },
+  { icon: BookOpen, label: "Tariffario", route: "tariffs" },
   { icon: Box, label: "Materiali", route: "materials" },
-  { icon: BarChart3, label: "Contabilita", route: "accounting" },
-];
-
-const utilityNavItems: NavItem[] = [
+  { icon: BarChart3, label: "Contabilità", route: "accounting" },
   { icon: Users, label: "Team", route: "team" },
-  { icon: Settings, label: "Impostazioni", route: "settings" },
 ];
 
-const activeProject = {
-  context: "Lotto 3A · Verona Est",
-  name: "Milano-Verona",
-  progress: 68,
-  tone: "info" as const,
-};
-
-const projectFocusOptions = [
-  {
-    context: "Lotto 3A · Verona Est",
-    name: "Milano-Verona",
-    progress: 68,
-    tone: "info" as const,
-  },
-  {
-    context: "Lotto 1C · Tratta Orsara",
-    name: "Napoli-Bari",
-    progress: 45,
-    tone: "warning" as const,
-  },
-  {
-    context: "Lotto 2B · Galleria Belvedere",
-    name: "Nodo Firenze AV",
-    progress: 72,
-    tone: "success" as const,
-  },
-] as const;
+const utilityNavItems: NavItem[] = [{ icon: Settings, label: "Impostazioni", route: "settings" }];
 
 type AppSidebarProps = {
   activeRoute: QuantaraRoute;
   onRouteChange: (route: QuantaraRoute) => void;
 };
 
-export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
-  return (
-    <aside className="shell-sidebar flex h-screen w-[272px] shrink-0 flex-col border-r border-subtle/80 px-4 py-5">
-      <div className="min-h-0 flex-1">
-        <SidebarHeader />
-        <SidebarNav activeRoute={activeRoute} items={primaryNavItems} onNavigate={onRouteChange} />
-        <SidebarNav activeRoute={activeRoute} items={utilityNavItems} onNavigate={onRouteChange} />
-      </div>
+const SIDEBAR_WIDTH_EXPANDED = 272;
+const SIDEBAR_WIDTH_COLLAPSED = 72;
 
-      <div className="space-y-4">
-        <ActiveProjectStrip onOpen={() => onRouteChange("project-detail")} />
-        <SidebarFooter />
+export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const toggleCollapsed = useCallback(() => setCollapsed((prev) => !prev), []);
+
+  const sidebarWidth = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
+
+  return (
+    <aside
+      className="flex h-full shrink-0 overflow-hidden bg-transparent transition-all duration-300 [font-family:var(--font-sans)] text-[var(--text-primary)]"
+      style={{ width: sidebarWidth }}
+    >
+      <div className="flex min-h-0 w-full flex-col">
+        {/* Header */}
+        <div className="shrink-0 px-3 pb-4 pt-5">
+          <SidebarHeader collapsed={collapsed} />
+        </div>
+
+        {/* Navigation */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* Primary Navigation */}
+          <div className="mb-5">
+            <SidebarNav
+              activeRoute={activeRoute}
+              collapsed={collapsed}
+              items={primaryNavItems}
+              onNavigate={onRouteChange}
+            />
+          </div>
+
+          {/* Utility Navigation */}
+          <div className="mb-5">
+            <SidebarNav
+              activeRoute={activeRoute}
+              collapsed={collapsed}
+              items={utilityNavItems}
+              onNavigate={onRouteChange}
+            />
+          </div>
+        </div>
+
+        {/* Bottom Section */}
+        <div className="shrink-0 px-3 pb-4 pt-2">
+          <SidebarFooter collapsed={collapsed} onToggle={toggleCollapsed} />
+        </div>
       </div>
     </aside>
   );
 }
 
-function SidebarHeader() {
+function SidebarHeader({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className="flex items-center gap-3 px-1 pb-5">
-      <div className="flex size-14 items-center justify-center rounded-[20px] border border-subtle bg-card p-1.5 shadow-soft">
-        <img alt="Quantara" className="size-full object-contain" src={logoSidebar} />
-      </div>
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold uppercase tracking-[0.28em] text-foreground">
-          QUANTARA
+    <div
+      className={cn(
+        "flex items-center gap-3",
+        collapsed ? "justify-center px-0" : "justify-between px-2",
+      )}
+    >
+      <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
+        <div className="relative shrink-0">
+          <img alt="Quantara" className="h-9 w-9 object-contain" src={logoSidebar} />
+          <div className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[var(--sidebar-bg)] bg-[var(--success-base)]" />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ActiveProjectStrip({ onOpen }: { onOpen: () => void }) {
-  const [selectedFocus, setSelectedFocus] = useState(0);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const activeFocus = projectFocusOptions[selectedFocus] ?? activeProject;
-
-  return (
-    <section className="rounded-[22px] border border-subtle bg-card/82 p-3 shadow-soft">
-      <button
-        aria-expanded={isExpanded}
-        className="sidebar-focus-trigger flex w-full items-start justify-between gap-3 text-left"
-        onClick={() => setIsExpanded((value) => !value)}
-        type="button"
-      >
-        <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-secondary">
-            Focus progetto
+        {!collapsed && (
+          <div>
+            <div className="text-[14px] font-bold tracking-[-0.01em] text-[var(--text-primary)]">
+              Quantara
+            </div>
+            <div className="text-[10px] font-medium text-[var(--text-secondary)]">
+              Construction Suite
+            </div>
           </div>
-          <div className="mt-1 truncate text-sm font-semibold text-foreground">
-            {activeFocus.name}
-          </div>
-          <div className="truncate text-xs text-secondary">{activeFocus.context}</div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={activeFocus.tone}>{activeFocus.progress}%</Badge>
-          <ChevronsUpDown
-            className={cn(
-              "size-4 text-secondary transition-transform duration-300 ease-out",
-              isExpanded && "rotate-180",
-            )}
-          />
-        </div>
-      </button>
-
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full bg-primary transition-[width] duration-300"
-          style={{ width: `${activeFocus.progress}%` }}
-        />
-      </div>
-
-      <div
-        className={cn(
-          "sidebar-focus-options grid",
-          isExpanded ? "sidebar-focus-options-open" : "sidebar-focus-options-closed",
         )}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <div className="mt-3 space-y-1.5 border-t border-subtle pt-3">
-            {projectFocusOptions.map((project, index) => (
-              <button
-                className={cn(
-                  "sidebar-focus-option flex w-full items-center justify-between gap-3 rounded-[14px] px-2.5 py-2 text-left text-xs",
-                  index === selectedFocus
-                    ? "bg-primary/10 text-foreground"
-                    : "text-secondary hover:bg-muted hover:text-foreground",
-                )}
-                key={project.name}
-                onClick={() => {
-                  setSelectedFocus(index);
-                  setIsExpanded(false);
-                }}
-                type="button"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate font-semibold">{project.name}</span>
-                  <span className="block truncate">{project.context}</span>
-                </span>
-                <Badge variant={project.tone}>{project.progress}%</Badge>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
-
-      <div className="mt-3 flex justify-end">
-        <Button onClick={onOpen} size="sm" variant="ghost">
-          Apri
-          <ChevronRight className="size-4" />
-        </Button>
-      </div>
-    </section>
+      {!collapsed && (
+        <button
+          className="flex size-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+          type="button"
+        >
+          <Bell className="size-4" />
+        </button>
+      )}
+    </div>
   );
 }
 
 function SidebarNav({
   activeRoute,
+  collapsed,
+  className,
   items,
   onNavigate,
 }: {
   activeRoute: QuantaraRoute;
+  collapsed: boolean;
+  className?: string;
   items: NavItem[];
   onNavigate: (route: QuantaraRoute) => void;
 }) {
   return (
-    <nav className="mt-4 space-y-2">
+    <nav className={cn("space-y-0.5", className)}>
       {items.map((item) => (
         <SidebarNavItem
           active={isRouteActive(item.route, activeRoute)}
+          collapsed={collapsed}
           item={item}
           key={item.route}
           onClick={() => onNavigate(item.route)}
@@ -213,10 +158,12 @@ function SidebarNav({
 
 function SidebarNavItem({
   active,
+  collapsed,
   item,
   onClick,
 }: {
   active: boolean;
+  collapsed: boolean;
   item: NavItem;
   onClick: () => void;
 }) {
@@ -225,53 +172,107 @@ function SidebarNavItem({
   return (
     <button
       className={cn(
-        "sidebar-nav-item flex h-12 w-full items-center gap-3 rounded-[18px] border px-3 text-left",
+        "group relative flex h-[44px] w-full items-center rounded-xl transition-all duration-200",
+        collapsed ? "justify-center px-0" : "gap-3 px-3",
         active
-          ? "border-primary/20 bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base))] text-foreground shadow-soft"
-          : "border-subtle bg-card/76 text-secondary hover:border-border hover:bg-card hover:text-foreground",
+          ? "bg-[color-mix(in_srgb,var(--accent-primary)_13%,var(--surface-base))] text-[var(--accent-primary-hover)] shadow-none"
+          : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
       )}
       onClick={onClick}
+      title={collapsed ? item.label : undefined}
       type="button"
     >
-      <span
+      <div
         className={cn(
-          "sidebar-nav-icon flex size-8 shrink-0 items-center justify-center rounded-2xl",
-          active ? "bg-primary text-white" : "bg-muted text-secondary",
+          "flex size-8 shrink-0 items-center justify-center rounded-lg transition-all",
+          active
+            ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+            : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] group-hover:bg-[var(--accent-primary)]/10 group-hover:text-[var(--accent-primary)]",
         )}
       >
-        <Icon className="size-4" />
-      </span>
-      <span className="flex-1 text-sm font-medium">{item.label}</span>
-      {item.badge ? <Badge variant={active ? "info" : "neutral"}>{item.badge}</Badge> : null}
+        <Icon className="size-4" strokeWidth={2} />
+      </div>
+
+      {!collapsed && (
+        <>
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+
+          {item.badge ? (
+            <span
+              className={cn(
+                "flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 text-[10px] font-bold",
+                active
+                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                  : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+              )}
+            >
+              {item.badge}
+            </span>
+          ) : null}
+        </>
+      )}
     </button>
   );
 }
 
-function SidebarFooter() {
+function SidebarFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
-    <footer className="space-y-3 border-t border-subtle pt-4">
-      <div className="rounded-[22px] border border-subtle bg-card/90 p-3.5 shadow-soft">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 items-center justify-center rounded-2xl bg-primary text-xs font-bold text-white shadow-soft">
+    <footer>
+      {/* User info */}
+      <div
+        className={cn(
+          "flex items-center gap-3 rounded-xl py-2.5 transition-all hover:bg-[var(--bg-muted)]",
+          collapsed ? "justify-center px-0" : "px-3",
+        )}
+      >
+        <div className="relative shrink-0">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-primary-hover)] text-[12px] font-bold text-[var(--text-inverse)]">
             MB
           </div>
+          <div className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[var(--sidebar-bg)] bg-[var(--success-base)]" />
+        </div>
+        {!collapsed && (
           <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <div className="truncate text-sm font-semibold text-foreground">Marco Bianchi</div>
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-success-soft text-success">
-                <ShieldCheck className="size-3.5" />
-              </span>
+            <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+              Marco Bianchi
             </div>
-            <div className="mt-0.5 text-xs text-secondary">Account demo collegato</div>
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-[14px] border border-subtle bg-muted/35 px-2.5 py-2">
-              <span className="text-[11px] font-medium text-secondary">Ruolo</span>
-              <span className="text-xs font-semibold text-foreground">Project Manager</span>
+            <div className="truncate text-[11px] font-medium text-[var(--text-secondary)]">
+              Project Manager
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      <div className="text-center text-xs font-light text-secondary">Quantara v{APP_VERSION}</div>
+      {/* Collapse toggle */}
+      <button
+        className={cn(
+          "mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-lg text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+          collapsed && "px-0",
+        )}
+        onClick={onToggle}
+        title={collapsed ? "Espandi sidebar" : "Comprimi sidebar"}
+        type="button"
+      >
+        {collapsed ? (
+          <ChevronsRight className="size-4" />
+        ) : (
+          <>
+            <ChevronsLeft className="size-4" />
+            <span className="text-[11px] font-medium">Comprimi</span>
+          </>
+        )}
+      </button>
+
+      {/* Version */}
+      {!collapsed && (
+        <div className="mt-2 flex items-center justify-between px-1 text-[10px] font-medium text-[var(--text-secondary)]">
+          <span>Quantara v{APP_VERSION}</span>
+          <span className="flex items-center gap-1">
+            <span className="size-1.5 rounded-full bg-[var(--success-base)]" />
+            Online
+          </span>
+        </div>
+      )}
     </footer>
   );
 }

@@ -59,6 +59,7 @@
   --kpi-card-bg: var(--surface-raised);
   --table-row-hover: #fff7f4;
   --detail-panel-bg: var(--surface-base);
+  --bg-app-accent: color-mix(in srgb, var(--sidebar-bg) 92%, #5c4a3d 8%);
 
   --shadow-soft: 0 12px 30px rgb(16 23 34 / 7%);
   --shadow-panel: 0 18px 48px rgb(16 23 34 / 10%);
@@ -108,6 +109,7 @@
   --topbar-bg: color-mix(in srgb, var(--bg-app) 84%, var(--surface-base));
   --table-row-hover: #211d1b;
   --detail-panel-bg: #151c26;
+  --bg-app-accent: color-mix(in srgb, var(--sidebar-bg) 92%, #3d3f5a 8%);
   --shadow-soft: 0 12px 30px rgb(0 0 0 / 24%);
   --shadow-panel: 0 18px 48px rgb(0 0 0 / 34%);
 }
@@ -143,6 +145,7 @@
   --color-info: var(--info-base);
   --color-info-soft: var(--info-soft);
   --color-table-row-hover: var(--table-row-hover);
+  --color-bg-app-accent: var(--bg-app-accent);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
