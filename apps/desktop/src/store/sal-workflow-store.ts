@@ -14,6 +14,9 @@ import {
 type CreateProjectInput = Omit<SalProject, "id">;
 type CreateTariffVoiceInput = Omit<SalTariffVoice, "id">;
 type CreateSalInput = Pick<SalDocument, "date" | "description" | "notes" | "projectId" | "title">;
+type CreateDraftSalWithLinesInput = CreateSalInput & {
+  voices: SalTariffVoice[];
+};
 type CloseNewSalInput = CreateSalInput & {
   lines: SalLine[];
 };
@@ -24,10 +27,13 @@ type SalWorkflowStore = {
   addLineToSal: (salId: string, voiceId: string) => void;
   closeSal: (salId: string) => void;
   createProject: (input: CreateProjectInput) => SalProject;
+  createProjectWithId: (input: SalProject) => SalProject;
   createClosedSal: (input: CloseNewSalInput) => SalDocument;
   createSal: (input: CreateSalInput) => SalDocument;
+  createSalDraftWithLines: (input: CreateDraftSalWithLinesInput) => SalDocument;
   createTariffVoice: (input: CreateTariffVoiceInput) => SalTariffVoice;
   deleteLineFromSal: (salId: string, lineId: string) => void;
+  deleteSal: (salId: string) => void;
   getActiveProject: () => SalProject | null;
   getActiveSalView: () => SalDocumentView | null;
   getProjectSals: (projectId: string) => SalDocumentView[];
@@ -96,6 +102,20 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
 
         return project;
       },
+      createProjectWithId: (input) => {
+        const existing = get().projects.find((project) => project.id === input.id);
+
+        if (existing) {
+          return existing;
+        }
+
+        set((state) => ({
+          activeProjectId: input.id,
+          projects: [input, ...state.projects],
+        }));
+
+        return input;
+      },
       createClosedSal: (input) => {
         const currentCount = get().salDocuments.filter(
           (sal) => sal.projectId === input.projectId,
@@ -140,6 +160,37 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
 
         return sal;
       },
+      createSalDraftWithLines: (input) => {
+        const currentCount = get().salDocuments.filter(
+          (sal) => sal.projectId === input.projectId,
+        ).length;
+        const existingVoiceIds = new Set(get().tariffVoices.map((voice) => voice.id));
+        const voicesToAdd = input.voices.filter((voice) => !existingVoiceIds.has(voice.id));
+        const sal: SalDocument = {
+          date: input.date,
+          description: input.description,
+          id: createId("sal"),
+          lines: input.voices.map((voice) => ({
+            id: createId("sal_line"),
+            quantity: 0,
+            surcharge: "none",
+            voiceId: voice.id,
+          })),
+          notes: input.notes,
+          projectId: input.projectId,
+          status: "draft",
+          title: input.title.trim() || `SAL ${currentCount + 1}`,
+        };
+
+        set((state) => ({
+          activeProjectId: sal.projectId,
+          activeSalId: sal.id,
+          salDocuments: [sal, ...state.salDocuments],
+          tariffVoices: [...voicesToAdd, ...state.tariffVoices],
+        }));
+
+        return sal;
+      },
       createTariffVoice: (input) => {
         const voice: SalTariffVoice = {
           ...input,
@@ -162,6 +213,11 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
                 }
               : sal,
           ),
+        })),
+      deleteSal: (salId) =>
+        set((state) => ({
+          salDocuments: state.salDocuments.filter((sal) => sal.id !== salId),
+          activeSalId: state.activeSalId === salId ? "" : state.activeSalId,
         })),
       getActiveProject: () => {
         const state = get();

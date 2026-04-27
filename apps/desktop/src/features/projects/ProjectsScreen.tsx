@@ -1,17 +1,22 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowLeft,
   Bell,
+  Building2,
   CheckCircle2,
   ChevronRight,
+  ClipboardList,
   Download,
   FileText,
   FileSpreadsheet,
+  FolderOpen,
   HardHat,
   Layers3,
   Loader2,
   MapPin,
   MoreVertical,
   Pencil,
+  Plus,
   Search,
   Target,
   Trash2,
@@ -42,13 +47,17 @@ import {
   deleteDesktopContract,
   listDesktopContracts,
   listDesktopTariffBooks,
+  listDesktopTariffVoices,
   updateDesktopContract,
   type CreateDesktopContractRequest,
   type DesktopContract,
   type DesktopDataResult,
+  type DesktopTariffBook,
+  type DesktopTariffVoice,
 } from "@/lib/desktopData";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 type LaneTone = Extract<StatusTone, "success" | "warning" | "danger">;
 type PortfolioFocus = "all" | "critical" | "sal";
@@ -58,6 +67,7 @@ type ProjectEditState = {
   contractId: string;
   values: {
     applicationContractCode: string;
+    contractorName: string;
     contractualAmount: string;
     frameworkAgreementCode: string;
     tariffBookId: string;
@@ -78,6 +88,7 @@ type MigrationPreview = {
 
 export type PortfolioProject = {
   budget: Money;
+  contractor: string;
   forecastDeltaDays: number;
   healthLabel: string;
   id: string;
@@ -130,9 +141,36 @@ type ActivityItem = {
   tone: StatusTone;
 };
 
+type ContractorFolder = {
+  budget: number;
+  contractor: string;
+  criticalCount: number;
+  id: string;
+  projectCount: number;
+  salCount: number;
+  salExposure: number;
+  salWindowCount: number;
+};
+
+type RecentSalItem = {
+  closedAt?: string;
+  date: string;
+  description: string;
+  id: string;
+  lines: { id: string; quantity: number; surcharge: "day" | "night" | "none"; voiceId: string }[];
+  notes: string;
+  projectId: string;
+  status: string;
+  title: string;
+};
+
+const contractorRegistryStorageKey = "quantara.contractorRegistry.v1";
+const projectContractorStorageKey = "quantara.projectContractors.v1";
+
 export const portfolioProjects: PortfolioProject[] = [
   {
     budget: eur(26150000),
+    contractor: "RFI",
     forecastDeltaDays: 5,
     healthLabel: "In linea",
     id: "milano-verona",
@@ -152,6 +190,7 @@ export const portfolioProjects: PortfolioProject[] = [
   },
   {
     budget: eur(18420000),
+    contractor: "RFI",
     forecastDeltaDays: 11,
     healthLabel: "Sotto presidio",
     id: "firenze-av",
@@ -171,6 +210,7 @@ export const portfolioProjects: PortfolioProject[] = [
   },
   {
     budget: eur(32780000),
+    contractor: "RFI",
     forecastDeltaDays: 18,
     healthLabel: "Escalation",
     id: "napoli-bari",
@@ -190,6 +230,7 @@ export const portfolioProjects: PortfolioProject[] = [
   },
   {
     budget: eur(9850000),
+    contractor: "RFI",
     forecastDeltaDays: -3,
     healthLabel: "In anticipo",
     id: "genova-ventimiglia",
@@ -209,6 +250,7 @@ export const portfolioProjects: PortfolioProject[] = [
   },
   {
     budget: eur(4250000),
+    contractor: "ANAS",
     forecastDeltaDays: 0,
     healthLabel: "Monitoraggio",
     id: "rete-nord",
@@ -228,6 +270,7 @@ export const portfolioProjects: PortfolioProject[] = [
   },
   {
     budget: eur(11600000),
+    contractor: "RFI",
     forecastDeltaDays: 7,
     healthLabel: "Sotto presidio",
     id: "catania-merci",
@@ -247,6 +290,7 @@ export const portfolioProjects: PortfolioProject[] = [
   },
   {
     budget: eur(14900000),
+    contractor: "Regione Marche",
     forecastDeltaDays: 21,
     healthLabel: "Escalation",
     id: "adriatica-quadruplicamento",
@@ -453,26 +497,60 @@ export function ProjectsScreen() {
   const [projectActionDialog, setProjectActionDialog] = useState<ProjectActionDialogState | null>(
     null,
   );
+  const [contractorDraft, setContractorDraft] = useState("");
+  const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
+  const [contractorRegistry, setContractorRegistry] = useState<string[]>(() =>
+    readStringList(contractorRegistryStorageKey),
+  );
+  const [projectContractors, setProjectContractors] = useState<Record<string, string>>(() =>
+    readStringRecord(projectContractorStorageKey),
+  );
+  const [selectedContractorId, setSelectedContractorId] = useState<string | null>(null);
   const [selectedContractId, setSelectedContractId] = useState("");
   const [tariffBooksState, setTariffBooksState] = useState([fallbackProjectTariffBook]);
   const [focus, setFocus] = useState<PortfolioFocus>("all");
   const [migrationAction, setMigrationAction] = useState<MigrationAction>("idle");
   const [migrationPreview, setMigrationPreview] = useState<MigrationPreview | null>(null);
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ProjectsViewMode>("board");
+  const [viewMode, setViewMode] = useState<ProjectsViewMode>("workbench");
+  const [isCreateSalModalOpen, setIsCreateSalModalOpen] = useState(false);
+  const [isSalModalOpen, setIsSalModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
   const activeProjects = useMemo(
     () =>
       contractsState.source === "desktop" || contractsState.data.length > 0
-        ? contractsState.data.map(mapContractToProject)
-        : portfolioProjects,
-    [contractsState.data, contractsState.source],
+        ? contractsState.data.map((contract) =>
+            mapContractToProject(contract, projectContractors[contract.id]),
+          )
+        : [],
+    [contractsState.data, contractsState.source, projectContractors],
   );
   const projectIndex = useMemo(
     () => new Map(activeProjects.map((project) => [project.id, project])),
     [activeProjects],
   );
+
+  const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
+  const salProjects = useSalWorkflowStore((state) => state.projects);
+  const createSalDraftWithLines = useSalWorkflowStore((state) => state.createSalDraftWithLines);
+  const createSalProjectWithId = useSalWorkflowStore((state) => state.createProjectWithId);
+  const updateSalLineQuantity = useSalWorkflowStore((state) => state.updateLineQuantity);
+  const updateSalLineSurcharge = useSalWorkflowStore((state) => state.updateLineSurcharge);
+  const projectSalIndex = useMemo(
+    () => new Map(salProjects.map((project) => [project.id, project])),
+    [salProjects],
+  );
+  const allSals = useMemo(
+    () =>
+      [...salDocuments].sort((a, b) => {
+        const dateA = a.closedAt || a.date;
+        const dateB = b.closedAt || b.date;
+        return dateB.localeCompare(dateA);
+      }),
+    [salDocuments],
+  );
+  const recentSals = useMemo(() => allSals.slice(0, 5), [allSals]);
 
   useEffect(() => {
     let active = true;
@@ -492,6 +570,14 @@ export function ProjectsScreen() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    writeJson(contractorRegistryStorageKey, contractorRegistry);
+  }, [contractorRegistry]);
+
+  useEffect(() => {
+    writeJson(projectContractorStorageKey, projectContractors);
+  }, [projectContractors]);
 
   useEffect(() => {
     const handleTopbarAction = (event: Event) => {
@@ -522,7 +608,27 @@ export function ProjectsScreen() {
     return () => window.removeEventListener("keydown", handleKeyboardShortcut);
   }, []);
 
-  async function handleCreateProject(request: CreateDesktopContractRequest) {
+  useEffect(() => {
+    const handleSalModalAction = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+
+      if (customEvent.detail === "create") {
+        setIsCreateSalModalOpen(true);
+      }
+
+      if (customEvent.detail === "open") {
+        setIsSalModalOpen(true);
+      }
+    };
+
+    window.addEventListener("sal-modal-action", handleSalModalAction);
+    return () => window.removeEventListener("sal-modal-action", handleSalModalAction);
+  }, []);
+
+  async function handleCreateProject(
+    request: CreateDesktopContractRequest,
+    meta: { contractorName: string },
+  ) {
     setCreateState("saving");
     setCreateMessage("");
 
@@ -535,6 +641,13 @@ export function ProjectsScreen() {
           ? { message: "Runtime browser: anteprima locale.", source: "fallback" }
           : { source: "desktop" }),
       }));
+      setProjectContractors((current) => ({
+        ...current,
+        [created.id]: normalizeContractorName(meta.contractorName),
+      }));
+      setContractorRegistry((current) =>
+        mergeContractorRegistry(current, normalizeContractorName(meta.contractorName)),
+      );
       setSelectedContractId(created.id);
       setCreateState("saved");
       setCreateMessage(`${created.title} creato.`);
@@ -556,9 +669,12 @@ export function ProjectsScreen() {
     }
   }
 
-  async function handleUpdateProject(request: CreateDesktopContractRequest) {
+  async function handleUpdateProject(
+    request: CreateDesktopContractRequest,
+    meta: { contractorName: string },
+  ) {
     if (!editingProject) {
-      return handleCreateProject(request);
+      return handleCreateProject(request, meta);
     }
 
     setCreateState("saving");
@@ -576,6 +692,13 @@ export function ProjectsScreen() {
           ? { message: "Runtime browser: modifica in anteprima.", source: "fallback" }
           : { source: "desktop" }),
       }));
+      setProjectContractors((current) => ({
+        ...current,
+        [updated.id]: normalizeContractorName(meta.contractorName),
+      }));
+      setContractorRegistry((current) =>
+        mergeContractorRegistry(current, normalizeContractorName(meta.contractorName)),
+      );
       setSelectedContractId(updated.id);
       setCreateState("saved");
       setCreateMessage(`${updated.title} aggiornato.`);
@@ -617,6 +740,7 @@ export function ProjectsScreen() {
       contractId: contract.id,
       values: {
         applicationContractCode: contract.applicationContractCode,
+        contractorName: projectContractors[contract.id] ?? "",
         contractualAmount: String(contract.contractualAmount.amount),
         frameworkAgreementCode: contract.frameworkAgreementCode,
         tariffBookId: contract.tariffPriorities[0]?.tariffBookId ?? tariffBooksState[0]?.id ?? "",
@@ -675,6 +799,22 @@ export function ProjectsScreen() {
 
   function handleOpenProjectActions(project: PortfolioProject) {
     setProjectActionDialog({ mode: "actions", project });
+  }
+
+  function handleCreateContractor() {
+    const contractorName = normalizeContractorName(contractorDraft);
+
+    if (contractorName.length < 2) {
+      setCreateState("error");
+      setCreateMessage("Inserisci un nome appaltatore valido.");
+      return;
+    }
+
+    setContractorRegistry((current) => mergeContractorRegistry(current, contractorName));
+    setContractorDraft("");
+    setIsContractorModalOpen(false);
+    setCreateState("saved");
+    setCreateMessage(`${contractorName} creato tra gli appaltatori.`);
   }
 
   function handleEditFromActions(project: PortfolioProject) {
@@ -874,20 +1014,57 @@ export function ProjectsScreen() {
     }
   }
 
+  const contractorFolders = useMemo(
+    () => buildContractorFolders(contractorRegistry, activeProjects, allSals, projectSalIndex),
+    [activeProjects, allSals, contractorRegistry, projectSalIndex],
+  );
+  const selectedContractor = contractorFolders.find((folder) => folder.id === selectedContractorId);
+  const contractorProjects = useMemo(
+    () =>
+      selectedContractorId
+        ? activeProjects.filter(
+            (project) => createContractorId(project.contractor) === selectedContractorId,
+          )
+        : activeProjects,
+    [activeProjects, selectedContractorId],
+  );
+  const folderRecentSals = useMemo(
+    () =>
+      selectedContractorId
+        ? allSals
+            .filter((sal) => {
+              const project = projectSalIndex.get(sal.projectId);
+              return createContractorId(project?.client ?? "") === selectedContractorId;
+            })
+            .slice(0, 5)
+        : recentSals,
+    [allSals, projectSalIndex, recentSals, selectedContractorId],
+  );
+  const modalSals = useMemo(
+    () =>
+      selectedContractorId
+        ? allSals.filter((sal) => {
+            const project = projectSalIndex.get(sal.projectId);
+            return createContractorId(project?.client ?? "") === selectedContractorId;
+          })
+        : allSals,
+    [allSals, projectSalIndex, selectedContractorId],
+  );
+
   const visibleProjects = useMemo(
     () =>
-      activeProjects
+      contractorProjects
         .filter(
           (project) => matchesFocus(project, focus) && matchesProjectSearch(project, deferredQuery),
         )
         .sort(compareProjects),
-    [activeProjects, deferredQuery, focus],
+    [contractorProjects, deferredQuery, focus],
   );
 
   const visibleQueue = useMemo(
     () =>
       priorityQueue.filter((item) => {
-        const project = projectIndex.get(item.projectId);
+        const project = contractorProjects.find((candidate) => candidate.id === item.projectId);
 
         if (!project || !matchesFocus(project, focus)) {
           return false;
@@ -898,13 +1075,13 @@ export function ProjectsScreen() {
           deferredQuery,
         );
       }),
-    [deferredQuery, focus, projectIndex],
+    [contractorProjects, deferredQuery, focus],
   );
 
   const visibleApprovals = useMemo(
     () =>
       approvalWindow.filter((item) => {
-        const project = projectIndex.get(item.projectId);
+        const project = contractorProjects.find((candidate) => candidate.id === item.projectId);
 
         if (!project || !matchesFocus(project, focus)) {
           return false;
@@ -915,13 +1092,13 @@ export function ProjectsScreen() {
           deferredQuery,
         );
       }),
-    [deferredQuery, focus, projectIndex],
+    [contractorProjects, deferredQuery, focus],
   );
 
   const visibleActivities = useMemo(
     () =>
       activityFeed.filter((item) => {
-        const project = projectIndex.get(item.projectId);
+        const project = contractorProjects.find((candidate) => candidate.id === item.projectId);
 
         if (!project || !matchesFocus(project, focus)) {
           return false;
@@ -929,7 +1106,7 @@ export function ProjectsScreen() {
 
         return matchesSearch(`${project.title} ${item.label} ${item.detail}`, deferredQuery);
       }),
-    [deferredQuery, focus, projectIndex],
+    [contractorProjects, deferredQuery, focus],
   );
 
   const totalBudget = visibleProjects.reduce((sum, project) => sum + project.budget.amount, 0);
@@ -948,7 +1125,7 @@ export function ProjectsScreen() {
   const focusCounts = useMemo(() => {
     const counts: Record<PortfolioFocus, number> = { all: 0, critical: 0, sal: 0 };
 
-    for (const project of activeProjects) {
+    for (const project of contractorProjects) {
       if (!matchesProjectSearch(project, deferredQuery)) {
         continue;
       }
@@ -965,7 +1142,7 @@ export function ProjectsScreen() {
     }
 
     return counts;
-  }, [activeProjects, deferredQuery]);
+  }, [contractorProjects, deferredQuery]);
 
   return (
     <ScreenShell>
@@ -983,180 +1160,303 @@ export function ProjectsScreen() {
         </div>
       ) : null}
 
-      <CommandPanel className="p-0" variant="projects">
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="p-6 md:p-8">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="info">Sala controllo portfolio</Badge>
-              <span className="text-xs font-medium text-secondary">
-                {contractsState.source === "desktop"
-                  ? "Contratti caricati dal database locale"
-                  : contractsState.message}{" "}
-                · {visibleProjects.length} lotti nel perimetro attivo
-              </span>
-              {isPending ? <Badge variant="warning">Filtri in aggiornamento</Badge> : null}
-            </div>
-
-            <div className="mt-5 max-w-3xl">
-              <h2 className="text-[2rem] font-semibold tracking-tight text-foreground md:text-[2.6rem]">
-                Portafoglio lavori sotto presidio operativo.
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary md:text-[15px]">
-                Vista unica su forecast, SAL, materiali critici e milestone di approvazione. Il
-                filtro guida board, coda prioritaria e registro operativo senza spezzare il flusso.
-              </p>
-            </div>
-
-            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <PortfolioMetric
-                label="EAC presidiato"
-                note="Valore totale dei lotti nel perimetro corrente"
-                value={formatMoney({ amount: totalBudget, currency: "EUR" })}
-              />
-              <PortfolioMetric
-                label="Importo SAL in corsa"
-                note={`${salWindowCount} lotti tra emissioni, firme e dossier aperti nei prossimi 7 giorni`}
-                tone={salWindowCount > 0 ? "warning" : "success"}
-                value={formatMoney({ amount: salExposure, currency: "EUR" })}
-              />
-              <PortfolioMetric
-                label="Escalation"
-                note="Cantieri con forecast e documentazione fuori soglia"
-                tone={criticalCount > 0 ? "danger" : "success"}
-                value={`${criticalCount} cantieri`}
-              />
-              <PortfolioMetric
-                label="Avanzamento medio"
-                note="Media ponderata sul portafoglio visibile"
-                tone="success"
-                value={formatPercent(averageProgress)}
-              />
-            </div>
-
-            <div className="mt-7 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-              <div className="flex max-w-3xl flex-1 flex-col gap-3">
-                <div className="flex flex-wrap gap-2">
-                  {focusOptions.map((option) => (
-                    <FocusChip
-                      active={focus === option.value}
-                      count={focusCounts[option.value]}
-                      key={option.value}
-                      label={option.label}
-                      onClick={() => startTransition(() => setFocus(option.value))}
-                    />
-                  ))}
+      {selectedContractor ? (
+        <>
+          <CommandPanel className="p-0" variant="projects">
+            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="p-6 md:p-8">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge variant="info">Cartella appaltatore</Badge>
+                  <span className="text-xs font-medium text-secondary">
+                    {contractsState.source === "desktop"
+                      ? "Contratti caricati dal database locale"
+                      : contractsState.message}{" "}
+                    · {selectedContractor.contractor} · {visibleProjects.length} lotti nel perimetro
+                    attivo
+                  </span>
+                  {isPending ? <Badge variant="warning">Filtri in aggiornamento</Badge> : null}
                 </div>
 
-                <label className="relative block max-w-2xl">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-secondary" />
-                  <input
-                    className="h-12 w-full rounded-2xl border border-subtle bg-card/90 pl-11 pr-4 text-sm text-foreground outline-none transition-all duration-base focus:border-primary focus:ring-2 focus:ring-ring"
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Cerca lotto, PM, milestone o materiale critico"
-                    type="search"
-                    value={query}
+                <div className="mt-5 max-w-3xl">
+                  <h2 className="text-[2rem] font-semibold tracking-tight text-foreground md:text-[2.35rem]">
+                    {selectedContractor.contractor}
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary md:text-[15px]">
+                    Cartella operativa dell'appaltatore: progetti, contratti, SAL e priorita sono
+                    filtrati su questo perimetro.
+                  </p>
+                </div>
+
+                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <PortfolioMetric
+                    label="Contratti / progetti"
+                    note="Elementi agganciati alla cartella appaltatore"
+                    value={`${visibleProjects.length}`}
                   />
-                </label>
+                  <PortfolioMetric
+                    label="Valore contratti"
+                    note="Totale dei progetti nel perimetro corrente"
+                    value={formatMoney({ amount: totalBudget, currency: "EUR" })}
+                  />
+                  <PortfolioMetric
+                    label="Importo SAL in corsa"
+                    note={`${salWindowCount} lotti tra emissioni, firme e dossier aperti nei prossimi 7 giorni`}
+                    tone={salWindowCount > 0 ? "warning" : "success"}
+                    value={formatMoney({ amount: salExposure, currency: "EUR" })}
+                  />
+                  <PortfolioMetric
+                    label="Escalation"
+                    note="Cantieri con forecast e documentazione fuori soglia"
+                    tone={criticalCount > 0 ? "danger" : "success"}
+                    value={`${criticalCount} cantieri`}
+                  />
+                  <PortfolioMetric
+                    label="Avanzamento medio"
+                    note="Media ponderata sul portafoglio visibile"
+                    tone="success"
+                    value={formatPercent(averageProgress)}
+                  />
+                </div>
+
+                <div className="mt-7 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                  <div className="flex max-w-3xl flex-1 flex-col gap-3">
+                    <div className="flex flex-wrap gap-2">
+                      {focusOptions.map((option) => (
+                        <FocusChip
+                          active={focus === option.value}
+                          count={focusCounts[option.value]}
+                          key={option.value}
+                          label={option.label}
+                          onClick={() => startTransition(() => setFocus(option.value))}
+                        />
+                      ))}
+                    </div>
+
+                    <label className="relative block max-w-2xl">
+                      <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+                      <input
+                        className="h-12 w-full rounded-2xl border border-subtle bg-card/90 pl-11 pr-4 text-sm text-foreground outline-none transition-all duration-base focus:border-primary focus:ring-2 focus:ring-ring"
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Cerca lotto, PM, milestone o materiale critico"
+                        type="search"
+                        value={query}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
+
+              <aside className="border-t border-subtle/80 p-6 xl:border-l xl:border-t-0">
+                <Button
+                  onClick={() => {
+                    setSelectedContractorId(null);
+                    setQuery("");
+                    setFocus("all");
+                  }}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <ArrowLeft className="size-4" />
+                  Appaltatori
+                </Button>
+                <div className="mt-5 space-y-3">
+                  <PortfolioMetric
+                    label="SAL recenti"
+                    note="Ultime attivita della cartella"
+                    tone={folderRecentSals.length > 0 ? "warning" : "success"}
+                    value={`${folderRecentSals.length}`}
+                  />
+                  <PortfolioMetric
+                    label="Escalation"
+                    note="Progetti fuori soglia nella cartella"
+                    tone={criticalCount > 0 ? "danger" : "success"}
+                    value={`${criticalCount}`}
+                  />
+                </div>
+              </aside>
             </div>
-          </div>
+          </CommandPanel>
 
-          <ApprovalWindowPanel items={visibleApprovals} projectIndex={projectIndex} />
-        </div>
-      </CommandPanel>
+          {folderRecentSals.length > 0 ? (
+            <RecentSalsPanel
+              onOpenModal={() => setIsSalModalOpen(true)}
+              projectIndex={projectSalIndex}
+              sals={folderRecentSals}
+            />
+          ) : null}
 
-      <MigrationPanel
-        action={migrationAction}
-        isCommitDisabled={
-          !migrationPreview?.validation.valid ||
-          (migrationPreview?.data.projects.length ?? 0) === 0 ||
-          migrationAction !== "idle"
-        }
-        isBusy={migrationAction !== "idle"}
-        onClearPreview={() => {
-          setMigrationPreview(null);
-          setCreateState("idle");
-          setCreateMessage("");
-        }}
-        onCommit={handleCommitMigrationPreview}
-        onDownloadTemplate={handleDownloadMigrationTemplate}
-        onExport={handleExportMigrationWorkbook}
-        onOpenFilePicker={() => fileInputRef.current?.click()}
-        preview={migrationPreview}
-      />
-      <input
-        accept=".xlsx"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-
-          if (file) {
-            void handleImportMigrationFile(file);
-          }
-
-          event.currentTarget.value = "";
-        }}
-        ref={fileInputRef}
-        type="file"
-      />
-
-      <section className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
-        <div className="space-y-6">
-          <PriorityQueuePanel items={visibleQueue} projectIndex={projectIndex} />
-          <ManagerLoadPanel
-            rows={managerLoad}
-            totalManagers={new Set(visibleProjects.map((project) => project.manager)).size}
+          <MigrationPanel
+            action={migrationAction}
+            isCommitDisabled={
+              !migrationPreview?.validation.valid ||
+              (migrationPreview?.data.projects.length ?? 0) === 0 ||
+              migrationAction !== "idle"
+            }
+            isBusy={migrationAction !== "idle"}
+            onClearPreview={() => {
+              setMigrationPreview(null);
+              setCreateState("idle");
+              setCreateMessage("");
+            }}
+            onCommit={handleCommitMigrationPreview}
+            onDownloadTemplate={handleDownloadMigrationTemplate}
+            onExport={handleExportMigrationWorkbook}
+            onOpenFilePicker={() => fileInputRef.current?.click()}
+            preview={migrationPreview}
           />
-        </div>
+          <input
+            accept=".xlsx"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
 
-        <section className="min-w-0">
-          <div className="mb-4 flex flex-col gap-3 rounded-[24px] border border-subtle bg-card p-4 shadow-soft md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
-                Vista operativa
+              if (file) {
+                void handleImportMigrationFile(file);
+              }
+
+              event.currentTarget.value = "";
+            }}
+            ref={fileInputRef}
+            type="file"
+          />
+
+          <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="min-w-0">
+              <div className="mb-4 flex flex-col gap-3 rounded-[24px] border border-subtle bg-card p-4 shadow-soft md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+                    Progetti della cartella
+                  </div>
+                  <h3 className="mt-1 text-base font-semibold text-foreground">
+                    {viewMode === "workbench" ? "Registro progetti" : "Board per priorita"}
+                  </h3>
+                </div>
+                <div className="flex rounded-[18px] border border-subtle bg-muted/45 p-1">
+                  <ViewModeButton
+                    active={viewMode === "workbench"}
+                    label="Registro"
+                    onClick={() => setViewMode("workbench")}
+                  />
+                  <ViewModeButton
+                    active={viewMode === "board"}
+                    label="Board"
+                    onClick={() => setViewMode("board")}
+                  />
+                </div>
               </div>
-              <h3 className="mt-1 text-base font-semibold text-foreground">
-                {viewMode === "board" ? "Board per priorita" : "Registro progetti"}
-              </h3>
-            </div>
-            <div className="flex rounded-[18px] border border-subtle bg-muted/45 p-1">
-              <ViewModeButton
-                active={viewMode === "board"}
-                label="Board"
-                onClick={() => setViewMode("board")}
-              />
-              <ViewModeButton
-                active={viewMode === "workbench"}
-                label="Registro"
-                onClick={() => setViewMode("workbench")}
-              />
-            </div>
-          </div>
 
-          {viewMode === "board" ? (
-            <PortfolioBoard
-              onOpenProject={handleOpenProject}
-              onOpenProjectActions={handleOpenProjectActions}
-              projects={visibleProjects}
-            />
-          ) : (
-            <ProjectsWorkbench
-              onOpenProject={handleOpenProject}
-              onOpenProjectActions={handleOpenProjectActions}
-              projects={visibleProjects}
-              query={query}
-              selectedProjectId={selectedContractId}
-            />
-          )}
-        </section>
+              {viewMode === "workbench" ? (
+                <ProjectsWorkbench
+                  onOpenProject={handleOpenProject}
+                  onOpenProjectActions={handleOpenProjectActions}
+                  projects={visibleProjects}
+                  query={query}
+                  selectedProjectId={selectedContractId}
+                />
+              ) : (
+                <PortfolioBoard
+                  onOpenProject={handleOpenProject}
+                  onOpenProjectActions={handleOpenProjectActions}
+                  projects={visibleProjects}
+                />
+              )}
+            </section>
 
-        <ControlRailPanel activities={visibleActivities} signals={controlSignals} />
-      </section>
+            <div className="space-y-6">
+              <PriorityQueuePanel items={visibleQueue} projectIndex={projectIndex} />
+              <ApprovalWindowPanel items={visibleApprovals} projectIndex={projectIndex} compact />
+              <ManagerLoadPanel
+                rows={managerLoad}
+                totalManagers={new Set(visibleProjects.map((project) => project.manager)).size}
+              />
+              <ControlRailPanel activities={visibleActivities} signals={controlSignals} />
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          <CommandPanel className="p-0" variant="projects">
+            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="p-6 md:p-8">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge variant="info">Cartelle appaltatori</Badge>
+                  <span className="text-xs font-medium text-secondary">
+                    {contractsState.source === "desktop"
+                      ? "Contratti caricati dal database locale"
+                      : contractsState.message}{" "}
+                    · {contractorFolders.length} cartelle · {activeProjects.length} progetti
+                  </span>
+                </div>
+                <div className="mt-5 max-w-3xl">
+                  <h2 className="text-[2rem] font-semibold tracking-tight text-foreground md:text-[2.6rem]">
+                    Seleziona l'appaltatore e apri i suoi progetti.
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-secondary md:text-[15px]">
+                    La pagina Progetti parte dalle cartelle appaltatore. Entrando in una cartella
+                    trovi board, registro e controlli filtrati sul perimetro scelto.
+                  </p>
+                </div>
+              </div>
+              <aside className="border-t border-subtle/80 p-6 xl:border-l xl:border-t-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+                  Sintesi portfolio
+                </div>
+                <div className="mt-5 grid gap-3">
+                  <PortfolioMetric
+                    label="Appaltatori"
+                    note="Cartelle operative disponibili"
+                    value={`${contractorFolders.length}`}
+                  />
+                  <PortfolioMetric
+                    label="SAL recenti"
+                    note="Ultime attivita prima di entrare nel dettaglio"
+                    tone={recentSals.length > 0 ? "warning" : "success"}
+                    value={`${recentSals.length}`}
+                  />
+                </div>
+              </aside>
+            </div>
+          </CommandPanel>
+
+          {recentSals.length > 0 ? (
+            <RecentSalsPanel
+              onOpenModal={() => setIsSalModalOpen(true)}
+              projectIndex={projectSalIndex}
+              sals={recentSals}
+            />
+          ) : null}
+
+          <ContractorFoldersPanel
+            folders={contractorFolders}
+            onOpenCreateContractor={() => setIsContractorModalOpen(true)}
+            onOpenFolder={(folderId) => {
+              setSelectedContractorId(folderId);
+              setQuery("");
+              setFocus("all");
+            }}
+          />
+        </>
+      )}
 
       {isCreateProjectModalOpen ? (
         <CreateProjectModal
+          contractorOptions={contractorRegistry}
           defaultTariffBookId={tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id}
-          {...(editingProject ? { initialValues: editingProject.values } : {})}
+          {...(editingProject
+            ? { initialValues: editingProject.values }
+            : selectedContractor
+              ? {
+                  initialValues: {
+                    applicationContractCode: "",
+                    contractorName: selectedContractor.contractor,
+                    contractualAmount: "",
+                    frameworkAgreementCode: "",
+                    tariffBookId: tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id,
+                    title: "",
+                  },
+                }
+              : {})}
           isSaving={createState === "saving"}
           onClose={() => {
             setIsCreateProjectModalOpen(false);
@@ -1181,6 +1481,72 @@ export function ProjectsScreen() {
           project={projectActionDialog.project}
         />
       ) : null}
+      {isContractorModalOpen ? (
+        <ContractorModal
+          contractorDraft={contractorDraft}
+          onChange={setContractorDraft}
+          onClose={() => {
+            setContractorDraft("");
+            setIsContractorModalOpen(false);
+          }}
+          onCreate={handleCreateContractor}
+        />
+      ) : null}
+      {isCreateSalModalOpen ? (
+        <CreateSalModal
+          contractors={contractorFolders}
+          onClose={() => setIsCreateSalModalOpen(false)}
+          onCreate={(request) => {
+            const project = activeProjects.find((item) => item.id === request.projectId);
+
+            if (!project) {
+              notify({
+                message: "Seleziona un progetto valido prima di creare la SAL.",
+                title: "SAL non creata",
+                tone: "warning",
+              });
+              return;
+            }
+
+            const voices = request.voices.map((voice) =>
+              mapDesktopVoiceToSalVoice(voice, request.projectYear),
+            );
+
+            createSalProjectWithId({
+              client: project.contractor,
+              description: `${project.lot} - ${project.location}`,
+              id: project.id,
+              name: project.title,
+              year: new Date().getFullYear(),
+            });
+            const created = createSalDraftWithLines({
+              date: request.date,
+              description: request.description,
+              notes: "",
+              projectId: request.projectId,
+              title: request.title,
+              voices,
+            });
+            setIsCreateSalModalOpen(false);
+            setIsSalModalOpen(true);
+            notify({
+              message: `${created.title} creata come bozza.`,
+              title: "SAL creata",
+              tone: "success",
+            });
+          }}
+          projects={selectedContractorId ? contractorProjects : activeProjects}
+          tariffBooks={tariffBooksState}
+        />
+      ) : null}
+      <SalModal
+        isOpen={isSalModalOpen}
+        onClose={() => setIsSalModalOpen(false)}
+        projectIndex={projectSalIndex}
+        sals={modalSals}
+        onUpdateQuantity={updateSalLineQuantity}
+        onUpdateSurcharge={updateSalLineSurcharge}
+      />
     </ScreenShell>
   );
 }
@@ -1341,6 +1707,591 @@ function MigrationPanel({
   );
 }
 
+function ContractorFoldersPanel({
+  folders,
+  onOpenCreateContractor,
+  onOpenFolder,
+}: {
+  folders: ContractorFolder[];
+  onOpenCreateContractor: () => void;
+  onOpenFolder: (folderId: string) => void;
+}) {
+  return (
+    <SectionPanel className="mt-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+            Appaltatori
+          </div>
+          <h3 className="mt-2 text-lg font-semibold text-foreground">Cartelle progetto</h3>
+          <p className="mt-1 text-sm text-secondary">
+            Apri una cartella per vedere solo i progetti, i controlli e le priorita dell'appaltatore
+            selezionato.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="neutral">{folders.length} cartelle</Badge>
+          <Button onClick={onOpenCreateContractor} size="sm" type="button">
+            <Plus className="size-4" />
+            Appaltatore
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {folders.length > 0 ? (
+          folders.map((folder) => {
+            const hasCriticalItems = folder.criticalCount > 0 || folder.salWindowCount > 0;
+
+            return (
+              <button
+                className="group rounded-[18px] border border-subtle bg-card p-4 text-left shadow-soft transition-colors hover:border-primary/40 hover:bg-muted/35"
+                key={folder.id}
+                onClick={() => onOpenFolder(folder.id)}
+                type="button"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-[14px] border border-subtle bg-muted text-primary">
+                      <FolderOpen className="size-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+                        <Building2 className="size-4" />
+                        Appaltatore
+                      </div>
+                      <h4 className="mt-1 truncate text-xl font-semibold text-foreground">
+                        {folder.contractor}
+                      </h4>
+                    </div>
+                  </div>
+                  <Badge variant={hasCriticalItems ? "warning" : "success"}>
+                    {hasCriticalItems ? "Presidio" : "Stabile"}
+                  </Badge>
+                </div>
+
+                <dl className="mt-4 grid grid-cols-4 gap-2">
+                  <FolderMetric label="Contratti" value={`${folder.projectCount}`} />
+                  <FolderMetric label="Progetti" value={`${folder.projectCount}`} />
+                  <FolderMetric label="SAL" value={`${folder.salCount}`} />
+                  <FolderMetric label="Alert" value={`${folder.criticalCount}`} />
+                </dl>
+
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-subtle pt-3">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
+                      Valore
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-foreground">
+                      {formatMoney({ amount: folder.budget, currency: "EUR" })}
+                    </div>
+                  </div>
+                  <ChevronRight className="size-4 text-primary transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </button>
+            );
+          })
+        ) : (
+          <div className="md:col-span-2 xl:col-span-3">
+            <EmptyState
+              description="Crea il primo appaltatore. I progetti creati dalla sua cartella verranno agganciati automaticamente."
+              title="Nessuna cartella appaltatore"
+            />
+          </div>
+        )}
+      </div>
+    </SectionPanel>
+  );
+}
+
+function FolderMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-[12px] border border-subtle bg-muted/35 px-2.5 py-2">
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
+        {label}
+      </dt>
+      <dd className="mt-1 truncate text-sm font-semibold text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function ContractorModal({
+  contractorDraft,
+  onChange,
+  onClose,
+  onCreate,
+}: {
+  contractorDraft: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+      <button
+        aria-label="Chiudi creazione appaltatore"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <section className="relative w-full max-w-md rounded-[22px] border border-subtle bg-card shadow-panel">
+        <div className="flex items-center justify-between gap-4 border-b border-subtle px-5 py-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              Appaltatori
+            </div>
+            <h3 className="mt-1 text-lg font-semibold text-foreground">Nuovo appaltatore</h3>
+          </div>
+          <button
+            className="flex size-9 items-center justify-center rounded-[14px] text-secondary transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="p-5">
+          <label className="block">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+              Nome appaltatore
+            </span>
+            <input
+              className="mt-2 h-11 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+              onChange={(event) => onChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onCreate();
+                }
+              }}
+              placeholder="Es. RFI"
+              value={contractorDraft}
+            />
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-subtle px-5 py-4">
+          <Button onClick={onClose} type="button" variant="outline">
+            Annulla
+          </Button>
+          <Button onClick={onCreate} type="button">
+            Crea
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CreateSalModal({
+  contractors,
+  onClose,
+  onCreate,
+  projects,
+  tariffBooks,
+}: {
+  contractors: ContractorFolder[];
+  onClose: () => void;
+  onCreate: (request: {
+    date: string;
+    description: string;
+    notes: string;
+    projectId: string;
+    projectYear: number;
+    title: string;
+    voices: DesktopTariffVoice[];
+  }) => void;
+  projects: PortfolioProject[];
+  tariffBooks: DesktopTariffBook[];
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [contractorId, setContractorId] = useState(
+    projects[0]?.contractor ? createContractorId(projects[0].contractor) : "",
+  );
+  const contractorProjects = useMemo(
+    () => projects.filter((project) => createContractorId(project.contractor) === contractorId),
+    [contractorId, projects],
+  );
+  const [projectId, setProjectId] = useState(contractorProjects[0]?.id ?? projects[0]?.id ?? "");
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState(today);
+  const [error, setError] = useState("");
+  const [selectedTariffBookIds, setSelectedTariffBookIds] = useState<string[]>([]);
+  const [activeTariffBookId, setActiveTariffBookId] = useState("");
+  const [voicesByBook, setVoicesByBook] = useState<Record<string, DesktopTariffVoice[]>>({});
+  const [selectedVoiceIds, setSelectedVoiceIds] = useState<string[]>([]);
+  const selectedProject = projects.find((project) => project.id === projectId);
+  const activeVoices = activeTariffBookId ? (voicesByBook[activeTariffBookId] ?? []) : [];
+  const selectedVoices = selectedTariffBookIds.flatMap((bookId) =>
+    (voicesByBook[bookId] ?? []).filter((voice) =>
+      selectedVoiceIds.includes(createDesktopVoiceKey(bookId, voice.id)),
+    ),
+  );
+
+  useEffect(() => {
+    const firstProject = contractorProjects[0];
+
+    setProjectId((current) =>
+      contractorProjects.some((project) => project.id === current)
+        ? current
+        : (firstProject?.id ?? ""),
+    );
+  }, [contractorProjects]);
+
+  useEffect(() => {
+    if (!activeTariffBookId && selectedTariffBookIds[0]) {
+      setActiveTariffBookId(selectedTariffBookIds[0]);
+    }
+  }, [activeTariffBookId, selectedTariffBookIds]);
+
+  useEffect(() => {
+    for (const tariffBookId of selectedTariffBookIds) {
+      if (voicesByBook[tariffBookId]) {
+        continue;
+      }
+
+      void listDesktopTariffVoices(tariffBookId, buildFallbackTariffVoices(tariffBookId)).then(
+        (result) => {
+          setVoicesByBook((current) => ({
+            ...current,
+            [tariffBookId]: result.data,
+          }));
+        },
+      );
+    }
+  }, [selectedTariffBookIds, voicesByBook]);
+
+  function toggleTariffBook(tariffBookId: string) {
+    setSelectedTariffBookIds((current) => {
+      if (current.includes(tariffBookId)) {
+        setSelectedVoiceIds((voiceIds) =>
+          voiceIds.filter(
+            (voiceId) =>
+              !(voicesByBook[tariffBookId] ?? []).some(
+                (voice) => voiceId === createDesktopVoiceKey(tariffBookId, voice.id),
+              ),
+          ),
+        );
+        return current.filter((id) => id !== tariffBookId);
+      }
+
+      return [...current, tariffBookId];
+    });
+    setActiveTariffBookId(tariffBookId);
+  }
+
+  function toggleVoice(voiceId: string) {
+    setSelectedVoiceIds((current) =>
+      current.includes(voiceId) ? current.filter((id) => id !== voiceId) : [...current, voiceId],
+    );
+  }
+
+  function goNext() {
+    if (step === 1 && !contractorId) {
+      setError("Seleziona un appaltatore.");
+      return;
+    }
+
+    if (step === 2 && !projectId) {
+      setError("Seleziona un progetto.");
+      return;
+    }
+
+    if (step === 3 && selectedTariffBookIds.length === 0) {
+      setError("Seleziona almeno un tariffario.");
+      return;
+    }
+
+    setError("");
+    setStep((current) => (current < 4 ? ((current + 1) as 1 | 2 | 3 | 4) : current));
+  }
+
+  function handleCreate() {
+    if (!projectId || !selectedProject) {
+      setError("Seleziona un progetto.");
+      return;
+    }
+
+    if (selectedVoices.length === 0) {
+      setError("Seleziona almeno una voce.");
+      return;
+    }
+
+    onCreate({
+      date,
+      description: "",
+      notes: "",
+      projectId,
+      projectYear: new Date().getFullYear(),
+      title: title.trim(),
+      voices: selectedVoices,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+      <button
+        aria-label="Chiudi creazione SAL"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <section className="relative max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[22px] border border-subtle bg-card shadow-panel">
+        <div className="flex items-center justify-between gap-4 border-b border-subtle px-5 py-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              SAL
+            </div>
+            <h3 className="mt-1 text-lg font-semibold text-foreground">Nuova SAL</h3>
+          </div>
+          <button
+            className="flex size-9 items-center justify-center rounded-[14px] text-secondary transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="grid max-h-[70vh] gap-0 overflow-hidden lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside className="border-b border-subtle bg-muted/30 p-4 lg:border-b-0 lg:border-r">
+            {[1, 2, 3, 4].map((item) => (
+              <button
+                className={cn(
+                  "mb-2 flex w-full items-center gap-3 rounded-[14px] px-3 py-2 text-left text-sm",
+                  step === item
+                    ? "bg-card font-semibold text-foreground shadow-soft"
+                    : "text-secondary",
+                )}
+                key={item}
+                onClick={() => setStep(item as 1 | 2 | 3 | 4)}
+                type="button"
+              >
+                <span className="flex size-6 items-center justify-center rounded-full border border-subtle text-xs">
+                  {item}
+                </span>
+                <span>
+                  {item === 1
+                    ? "Appaltatore"
+                    : item === 2
+                      ? "Progetto"
+                      : item === 3
+                        ? "Tariffari"
+                        : "Draft"}
+                </span>
+              </button>
+            ))}
+          </aside>
+
+          <div className="overflow-y-auto p-5">
+            {step === 1 ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {contractors.map((contractor) => (
+                  <button
+                    className={cn(
+                      "rounded-[18px] border p-4 text-left transition-colors",
+                      contractorId === contractor.id
+                        ? "border-primary bg-primary/10"
+                        : "border-subtle bg-muted/25 hover:bg-muted",
+                    )}
+                    key={contractor.id}
+                    onClick={() => setContractorId(contractor.id)}
+                    type="button"
+                  >
+                    <div className="text-sm font-semibold text-foreground">
+                      {contractor.contractor}
+                    </div>
+                    <div className="mt-1 text-xs text-secondary">
+                      {contractor.projectCount} progetti
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {step === 2 ? (
+              <div className="grid gap-3">
+                {contractorProjects.map((project) => (
+                  <button
+                    className={cn(
+                      "rounded-[18px] border p-4 text-left transition-colors",
+                      projectId === project.id
+                        ? "border-primary bg-primary/10"
+                        : "border-subtle bg-muted/25 hover:bg-muted",
+                    )}
+                    key={project.id}
+                    onClick={() => setProjectId(project.id)}
+                    type="button"
+                  >
+                    <div className="text-sm font-semibold text-foreground">{project.title}</div>
+                    <div className="mt-1 text-xs text-secondary">
+                      {project.lot} · {project.location}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {step === 3 ? (
+              <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+                <div className="space-y-2">
+                  {tariffBooks.map((book) => (
+                    <button
+                      className={cn(
+                        "w-full rounded-[16px] border p-3 text-left",
+                        selectedTariffBookIds.includes(book.id)
+                          ? "border-primary bg-primary/10"
+                          : "border-subtle bg-muted/25 hover:bg-muted",
+                      )}
+                      key={book.id}
+                      onClick={() => toggleTariffBook(book.id)}
+                      type="button"
+                    >
+                      <div className="text-sm font-semibold text-foreground">{book.name}</div>
+                      <div className="mt-1 text-xs text-secondary">{book.year}</div>
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {selectedTariffBookIds.map((bookId) => {
+                      const book = tariffBooks.find((item) => item.id === bookId);
+                      return (
+                        <Button
+                          key={bookId}
+                          onClick={() => setActiveTariffBookId(bookId)}
+                          size="sm"
+                          type="button"
+                          variant={activeTariffBookId === bookId ? "default" : "outline"}
+                        >
+                          {book?.name ?? bookId}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <div className="max-h-[360px] space-y-2 overflow-y-auto">
+                    {activeVoices.map((voice) => {
+                      const voiceKey = createDesktopVoiceKey(activeTariffBookId, voice.id);
+
+                      return (
+                        <label
+                          className="flex cursor-pointer items-start gap-3 rounded-[14px] border border-subtle bg-card p-3"
+                          key={voiceKey}
+                        >
+                          <input
+                            checked={selectedVoiceIds.includes(voiceKey)}
+                            className="mt-1"
+                            onChange={() => toggleVoice(voiceKey)}
+                            type="checkbox"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold text-foreground">
+                              {voice.officialCode}
+                            </span>
+                            <span className="mt-1 block text-xs leading-5 text-secondary">
+                              {voice.description}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {step === 4 ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                      Titolo
+                    </span>
+                    <input
+                      className="mt-2 h-11 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+                      onChange={(event) => setTitle(event.target.value)}
+                      value={title}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                      Data
+                    </span>
+                    <input
+                      className="mt-2 h-11 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+                      onChange={(event) => setDate(event.target.value)}
+                      type="date"
+                      value={date}
+                    />
+                  </label>
+                </div>
+                <div className="rounded-[18px] border border-subtle">
+                  {selectedVoices.map((voice) => (
+                    <div
+                      className="grid gap-3 border-b border-subtle p-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_120px_150px]"
+                      key={voice.id}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-foreground">
+                          {voice.officialCode}
+                        </div>
+                        <div className="mt-1 line-clamp-2 text-xs text-secondary">
+                          {voice.description}
+                        </div>
+                      </div>
+                      <input
+                        className="h-10 rounded-[12px] border border-subtle bg-card px-3 text-sm"
+                        disabled
+                        placeholder="Quantita"
+                      />
+                      <select
+                        className="h-10 rounded-[12px] border border-subtle bg-card px-3 text-sm"
+                        disabled
+                      >
+                        <option>Nessuna</option>
+                        <option>Diurna</option>
+                        <option>Notturna</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {error ? <div className="mt-4 text-sm text-danger">{error}</div> : null}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-subtle px-5 py-4">
+          <Button onClick={onClose} type="button" variant="outline">
+            Annulla
+          </Button>
+          {step > 1 ? (
+            <Button
+              onClick={() => setStep((current) => (current - 1) as 1 | 2 | 3 | 4)}
+              type="button"
+              variant="outline"
+            >
+              Indietro
+            </Button>
+          ) : null}
+          {step < 4 ? (
+            <Button onClick={goNext} type="button">
+              Avanti
+            </Button>
+          ) : (
+            <Button
+              disabled={projects.length === 0 || selectedVoices.length === 0}
+              onClick={handleCreate}
+              type="button"
+            >
+              Crea draft
+            </Button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function formatMigrationAction(action: MigrationAction) {
   if (action === "template") {
     return "Template in preparazione";
@@ -1372,9 +2323,16 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function mapContractToProject(contract: DesktopContract): PortfolioProject {
+export function mapContractToProject(
+  contract: DesktopContract,
+  contractorName?: unknown,
+): PortfolioProject {
+  const normalizedContractor =
+    typeof contractorName === "string" ? normalizeContractorName(contractorName) : "";
+
   return {
     budget: contract.contractualAmount,
+    contractor: normalizedContractor || "Senza appaltatore",
     forecastDeltaDays: 0,
     healthLabel: "Da pianificare",
     id: contract.id,
@@ -1398,6 +2356,36 @@ function mergeContracts(created: DesktopContract[], current: DesktopContract[]) 
   const createdIds = new Set(created.map((contract) => contract.id));
 
   return [...created, ...current.filter((contract) => !createdIds.has(contract.id))];
+}
+
+function mapDesktopVoiceToSalVoice(voice: DesktopTariffVoice, projectYear: number) {
+  return {
+    category: voice.category,
+    code: voice.officialCode,
+    description: voice.description,
+    id: `desktop_${voice.tariffBookId}_${voice.id}`,
+    projectYear,
+    unit: voice.unitOfMeasure,
+    unitPrice: voice.unitPrice,
+  };
+}
+
+function buildFallbackTariffVoices(tariffBookId: string): DesktopTariffVoice[] {
+  return [
+    {
+      category: "Opere",
+      description: "Voce tariffaria da configurare",
+      id: `${tariffBookId}_fallback_1`,
+      officialCode: "VOCE-001",
+      tariffBookId,
+      unitOfMeasure: "cad",
+      unitPrice: 0,
+    },
+  ];
+}
+
+function createDesktopVoiceKey(tariffBookId: string, voiceId: string) {
+  return `${tariffBookId}::${voiceId}`;
 }
 
 function createMigrationId(title: string, timestamp: number, index: number) {
@@ -1453,16 +2441,24 @@ function downloadWorkbook(bytes: Uint8Array, fileName: string) {
 }
 
 function ApprovalWindowPanel({
+  compact = false,
   items,
   projectIndex,
 }: {
+  compact?: boolean;
   items: ApprovalItem[];
   projectIndex: Map<string, PortfolioProject>;
 }) {
   const activeEscalations = items.filter((item) => item.tone === "danger").length;
 
   return (
-    <aside className="relative border-t border-subtle/80 p-6 xl:border-l xl:border-t-0">
+    <aside
+      className={
+        compact
+          ? "rounded-[24px] border border-subtle bg-card p-5 shadow-soft"
+          : "relative border-t border-subtle/80 p-6 xl:border-l xl:border-t-0"
+      }
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
@@ -2463,9 +3459,160 @@ function isSalWindow(project: PortfolioProject) {
 
 function matchesProjectSearch(project: PortfolioProject, query: string) {
   return matchesSearch(
-    `${project.title} ${project.lot} ${project.location} ${project.manager} ${project.phase} ${project.materialRisk} ${project.nextMilestone}`,
+    `${project.title} ${project.contractor} ${project.lot} ${project.location} ${project.manager} ${project.phase} ${project.materialRisk} ${project.nextMilestone}`,
     query,
   );
+}
+
+function buildContractorFolders(
+  contractors: string[],
+  projects: PortfolioProject[],
+  sals: { projectId: string; status: string }[],
+  salProjectIndex: Map<string, { client: string }>,
+): ContractorFolder[] {
+  const folders = new Map<string, ContractorFolder>();
+
+  for (const contractorName of contractors) {
+    const contractor = normalizeContractorName(contractorName);
+    const id = createContractorId(contractor);
+
+    if (!id) {
+      continue;
+    }
+
+    folders.set(id, {
+      budget: 0,
+      contractor,
+      criticalCount: 0,
+      id,
+      projectCount: 0,
+      salCount: 0,
+      salExposure: 0,
+      salWindowCount: 0,
+    });
+  }
+
+  for (const project of projects) {
+    const contractor = normalizeContractorName(project.contractor);
+    const id = createContractorId(contractor);
+    const current = folders.get(id);
+
+    if (!current) {
+      continue;
+    }
+
+    current.budget += project.budget.amount;
+    current.projectCount += 1;
+    current.salExposure += project.salValue.amount;
+    current.criticalCount += project.tone === "danger" ? 1 : 0;
+    current.salWindowCount += isSalWindow(project) ? 1 : 0;
+    folders.set(id, current);
+  }
+
+  for (const sal of sals) {
+    const project = salProjectIndex.get(sal.projectId);
+    const contractor = normalizeContractorName(project?.client ?? "Appaltatore da assegnare");
+    const id = createContractorId(contractor);
+    const current = folders.get(id);
+
+    if (!current) {
+      continue;
+    }
+
+    current.salCount += 1;
+    folders.set(id, current);
+  }
+
+  return [...folders.values()].sort((left, right) => {
+    if (right.projectCount !== left.projectCount) {
+      return right.projectCount - left.projectCount;
+    }
+
+    return left.contractor.localeCompare(right.contractor);
+  });
+}
+
+function normalizeContractorName(value: string) {
+  const normalized = value.trim();
+  const lowerValue = normalized.toLowerCase();
+
+  if (lowerValue.includes("rfi")) {
+    return "RFI";
+  }
+
+  if (lowerValue.includes("anas")) {
+    return "ANAS";
+  }
+
+  if (lowerValue.includes("regione marche") || lowerValue.includes("adriatica")) {
+    return "Regione Marche";
+  }
+
+  if (lowerValue.includes("regione")) {
+    return normalized;
+  }
+
+  return normalized || "Appaltatore da assegnare";
+}
+
+function createContractorId(contractor: string) {
+  return normalizeContractorName(contractor)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function mergeContractorRegistry(current: string[], contractorName: string) {
+  const normalized = normalizeContractorName(contractorName);
+
+  if (
+    !normalized ||
+    current.some((item) => createContractorId(item) === createContractorId(normalized))
+  ) {
+    return current;
+  }
+
+  return [...current, normalized].sort((left, right) => left.localeCompare(right));
+}
+
+function readStringList(key: string) {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+
+    return Array.isArray(parsed)
+      ? parsed
+          .filter((item): item is string => typeof item === "string")
+          .map(normalizeContractorName)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function readStringRecord(key: string) {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+        .map(([projectId, contractorName]) => [projectId, normalizeContractorName(contractorName)]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeJson(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Persistence is best-effort in browser preview mode.
+  }
 }
 
 function matchesSearch(value: string, query: string) {
@@ -2566,4 +3713,353 @@ function getTonePalette(tone: StatusTone) {
     surface:
       "linear-gradient(180deg, color-mix(in srgb, var(--bg-muted) 56%, var(--surface-base)), var(--surface-base))",
   };
+}
+
+type RecentSalsPanelProps = {
+  onOpenModal: () => void;
+  projectIndex: Map<string, { name: string; year: number; client: string }>;
+  sals: RecentSalItem[];
+};
+
+function RecentSalsPanel({ onOpenModal, projectIndex, sals }: RecentSalsPanelProps) {
+  return (
+    <SectionPanel className="mt-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 items-center justify-center rounded-sm bg-primary/10">
+            <ClipboardList className="size-4 text-primary" />
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              Ultime attivita SAL
+            </div>
+            <div className="text-sm font-medium text-foreground">{sals.length} SAL recenti</div>
+          </div>
+        </div>
+        <Button onClick={onOpenModal} size="sm" type="button" variant="outline">
+          Visualizza tutte
+        </Button>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {sals.map((sal) => {
+          const project = projectIndex.get(sal.projectId);
+          return (
+            <div
+              key={sal.id}
+              className="rounded-[18px] border border-subtle bg-muted/35 p-3 transition-colors hover:bg-muted"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <Badge variant={sal.status === "closed" ? "success" : "warning"}>
+                  {sal.status === "closed" ? "Chiusa" : "Bozza"}
+                </Badge>
+                <span className="text-[10px] font-medium text-secondary">
+                  {new Date(sal.closedAt || sal.date).toLocaleDateString("it-IT", {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </span>
+              </div>
+              <div className="mt-2 text-sm font-semibold text-foreground truncate">{sal.title}</div>
+              <div className="mt-2 space-y-1 text-xs text-secondary">
+                <div className="truncate">
+                  Appaltatore:{" "}
+                  <span className="font-semibold text-foreground">
+                    {project?.client || "Non assegnato"}
+                  </span>
+                </div>
+                <div className="truncate">
+                  Progetto:{" "}
+                  <span className="font-semibold text-foreground">
+                    {project ? `${project.name} (${project.year})` : "Progetto non trovato"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </SectionPanel>
+  );
+}
+
+type SalModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onUpdateQuantity: (salId: string, lineId: string, quantity: number) => void;
+  onUpdateSurcharge: (salId: string, lineId: string, surcharge: "day" | "night" | "none") => void;
+  projectIndex: Map<string, { name: string; year: number; client: string }>;
+  sals: RecentSalItem[];
+};
+
+function SalModal({
+  isOpen,
+  onClose,
+  onUpdateQuantity,
+  onUpdateSurcharge,
+  projectIndex,
+  sals,
+}: SalModalProps) {
+  const deleteSal = useSalWorkflowStore((state) => state.deleteSal);
+  const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
+  const { notify } = useToast();
+  const [filter, setFilter] = useState<"all" | "draft" | "closed">("all");
+  const [query, setQuery] = useState("");
+  const [editingSal, setEditingSal] = useState<string | null>(null);
+  const [deletingSal, setDeletingSal] = useState<string | null>(null);
+
+  const filteredSals = useMemo(() => {
+    return sals
+      .filter((sal) => {
+        if (filter !== "all" && sal.status !== filter) return false;
+        if (query) {
+          const project = projectIndex.get(sal.projectId);
+          const searchText = `${sal.title} ${sal.description} ${project?.name ?? ""}`.toLowerCase();
+          if (!searchText.includes(query.toLowerCase())) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = a.closedAt || a.date;
+        const dateB = b.closedAt || b.date;
+        return dateB.localeCompare(dateA);
+      });
+  }, [filter, query, projectIndex, sals]);
+
+  function handleDelete(salId: string) {
+    deleteSal(salId);
+    setDeletingSal(null);
+    notify({
+      message: "SAL eliminata",
+      title: "Eliminazione completata",
+      tone: "success",
+    });
+  }
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+      <button
+        aria-label="Chiudi modal"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <section className="relative max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[24px] border border-subtle bg-card shadow-panel">
+        <div className="flex items-center justify-between gap-4 border-b border-subtle px-5 py-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+              Registro SAL
+            </div>
+            <h3 className="mt-1 text-lg font-semibold text-foreground">Tutte le SAL</h3>
+          </div>
+          <button
+            className="flex size-9 items-center justify-center rounded-[14px] text-secondary transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 border-b border-subtle px-5 py-3">
+          <div className="flex rounded-full border border-subtle bg-muted/45 p-1">
+            {(["all", "draft", "closed"] as const).map((f) => (
+              <button
+                key={f}
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  filter === f
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-secondary hover:text-foreground",
+                )}
+                onClick={() => setFilter(f)}
+                type="button"
+              >
+                {f === "all" ? "Tutte" : f === "draft" ? "Bozze" : "Chiuse"}
+              </button>
+            ))}
+          </div>
+          <label className="relative flex-1 min-w-[200px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+            <input
+              className="h-9 w-full rounded-full border border-subtle bg-card pl-9 pr-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Cerca SAL..."
+              type="search"
+              value={query}
+            />
+          </label>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto p-5">
+          {filteredSals.length === 0 ? (
+            <div className="py-8 text-center text-sm text-secondary">Nessuna SAL trovata</div>
+          ) : (
+            <div className="space-y-2">
+              {filteredSals.map((sal) => {
+                const project = projectIndex.get(sal.projectId);
+                const isDeleting = deletingSal === sal.id;
+                const isEditing = editingSal === sal.id;
+                const voiceIndex = new Map(tariffVoices.map((voice) => [voice.id, voice]));
+
+                return (
+                  <div
+                    key={sal.id}
+                    className={cn(
+                      "rounded-[18px] border p-4 transition-colors",
+                      isDeleting
+                        ? "border-danger/25 bg-danger/10"
+                        : "border-subtle bg-muted/35 hover:bg-muted",
+                    )}
+                  >
+                    {isDeleting ? (
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold text-danger">
+                            Eliminare questa SAL?
+                          </div>
+                          <div className="mt-1 text-xs text-secondary">
+                            L&apos;azione e irreversibile.
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => setDeletingSal(null)}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            Annulla
+                          </Button>
+                          <Button
+                            className="border-danger/25 bg-danger text-white hover:bg-danger/90"
+                            onClick={() => handleDelete(sal.id)}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            <Trash2 className="size-4" />
+                            Elimina
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={sal.status === "closed" ? "success" : "warning"}>
+                                {sal.status === "closed" ? "Chiusa" : "Bozza"}
+                              </Badge>
+                              <span className="text-xs text-secondary">{sal.date}</span>
+                            </div>
+                            <div className="mt-2 text-sm font-semibold text-foreground">
+                              {sal.title}
+                            </div>
+                            <div className="mt-1 text-xs text-secondary">
+                              {project
+                                ? `${project.name} (${project.year}) · ${project.client || "N/A"}`
+                                : "Progetto non trovato"}
+                            </div>
+                            {sal.description && (
+                              <div className="mt-2 text-xs text-secondary/80 line-clamp-2">
+                                {sal.description}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              className="flex size-8 items-center justify-center rounded-[12px] text-secondary hover:bg-muted hover:text-foreground"
+                              onClick={() => setEditingSal(sal.id)}
+                              title="Modifica"
+                              type="button"
+                            >
+                              <Pencil className="size-4" />
+                            </button>
+                            <button
+                              className="flex size-8 items-center justify-center rounded-[12px] text-secondary hover:bg-muted hover:text-danger"
+                              onClick={() => setDeletingSal(sal.id)}
+                              title="Elimina"
+                              type="button"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        </div>
+                        {isEditing || sal.status === "draft" ? (
+                          <div className="mt-4 overflow-hidden rounded-[14px] border border-subtle bg-card">
+                            {sal.lines.length > 0 ? (
+                              sal.lines.map((line) => {
+                                const voice = voiceIndex.get(line.voiceId);
+
+                                return (
+                                  <div
+                                    className="grid gap-3 border-b border-subtle p-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_120px_150px]"
+                                    key={line.id}
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-semibold text-foreground">
+                                        {voice?.code ?? "Voce"}
+                                      </div>
+                                      <div className="mt-1 line-clamp-2 text-xs text-secondary">
+                                        {voice?.description ?? "Voce tariffaria non trovata"}
+                                      </div>
+                                    </div>
+                                    <input
+                                      className="h-10 rounded-[12px] border border-subtle bg-card px-3 text-sm"
+                                      min={0}
+                                      onChange={(event) =>
+                                        onUpdateQuantity(
+                                          sal.id,
+                                          line.id,
+                                          Number(event.target.value),
+                                        )
+                                      }
+                                      type="number"
+                                      value={line.quantity}
+                                    />
+                                    <select
+                                      className="h-10 rounded-[12px] border border-subtle bg-card px-3 text-sm"
+                                      onChange={(event) =>
+                                        onUpdateSurcharge(
+                                          sal.id,
+                                          line.id,
+                                          event.target.value as "day" | "night" | "none",
+                                        )
+                                      }
+                                      value={line.surcharge}
+                                    >
+                                      <option value="none">Nessuna</option>
+                                      <option value="day">Diurna</option>
+                                      <option value="night">Notturna</option>
+                                    </select>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="p-3 text-xs text-secondary">
+                                Nessuna voce agganciata alla bozza.
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between border-t border-subtle px-5 py-4">
+          <div className="text-sm text-secondary">{filteredSals.length} SAL</div>
+          <Button onClick={onClose} size="sm" type="button" variant="outline">
+            Chiudi
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
 }

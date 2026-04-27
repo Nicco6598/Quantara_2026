@@ -3,7 +3,6 @@ import {
   BarChart3,
   BookOpen,
   Box,
-  ClipboardList,
   FileUp,
   FolderKanban,
   LayoutDashboard,
@@ -55,12 +54,6 @@ const routeCommands: Array<{
     keywords: "contratti portfolio commesse",
     label: "Vai a Progetti",
     route: "projects",
-  },
-  {
-    icon: ClipboardList,
-    keywords: "stato avanzamento lavori contabilita",
-    label: "Vai a SAL",
-    route: "sal",
   },
   { icon: BookOpen, keywords: "prezzi rfi voci", label: "Vai a Tariffari", route: "tariffs" },
   {

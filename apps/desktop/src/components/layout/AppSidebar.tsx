@@ -5,7 +5,6 @@ import {
   Box,
   ChevronsUpDown,
   ChevronRight,
-  ClipboardList,
   FolderKanban,
   LayoutDashboard,
   ShieldCheck,
@@ -30,7 +29,6 @@ type NavItem = {
 const primaryNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", route: "dashboard" },
   { badge: "3", icon: FolderKanban, label: "Progetti", route: "projects" },
-  { icon: ClipboardList, label: "SAL", route: "sal" },
   { icon: BookOpen, label: "Tariffari", route: "tariffs" },
   { icon: Box, label: "Materiali", route: "materials" },
   { icon: BarChart3, label: "Contabilita", route: "accounting" },

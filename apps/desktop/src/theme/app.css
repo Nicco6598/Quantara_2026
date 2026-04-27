@@ -358,3 +358,48 @@ textarea {
   transition-delay: 0ms;
   transition-duration: 0.01ms;
 }
+
+.hue-button {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.hue-button::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    var(--accent-primary),
+    var(--accent-secondary),
+    var(--color-copper-500),
+    var(--track-500),
+    var(--accent-primary)
+  );
+  animation: hue-spin 3s linear infinite;
+  z-index: -1;
+}
+
+.hue-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent-primary);
+  z-index: -1;
+}
+
+.hue-button:hover::after {
+  background: var(--accent-primary-hover);
+}
+
+@keyframes hue-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

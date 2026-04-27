@@ -16,6 +16,7 @@ type ProjectModalStep = 1 | 2;
 
 export type ProjectFormState = {
   applicationContractCode: string;
+  contractorName: string;
   contractualAmount: string;
   frameworkAgreementCode: string;
   tariffBookId: string;
@@ -23,11 +24,15 @@ export type ProjectFormState = {
 };
 
 type CreateProjectModalProps = {
+  contractorOptions: string[];
   defaultTariffBookId: string;
   initialValues?: ProjectFormState;
   isSaving: boolean;
   onClose: () => void;
-  onCreate: (request: CreateDesktopContractRequest) => Promise<DesktopContract | null>;
+  onCreate: (
+    request: CreateDesktopContractRequest,
+    meta: { contractorName: string },
+  ) => Promise<DesktopContract | null>;
   submitLabel?: string;
   tariffBooks: DesktopTariffBook[];
 };
@@ -38,6 +43,7 @@ const currentDraftStorageKey = "quantara.projectDraft.v2";
 function createInitialProjectForm(defaultTariffBookId: string): ProjectFormState {
   return {
     applicationContractCode: "",
+    contractorName: "",
     contractualAmount: "",
     frameworkAgreementCode: "",
     tariffBookId: defaultTariffBookId,
@@ -46,6 +52,7 @@ function createInitialProjectForm(defaultTariffBookId: string): ProjectFormState
 }
 
 export function CreateProjectModal({
+  contractorOptions,
   defaultTariffBookId,
   initialValues,
   isSaving,
@@ -165,7 +172,7 @@ export function CreateProjectModal({
       return;
     }
 
-    const created = await onCreate(request);
+    const created = await onCreate(request, { contractorName: draft.contractorName.trim() });
 
     if (created) {
       try {
@@ -237,6 +244,25 @@ export function CreateProjectModal({
                     placeholder="AQ-RFI-2026"
                     value={draft.frameworkAgreementCode}
                   />
+                  <label className="block">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                      Appaltatore
+                    </span>
+                    <input
+                      className="mt-2 h-11 w-full rounded-[14px] border border-subtle bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+                      list="project-contractor-options"
+                      onChange={(event) =>
+                        setDraft((state) => ({ ...state, contractorName: event.target.value }))
+                      }
+                      placeholder="RFI"
+                      value={draft.contractorName}
+                    />
+                    <datalist id="project-contractor-options">
+                      {contractorOptions.map((contractor) => (
+                        <option key={contractor} value={contractor} />
+                      ))}
+                    </datalist>
+                  </label>
                   <div className="rounded-[20px] border border-subtle bg-muted/35 p-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <FileText className="size-4 text-primary" />
@@ -356,6 +382,9 @@ export function CreateProjectModal({
                 {draft.applicationContractCode.trim() || "Contratto applicativo"} ·{" "}
                 {draft.frameworkAgreementCode.trim() || "Accordo quadro"}
               </div>
+              <div className="mt-2 text-xs leading-5 text-secondary">
+                {draft.contractorName.trim() || "Appaltatore da selezionare"}
+              </div>
               <div className="mt-4 grid gap-3">
                 <PreviewMetric
                   label="Importo"
@@ -445,6 +474,10 @@ function validateProjectIdentity(draft: ProjectFormState) {
 
   if (draft.frameworkAgreementCode.trim().length < 2) {
     return "Inserisci il codice dell'accordo quadro.";
+  }
+
+  if (draft.contractorName.trim().length < 2) {
+    return "Seleziona o inserisci l'appaltatore del progetto.";
   }
 
   return null;

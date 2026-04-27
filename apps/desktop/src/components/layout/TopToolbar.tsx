@@ -46,7 +46,6 @@ const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
   materials: { section: "Magazzino", title: "Materiali" },
   "project-detail": { section: "Dettaglio", title: "Progetto" },
   projects: { section: "Portfolio", title: "Progetti" },
-  sal: { section: "Monitoraggio", title: "SAL" },
   settings: { section: "Sistema", title: "Impostazioni" },
   tariffs: { section: "Reference", title: "Tariffario" },
   team: { section: "Risorse", title: "Team" },
@@ -171,7 +170,7 @@ function HistoryNavigator({
   onNavigateForward: () => void;
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-[18px] border border-subtle bg-card/92 p-1 shadow-soft">
+    <div className="flex items-center gap-1 rounded-sm border border-subtle bg-card/92 p-1 shadow-soft">
       <HistoryButton
         disabled={!canGoBack}
         icon={ChevronLeft}
@@ -202,7 +201,7 @@ function HistoryButton({
   return (
     <button
       className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-[14px] transition-all",
+        "flex h-9 w-9 items-center justify-center rounded-sm transition-all",
         disabled ? "cursor-not-allowed text-secondary/40" : "text-foreground hover:bg-muted",
       )}
       disabled={disabled}
@@ -220,7 +219,7 @@ function GlobalSearch({ onOpen }: { onOpen: (anchorRect: DOMRect) => void }) {
 
   return (
     <button
-      className="relative block h-10 w-[220px] rounded-[18px] border border-subtle bg-card/92 pl-10 pr-3 text-left text-sm text-secondary outline-none transition-all duration-base hover:border-border hover:text-foreground focus:border-primary focus:ring-2 focus:ring-ring"
+      className="relative block h-10 w-[220px] rounded-sm border border-subtle bg-card/92 pl-10 pr-3 text-left text-sm text-secondary outline-none transition-all duration-base hover:border-border hover:text-foreground focus:border-primary focus:ring-2 focus:ring-ring"
       data-command-palette-anchor
       onClick={() => {
         const anchorRect = buttonRef.current?.getBoundingClientRect();
@@ -234,7 +233,7 @@ function GlobalSearch({ onOpen }: { onOpen: (anchorRect: DOMRect) => void }) {
     >
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
       <span>Cerca...</span>
-      <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded-[9px] border border-subtle bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-secondary">
+      <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm border border-subtle bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-secondary">
         Ctrl K
       </kbd>
     </button>
@@ -259,7 +258,7 @@ function PageActions({
           />
         ) : (
           <Button
-            className="gap-1.5 rounded-[18px]"
+            className="gap-1.5 rounded-sm"
             key={`${action.actionId}-${action.variant}`}
             onClick={() => onAction(action.actionId)}
             size="sm"
@@ -283,15 +282,16 @@ function PageActionMenu({
   onAction: (actionId: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const isPrimary = action.variant === "primary";
 
   return (
     <div className="relative">
       <Button
         aria-expanded={isOpen}
-        className="gap-1.5 rounded-[18px]"
+        className={cn("gap-1.5 rounded-sm", isPrimary && "hue-button")}
         onClick={() => setIsOpen((current) => !current)}
         size="sm"
-        variant={action.variant === "primary" ? "default" : "outline"}
+        variant={isPrimary ? "default" : "outline"}
       >
         <action.icon className="size-4" />
         <span>{action.label}</span>
@@ -305,7 +305,7 @@ function PageActionMenu({
             onClick={() => setIsOpen(false)}
             type="button"
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-[18px] border border-subtle bg-card py-2 shadow-panel">
+          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-sm border border-subtle bg-card py-2 shadow-panel">
             {action.menuItems?.map((item) => (
               <button
                 className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted"
@@ -316,7 +316,7 @@ function PageActionMenu({
                 }}
                 type="button"
               >
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-muted text-primary">
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-sm bg-muted text-primary">
                   <item.icon className="size-4" />
                 </span>
                 <span className="min-w-0">
@@ -344,7 +344,7 @@ function UtilityButtons({
   const ThemeIcon = themeMode === "light" ? Moon : Sun;
 
   return (
-    <div className="flex items-center gap-1 rounded-[18px] border border-subtle bg-card/92 p-1 shadow-soft">
+    <div className="flex items-center gap-1 rounded-sm border border-subtle bg-card/92 p-1 shadow-soft">
       <IconButton badge={3} icon={Bell} label="Notifiche" />
       <IconButton
         icon={ThemeIcon}
@@ -368,7 +368,7 @@ function IconButton({
 }) {
   return (
     <button
-      className="relative flex h-9 w-9 items-center justify-center rounded-[14px] text-secondary transition-all hover:bg-muted hover:text-foreground"
+      className="relative flex h-9 w-9 items-center justify-center rounded-sm text-secondary transition-all hover:bg-muted hover:text-foreground"
       onClick={onClick}
       title={label}
       type="button"

@@ -78,9 +78,11 @@ function AppShell() {
       }
 
       if (actionId === "new-sal") {
-        navigate("sal");
+        if (activeRoute !== "projects") {
+          navigate("projects");
+        }
         window.setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("sal-workflow-action", { detail: "new-sal" }));
+          window.dispatchEvent(new CustomEvent("sal-modal-action", { detail: "create" }));
         }, 0);
         notify({
           message: "Aperta la creazione guidata del SAL.",
@@ -109,7 +111,7 @@ function AppShell() {
         tone: "info",
       });
     },
-    [navigate, notify],
+    [activeRoute, navigate, notify],
   );
 
   useEffect(() => {
@@ -157,7 +159,7 @@ function AppShell() {
 
       if ((event.ctrlKey || event.metaKey) && key === "n") {
         event.preventDefault();
-        handleTopbarAction(activeRoute === "sal" ? "new-sal" : "new-project");
+        handleTopbarAction("new-project");
         return;
       }
 
@@ -176,7 +178,6 @@ function AppShell() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
-    activeRoute,
     canGoBack,
     canGoForward,
     handleTopbarAction,

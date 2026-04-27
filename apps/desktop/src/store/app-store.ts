@@ -5,7 +5,6 @@ export type QuantaraRoute =
   | "dashboard"
   | "projects"
   | "project-detail"
-  | "sal"
   | "tariffs"
   | "materials"
   | "accounting"
