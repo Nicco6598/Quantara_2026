@@ -87,6 +87,10 @@ const commonPageActions: PageAction[] = [
 ];
 
 const routeActionOverrides: Partial<Record<QuantaraRoute, PageAction[]>> = {
+  team: [
+    { actionId: "filter", hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
+    { actionId: "add-member", icon: Plus, label: "Aggiungi membro", variant: "primary" },
+  ],
   tariffs: [
     { actionId: "filter", hasDropdown: true, icon: Filter, label: "Filtri", variant: "outline" },
     { actionId: "import-tariff", icon: UploadCloud, label: "Importa", variant: "primary" },

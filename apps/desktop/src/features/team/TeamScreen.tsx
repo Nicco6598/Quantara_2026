@@ -1,185 +1,228 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Briefcase,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
   ChevronRight,
-  Clock,
-  FolderKanban,
-  MoreVertical,
+  Crown,
+  Ellipsis,
+  Mail,
+  Search,
+  Send,
   ShieldCheck,
-  UserPlus,
+  UserCog,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/shared/Button";
+
+type MemberStatus = "active" | "inactive" | "invited";
 
 type TeamMember = {
+  avatar?: string;
+  email: string;
   id: string;
+  lastAccess: string;
   name: string;
-  role: string;
-  projects: string[];
-  status: "active" | "overloaded" | "available";
-  load: number;
+  projects: number;
+  role: TeamRole;
+  status: MemberStatus;
+};
+
+type TeamRole = "Super Admin" | "Project Manager" | "Ingegnere" | "Contabile" | "Viewer";
+
+const roleMeta: Record<
+  TeamRole,
+  {
+    count: number;
+    description: string;
+    icon: LucideIcon;
+    tone: "blue" | "green" | "orange" | "slate";
+  }
+> = {
+  Contabile: {
+    count: 3,
+    description: "Gestisce aspetti economici e contabili",
+    icon: ShieldCheck,
+    tone: "orange",
+  },
+  Ingegnere: {
+    count: 6,
+    description: "Crea e modifica SAL e tariffari",
+    icon: Users,
+    tone: "blue",
+  },
+  "Project Manager": {
+    count: 4,
+    description: "Gestisce progetti e team",
+    icon: Users,
+    tone: "green",
+  },
+  "Super Admin": {
+    count: 3,
+    description: "Accesso completo a tutte le funzionalita",
+    icon: Crown,
+    tone: "blue",
+  },
+  Viewer: {
+    count: 2,
+    description: "Visualizza dati e documenti",
+    icon: ShieldCheck,
+    tone: "slate",
+  },
 };
 
 const teamMembers: TeamMember[] = [
   {
+    email: "marco.bianchi@azienda.it",
     id: "1",
-    name: "Davide Ascani",
-    role: "Direttore Lavori",
-    projects: ["Milano-Verona · Lotto 3A", "Nodo di Firenze · Lotto 2B"],
-    status: "overloaded",
-    load: 92,
+    lastAccess: "Oggi, 09:15",
+    name: "Marco Bianchi",
+    projects: 12,
+    role: "Super Admin",
+    status: "active",
   },
   {
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=96&q=80",
+    email: "laura.rossi@azienda.it",
     id: "2",
-    name: "Davide Lucherini",
-    role: "Responsabile Tecnico",
-    projects: ["Milano-Verona · Lotto 3A"],
+    lastAccess: "Oggi, 08:45",
+    name: "Laura Rossi",
+    projects: 8,
+    role: "Project Manager",
     status: "active",
-    load: 78,
   },
   {
+    email: "alessandro.ferrari@azienda.it",
     id: "3",
-    name: "Carlo Capretta",
-    role: "Geometra",
-    projects: ["Nodo di Firenze · Lotto 2B", "Nodo di Firenze · Lotto 1A"],
+    lastAccess: "Ieri, 17:30",
+    name: "Alessandro Ferrari",
+    projects: 6,
+    role: "Ingegnere",
     status: "active",
-    load: 65,
   },
   {
+    avatar:
+      "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=96&q=80",
+    email: "giulia.colombo@azienda.it",
     id: "4",
-    name: "Paolo Rosi",
-    role: "Ingegnere Stradale",
-    projects: ["Milano-Verona · Lotto 3A"],
-    status: "available",
-    load: 40,
-  },
-  {
-    id: "5",
-    name: "Luca Bianchi",
-    role: "Quadro Cantiere",
-    projects: ["Nodo di Firenze · Lotto 2B"],
+    lastAccess: "Ieri, 14:20",
+    name: "Giulia Colombo",
+    projects: 4,
+    role: "Contabile",
     status: "active",
-    load: 71,
   },
   {
+    email: "riccardo.parisi@azienda.it",
+    id: "5",
+    lastAccess: "2 giorni fa",
+    name: "Riccardo Parisi",
+    projects: 2,
+    role: "Viewer",
+    status: "active",
+  },
+  {
+    email: "sara.moretti@azienda.it",
     id: "6",
-    name: "Marco Neri",
-    role: "Perito Contabile",
-    projects: [],
-    status: "available",
-    load: 22,
+    lastAccess: "1 settimana fa",
+    name: "Sara Moretti",
+    projects: 3,
+    role: "Ingegnere",
+    status: "inactive",
+  },
+  {
+    email: "luca.conti@azienda.it",
+    id: "7",
+    lastAccess: "Invito inviato",
+    name: "Luca Conti",
+    projects: 1,
+    role: "Viewer",
+    status: "invited",
+  },
+  {
+    avatar:
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=96&q=80",
+    email: "martina.deluca@azienda.it",
+    id: "8",
+    lastAccess: "Invito inviato",
+    name: "Martina De Luca",
+    projects: 0,
+    role: "Contabile",
+    status: "invited",
   },
 ];
 
-const statusLabel: Record<TeamMember["status"], string> = {
-  active: "Attivo",
-  overloaded: "Sovraccarico",
-  available: "Disponibile",
+const metricCards = [
+  {
+    detail: "Utenti nel workspace",
+    icon: Users,
+    label: "Membri totali",
+    tone: "blue" as const,
+    value: "18",
+  },
+  {
+    detail: "Utenti attivi",
+    icon: CheckCircle2,
+    label: "Membri attivi",
+    tone: "green" as const,
+    value: "16",
+  },
+  {
+    detail: "Ruoli personalizzati",
+    icon: ShieldCheck,
+    label: "Ruoli definiti",
+    tone: "orange" as const,
+    value: "5",
+  },
+  {
+    detail: "Inviti in attesa",
+    icon: Send,
+    label: "Inviti pendenti",
+    tone: "violet" as const,
+    value: "2",
+  },
+];
+
+const statusMeta: Record<MemberStatus, { className: string; label: string }> = {
+  active: {
+    className: "bg-[var(--success-soft)] text-[var(--success-base)]",
+    label: "Attivo",
+  },
+  inactive: {
+    className: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
+    label: "Inattivo",
+  },
+  invited: {
+    className: "bg-violet-100 text-violet-700",
+    label: "Invitato",
+  },
 };
 
 export function TeamScreen() {
-  const totalMembers = teamMembers.length;
-  const rolesActive = new Set(teamMembers.map((m) => m.role)).size;
-  const projectsCovered = new Set(teamMembers.flatMap((m) => m.projects)).size;
-  const avgLoad = Math.round(teamMembers.reduce((sum, m) => sum + m.load, 0) / totalMembers);
-
-  const metrics = [
-    {
-      detail: "Membri attivi in squadra",
-      icon: Users,
-      label: "Team members",
-      tone: "blue" as const,
-      value: String(totalMembers),
-    },
-    {
-      detail: "Profili unici nel team",
-      icon: ShieldCheck,
-      label: "Roles attivi",
-      tone: "green" as const,
-      value: String(rolesActive),
-    },
-    {
-      detail: "Progetti coperti",
-      icon: FolderKanban,
-      label: "Progetti coperti",
-      tone: "orange" as const,
-      value: String(projectsCovered),
-    },
-    {
-      detail: "Carico medio sul team",
-      icon: Clock,
-      label: "Avg load",
-      tone: "red" as const,
-      value: `${avgLoad}%`,
-    },
-  ];
-
   return (
-    <div className="pt-2">
-      <section>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
-            Team
-          </span>
-          <span className="text-[12px] font-medium text-[var(--text-secondary)]">
-            Gestione squadra e assegnazioni
-          </span>
-        </div>
-        <div className="mt-3">
-          <div className="text-[18px] font-medium leading-none text-[var(--accent-primary)]">
-            Quantara
-          </div>
-          <h2 className="mt-2 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
-            Team operativo
-          </h2>
-          <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
-            Panoramica dei componenti del team, dei ruoli attivi e delle assegnazioni progetto.
-          </p>
-        </div>
-      </section>
-
-      <div className="mt-6 grid grid-cols-4 gap-4">
-        {metrics.map((metric) => (
+    <div className="space-y-5 pb-6">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {metricCards.map((metric) => (
           <TeamMetricCard {...metric} key={metric.label} />
         ))}
-      </div>
+      </section>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <UserPlus className="size-4 text-[var(--info-base)]" />
-              <div>
-                <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                  Membri del team
-                </div>
-                <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
-                  {totalMembers} membri · {rolesActive} ruoli attivi
-                </div>
-              </div>
-            </div>
-            <Button
-              className="h-10 rounded-[9px] border-[var(--border-subtle)] bg-[var(--surface-base)] text-[13px] font-semibold text-[var(--text-primary)]"
-              size="sm"
-              variant="outline"
-            >
-              Aggiungi membro
-            </Button>
-          </div>
+      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <TeamMembersPanel />
 
-          <div className="space-y-3">
-            {teamMembers.map((member) => (
-              <TeamMemberCard key={member.id} member={member} />
-            ))}
-          </div>
-        </div>
-
-        <aside className="space-y-4">
-          <QuickActionsCard />
-          <TeamDistributionCard members={teamMembers} />
+        <aside className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
+          <InviteMemberCard />
+          <RolesCard />
         </aside>
       </section>
+
+      <p className="flex items-start gap-2 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+        <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-[var(--info-base)] text-[10px] font-bold text-[var(--info-base)]">
+          i
+        </span>
+        I permessi sono applicati a livello di progetto. Un membro puo avere ruoli diversi su
+        progetti diversi.
+      </p>
     </div>
   );
 }
@@ -194,198 +237,325 @@ function TeamMetricCard({
   detail: string;
   icon: LucideIcon;
   label: string;
-  tone: "blue" | "green" | "orange" | "red";
+  tone: "blue" | "green" | "orange" | "violet";
   value: string;
 }) {
   const toneClass = {
     blue: "bg-[var(--info-soft)] text-[var(--info-base)]",
     green: "bg-[var(--success-soft)] text-[var(--success-base)]",
     orange: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-    red: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
+    violet: "bg-violet-100 text-violet-700",
   }[tone];
 
   return (
-    <section className="group min-h-[130px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]">
-      <div className="flex items-start gap-4">
+    <article className="min-h-[116px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-sm shadow-slate-950/[0.03]">
+      <div className="flex items-center gap-4">
         <div
-          className={`flex size-11 shrink-0 items-center justify-center rounded-full ${toneClass}`}
+          className={cn(
+            "flex size-12 shrink-0 items-center justify-center rounded-full",
+            toneClass,
+          )}
         >
           <Icon className="size-5" />
         </div>
         <div className="min-w-0">
-          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
             {label}
           </div>
-          <div className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.03em] text-[var(--info-base)]">
+          <div className={cn("mt-2 text-[26px] font-bold leading-none", toneClass.split(" ")[1])}>
             {value}
           </div>
-          <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+          <div className="mt-2 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
             {detail}
           </div>
         </div>
       </div>
+    </article>
+  );
+}
+
+function TeamMembersPanel() {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm shadow-slate-950/[0.03]">
+      <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] p-5 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+          Membri del team
+        </h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="relative block sm:w-[290px]">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+            <span className="sr-only">Cerca membro</span>
+            <input
+              className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              placeholder="Cerca membro..."
+              type="search"
+            />
+          </label>
+          <button
+            className="flex h-10 min-w-[168px] items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3.5 text-[13px] font-semibold text-[var(--text-primary)]"
+            type="button"
+          >
+            Tutti i ruoli
+            <ChevronDown className="size-4 text-[var(--text-secondary)]" />
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] border-collapse text-left">
+          <thead>
+            <tr className="bg-[var(--bg-muted)] text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+              <th className="px-5 py-3.5">Membro</th>
+              <th className="px-4 py-3.5">Ruolo</th>
+              <th className="px-4 py-3.5 text-center">Progetti assegnati</th>
+              <th className="px-4 py-3.5">Stato</th>
+              <th className="px-4 py-3.5">Ultimo accesso</th>
+              <th className="px-5 py-3.5 text-right">Azioni</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border-subtle)]">
+            {teamMembers.map((member) => (
+              <TeamMemberRow key={member.id} member={member} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-[12px] font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          Mostra
+          <button
+            className="flex h-8 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2.5 font-semibold text-[var(--text-primary)]"
+            type="button"
+          >
+            10
+            <ChevronDown className="size-3.5" />
+          </button>
+          di 18 risultati
+        </div>
+        <div className="flex items-center gap-2">
+          <PaginationButton icon={ChevronLeft} label="Pagina precedente" />
+          <button
+            className="size-8 rounded-lg border border-[var(--info-base)] bg-[var(--info-soft)] text-[12px] font-bold text-[var(--info-base)]"
+            type="button"
+          >
+            1
+          </button>
+          <button
+            className="size-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[12px] font-bold text-[var(--text-primary)]"
+            type="button"
+          >
+            2
+          </button>
+          <PaginationButton icon={ChevronRight} label="Pagina successiva" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TeamMemberRow({ member }: { member: TeamMember }) {
+  return (
+    <tr className="text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]/60">
+      <td className="px-5 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar member={member} />
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+              {member.name}
+            </div>
+            <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+              {member.email}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <RolePill role={member.role} />
+      </td>
+      <td className="px-4 py-3 text-center font-bold">{member.projects}</td>
+      <td className="px-4 py-3">
+        <StatusPill status={member.status} />
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-[13px] text-[var(--text-secondary)]">
+        {member.lastAccess}
+      </td>
+      <td className="px-5 py-3 text-right">
+        <button
+          aria-label={`Azioni per ${member.name}`}
+          className="inline-flex size-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] transition hover:border-[var(--accent-primary)]/30 hover:text-[var(--text-primary)]"
+          type="button"
+        >
+          <Ellipsis className="size-4" />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function InviteMemberCard() {
+  return (
+    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-sm shadow-slate-950/[0.03]">
+      <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+        Aggiungi membro
+      </h2>
+      <p className="mt-1.5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+        Invita un nuovo membro al workspace.
+      </p>
+      <div className="mt-5 space-y-3">
+        <label className="relative block">
+          <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)] sm:hidden" />
+          <span className="sr-only">Email aziendale</span>
+          <input
+            className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3.5 text-[13px] font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] sm:pl-3.5"
+            placeholder="Inserisci email aziendale"
+            type="email"
+          />
+        </label>
+        <button
+          className="flex h-10 w-full items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3.5 text-[13px] font-semibold text-[var(--text-primary)]"
+          type="button"
+        >
+          Seleziona ruolo
+          <ChevronDown className="size-4 text-[var(--text-secondary)]" />
+        </button>
+        <button
+          className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--info-base)]/25 bg-[var(--info-soft)] text-[13px] font-bold text-[var(--info-base)] transition hover:border-[var(--info-base)]/45"
+          type="button"
+        >
+          <Send className="size-4" />
+          Invia invito
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function RolesCard() {
+  const roles = Object.entries(roleMeta) as [TeamRole, (typeof roleMeta)[TeamRole]][];
+
+  return (
+    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-sm shadow-slate-950/[0.03]">
+      <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+        Ruoli e permessi
+      </h2>
+      <p className="mt-1.5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+        Gestisci ruoli e permessi del workspace.
+      </p>
+      <div className="mt-5 space-y-2">
+        {roles.map(([role, meta]) => {
+          const Icon = meta.icon;
+
+          return (
+            <div
+              className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3"
+              key={role}
+            >
+              <div
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                  roleToneClass(meta.tone),
+                )}
+              >
+                <Icon className="size-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+                  {role}
+                </div>
+                <div className="mt-0.5 truncate text-[11px] font-medium text-[var(--text-secondary)]">
+                  {meta.description}
+                </div>
+              </div>
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-muted)] text-[12px] font-bold text-[var(--text-secondary)]">
+                {meta.count}
+              </span>
+            </div>
+          );
+        })}
+      </div>
       <button
-        className="mt-5 flex items-center gap-1 text-[12px] font-medium text-[var(--text-secondary)] transition group-hover:text-[var(--text-primary)]"
+        className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--info-base)]/25 bg-[var(--info-soft)] text-[13px] font-bold text-[var(--info-base)] transition hover:border-[var(--info-base)]/45"
         type="button"
       >
-        Vedi dettaglio
-        <ChevronRight className="size-3.5" />
+        <UserCog className="size-4" />
+        Gestisci ruoli
       </button>
     </section>
   );
 }
 
-function TeamMemberCard({ member }: { member: TeamMember }) {
+function Avatar({ member }: { member: TeamMember }) {
   const initials = member.name
     .split(" ")
-    .map((n) => n[0])
+    .map((part) => part[0])
     .join("");
-  const badgeClasses: Record<TeamMember["status"], string> = {
-    active: "bg-[var(--info-soft)] text-[var(--info-base)]",
-    overloaded: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-    available: "bg-[var(--success-soft)] text-[var(--success-base)]",
-  };
+
+  if (member.avatar) {
+    return (
+      <img
+        alt=""
+        className="size-10 shrink-0 rounded-full object-cover ring-1 ring-[var(--border-subtle)]"
+        src={member.avatar}
+      />
+    );
+  }
 
   return (
-    <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted-strong)] text-[14px] font-semibold text-[var(--text-secondary)]">
-            {initials}
-          </div>
-          <div>
-            <div className="text-[14px] font-medium text-[var(--text-primary)]">{member.name}</div>
-            <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
-              {member.role}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`rounded-[9px] px-2.5 py-1 text-[11px] font-semibold ${badgeClasses[member.status]}`}
-          >
-            {statusLabel[member.status]}
-          </span>
-          <MoreVertical className="size-4 text-[var(--text-secondary)]" />
-        </div>
-      </div>
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[12px] font-bold text-[var(--text-inverse)]">
+      {initials}
+    </div>
+  );
+}
 
-      <div className="mt-4">
-        <div className="flex items-center justify-between text-[12px] font-medium text-[var(--text-secondary)]">
-          <span>Carico</span>
-          <span className="text-[var(--text-primary)]">{member.load}%</span>
-        </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-          <div
-            className={cn(
-              "h-full rounded-full",
-              member.load >= 85
-                ? "bg-[var(--warning-base)]"
-                : member.load >= 60
-                  ? "bg-[var(--info-base)]"
-                  : "bg-[var(--success-base)]",
-            )}
-            style={{ width: `${member.load}%` }}
-          />
-        </div>
-      </div>
+function RolePill({ role }: { role: TeamRole }) {
+  const meta = roleMeta[role];
 
-      {member.projects.length > 0 && (
-        <div className="mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-            Progetti assegnati
-          </div>
-          <div className="mt-2 space-y-1.5">
-            {member.projects.map((project) => (
-              <div
-                className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-primary)]"
-                key={project}
-              >
-                <Briefcase className="size-3.5 text-[var(--info-base)]" />
-                {project}
-              </div>
-            ))}
-          </div>
-        </div>
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center rounded-lg px-2.5 py-1 text-[11px] font-bold leading-none",
+        roleToneClass(meta.tone),
       )}
-    </section>
+    >
+      <span className="truncate">{role}</span>
+    </span>
   );
 }
 
-function QuickActionsCard() {
+function StatusPill({ status }: { status: MemberStatus }) {
+  const meta = statusMeta[status];
+
   return (
-    <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
-      <div className="mb-4 flex items-center gap-3">
-        <ShieldCheck className="size-4 text-[var(--info-base)]" />
-        <h3 className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-          Azioni rapide
-        </h3>
-      </div>
-      <div className="space-y-3">
-        {[
-          { label: "Aggiungi nuovo membro", icon: UserPlus },
-          { label: "Gestisci ruoli team", icon: ShieldCheck },
-          { label: "Report carichi lavoro", icon: Clock },
-        ].map((action) => (
-          <button
-            className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--text-primary)] transition hover:bg-[var(--surface-inset)]"
-            key={action.label}
-            type="button"
-          >
-            <action.icon className="size-4 text-[var(--info-base)]" />
-            {action.label}
-            <ChevronRight className="ml-auto size-3.5 text-[var(--text-secondary)]" />
-          </button>
-        ))}
-      </div>
-    </section>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none",
+        meta.className,
+      )}
+    >
+      <span className="size-1.5 rounded-full bg-current" />
+      {meta.label}
+    </span>
   );
 }
 
-function TeamDistributionCard({ members }: { members: TeamMember[] }) {
-  const overloaded = members.filter((m) => m.status === "overloaded").length;
-  const active = members.filter((m) => m.status === "active").length;
-  const available = members.filter((m) => m.status === "available").length;
-  const total = members.length;
-
+function PaginationButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return (
-    <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
-      <div className="mb-4 flex items-center gap-3">
-        <FolderKanban className="size-4 text-[var(--info-base)]" />
-        <h3 className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-          Distribuzione stato
-        </h3>
-      </div>
-      <div className="flex items-center gap-5">
-        <div className="size-[96px] rounded-full bg-[conic-gradient(var(--warning-base)_0_17%,var(--info-base)_17%_67%,var(--success-base)_67%_100%)] p-[16px]">
-          <div className="size-full rounded-full bg-[var(--surface-base)]" />
-        </div>
-        <div className="flex-1 space-y-2">
-          {[
-            { label: "Sovraccarico", tone: "warning" as const, value: String(overloaded) },
-            { label: "Attivo", tone: "info" as const, value: String(active) },
-            { label: "Disponibile", tone: "success" as const, value: String(available) },
-          ].map((row) => (
-            <div className="flex items-center justify-between text-[12px]" key={row.label}>
-              <span className="flex items-center gap-2 font-semibold text-[var(--text-secondary)]">
-                <span
-                  className={cn(
-                    "size-2 rounded-full",
-                    row.tone === "warning" && "bg-[var(--warning-base)]",
-                    row.tone === "info" && "bg-[var(--info-base)]",
-                    row.tone === "success" && "bg-[var(--success-base)]",
-                  )}
-                />
-                {row.label}
-              </span>
-              <span className="font-semibold text-[var(--text-primary)]">{row.value}</span>
-            </div>
-          ))}
-          <div className="border-t border-[var(--border-subtle)] pt-2 text-[12px] font-medium text-[var(--text-secondary)]">
-            Totale <span className="float-right text-[var(--text-primary)]">{total}</span>
-          </div>
-        </div>
-      </div>
-    </section>
+    <button
+      aria-label={label}
+      className="flex size-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)]"
+      type="button"
+    >
+      <Icon className="size-4" />
+    </button>
   );
+}
+
+function roleToneClass(tone: "blue" | "green" | "orange" | "slate") {
+  return {
+    blue: "bg-[var(--info-soft)] text-[var(--info-base)]",
+    green: "bg-[var(--success-soft)] text-[var(--success-base)]",
+    orange: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+    slate: "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+  }[tone];
 }

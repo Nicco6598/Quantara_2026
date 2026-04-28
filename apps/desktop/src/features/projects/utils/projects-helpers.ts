@@ -1,28 +1,5 @@
 import type { StatusTone } from "@/components/shared/StatusBadge";
-import type { Money } from "@quantara/shared-types";
-
-export type LaneTone = "success" | "warning" | "danger";
-
-export type PortfolioProject = {
-  budget: Money;
-  contractor: string;
-  forecastDeltaDays: number;
-  healthLabel: string;
-  id: string;
-  location: string;
-  lot: string;
-  manager: string;
-  materialRisk: string;
-  nextMilestone: string;
-  phase: string;
-  progress: number;
-  salDays: number;
-  salState: string;
-  salValue: Money;
-  title: string;
-  tone: LaneTone;
-  variance: string;
-};
+import type { LaneTone, PortfolioProject } from "@/features/projects/types";
 
 export type TonePalette = {
   accent: string;

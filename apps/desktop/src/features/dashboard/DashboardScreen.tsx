@@ -52,12 +52,12 @@ export function DashboardScreen() {
   const activities = useMemo(() => buildActivityRows(projects), [projects]);
 
   return (
-    <div className="pt-7">
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_280px] gap-7">
+    <div className="pt-4 md:pt-6 2xl:pt-7">
+      <div className="grid min-w-0 gap-4 md:gap-5 2xl:grid-cols-[minmax(0,1fr)_280px] 2xl:gap-7">
         <div className="min-w-0 space-y-5">
           <Hero />
 
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:gap-4">
             {metrics.map((metric) => (
               <MetricCard {...metric} key={metric.label} />
             ))}
@@ -82,7 +82,7 @@ function Hero() {
       <div className="text-[18px] font-medium leading-none text-[var(--accent-primary)]">
         Buonasera, Marco.
       </div>
-      <h2 className="mt-2 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
+      <h2 className="mt-2 text-[28px] font-semibold leading-[1.08] tracking-[-0.02em] text-[var(--text-primary)] 2xl:text-[34px]">
         Centro di controllo dei lavori ferroviari.
       </h2>
       <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
@@ -113,8 +113,8 @@ function MetricCard({
   }[tone];
 
   return (
-    <section className="group min-h-[154px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]">
-      <div className="flex items-start gap-4">
+    <section className="group min-h-[146px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-4 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)] 2xl:min-h-[154px] 2xl:p-5">
+      <div className="flex items-start gap-3 2xl:gap-4">
         <div
           className={`flex size-11 shrink-0 items-center justify-center rounded-full ${toneClass}`}
         >
@@ -124,7 +124,7 @@ function MetricCard({
           <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
             {label}
           </div>
-          <div className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.03em] text-[var(--info-base)]">
+          <div className="mt-2 text-[20px] font-semibold leading-none tracking-[-0.02em] text-[var(--info-base)] md:text-[23px] 2xl:text-[26px]">
             {value}
           </div>
           <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
@@ -146,7 +146,7 @@ function MetricCard({
 
 function PriorityActions() {
   return (
-    <section className="rounded-[12px] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--accent-primary)_10%,transparent),color-mix(in_srgb,var(--accent-primary)_3.5%,transparent))] px-5 py-4">
+    <section className="rounded-[12px] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--accent-primary)_10%,transparent),color-mix(in_srgb,var(--accent-primary)_3.5%,transparent))] px-4 py-4 2xl:px-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-[12px] font-medium uppercase tracking-[0.14em] text-[var(--accent-primary)]">
@@ -165,7 +165,7 @@ function PriorityActions() {
         </button>
       </div>
 
-      <div className="grid grid-cols-[1fr_1px_1fr] items-center gap-8">
+      <div className="grid gap-4 xl:grid-cols-[1fr_1px_1fr] xl:items-center xl:gap-8">
         <PriorityItem
           copy="Intervento richiesto per evitare impatti sulle lavorazioni."
           cta="Apri alert materiali"
@@ -173,7 +173,7 @@ function PriorityActions() {
           title="2 materiali critici su opere civili"
           tone="danger"
         />
-        <div className="h-14 w-px bg-[var(--accent-primary)]/20" />
+        <div className="hidden h-14 w-px bg-[var(--accent-primary)]/20 xl:block" />
         <PriorityItem
           copy="Verifica e conferma per mantenere il programma."
           cta="Vai alle forniture"
@@ -228,7 +228,7 @@ function PriorityItem({
 function OperationalSites({ projects }: { projects: PortfolioProject[] }) {
   return (
     <section className="rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none">
-      <div className="flex items-center justify-between px-5 py-4">
+      <div className="flex flex-col gap-3 px-4 py-4 xl:flex-row xl:items-center xl:justify-between 2xl:px-5">
         <div className="flex items-start gap-3">
           <FolderKanban className="mt-1 size-4 text-[var(--info-base)]" />
           <div>
@@ -242,7 +242,7 @@ function OperationalSites({ projects }: { projects: PortfolioProject[] }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="relative h-10 w-[270px] rounded-[9px] border border-[var(--border-subtle)] bg-[var(--surface-base)]">
+          <div className="relative h-10 w-[220px] rounded-[9px] border border-[var(--border-subtle)] bg-[var(--surface-base)] 2xl:w-[270px]">
             <SearchIcon />
             <span className="absolute left-10 top-1/2 -translate-y-1/2 text-[13px] font-medium text-[var(--text-secondary)]">
               Cerca per progetto...
@@ -258,19 +258,21 @@ function OperationalSites({ projects }: { projects: PortfolioProject[] }) {
         </div>
       </div>
 
-      <div className="mx-4 overflow-hidden rounded-[13px] border border-[var(--border-subtle)]">
-        <div className="grid h-10 grid-cols-[1.55fr_0.9fr_0.8fr_0.85fr_0.75fr_120px] items-center bg-[var(--bg-muted)] px-4 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-          <span>Progetto / Lotto</span>
-          <span>Stato</span>
-          <span>SAL approvata</span>
-          <span>Avanzamento</span>
-          <span>Budget</span>
-          <span className="text-right">Azioni</span>
-        </div>
+      <div className="overflow-x-auto rounded-[13px] border border-[var(--border-subtle)] mx-3 2xl:mx-4">
+        <div className="min-w-[700px] xl:min-w-0">
+          <div className="grid h-10 grid-cols-[1.55fr_0.85fr_0.75fr_0.75fr_0.72fr_112px] items-center bg-[var(--bg-muted)] px-3 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)] xl:px-4 2xl:text-[11px] 2xl:tracking-[0.14em]">
+            <span>Progetto / Lotto</span>
+            <span>Stato</span>
+            <span>SAL approvata</span>
+            <span>Avanzamento</span>
+            <span>Budget</span>
+            <span className="text-right">Azioni</span>
+          </div>
 
-        {projects.map((project) => (
-          <ProjectRow key={project.id} project={project} />
-        ))}
+          {projects.map((project) => (
+            <ProjectRow key={project.id} project={project} />
+          ))}
+        </div>
       </div>
 
       <div className="flex h-12 items-center justify-between px-5 text-[12px] font-medium text-[var(--text-secondary)]">
@@ -306,7 +308,7 @@ function SearchIcon() {
 
 function ProjectRow({ project }: { project: PortfolioProject }) {
   return (
-    <div className="grid min-h-[70px] grid-cols-[1.55fr_0.9fr_0.8fr_0.85fr_0.75fr_120px] items-center border-t border-[var(--border-subtle)] px-4">
+    <div className="grid min-h-[70px] grid-cols-[1.55fr_0.85fr_0.75fr_0.75fr_0.72fr_112px] items-center border-t border-[var(--border-subtle)] px-4">
       <div className="flex items-center gap-3">
         <div
           className={cn(
@@ -336,22 +338,22 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
       </div>
 
       <div>
-        <div className="text-[14px] font-medium text-[var(--text-primary)]">
+        <div className="text-[13px] font-medium text-[var(--text-primary)]">
           {formatMoney(project.salValue)}
         </div>
-        <div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">0,0%</div>
+        <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">0,0%</div>
       </div>
 
       <div>
         <div
           className={cn(
-            "text-[14px] font-medium",
+            "text-[13px] font-medium",
             project.tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--info-base)]",
           )}
         >
           {project.progress}%
         </div>
-        <div className="mt-2 h-1.5 w-[120px] overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
+        <div className="mt-2 h-1.5 w-[80px] overflow-hidden rounded-full bg-[var(--bg-muted-strong)] md:w-[96px] 2xl:w-[120px]">
           <div
             className={cn(
               "h-full rounded-full",
@@ -367,7 +369,7 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
       </div>
 
       <div>
-        <div className="text-[14px] font-medium text-[var(--text-primary)]">
+        <div className="text-[13px] font-medium text-[var(--text-primary)]">
           {formatMoney(project.budget)}
         </div>
         <div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">
@@ -377,7 +379,7 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
 
       <div className="flex items-center justify-end gap-2">
         <Button
-          className="h-9 rounded-[9px] border-[var(--border-subtle)] bg-[var(--surface-base)] text-[12px] font-medium text-[var(--text-primary)]"
+          className="h-9 rounded-[9px] border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[12px] font-medium text-[var(--text-primary)]"
           onClick={() => {
             try {
               window.sessionStorage.setItem(
@@ -392,7 +394,7 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
           size="sm"
           variant="outline"
         >
-          Apri dossier
+          Apri
         </Button>
         <MoreVertical className="size-4 text-[var(--text-secondary)]" />
       </div>
@@ -412,8 +414,8 @@ function Milestones() {
   ];
 
   return (
-    <section className="grid h-[78px] grid-cols-[210px_1fr_1fr_1fr_150px] items-center rounded-[13px] bg-[var(--info-soft)]/62 px-5">
-      <div className="flex items-center gap-3 text-[12px] font-medium uppercase tracking-[0.14em] text-[var(--info-base)]">
+    <section className="grid gap-3 rounded-[13px] bg-[var(--info-soft)]/62 px-4 py-4 xl:grid-cols-[180px_1fr_1fr_1fr_130px] xl:items-center 2xl:h-[78px] 2xl:grid-cols-[210px_1fr_1fr_1fr_150px] 2xl:px-5 2xl:py-0">
+      <div className="flex items-center gap-3 text-[12px] font-medium uppercase tracking-[0.12em] text-[var(--info-base)]">
         <CalendarDays className="size-4" />
         Prossime milestone
       </div>
@@ -422,7 +424,7 @@ function Milestones() {
           <div className="text-[11px] font-medium uppercase text-[var(--info-base)]">
             {item.date}
           </div>
-          <div className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">
+          <div className="mt-1 text-[12px] font-semibold text-[var(--text-primary)] 2xl:text-[13px]">
             {item.title}
           </div>
           <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
@@ -449,7 +451,7 @@ function RightRail({
   distribution: Array<{ label: string; tone: StatusTone; value: string }>;
 }) {
   return (
-    <aside className="space-y-4">
+    <aside className="grid gap-4 lg:grid-cols-2 2xl:block 2xl:space-y-4">
       <RailCard icon={ShieldCheck} title="Salute sistema">
         <div className="space-y-3">
           {["Database", "Servizi", "Integrazioni"].map((item) => (

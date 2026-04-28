@@ -1,27 +1,19 @@
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
+  AlertTriangle,
   Bell,
-  Building2,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
-  Download,
   FileText,
-  FileSpreadsheet,
-  FolderKanban,
   FolderOpen,
   HardHat,
   Layers3,
-  Loader2,
-  MapPin,
-  MoreVertical,
   Pencil,
-  Plus,
   Search,
-  Target,
+  TrendingUp,
   Trash2,
-  Upload,
   Wrench,
   X,
 } from "lucide-react";
@@ -31,7 +23,6 @@ import {
   parseQuantaraMigrationWorkbook,
   serializeQuantaraMigrationWorkbook,
   validateQuantaraMigrationWorkbook,
-  type MigrationValidationResult,
   type QuantaraMigrationWorkbook,
 } from "@quantara/excel-import";
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -40,7 +31,16 @@ import { Button } from "@/components/shared/Button";
 import { ScreenShell, SectionPanel } from "@/components/shared/Screen";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
 import { useToast } from "@/components/shared/ToastProvider";
+import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
+import { ProjectsWorkbench } from "@/features/projects/components/ProjectsWorkbench";
+import {
+  CompactRail,
+  EmptyState,
+  FocusChip,
+  PortfolioMetric,
+} from "@/features/projects/components/workspace-ui";
 import { CreateProjectModal } from "@/features/projects/dialogs/CreateProjectModal";
+import type { ContractorFolder, PortfolioFocus, PortfolioProject } from "@/features/projects/types";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   createDesktopContract,
@@ -64,20 +64,13 @@ import {
   countValidationIssues,
   createContractorId,
   createDesktopVoiceKey,
-  createMigrationId,
   downloadWorkbook,
-  formatDueWindow,
-  formatForecastDelta,
-  formatMigrationAction,
-  formatSheetName,
-  getSalTone,
   getTonePalette,
   isSalWindow,
   matchesFocus,
   matchesProjectSearch,
   matchesSearch,
   mergeContractorRegistry,
-  mergeContracts,
   normalizeContractorName,
   readStringList,
   readStringRecord,
@@ -85,9 +78,8 @@ import {
   writeJson,
 } from "./utils/projects-helpers";
 
-type LaneTone = Extract<StatusTone, "success" | "warning" | "danger">;
-type PortfolioFocus = "all" | "critical" | "sal";
-type ProjectsViewMode = "board" | "workbench";
+export type { PortfolioProject } from "@/features/projects/types";
+
 type MigrationAction = "commit" | "export" | "idle" | "import" | "template";
 type ProjectEditState = {
   contractId: string;
@@ -104,33 +96,6 @@ type ProjectEditState = {
 type ProjectActionDialogState = {
   mode: "actions" | "delete";
   project: PortfolioProject;
-};
-
-type MigrationPreview = {
-  fileName: string;
-  data: QuantaraMigrationWorkbook;
-  validation: MigrationValidationResult;
-};
-
-export type PortfolioProject = {
-  budget: Money;
-  contractor: string;
-  forecastDeltaDays: number;
-  healthLabel: string;
-  id: string;
-  location: string;
-  lot: string;
-  manager: string;
-  materialRisk: string;
-  nextMilestone: string;
-  phase: string;
-  progress: number;
-  salDays: number;
-  salState: string;
-  salValue: Money;
-  title: string;
-  tone: LaneTone;
-  variance: string;
 };
 
 type PriorityItem = {
@@ -165,17 +130,6 @@ type ActivityItem = {
   label: string;
   projectId: string;
   tone: StatusTone;
-};
-
-type ContractorFolder = {
-  budget: number;
-  contractor: string;
-  criticalCount: number;
-  id: string;
-  projectCount: number;
-  salCount: number;
-  salExposure: number;
-  salWindowCount: number;
 };
 
 type RecentSalItem = {
@@ -414,30 +368,6 @@ const approvalWindow: ApprovalItem[] = [
   },
 ];
 
-const controlSignals: ControlSignal[] = [
-  {
-    detail: "tra verbali, perizie e pacchetti allegati con scadenza settimanale",
-    icon: FileText,
-    label: "Pratiche da chiudere",
-    tone: "warning",
-    value: "6",
-  },
-  {
-    detail: "forniture con impatto diretto sul forecast e sulla finestra SAL",
-    icon: Layers3,
-    label: "Materiali sensibili",
-    tone: "danger",
-    value: "4",
-  },
-  {
-    detail: "cantieri che stanno recuperando ritardo sulla curva lavori",
-    icon: Target,
-    label: "Lotti in recupero",
-    tone: "success",
-    value: "2",
-  },
-];
-
 const activityFeed: ActivityItem[] = [
   {
     detail: "Napoli-Bari · 17:42",
@@ -482,23 +412,6 @@ const focusOptions: { label: string; value: PortfolioFocus }[] = [
   { label: "Finestra SAL", value: "sal" },
 ];
 
-const laneOrder: LaneTone[] = ["danger", "warning", "success"];
-
-const laneMeta: Record<LaneTone, { description: string; label: string }> = {
-  danger: {
-    description: "lotti che richiedono escalation o sblocco immediato",
-    label: "Escalation",
-  },
-  success: {
-    description: "cantieri stabili, da tenere in spinta senza perdere ritmo",
-    label: "Stabili",
-  },
-  warning: {
-    description: "interventi sotto presidio operativo stretto",
-    label: "Sotto presidio",
-  },
-};
-
 const fallbackProjectTariffBook = {
   id: "tariff_lombardia_2025",
   name: "Tariffario Lombardia 2025",
@@ -535,10 +448,8 @@ export function ProjectsScreen() {
   const [selectedContractId, setSelectedContractId] = useState("");
   const [tariffBooksState, setTariffBooksState] = useState([fallbackProjectTariffBook]);
   const [focus, setFocus] = useState<PortfolioFocus>("all");
-  const [migrationAction, setMigrationAction] = useState<MigrationAction>("idle");
-  const [migrationPreview, setMigrationPreview] = useState<MigrationPreview | null>(null);
+  const [, setMigrationAction] = useState<MigrationAction>("idle");
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ProjectsViewMode>("workbench");
   const [isCreateSalModalOpen, setIsCreateSalModalOpen] = useState(false);
   const [isSalModalOpen, setIsSalModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -552,11 +463,6 @@ export function ProjectsScreen() {
         : [],
     [contractsState.data, contractsState.source, projectContractors],
   );
-  const projectIndex = useMemo(
-    () => new Map(activeProjects.map((project) => [project.id, project])),
-    [activeProjects],
-  );
-
   const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
   const salProjects = useSalWorkflowStore((state) => state.projects);
   const createSalDraftWithLines = useSalWorkflowStore((state) => state.createSalDraftWithLines);
@@ -857,37 +763,6 @@ export function ProjectsScreen() {
     await handleDeleteFromDropdown(project.id);
   }
 
-  async function handleDownloadMigrationTemplate() {
-    setMigrationAction("template");
-    setCreateState("saving");
-    setCreateMessage("Preparazione template Excel standard...");
-
-    try {
-      await waitForUiPaint();
-      downloadWorkbook(
-        serializeQuantaraMigrationWorkbook({ materials: [], projects: [], sal: [] }),
-        "quantara-migration-template.xlsx",
-      );
-      setCreateState("saved");
-      setCreateMessage("Template Excel standard scaricato.");
-      notify({
-        message: "Template Excel standard scaricato.",
-        title: "Template migrazione",
-        tone: "success",
-      });
-    } catch (error) {
-      setCreateState("error");
-      setCreateMessage(error instanceof Error ? error.message : String(error));
-      notify({
-        message: error instanceof Error ? error.message : String(error),
-        title: "Template non generato",
-        tone: "danger",
-      });
-    } finally {
-      setMigrationAction("idle");
-    }
-  }
-
   async function handleExportMigrationWorkbook() {
     setMigrationAction("export");
     setCreateState("saving");
@@ -947,11 +822,6 @@ export function ProjectsScreen() {
       const data = parseQuantaraMigrationWorkbook(await file.arrayBuffer());
       const validation = validateQuantaraMigrationWorkbook(data);
 
-      setMigrationPreview({
-        data,
-        fileName: file.name,
-        validation,
-      });
       setCreateState(validation.valid ? "saved" : "error");
       setCreateMessage(
         validation.valid
@@ -966,73 +836,11 @@ export function ProjectsScreen() {
         tone: validation.valid ? "success" : "warning",
       });
     } catch (error) {
-      setMigrationPreview(null);
       setCreateState("error");
       setCreateMessage(error instanceof Error ? error.message : String(error));
       notify({
         message: error instanceof Error ? error.message : String(error),
         title: "Import Excel non riuscito",
-        tone: "danger",
-      });
-    } finally {
-      setMigrationAction("idle");
-    }
-  }
-
-  async function handleCommitMigrationPreview() {
-    if (!migrationPreview?.validation.valid) {
-      return;
-    }
-
-    setMigrationAction("commit");
-    setCreateState("saving");
-    setCreateMessage("Commit migrazione in corso...");
-
-    try {
-      const timestamp = Date.now();
-      const createdContracts = await Promise.all(
-        migrationPreview.data.projects.map((project, index) =>
-          createDesktopContract({
-            applicationContractCode: project.applicationContractCode,
-            contractualAmount: project.contractualAmount,
-            frameworkAgreementCode: project.frameworkAgreementCode,
-            id: createMigrationId(project.title, timestamp, index),
-            tariffPriorities: [
-              {
-                priority: 1,
-                reason: "Import Excel",
-                tariffBookId:
-                  project.tariffBookId || tariffBooksState[0]?.id || fallbackProjectTariffBook.id,
-              },
-            ],
-            title: project.title,
-          }),
-        ),
-      );
-
-      setContractsState((current) => ({
-        data: mergeContracts(createdContracts, current.data),
-        ...(current.source === "fallback"
-          ? { message: "Runtime browser: import in anteprima.", source: "fallback" }
-          : { source: "desktop" }),
-      }));
-      setSelectedContractId(createdContracts[0]?.id ?? selectedContractId);
-      setMigrationPreview(null);
-      setCreateState("saved");
-      setCreateMessage(
-        `Import completato: ${createdContracts.length} progetti creati. SAL e materiali restano in preview.`,
-      );
-      notify({
-        message: `${createdContracts.length} progetti creati. SAL e materiali restano in preview.`,
-        title: "Migrazione completata",
-        tone: "success",
-      });
-    } catch (error) {
-      setCreateState("error");
-      setCreateMessage(error instanceof Error ? error.message : String(error));
-      notify({
-        message: error instanceof Error ? error.message : String(error),
-        title: "Commit migrazione non riuscito",
         tone: "danger",
       });
     } finally {
@@ -1053,18 +861,6 @@ export function ProjectsScreen() {
           )
         : activeProjects,
     [activeProjects, selectedContractorId],
-  );
-  const folderRecentSals = useMemo(
-    () =>
-      selectedContractorId
-        ? allSals
-            .filter((sal) => {
-              const project = projectSalIndex.get(sal.projectId);
-              return createContractorId(project?.client ?? "") === selectedContractorId;
-            })
-            .slice(0, 5)
-        : recentSals,
-    [allSals, projectSalIndex, recentSals, selectedContractorId],
   );
   const modalSals = useMemo(
     () =>
@@ -1147,7 +943,6 @@ export function ProjectsScreen() {
     : 0;
 
   const managerLoad = buildManagerLoad(visibleProjects);
-
   const focusCounts = useMemo(() => {
     const counts: Record<PortfolioFocus, number> = { all: 0, critical: 0, sal: 0 };
 
@@ -1188,35 +983,29 @@ export function ProjectsScreen() {
 
       {selectedContractor ? (
         <div className="pt-2">
-          {/* Hero - outside cards, like dashboard */}
           <section>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
-                Cartella appaltatore
-              </span>
-              <span className="text-[12px] font-medium text-[var(--text-secondary)]">
-                {contractsState.source === "desktop"
-                  ? "Contratti caricati dal database locale"
-                  : contractsState.message}{" "}
-                · {selectedContractor.contractor} · {visibleProjects.length} lotti nel perimetro
-                attivo
-              </span>
-              {isPending ? (
-                <span className="rounded-[9px] bg-[var(--warning-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-base)]">
-                  Filtri in aggiornamento
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-3 flex items-end justify-between gap-4">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-[18px] font-medium leading-none text-[var(--accent-primary)]">
-                  {selectedContractor.contractor}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)]">
+                    Portfolio / 27 apr
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-[8px] border border-[var(--success-base)]/20 bg-[var(--success-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--success-base)]">
+                    <span className="size-1.5 rounded-full bg-current" />
+                    Operativo
+                  </span>
+                  {isPending ? (
+                    <span className="rounded-[8px] bg-[var(--warning-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-base)]">
+                      Filtri in aggiornamento
+                    </span>
+                  ) : null}
                 </div>
-                <h2 className="mt-2 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
-                  Cartella operativa dell'appaltatore.
+                <h2 className="mt-6 text-[28px] font-semibold leading-none tracking-[-0.02em] text-[var(--text-primary)] md:mt-8 md:text-[36px]">
+                  {selectedContractor.contractor}
                 </h2>
-                <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
-                  Progetti, contratti, SAL e priorita sono filtrati sul perimetro scelto.
+                <p className="mt-3 max-w-4xl text-[14px] font-normal leading-6 text-[var(--text-secondary)] md:mt-4 md:text-[15px]">
+                  Cartella operativa dell'appaltatore. Monitoraggio del portfolio e dei contratti
+                  nel perimetro attivo.
                 </p>
               </div>
               <button
@@ -1234,222 +1023,164 @@ export function ProjectsScreen() {
             </div>
           </section>
 
-          {/* Metrics grid - outside cards, like dashboard */}
-          <div className="mt-6 grid grid-cols-5 gap-4">
-            <PortfolioMetric
-              detail="Elementi agganciati alla cartella appaltatore"
-              label="Contratti / progetti"
-              value={`${visibleProjects.length}`}
-            />
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             <PortfolioMetric
               detail="Totale dei progetti nel perimetro corrente"
+              icon={Layers3}
               label="Valore contratti"
+              tone="info"
               value={formatMoney({ amount: totalBudget, currency: "EUR" })}
             />
             <PortfolioMetric
-              detail={`${salWindowCount} lotti tra emissioni, firme e dossier aperti`}
-              label="Importo SAL in corsa"
+              detail="Elementi agganciati alla cartella"
+              icon={FolderOpen}
+              label="Progetti / contratti"
+              tone="success"
+              value={`${visibleProjects.length}`}
+            />
+            <PortfolioMetric
+              detail={`${salWindowCount} lotti tra emissioni, firme e dossier`}
+              icon={ClipboardList}
+              label="SAL in corso"
               tone={salWindowCount > 0 ? "warning" : "success"}
               value={formatMoney({ amount: salExposure, currency: "EUR" })}
             />
             <PortfolioMetric
               detail="Cantieri con forecast e documentazione fuori soglia"
+              icon={AlertTriangle}
               label="Escalation"
               tone={criticalCount > 0 ? "danger" : "success"}
-              value={`${criticalCount} cantieri`}
+              value={`${criticalCount}`}
             />
             <PortfolioMetric
-              detail="Media ponderata sul portafoglio visibile"
+              detail="Media ponderata sul portfolio visibile"
+              icon={TrendingUp}
               label="Avanzamento medio"
-              tone="success"
+              tone="info"
               value={formatPercent(averageProgress)}
             />
           </div>
 
-          {/* Focus chips + Search */}
-          <div className="mt-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="flex max-w-3xl flex-1 flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {focusOptions.map((option) => (
-                  <FocusChip
-                    active={focus === option.value}
-                    count={focusCounts[option.value]}
-                    key={option.value}
-                    label={option.label}
-                    onClick={() => startTransition(() => setFocus(option.value))}
+          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="min-w-0">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {focusOptions.map((option) => (
+                    <FocusChip
+                      active={focus === option.value}
+                      count={focusCounts[option.value]}
+                      key={option.value}
+                      label={option.label}
+                      onClick={() => startTransition(() => setFocus(option.value))}
+                    />
+                  ))}
+                </div>
+                <label className="relative block h-10 min-w-0 xl:w-[420px]">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+                  <input
+                    className="h-full w-full rounded-[10px] border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-4 text-[13px] font-medium text-[var(--text-primary)] outline-none transition-all hover:border-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Cerca lotto, PM, milestone o materiale critico"
+                    type="search"
+                    value={query}
                   />
-                ))}
+                </label>
               </div>
-              <label className="relative block max-w-2xl">
-                <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
-                <input
-                  className="h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-11 pr-4 text-[13px] font-medium text-[var(--text-primary)] outline-none transition-all hover:border-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Cerca lotto, PM, milestone o materiale critico"
-                  type="search"
-                  value={query}
-                />
-              </label>
             </div>
+            <button
+              className="hidden h-10 rounded-[10px] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-left text-[13px] font-semibold text-[var(--text-primary)] xl:block"
+              type="button"
+            >
+              Dettagli perimetro
+            </button>
           </div>
 
-          {folderRecentSals.length > 0 ? (
-            <RecentSalsPanel
-              onOpenModal={() => setIsSalModalOpen(true)}
-              projectIndex={projectSalIndex}
-              sals={folderRecentSals}
-            />
-          ) : null}
-
-          <MigrationPanel
-            action={migrationAction}
-            isCommitDisabled={
-              !migrationPreview?.validation.valid ||
-              (migrationPreview?.data.projects.length ?? 0) === 0 ||
-              migrationAction !== "idle"
-            }
-            isBusy={migrationAction !== "idle"}
-            onClearPreview={() => {
-              setMigrationPreview(null);
-              setCreateState("idle");
-              setCreateMessage("");
-            }}
-            onCommit={handleCommitMigrationPreview}
-            onDownloadTemplate={handleDownloadMigrationTemplate}
-            onExport={handleExportMigrationWorkbook}
-            onOpenFilePicker={() => fileInputRef.current?.click()}
-            preview={migrationPreview}
-          />
-          <input
-            accept=".xlsx"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                void handleImportMigrationFile(file);
-              }
-              event.currentTarget.value = "";
-            }}
-            ref={fileInputRef}
-            type="file"
-          />
-
-          <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="mt-3 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_220px]">
             <section className="min-w-0">
-              <div className="mb-4 flex flex-col gap-3 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-4 shadow-none md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                    Progetti della cartella
-                  </div>
-                  <h3 className="mt-1 text-[15px] font-semibold text-[var(--text-primary)]">
-                    {viewMode === "workbench" ? "Registro progetti" : "Board per priorita"}
-                  </h3>
-                </div>
-                <div className="flex rounded-xl bg-[var(--bg-muted)] p-1">
-                  <ViewModeButton
-                    active={viewMode === "workbench"}
-                    label="Registro"
-                    onClick={() => setViewMode("workbench")}
-                  />
-                  <ViewModeButton
-                    active={viewMode === "board"}
-                    label="Board"
-                    onClick={() => setViewMode("board")}
-                  />
-                </div>
-              </div>
-
-              {viewMode === "workbench" ? (
-                <ProjectsWorkbench
-                  onOpenProject={handleOpenProject}
-                  onOpenProjectActions={handleOpenProjectActions}
-                  projects={visibleProjects}
-                  query={query}
-                  selectedProjectId={selectedContractId}
-                />
-              ) : (
-                <PortfolioBoard
-                  onOpenProject={handleOpenProject}
-                  onOpenProjectActions={handleOpenProjectActions}
-                  projects={visibleProjects}
-                />
-              )}
+              <ProjectsWorkbench
+                onCreateProject={() => {
+                  setEditingProject(null);
+                  setIsCreateProjectModalOpen(true);
+                }}
+                onExport={handleExportMigrationWorkbook}
+                onImport={() => fileInputRef.current?.click()}
+                onOpenProject={handleOpenProject}
+                onOpenProjectActions={handleOpenProjectActions}
+                projects={visibleProjects}
+                query={query}
+                selectedProjectId={selectedContractId}
+              />
             </section>
 
-            <div className="space-y-6">
-              <PriorityQueuePanel items={visibleQueue} projectIndex={projectIndex} />
-              <ApprovalWindowPanel items={visibleApprovals} projectIndex={projectIndex} compact />
-              <ManagerLoadPanel
-                rows={managerLoad}
-                totalManagers={new Set(visibleProjects.map((project) => project.manager)).size}
-              />
-              <ControlRailPanel activities={visibleActivities} signals={controlSignals} />
+            <div className="grid gap-3 lg:grid-cols-2 2xl:block 2xl:space-y-3">
+              <CompactRail title="Azioni che non possono aspettare" value={visibleQueue.length}>
+                <EmptyState
+                  description="I filtri correnti non lasciano task critici in evidenza."
+                  title="Coda stabile"
+                />
+              </CompactRail>
+              <CompactRail
+                title="Finestra 72 ore"
+                value={`${visibleApprovals.filter((item) => item.tone === "danger").length} escalation`}
+              >
+                <EmptyState
+                  description="Nessuna approvazione ricade nel perimetro selezionato."
+                  title="Finestra pulita"
+                />
+              </CompactRail>
+              <CompactRail title="Copertura PM" value={String(managerLoad.length)}>
+                <div className="flex items-center gap-3">
+                  <div className="flex size-14 items-center justify-center rounded-full border-4 border-[var(--success-base)] text-[11px] font-semibold text-[var(--success-base)]">
+                    100%
+                  </div>
+                  <div>
+                    <div className="text-[12px] font-semibold text-[var(--text-primary)]">
+                      Copertura completa
+                    </div>
+                    <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
+                      {visibleProjects.length} progetto con PM assegnato su {visibleProjects.length}{" "}
+                      totale.
+                    </div>
+                  </div>
+                </div>
+              </CompactRail>
+              <ControlRailPanel activities={visibleActivities} signals={[]} />
             </div>
           </section>
         </div>
       ) : (
-        <div className="pt-2">
-          {/* Hero - outside cards, like dashboard */}
-          <section>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
-                Cartelle appaltatori
-              </span>
-              <span className="text-[12px] font-medium text-[var(--text-secondary)]">
-                {contractsState.source === "desktop"
-                  ? "Contratti caricati dal database locale"
-                  : contractsState.message}{" "}
-                · {contractorFolders.length} cartelle · {activeProjects.length} progetti
-              </span>
-            </div>
-            <div className="mt-3">
-              <div className="text-[18px] font-medium leading-none text-[var(--accent-primary)]">
-                Portfolio progetti
-              </div>
-              <h2 className="mt-2 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
-                Seleziona l'appaltatore e apri i suoi progetti.
-              </h2>
-              <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
-                La pagina Progetti parte dalle cartelle appaltatore. Entrando in una cartella trovi
-                board, registro e controlli filtrati sul perimetro scelto.
-              </p>
-            </div>
-          </section>
-
-          {/* Metrics - outside cards, like dashboard */}
-          <div className="mt-6 grid grid-cols-2 gap-4 max-w-md">
-            <PortfolioMetric
-              detail="Cartelle operative disponibili"
-              label="Appaltatori"
-              value={`${contractorFolders.length}`}
-            />
-            <PortfolioMetric
-              detail="Ultime attivita prima di entrare nel dettaglio"
-              label="SAL recenti"
-              tone={recentSals.length > 0 ? "warning" : "success"}
-              value={`${recentSals.length}`}
-            />
-          </div>
-
-          {recentSals.length > 0 ? (
-            <RecentSalsPanel
-              onOpenModal={() => setIsSalModalOpen(true)}
-              projectIndex={projectSalIndex}
-              sals={recentSals}
-            />
-          ) : null}
-
-          <ContractorFoldersPanel
-            folders={contractorFolders}
-            onOpenCreateContractor={() => setIsContractorModalOpen(true)}
-            onOpenFolder={(folderId) => {
-              setSelectedContractorId(folderId);
-              setQuery("");
-              setFocus("all");
-            }}
-          />
-        </div>
+        <ContractorsWorkspace
+          activeProjectsCount={activeProjects.length}
+          folders={contractorFolders}
+          onImport={() => fileInputRef.current?.click()}
+          onOpenCreateContractor={() => setIsContractorModalOpen(true)}
+          onOpenFolder={(folderId) => {
+            setSelectedContractorId(folderId);
+            setQuery("");
+            setFocus("all");
+          }}
+          onOpenNotifications={() => setIsSalModalOpen(true)}
+          recentSalsCount={recentSals.length}
+          totalPortfolioValue={activeProjects.reduce(
+            (sum, project) => sum + project.budget.amount,
+            0,
+          )}
+        />
       )}
+
+      <input
+        accept=".xlsx"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) {
+            void handleImportMigrationFile(file);
+          }
+          event.currentTarget.value = "";
+        }}
+        ref={fileInputRef}
+        type="file"
+      />
 
       {isCreateProjectModalOpen ? (
         <CreateProjectModal
@@ -1560,287 +1291,6 @@ export function ProjectsScreen() {
         onUpdateSurcharge={updateSalLineSurcharge}
       />
     </ScreenShell>
-  );
-}
-
-function MigrationPanel({
-  action,
-  isCommitDisabled,
-  isBusy,
-  onClearPreview,
-  onCommit,
-  onDownloadTemplate,
-  onExport,
-  onOpenFilePicker,
-  preview,
-}: {
-  action: MigrationAction;
-  isCommitDisabled: boolean;
-  isBusy: boolean;
-  onClearPreview: () => void;
-  onCommit: () => void;
-  onDownloadTemplate: () => void;
-  onExport: () => void;
-  onOpenFilePicker: () => void;
-  preview: MigrationPreview | null;
-}) {
-  const errors = preview ? countValidationIssues(preview.validation, "error") : 0;
-  const warnings = preview ? countValidationIssues(preview.validation, "warning") : 0;
-
-  return (
-    <SectionPanel aria-busy={isBusy} className="mt-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="info">Migrazione Excel</Badge>
-            {isBusy ? <Badge variant="warning">{formatMigrationAction(action)}</Badge> : null}
-            {preview ? (
-              <>
-                <Badge variant={errors > 0 ? "danger" : "success"}>
-                  {preview.validation.importableRows}/{preview.validation.rowCount} righe
-                </Badge>
-                {warnings > 0 ? <Badge variant="warning">{warnings} warning</Badge> : null}
-              </>
-            ) : null}
-          </div>
-          <h3 className="mt-3 text-lg font-semibold text-foreground">
-            Import progetti e template standard
-          </h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
-            Il workbook standard contiene Progetti, SAL e Materiali. In questa fase il commit crea i
-            contratti progetto validati; SAL e materiali vengono validati e conteggiati nella
-            preview.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            disabled={isBusy}
-            onClick={onDownloadTemplate}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {action === "template" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Download className="size-4" />
-            )}
-            Template
-          </Button>
-          <Button disabled={isBusy} onClick={onExport} size="sm" type="button" variant="outline">
-            {action === "export" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="size-4" />
-            )}
-            Export
-          </Button>
-          <Button
-            disabled={isBusy}
-            onClick={onOpenFilePicker}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {action === "import" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Upload className="size-4" />
-            )}
-            Importa
-          </Button>
-          <Button disabled={isCommitDisabled} onClick={onCommit} size="sm" type="button">
-            {action === "commit" ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Commit...
-              </>
-            ) : (
-              "Commit"
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {preview ? (
-        <div className="mt-5 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <div className="rounded-[18px] border border-subtle bg-muted/35 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 text-sm font-semibold text-foreground">
-                {preview.fileName}
-              </div>
-              <Button
-                disabled={isBusy}
-                onClick={onClearPreview}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                Reset
-              </Button>
-            </div>
-            <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
-              <PreviewMetric label="Progetti" value={String(preview.data.projects.length)} />
-              <PreviewMetric label="SAL" value={String(preview.data.sal.length)} />
-              <PreviewMetric label="Materiali" value={String(preview.data.materials.length)} />
-            </dl>
-          </div>
-
-          <div className="max-h-52 overflow-y-auto rounded-[18px] border border-subtle">
-            {preview.validation.issues.length > 0 ? (
-              preview.validation.issues.slice(0, 8).map((issue) => (
-                <div
-                  className="flex flex-col gap-1 border-b border-subtle px-4 py-3 last:border-b-0 md:flex-row md:items-center md:justify-between"
-                  key={`${issue.sheet}-${issue.rowIndex}-${issue.field}-${issue.message}`}
-                >
-                  <div className="text-sm font-medium text-foreground">
-                    {formatSheetName(issue.sheet)} riga {issue.rowIndex + 2} · {issue.field}
-                  </div>
-                  <div
-                    className={cn(
-                      "text-sm",
-                      issue.severity === "error" ? "text-danger" : "text-warning",
-                    )}
-                  >
-                    {issue.message}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="px-4 py-6 text-sm text-secondary">
-                Nessun errore di validazione nel workbook selezionato.
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
-    </SectionPanel>
-  );
-}
-
-function ContractorFoldersPanel({
-  folders,
-  onOpenCreateContractor,
-  onOpenFolder,
-}: {
-  folders: ContractorFolder[];
-  onOpenCreateContractor: () => void;
-  onOpenFolder: (folderId: string) => void;
-}) {
-  return (
-    <SectionPanel className="mt-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-            Appaltatori
-          </div>
-          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
-            Cartelle progetto
-          </h3>
-          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-            Apri una cartella per vedere solo i progetti, i controlli e le priorita dell'appaltatore
-            selezionato.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
-            {folders.length} cartelle
-          </span>
-          <button
-            className="flex h-9 items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 text-[13px] font-semibold text-[var(--text-inverse)] transition-all hover:bg-[var(--accent-primary-hover)] active:scale-[0.98]"
-            onClick={onOpenCreateContractor}
-            type="button"
-          >
-            <Plus className="size-4" />
-            Appaltatore
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {folders.length > 0 ? (
-          folders.map((folder) => {
-            const hasCriticalItems = folder.criticalCount > 0 || folder.salWindowCount > 0;
-
-            return (
-              <button
-                className="group rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 text-left shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]"
-                key={folder.id}
-                onClick={() => onOpenFolder(folder.id)}
-                type="button"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted-strong)] text-[var(--accent-primary)]">
-                      <FolderOpen className="size-5" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                        <Building2 className="size-3.5" />
-                        Appaltatore
-                      </div>
-                      <h4 className="mt-1 truncate text-[15px] font-semibold text-[var(--text-primary)]">
-                        {folder.contractor}
-                      </h4>
-                    </div>
-                  </div>
-                  <span
-                    className={cn(
-                      "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
-                      hasCriticalItems
-                        ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-                        : "bg-[var(--success-soft)] text-[var(--success-base)]",
-                    )}
-                  >
-                    {hasCriticalItems ? "Presidio" : "Stabile"}
-                  </span>
-                </div>
-
-                <dl className="mt-4 grid grid-cols-4 gap-2">
-                  <FolderMetric label="Contratti" value={`${folder.projectCount}`} />
-                  <FolderMetric label="Progetti" value={`${folder.projectCount}`} />
-                  <FolderMetric label="SAL" value={`${folder.salCount}`} />
-                  <FolderMetric label="Alert" value={`${folder.criticalCount}`} />
-                </dl>
-
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-3">
-                  <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                      Valore
-                    </div>
-                    <div className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">
-                      {formatMoney({ amount: folder.budget, currency: "EUR" })}
-                    </div>
-                  </div>
-                  <ChevronRight className="size-4 text-[var(--text-secondary)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--accent-primary)]" />
-                </div>
-              </button>
-            );
-          })
-        ) : (
-          <div className="md:col-span-2 xl:col-span-3">
-            <EmptyState
-              description="Crea il primo appaltatore. I progetti creati dalla sua cartella verranno agganciati automaticamente."
-              title="Nessuna cartella appaltatore"
-            />
-          </div>
-        )}
-      </div>
-    </SectionPanel>
-  );
-}
-
-function FolderMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-[12px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-2.5 py-2">
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-        {label}
-      </dt>
-      <dd className="mt-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">
-        {value}
-      </dd>
-    </div>
   );
 }
 
@@ -2321,17 +1771,6 @@ function CreateSalModal({
   );
 }
 
-function PreviewMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
-        {label}
-      </dt>
-      <dd className="mt-1 text-base font-semibold text-foreground">{value}</dd>
-    </div>
-  );
-}
-
 export function mapContractToProject(
   contract: DesktopContract,
   contractorName?: unknown,
@@ -2385,590 +1824,6 @@ function buildFallbackTariffVoices(tariffBookId: string): DesktopTariffVoice[] {
       unitPrice: 0,
     },
   ];
-}
-
-function ApprovalWindowPanel({
-  compact = false,
-  items,
-  projectIndex,
-}: {
-  compact?: boolean;
-  items: ApprovalItem[];
-  projectIndex: Map<string, PortfolioProject>;
-}) {
-  const activeEscalations = items.filter((item) => item.tone === "danger").length;
-
-  return (
-    <aside
-      className={
-        compact
-          ? "rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none"
-          : "relative border-t border-[var(--border-subtle)]/80 p-6 xl:border-l xl:border-t-0"
-      }
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-            Finestra 72 ore
-          </div>
-          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
-            Approvazioni e snodi
-          </h3>
-        </div>
-        <span
-          className={cn(
-            "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
-            activeEscalations > 0
-              ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-              : "bg-[var(--success-soft)] text-[var(--success-base)]",
-          )}
-        >
-          {activeEscalations} escalation
-        </span>
-      </div>
-
-      <div className="mt-5 space-y-3">
-        {items.length > 0 ? (
-          items.map((item) => {
-            const project = projectIndex.get(item.projectId);
-
-            if (!project) {
-              return null;
-            }
-
-            const palette = getTonePalette(item.tone);
-
-            return (
-              <article
-                className="rounded-2xl border p-4"
-                key={`${item.projectId}-${item.label}`}
-                style={{
-                  background: palette.panel,
-                  borderColor: palette.border,
-                }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-secondary">
-                      {project.title}
-                    </p>
-                    <h4 className="mt-2 text-sm font-semibold text-foreground">{item.label}</h4>
-                  </div>
-                  <Badge variant={item.tone}>{formatDueWindow(item.dueDays)}</Badge>
-                </div>
-
-                <div className="mt-4 grid gap-2 text-sm">
-                  <ApprovalMeta label="Responsabile" value={item.owner} />
-                  <ApprovalMeta label="Importo" value={formatMoney(item.amount)} />
-                  <ApprovalMeta label="Contesto" value={`${project.lot} · ${project.location}`} />
-                </div>
-              </article>
-            );
-          })
-        ) : (
-          <EmptyState
-            description="Nessuna approvazione ricade nel perimetro selezionato."
-            title="Finestra pulita"
-          />
-        )}
-      </div>
-    </aside>
-  );
-}
-
-function ApprovalMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-xs text-secondary">{label}</span>
-      <span className="text-xs font-semibold text-foreground">{value}</span>
-    </div>
-  );
-}
-
-function PortfolioMetric({
-  detail,
-  icon: Icon,
-  label,
-  tone,
-  value,
-}: {
-  detail?: string;
-  icon?: LucideIcon;
-  label: string;
-  note?: string;
-  tone?: StatusTone;
-  value: string;
-}) {
-  const toneClass = {
-    danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-    info: "bg-[var(--info-soft)] text-[var(--info-base)]",
-    neutral: "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-    success: "bg-[var(--success-soft)] text-[var(--success-base)]",
-    warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-  }[tone ?? "neutral"];
-
-  return (
-    <section className="group min-h-[130px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]">
-      <div className="flex items-start gap-4">
-        {Icon ? (
-          <div
-            className={`flex size-11 shrink-0 items-center justify-center rounded-full ${toneClass}`}
-          >
-            <Icon className="size-5" />
-          </div>
-        ) : null}
-        <div className="min-w-0">
-          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-            {label}
-          </div>
-          <div className="mt-2 text-[22px] font-semibold leading-none tracking-[-0.03em] text-[var(--text-primary)]">
-            {value}
-          </div>
-          {detail ? (
-            <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-              {detail}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FocusChip({
-  active,
-  count,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  count: number;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition-all",
-        active
-          ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-none"
-          : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]",
-      )}
-      onClick={onClick}
-      type="button"
-    >
-      <span>{label}</span>
-      <span
-        className={cn(
-          "inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
-          active
-            ? "bg-white/16 text-white"
-            : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-        )}
-      >
-        {count}
-      </span>
-    </button>
-  );
-}
-
-function ViewModeButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={cn(
-        "h-9 rounded-xl px-4 text-[13px] font-medium transition-colors",
-        active
-          ? "bg-[var(--surface-base)] text-[var(--text-primary)] shadow-none"
-          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-      )}
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
-  );
-}
-
-function PriorityQueuePanel({
-  items,
-  projectIndex,
-}: {
-  items: PriorityItem[];
-  projectIndex: Map<string, PortfolioProject>;
-}) {
-  return (
-    <SectionPanel>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-            Coda prioritaria
-          </div>
-          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
-            Azioni che non possono aspettare
-          </h3>
-        </div>
-        <span
-          className={cn(
-            "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
-            items.some((item) => item.tone === "danger")
-              ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-              : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-          )}
-        >
-          {items.length}
-        </span>
-      </div>
-
-      <div className="mt-5 space-y-3">
-        {items.length > 0 ? (
-          items.map((item) => {
-            const project = projectIndex.get(item.projectId);
-
-            if (!project) {
-              return null;
-            }
-
-            const palette = getTonePalette(item.tone);
-
-            return (
-              <article
-                className="rounded-2xl border p-4"
-                key={`${item.projectId}-${item.title}`}
-                style={{
-                  background: palette.panel,
-                  borderColor: palette.border,
-                }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="size-2 rounded-full"
-                        style={{ backgroundColor: palette.accent }}
-                      />
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-secondary">
-                        {project.title}
-                      </span>
-                    </div>
-                    <h4 className="mt-2 text-sm font-semibold text-foreground">{item.title}</h4>
-                  </div>
-                  <Badge variant={item.tone}>{item.deadline}</Badge>
-                </div>
-
-                <p className="mt-3 text-xs leading-5 text-secondary">{item.detail}</p>
-
-                <div className="mt-4 flex items-center justify-between gap-3 text-xs">
-                  <span className="text-secondary">{item.owner}</span>
-                  <span className="font-semibold text-foreground">{project.lot}</span>
-                </div>
-              </article>
-            );
-          })
-        ) : (
-          <EmptyState
-            description="I filtri correnti non lasciano task critici in evidenza."
-            title="Coda stabile"
-          />
-        )}
-      </div>
-    </SectionPanel>
-  );
-}
-
-function ManagerLoadPanel({
-  rows,
-  totalManagers,
-}: {
-  rows: { count: number; name: string; urgentWindow: number }[];
-  totalManagers: number;
-}) {
-  const maxLoad = rows[0]?.count ?? 1;
-
-  return (
-    <SectionPanel>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-            Copertura PM
-          </div>
-          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
-            Carico per responsabile
-          </h3>
-        </div>
-        <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
-          {totalManagers}
-        </span>
-      </div>
-
-      <div className="mt-5 space-y-4">
-        {rows.length > 0 ? (
-          rows.map((row) => (
-            <div key={row.name}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-foreground">{row.name}</div>
-                  <div className="text-xs text-secondary">
-                    Scadenza piu vicina {formatDueWindow(row.urgentWindow).toLowerCase()}
-                  </div>
-                </div>
-                <div className="text-sm font-semibold text-foreground">{row.count} lotti</div>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${(row.count / maxLoad) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))
-        ) : (
-          <EmptyState
-            description="Nessun responsabile rientra nel perimetro corrente."
-            title="Nessun carico visibile"
-          />
-        )}
-      </div>
-    </SectionPanel>
-  );
-}
-
-function PortfolioBoard({
-  onOpenProjectActions,
-  onOpenProject,
-  projects,
-}: {
-  onOpenProjectActions: (project: PortfolioProject) => void;
-  onOpenProject: (project: PortfolioProject) => void;
-  projects: PortfolioProject[];
-}) {
-  return (
-    <SectionPanel>
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-            Board operativo
-          </div>
-          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
-            Distribuzione per fascia di controllo
-          </h3>
-          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-            Ogni colonna tiene insieme stato, forecast, SAL e materiale sensibile per scendere
-            subito sul lotto giusto.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
-          <MapPin className="size-4" />
-          Portafoglio nazionale · vista per priorita
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-4 xl:grid-cols-3">
-        {laneOrder.map((tone) => (
-          <PortfolioLane
-            items={projects.filter((project) => project.tone === tone)}
-            key={tone}
-            onOpenProjectActions={onOpenProjectActions}
-            onOpenProject={onOpenProject}
-            tone={tone}
-          />
-        ))}
-      </div>
-    </SectionPanel>
-  );
-}
-
-function PortfolioLane({
-  items,
-  onOpenProjectActions,
-  onOpenProject,
-  tone,
-}: {
-  items: PortfolioProject[];
-  onOpenProjectActions: (project: PortfolioProject) => void;
-  onOpenProject: (project: PortfolioProject) => void;
-  tone: LaneTone;
-}) {
-  const meta = laneMeta[tone];
-
-  return (
-    <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-4 shadow-none">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-            {meta.label}
-          </div>
-          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">{meta.description}</p>
-        </div>
-        <span
-          className={cn(
-            "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
-            tone === "danger"
-              ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-              : tone === "warning"
-                ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-                : "bg-[var(--success-soft)] text-[var(--success-base)]",
-          )}
-        >
-          {items.length}
-        </span>
-      </div>
-
-      <div className="mt-4 space-y-3">
-        {items.length > 0 ? (
-          items.map((project) => (
-            <PortfolioLaneCard
-              key={project.id}
-              onOpen={() => onOpenProject(project)}
-              onOpenActions={() => onOpenProjectActions(project)}
-              project={project}
-            />
-          ))
-        ) : (
-          <EmptyState
-            description="Nessun lotto rientra in questa fascia con i filtri correnti."
-            title="Colonna vuota"
-          />
-        )}
-      </div>
-    </section>
-  );
-}
-
-function PortfolioLaneCard({
-  onOpenActions,
-  onOpen,
-  project,
-}: {
-  onOpenActions: () => void;
-  onOpen: () => void;
-  project: PortfolioProject;
-}) {
-  const salTone = getSalTone(project);
-
-  return (
-    <article className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-4 shadow-none transition hover:bg-[var(--surface-inset)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-            {project.phase}
-          </div>
-          <h4 className="mt-2 text-[14px] font-medium text-[var(--text-primary)]">
-            {project.title}
-          </h4>
-          <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
-            {project.lot} · {project.location}
-          </p>
-        </div>
-
-        <button
-          aria-label={`Apri ${project.title}`}
-          className="flex size-8 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-          onClick={onOpen}
-          type="button"
-        >
-          <ChevronRight className="size-4" />
-        </button>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        <span
-          className={cn("rounded-[9px] px-2.5 py-1 text-[11px] font-semibold", {
-            "bg-[var(--danger-soft)] text-[var(--danger-base)]": project.tone === "danger",
-            "bg-[var(--success-soft)] text-[var(--success-base)]": project.tone === "success",
-            "bg-[var(--warning-soft)] text-[var(--warning-base)]": project.tone === "warning",
-          })}
-        >
-          {project.healthLabel}
-        </span>
-        <span
-          className={cn("rounded-[9px] px-2.5 py-1 text-[11px] font-semibold", {
-            "bg-[var(--danger-soft)] text-[var(--danger-base)]": salTone === "danger",
-            "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]": salTone === "neutral",
-            "bg-[var(--warning-soft)] text-[var(--warning-base)]": salTone === "warning",
-          })}
-        >
-          {project.salState}
-        </span>
-      </div>
-
-      <div className="mt-3">
-        <div className="flex items-center justify-between gap-3 text-[12px] font-medium">
-          <span className="text-[var(--text-secondary)]">Avanzamento</span>
-          <span className="text-[var(--text-primary)]">{formatPercent(project.progress)}</span>
-        </div>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-          <div
-            className={cn(
-              "h-full rounded-full",
-              project.tone === "danger"
-                ? "bg-[var(--danger-base)]"
-                : project.tone === "warning"
-                  ? "bg-[var(--warning-base)]"
-                  : "bg-[var(--info-base)]",
-            )}
-            style={{ width: `${project.progress}%` }}
-          />
-        </div>
-      </div>
-
-      <dl className="mt-3 grid grid-cols-2 gap-2">
-        <LaneMetric
-          detail={`vs contratto ${project.variance}`}
-          label="EAC"
-          value={formatMoney(project.budget)}
-        />
-        <LaneMetric
-          detail={project.nextMilestone}
-          label="Forecast"
-          value={formatForecastDelta(project.forecastDeltaDays)}
-        />
-        <LaneMetric
-          detail={formatDueWindow(project.salDays)}
-          label="SAL"
-          value={formatMoney(project.salValue)}
-        />
-        <LaneMetric detail={project.materialRisk} label="Presidio" value={project.manager} />
-      </dl>
-
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          className="flex h-9 items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 text-[12px] font-semibold text-[var(--text-inverse)] transition-all hover:bg-[var(--accent-primary-hover)] active:scale-[0.98]"
-          onClick={onOpen}
-          type="button"
-        >
-          Apri dossier
-        </button>
-        <button
-          aria-label={`Azioni per ${project.title}`}
-          className="flex size-9 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-          onClick={onOpenActions}
-          type="button"
-        >
-          <MoreVertical className="size-4" />
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function LaneMetric({ detail, label, value }: { detail: string; label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-        {label}
-      </dt>
-      <dd className="mt-0.5 text-[13px] font-semibold text-[var(--text-primary)]">{value}</dd>
-      <p className="mt-0.5 text-[11px] leading-4 text-[var(--text-secondary)]">{detail}</p>
-    </div>
-  );
 }
 
 function ControlRailPanel({
@@ -3064,243 +1919,6 @@ function ControlRailPanel({
         </div>
       </div>
     </SectionPanel>
-  );
-}
-
-function ProjectsWorkbench({
-  onOpenProjectActions,
-  onOpenProject,
-  projects,
-  query,
-  selectedProjectId,
-}: {
-  onOpenProjectActions: (project: PortfolioProject) => void;
-  onOpenProject: (project: PortfolioProject) => void;
-  projects: PortfolioProject[];
-  query: string;
-  selectedProjectId: string;
-}) {
-  return (
-    <SectionPanel className="p-0">
-      <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-5 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-            Registro operativo
-          </div>
-          <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
-            Workbench dei progetti
-          </h3>
-          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-            Riga per riga: presidio, EAC, SAL, forecast e rischio materiale.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
-            {projects.length} visibili
-          </span>
-          {query.trim().length > 0 ? (
-            <span className="rounded-[9px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
-              Filtro: {query.trim()}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="space-y-3 p-4">
-        {projects.length > 0 ? (
-          projects.map((project) => (
-            <WorkbenchRow
-              isSelected={project.id === selectedProjectId}
-              key={project.id}
-              onOpenProjectActions={onOpenProjectActions}
-              onOpenProject={onOpenProject}
-              project={project}
-            />
-          ))
-        ) : (
-          <div className="p-8">
-            <EmptyState
-              description="Prova a cambiare perimetro o a ripulire la ricerca."
-              title="Nessun progetto trovato"
-            />
-          </div>
-        )}
-      </div>
-    </SectionPanel>
-  );
-}
-
-function WorkbenchRow({
-  isSelected,
-  onOpenProjectActions,
-  onOpenProject,
-  project,
-}: {
-  isSelected: boolean;
-  onOpenProjectActions: (project: PortfolioProject) => void;
-  onOpenProject: (project: PortfolioProject) => void;
-  project: PortfolioProject;
-}) {
-  const salTone = getSalTone(project);
-
-  const toneClass =
-    project.tone === "warning"
-      ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-      : project.tone === "danger"
-        ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-        : "bg-[var(--success-soft)] text-[var(--success-base)]";
-
-  return (
-    <article
-      className={cn(
-        "group relative rounded-[16px] border bg-[var(--surface-base)] p-4 shadow-none transition hover:bg-[var(--surface-inset)]",
-        isSelected ? "border-[var(--accent-primary)]/40" : "border-[var(--border-subtle)]/80",
-      )}
-    >
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <button
-          className="min-w-0 flex-1 text-left"
-          onClick={() => onOpenProject(project)}
-          type="button"
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-[12px]",
-                toneClass,
-              )}
-            >
-              <FolderKanban className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                  {project.phase}
-                </span>
-                <span
-                  className={cn("rounded-[9px] px-2.5 py-1 text-[11px] font-semibold", {
-                    "bg-[var(--danger-soft)] text-[var(--danger-base)]": project.tone === "danger",
-                    "bg-[var(--success-soft)] text-[var(--success-base)]":
-                      project.tone === "success",
-                    "bg-[var(--warning-soft)] text-[var(--warning-base)]":
-                      project.tone === "warning",
-                  })}
-                >
-                  {project.healthLabel}
-                </span>
-                <span
-                  className={cn("rounded-[9px] px-2.5 py-1 text-[11px] font-semibold", {
-                    "bg-[var(--danger-soft)] text-[var(--danger-base)]": salTone === "danger",
-                    "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]":
-                      salTone === "neutral",
-                    "bg-[var(--warning-soft)] text-[var(--warning-base)]": salTone === "warning",
-                  })}
-                >
-                  {project.salState}
-                </span>
-              </div>
-              <div className="mt-1 truncate text-[14px] font-medium text-[var(--text-primary)]">
-                {project.title}
-              </div>
-              <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
-                {project.lot} · {project.location} · {project.manager}
-              </div>
-            </div>
-          </div>
-        </button>
-
-        <div className="grid min-w-0 gap-3 sm:grid-cols-3 xl:w-[430px]">
-          <WorkbenchMetric
-            detail={project.variance}
-            label="EAC"
-            value={formatMoney(project.budget)}
-          />
-          <WorkbenchMetric
-            detail={formatDueWindow(project.salDays)}
-            label="SAL"
-            value={formatMoney(project.salValue)}
-          />
-          <WorkbenchMetric
-            detail={project.nextMilestone}
-            label="Forecast"
-            value={formatForecastDelta(project.forecastDeltaDays)}
-          />
-        </div>
-
-        <div className="flex items-center gap-2 xl:justify-end">
-          <button
-            className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-[12px] font-medium text-[var(--text-primary)] transition-all hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]"
-            onClick={() => onOpenProject(project)}
-            type="button"
-          >
-            Apri dossier
-          </button>
-          <button
-            aria-label={`Azioni per ${project.title}`}
-            className="flex size-9 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-            onClick={() => onOpenProjectActions(project)}
-            type="button"
-          >
-            <MoreVertical className="size-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <div className="flex items-center justify-between gap-3 text-[12px] font-medium">
-          <span className="text-[var(--text-secondary)]">{project.materialRisk}</span>
-          <span className="text-[var(--text-secondary)]">
-            Avanzamento{" "}
-            <span className="text-[var(--text-primary)]">{formatPercent(project.progress)}</span>
-          </span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-          <div
-            className={cn(
-              "h-full rounded-full",
-              project.tone === "danger"
-                ? "bg-[var(--danger-base)]"
-                : project.tone === "warning"
-                  ? "bg-[var(--warning-base)]"
-                  : "bg-[var(--info-base)]",
-            )}
-            style={{ width: `${project.progress}%` }}
-          />
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function WorkbenchMetric({
-  detail,
-  label,
-  value,
-}: {
-  detail: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-[12px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-        {label}
-      </div>
-      <div className="mt-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">
-        {value}
-      </div>
-      <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">{detail}</div>
-    </div>
-  );
-}
-
-function EmptyState({ description, title }: { description: string; title: string }) {
-  return (
-    <div className="rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] p-4">
-      <div className="text-[13px] font-semibold text-[var(--text-primary)]">{title}</div>
-      <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p>
-    </div>
   );
 }
 
@@ -3524,88 +2142,6 @@ function buildContractorFolders(
 
     return left.contractor.localeCompare(right.contractor);
   });
-}
-
-type RecentSalsPanelProps = {
-  onOpenModal: () => void;
-  projectIndex: Map<string, { name: string; year: number; client: string }>;
-  sals: RecentSalItem[];
-};
-
-function RecentSalsPanel({ onOpenModal, projectIndex, sals }: RecentSalsPanelProps) {
-  return (
-    <SectionPanel className="mt-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-[10px] bg-[var(--accent-primary)]/10">
-            <ClipboardList className="size-4 text-[var(--accent-primary)]" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-              Ultime attivita SAL
-            </div>
-            <div className="text-[13px] font-medium text-[var(--text-primary)]">
-              {sals.length} SAL recenti
-            </div>
-          </div>
-        </div>
-        <button
-          className="flex h-9 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-[12px] font-medium text-[var(--text-primary)] transition-all hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]"
-          onClick={onOpenModal}
-          type="button"
-        >
-          Visualizza tutte
-        </button>
-      </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {sals.map((sal) => {
-          const project = projectIndex.get(sal.projectId);
-          return (
-            <div
-              key={sal.id}
-              className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-3 shadow-none transition hover:bg-[var(--surface-inset)]"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className={cn(
-                    "rounded-[9px] px-2 py-0.5 text-[10px] font-semibold",
-                    sal.status === "closed"
-                      ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-                      : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-                  )}
-                >
-                  {sal.status === "closed" ? "Chiusa" : "Bozza"}
-                </span>
-                <span className="text-[10px] font-medium text-[var(--text-secondary)]">
-                  {new Date(sal.closedAt || sal.date).toLocaleDateString("it-IT", {
-                    day: "numeric",
-                    month: "short",
-                  })}
-                </span>
-              </div>
-              <div className="mt-2 truncate text-[13px] font-semibold text-[var(--text-primary)]">
-                {sal.title}
-              </div>
-              <div className="mt-2 space-y-1 text-[11px] text-[var(--text-secondary)]">
-                <div className="truncate">
-                  Appaltatore:{" "}
-                  <span className="font-semibold text-[var(--text-primary)]">
-                    {project?.client || "Non assegnato"}
-                  </span>
-                </div>
-                <div className="truncate">
-                  Progetto:{" "}
-                  <span className="font-semibold text-[var(--text-primary)]">
-                    {project ? `${project.name} (${project.year})` : "Progetto non trovato"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </SectionPanel>
-  );
 }
 
 type SalModalProps = {

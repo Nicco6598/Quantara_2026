@@ -96,6 +96,13 @@ const initialFormState: TariffFormState = {
   year: String(new Date().getFullYear()),
 };
 
+type TariffMetrics = {
+  activeCount: number;
+  sourceCount: number;
+  tariffCount: number;
+  years: number[];
+};
+
 export function TariffsScreen() {
   const { notify } = useToast();
   const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
@@ -144,30 +151,71 @@ export function TariffsScreen() {
     };
   }, []);
 
-  const contractById = useMemo(
-    () => new Map(contractsState.data.map((contract) => [contract.id, contract])),
-    [contractsState.data],
-  );
+  const tariffMetrics = useMemo<TariffMetrics>(() => {
+    const sourceNames = new Set<string>();
+    const years = new Set<number>();
+    let activeCount = 0;
 
-  const availableYears = useMemo(
-    () => [...new Set(tariffBooksState.data.map((book) => book.year))].sort((a, b) => b - a),
-    [tariffBooksState.data],
-  );
+    for (const book of tariffBooksState.data) {
+      sourceNames.add(book.sourceName);
+      years.add(book.year);
+      if (book.status === "active" || book.status === "validated") {
+        activeCount += 1;
+      }
+    }
 
-  const visibleTariffBooks = tariffBooksState.data.filter((book) => {
-    const matchesQuery = `${book.name} ${book.sourceName} ${book.year}`
-      .toLowerCase()
-      .includes(query.trim().toLowerCase());
-    const matchesYear = yearFilter === "all" || book.year === Number(yearFilter);
-    const matchesStatus = statusFilter === "all" || book.status === statusFilter;
-    const matchesProject =
-      projectFilter === "all" ||
-      contractById
-        .get(projectFilter)
-        ?.tariffPriorities.some((priority) => priority.tariffBookId === book.id);
+    return {
+      activeCount,
+      sourceCount: sourceNames.size,
+      tariffCount: tariffBooksState.data.length,
+      years: [...years].sort((a, b) => b - a),
+    };
+  }, [tariffBooksState.data]);
 
-    return matchesQuery && matchesYear && matchesStatus && Boolean(matchesProject);
-  });
+  const linkedProjectCountByTariffBookId = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const contract of contractsState.data) {
+      const linkedBookIds = new Set(
+        contract.tariffPriorities.map((priority) => priority.tariffBookId),
+      );
+
+      for (const tariffBookId of linkedBookIds) {
+        counts.set(tariffBookId, (counts.get(tariffBookId) ?? 0) + 1);
+      }
+    }
+
+    return counts;
+  }, [contractsState.data]);
+
+  const projectTariffBookIds = useMemo(() => {
+    if (projectFilter === "all") {
+      return null;
+    }
+
+    const contract = contractsState.data.find((item) => item.id === projectFilter);
+    return new Set(contract?.tariffPriorities.map((priority) => priority.tariffBookId) ?? []);
+  }, [contractsState.data, projectFilter]);
+
+  const availableYears = tariffMetrics.years;
+
+  const visibleTariffBooks = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const selectedYear = Number(yearFilter);
+
+    return tariffBooksState.data.filter((book) => {
+      const matchesQuery =
+        normalizedQuery.length === 0 ||
+        `${book.name} ${book.sourceName} ${book.year} ${book.id}`
+          .toLowerCase()
+          .includes(normalizedQuery);
+      const matchesYear = yearFilter === "all" || book.year === selectedYear;
+      const matchesStatus = statusFilter === "all" || book.status === statusFilter;
+      const matchesProject = projectTariffBookIds == null || projectTariffBookIds.has(book.id);
+
+      return matchesQuery && matchesYear && matchesStatus && matchesProject;
+    });
+  }, [projectTariffBookIds, query, statusFilter, tariffBooksState.data, yearFilter]);
 
   const selectedTariffBook =
     tariffBooksState.data.find((book) => book.id === selectedTariffBookId) ??
@@ -340,44 +388,32 @@ export function TariffsScreen() {
   }
 
   return (
-    <ScreenShell>
-      <section className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-3xl">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="info">Catalogo tariffari</Badge>
-            <span className="text-xs text-[var(--text-secondary)]">
-              {tariffBooksState.source === "desktop"
-                ? "Archivio locale SQLite"
-                : tariffBooksState.message}
-            </span>
-          </div>
-          <h2 className="mt-4 text-[2rem] font-semibold tracking-tight text-[var(--text-primary)]">
-            Catalogo tariffari per ente, anno e progetto.
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-            Qui gestisci basi prezzi e provenienza. Le voci di dettaglio restano collegate al
-            tariffario selezionato, mentre progetto e anno filtrano il catalogo realmente.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3 xl:w-[420px]">
-          <MetricTile label="Tariffari" value={String(tariffBooksState.data.length)} />
-          <MetricTile
-            label="Enti"
-            value={String(new Set(tariffBooksState.data.map((b) => b.sourceName)).size)}
-          />
-          <MetricTile label="Anni" value={String(availableYears.length)} />
-        </div>
+    <ScreenShell className="space-y-4 p-4 pb-6 lg:p-5 2xl:p-6">
+      <section>
+        <h2 className="text-[26px] font-bold leading-[1.08] tracking-[-0.02em] text-[var(--text-primary)] 2xl:text-[32px]">
+          Catalogo tariffari
+        </h2>
+        <p className="mt-2 max-w-3xl text-[14px] font-medium leading-6 text-[var(--text-secondary)] 2xl:text-[15px]">
+          Gestisci i tariffari per ente, anno e coerenza con i progetti.
+        </p>
       </section>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_360px]">
-        <SectionPanel>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <MetricTile label="Tariffari" value={String(tariffMetrics.tariffCount)} />
+        <MetricTile label="Enti" value={String(tariffMetrics.sourceCount)} />
+        <MetricTile label="Anni" value={String(availableYears.length)} />
+        <MetricTile label="Voci totali" value={String(voicesState.data.length)} />
+        <MetricTile label="Aggiornati" value={String(tariffMetrics.activeCount)} />
+      </div>
+
+      <section className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
+        <SectionPanel className="rounded-[18px] p-4 xl:sticky xl:top-4 xl:self-start">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                 Nuovo tariffario
               </div>
-              <h3 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+              <h3 className="mt-1 text-[16px] font-bold text-[var(--text-primary)]">
                 Dati sorgente
               </h3>
             </div>
@@ -386,7 +422,7 @@ export function TariffsScreen() {
             </Button>
           </div>
 
-          <form className="mt-5 space-y-4" onSubmit={handleCreateTariffBook}>
+          <form className="mt-4 space-y-3" onSubmit={handleCreateTariffBook}>
             <TextField
               label="Nome tariffario"
               onChange={(value) => setFormState((state) => ({ ...state, name: value }))}
@@ -399,7 +435,7 @@ export function TariffsScreen() {
               placeholder="Regione Lombardia"
               value={formState.sourceName}
             />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3">
               <TextField
                 label="Anno"
                 onChange={(value) => setFormState((state) => ({ ...state, year: value }))}
@@ -408,11 +444,11 @@ export function TariffsScreen() {
                 value={formState.year}
               />
               <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                   Stato
                 </span>
                 <select
-                  className="mt-2 h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  className="mt-2 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   onChange={(event) =>
                     setFormState((state) => ({ ...state, status: event.target.value }))
                   }
@@ -443,8 +479,8 @@ export function TariffsScreen() {
           </form>
         </SectionPanel>
 
-        <SectionPanel className="p-0">
-          <div className="border-b border-[var(--border-subtle)]/80 p-5">
+        <SectionPanel className="min-w-0 rounded-[18px] p-0">
+          <div className="border-b border-[var(--border-subtle)]/80 p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="neutral">{visibleTariffBooks.length} visibili</Badge>
@@ -453,9 +489,9 @@ export function TariffsScreen() {
                 </Badge>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
                 <select
-                  className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)]"
+                  className="h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)]"
                   onChange={(event) => setYearFilter(event.target.value)}
                   value={yearFilter}
                 >
@@ -467,7 +503,7 @@ export function TariffsScreen() {
                   ))}
                 </select>
                 <select
-                  className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)]"
+                  className="h-10 min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)] lg:w-[180px]"
                   onChange={(event) => setProjectFilter(event.target.value)}
                   value={projectFilter}
                 >
@@ -479,7 +515,7 @@ export function TariffsScreen() {
                   ))}
                 </select>
                 <select
-                  className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)]"
+                  className="h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)]"
                   onChange={(event) => setStatusFilter(event.target.value)}
                   value={statusFilter}
                 >
@@ -488,10 +524,10 @@ export function TariffsScreen() {
                   <option value="draft">draft</option>
                   <option value="validated">validated</option>
                 </select>
-                <label className="relative block">
+                <label className="relative block sm:col-span-2 lg:col-span-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
                   <input
-                    className="h-10 w-[240px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                    className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] lg:w-[220px] 2xl:w-[260px]"
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Cerca ente o nome"
                     type="search"
@@ -509,8 +545,10 @@ export function TariffsScreen() {
                   key={book.id}
                   book={book}
                   isSelected={selectedTariffBook.id === book.id}
+                  linkedProjectCount={linkedProjectCountByTariffBookId.get(book.id) ?? 0}
                   onDelete={() => handleDeleteFromDropdown(book.id)}
                   onSelect={() => handleSelectTariffBook(book)}
+                  voiceCount={book.id === selectedTariffBook.id ? voicesState.data.length : null}
                 />
               ))
             ) : (
@@ -521,16 +559,16 @@ export function TariffsScreen() {
           </div>
         </SectionPanel>
 
-        <aside className="space-y-6">
-          <SectionPanel>
-            <div className="text-[16px] font-semibold text-[var(--text-primary)]">
+        <aside className="space-y-4 xl:col-span-2 2xl:col-span-1">
+          <SectionPanel className="rounded-[18px] p-4">
+            <div className="text-[15px] font-bold text-[var(--text-primary)]">
               Dettaglio tariffario
             </div>
-            <div className="mt-4 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
+            <div className="mt-4 rounded-[14px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
               <Badge variant={selectedTariffBook.status === "active" ? "success" : "info"}>
                 {selectedTariffBook.status}
               </Badge>
-              <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
+              <div className="mt-3 text-[14px] font-bold text-[var(--text-primary)]">
                 {selectedTariffBook.name}
               </div>
               <dl className="mt-4 space-y-3">
@@ -541,16 +579,16 @@ export function TariffsScreen() {
             </div>
           </SectionPanel>
 
-          <SectionPanel>
+          <SectionPanel className="rounded-[18px] p-4">
             <div className="flex items-center justify-between">
-              <div className="text-[16px] font-semibold text-[var(--text-primary)]">
+              <div className="text-[15px] font-bold text-[var(--text-primary)]">
                 Voci tariffario
               </div>
               <Button size="icon" type="button" variant="outline">
                 <Download className="size-4" />
               </Button>
             </div>
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 grid gap-3 xl:grid-cols-2 2xl:grid-cols-1">
               {voicesState.data.length > 0 ? (
                 voicesState.data.map((row) => (
                   <div
@@ -598,11 +636,11 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="mt-2 h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+        className="mt-2 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -615,36 +653,56 @@ function TextField({
 function TariffBookRow({
   book,
   isSelected,
+  linkedProjectCount,
   onDelete,
   onSelect,
+  voiceCount,
 }: {
   book: DesktopTariffBook;
   isSelected: boolean;
+  linkedProjectCount: number;
   onDelete: () => void;
   onSelect: () => void;
+  voiceCount: null | number;
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div
-      className={`group relative flex items-center gap-4 border-b border-[var(--border-subtle)]/80 px-5 py-4 transition-colors hover:bg-[var(--bg-muted-strong)] ${
+      className={`group relative grid gap-3 border-b border-[var(--border-subtle)]/80 px-4 py-3 transition-colors hover:bg-[var(--bg-muted-strong)] sm:grid-cols-[minmax(0,1.4fr)_110px_84px_90px_44px] sm:items-center ${
         isSelected ? "bg-[var(--accent-primary)]/10" : ""
       }`}
     >
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold text-[var(--text-primary)]">{book.name}</div>
-        <div className="mt-1 text-xs text-[var(--text-secondary)]">{book.sourceName}</div>
+      <button className="min-w-0 text-left" onClick={onSelect} type="button">
+        <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">{book.name}</div>
+        <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
+          ID: {book.id}
+        </div>
+        <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)] sm:hidden">
+          {book.sourceName} · {book.year} · {linkedProjectCount} progetti
+        </div>
+      </button>
+      <div className="hidden min-w-0 text-[12px] font-medium text-[var(--text-secondary)] sm:block">
+        <div className="truncate">{book.sourceName}</div>
+        <div className="mt-1 text-[11px]">{linkedProjectCount} progetti</div>
       </div>
-      <div className="text-sm text-[var(--text-primary)]">{book.year}</div>
-      <Badge variant={book.status === "active" ? "success" : "info"}>{book.status}</Badge>
+      <div className="hidden text-[13px] font-semibold text-[var(--text-primary)] sm:block">
+        {book.year}
+        <div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">
+          {voiceCount == null ? "Voci -" : `${voiceCount} voci`}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 sm:block">
+        <Badge variant={book.status === "active" ? "success" : "info"}>{book.status}</Badge>
+      </div>
       <button
-        className="text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-primary)]"
+        className="hidden text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-primary)] sm:block"
         onClick={onSelect}
         type="button"
       >
         {isSelected ? "Selezionato" : "Apri"}
       </button>
-      <div className="relative">
+      <div className="absolute right-3 top-3 sm:static sm:justify-self-end">
         <Button
           aria-expanded={isOpen}
           aria-label={`Azioni per ${book.name}`}
