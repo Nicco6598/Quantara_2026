@@ -66,9 +66,15 @@ pub fn list_tariff_voices(
 }
 
 #[tauri::command]
-pub fn import_tariff_pdf_preview(path: String) -> Result<TariffPdfImportPreview, String> {
-    crate::infrastructure::tariff_repository::import_tariff_pdf_preview(std::path::Path::new(&path))
-        .map_err(to_command_error)
+pub fn import_tariff_pdf_preview(
+    app: AppHandle,
+    path: String,
+) -> Result<TariffPdfImportPreview, String> {
+    crate::infrastructure::tariff_repository::import_tariff_pdf_preview(
+        std::path::Path::new(&path),
+        Some(&app),
+    )
+    .map_err(to_command_error)
 }
 
 fn to_command_error(error: AppError) -> String {

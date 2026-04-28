@@ -9,6 +9,27 @@ pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<(
     )?;
 
     connection.execute_batch(include_str!("../../migrations/0002_tariff_voices.sql"))?;
+    ensure_tariff_voice_labor_percentage(connection)?;
+
+    Ok(())
+}
+
+fn ensure_tariff_voice_labor_percentage(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
+    let has_column = {
+        let mut statement = connection.prepare("PRAGMA table_info(tariff_voices)")?;
+        let columns = statement
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        columns.iter().any(|column| column == "labor_percentage")
+    };
+
+    if !has_column {
+        connection.execute(
+            "ALTER TABLE tariff_voices ADD COLUMN labor_percentage REAL",
+            [],
+        )?;
+    }
 
     Ok(())
 }

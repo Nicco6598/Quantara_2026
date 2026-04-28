@@ -5,12 +5,13 @@ import {
   Copy,
   Database,
   Download,
-  FileSpreadsheet,
   FileText,
   MoreVertical,
+  Save,
   Search,
   Sparkles,
   Star,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { parseEuroAmount } from "@quantara/domain-utils";
@@ -21,14 +22,17 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { ScreenShell, SectionPanel, SummaryLine } from "@/components/shared/Screen";
 import {
   deleteDesktopTariffBook,
+  createDesktopTariffBook,
   listDesktopContracts,
   listDesktopTariffBooks,
   listDesktopTariffVoices,
   selectTariffPdfMetadata,
+  updateDesktopTariffBook,
   type DesktopContract,
   type DesktopDataResult,
   type DesktopTariffBook,
   type DesktopTariffVoice,
+  type TariffPdfMetadata,
 } from "@/lib/desktopData";
 
 const fallbackTariffBook: DesktopTariffBook = {
@@ -88,47 +92,25 @@ const fallbackTariffVoices: DesktopTariffVoice[] = tariffRows.map((row) => ({
   category: row.category,
   description: row.description,
   id: `voice_${row.code.replaceAll(".", "_").toLowerCase()}`,
+  laborPercentage: null,
   officialCode: row.code,
   tariffBookId: fallbackTariffBook.id,
   unitOfMeasure: row.unit,
   unitPrice: parseEuroAmount(row.price),
 }));
 
-const previewVoiceRows = [
-  {
-    children: [
-      { code: "01.01", description: "Scavo a sezione obbligata", price: "12,45 €", unit: "m3" },
-      {
-        code: "01.02",
-        description: "Rinterro con materiale proveniente da scavo",
-        price: "8,75 €",
-        unit: "m3",
-      },
-      { code: "01.03", description: "Massicciata stradale", price: "25,30 €", unit: "m3" },
-    ],
-    code: "01",
-    description: "Opere stradali",
-  },
-  {
-    children: [
-      {
-        code: "02.01",
-        description: "Calcestruzzo C25/30 per strutture",
-        price: "113,20 €",
-        unit: "m3",
-      },
-      { code: "02.02", description: "Acciaio per c.a. B450C", price: "1,28 €", unit: "kg" },
-    ],
-    code: "02",
-    description: "Opere d'arte",
-  },
-] as const;
-
 type TariffMetrics = {
   activeCount: number;
   sourceCount: number;
   tariffCount: number;
   years: number[];
+};
+
+type EditTariffBookForm = {
+  name: string;
+  sourceName: string;
+  status: string;
+  year: string;
 };
 
 export function TariffsScreen() {
@@ -144,6 +126,15 @@ export function TariffsScreen() {
   const [query, setQuery] = useState("");
   const [selectedTariffBookId, setSelectedTariffBookId] = useState(fallbackTariffBook.id);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [importPreview, setImportPreview] = useState<TariffPdfMetadata | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [editingBookId, setEditingBookId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<EditTariffBookForm>({
+    name: "",
+    sourceName: "",
+    status: "active",
+    year: String(new Date().getFullYear()),
+  });
   const [tariffBooksState, setTariffBooksState] = useState<DesktopDataResult<DesktopTariffBook[]>>({
     data: fallbackTariffBooks,
     message: "Caricamento tariffari locali.",
@@ -198,10 +189,24 @@ export function TariffsScreen() {
     };
   }, [tariffBooksState.data]);
 
+  const realContracts = useMemo(
+    () => (contractsState.source === "desktop" ? contractsState.data : []),
+    [contractsState.data, contractsState.source],
+  );
+
+  useEffect(() => {
+    if (
+      projectFilter !== "all" &&
+      !realContracts.some((contract) => contract.id === projectFilter)
+    ) {
+      setProjectFilter("all");
+    }
+  }, [projectFilter, realContracts]);
+
   const linkedProjectCountByTariffBookId = useMemo(() => {
     const counts = new Map<string, number>();
 
-    for (const contract of contractsState.data) {
+    for (const contract of realContracts) {
       const linkedBookIds = new Set(
         contract.tariffPriorities.map((priority) => priority.tariffBookId),
       );
@@ -212,16 +217,16 @@ export function TariffsScreen() {
     }
 
     return counts;
-  }, [contractsState.data]);
+  }, [realContracts]);
 
   const projectTariffBookIds = useMemo(() => {
     if (projectFilter === "all") {
       return null;
     }
 
-    const contract = contractsState.data.find((item) => item.id === projectFilter);
+    const contract = realContracts.find((item) => item.id === projectFilter);
     return new Set(contract?.tariffPriorities.map((priority) => priority.tariffBookId) ?? []);
-  }, [contractsState.data, projectFilter]);
+  }, [projectFilter, realContracts]);
 
   const availableYears = tariffMetrics.years;
 
@@ -248,6 +253,11 @@ export function TariffsScreen() {
     visibleTariffBooks[0] ??
     fallbackTariffBook;
 
+  const previewVoicesByCategory = useMemo(
+    () => groupTariffVoices(voicesState.data.slice(0, 80)),
+    [voicesState.data],
+  );
+
   useEffect(() => {
     let active = true;
 
@@ -263,7 +273,26 @@ export function TariffsScreen() {
   }, [selectedTariffBook.id]);
 
   const handlePdfImport = useCallback(async () => {
-    const metadata = await selectTariffPdfMetadata();
+    setIsImporting(true);
+    setCreateState("saving");
+    setCreateMessage("Lettura PDF tariffario in corso...");
+
+    let metadata: TariffPdfMetadata | null = null;
+    try {
+      metadata = await selectTariffPdfMetadata();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setIsImporting(false);
+      setCreateState("error");
+      setCreateMessage(message);
+      notify({
+        message,
+        title: "Import tariffario non riuscito",
+        tone: "danger",
+      });
+      return;
+    }
+    setIsImporting(false);
 
     if (!metadata) {
       setCreateMessage("Selezione PDF non disponibile in browser o annullata.");
@@ -275,10 +304,11 @@ export function TariffsScreen() {
       return;
     }
 
-    setCreateState(metadata.voices.length > 0 ? "saved" : "idle");
+    setImportPreview(metadata);
+    setCreateState(metadata.voices.length > 0 ? "idle" : "error");
     setCreateMessage(
       metadata.voices.length > 0
-        ? `${metadata.voices.length} voci lette dal PDF ${metadata.name}.`
+        ? `${metadata.voices.length} voci lette dal PDF ${metadata.name}. Conferma la preview per salvarle.`
         : "Metadata PDF precompilati. Nessuna voce prezzo rilevata automaticamente.",
     );
     notify({
@@ -290,6 +320,58 @@ export function TariffsScreen() {
       tone: metadata.voices.length > 0 ? "success" : "warning",
     });
   }, [notify]);
+
+  async function handleConfirmImport(metadata: TariffPdfMetadata) {
+    if (metadata.voices.length === 0) {
+      setCreateState("error");
+      setCreateMessage("Nessuna voce prezzo rilevata: importazione non salvata.");
+      return;
+    }
+
+    setCreateState("saving");
+    const tariffBookId = createTariffBookId(metadata);
+    const voices = metadata.voices.map((voice) => ({
+      ...voice,
+      id: `voice_${tariffBookId}_${sanitizeIdentifier(voice.officialCode)}`,
+      tariffBookId,
+    }));
+
+    try {
+      const book = await createDesktopTariffBook({
+        id: tariffBookId,
+        name: metadata.name,
+        sourceName: metadata.sourceName,
+        status: "active",
+        voices,
+        year: metadata.year,
+      });
+
+      setTariffBooksState((current) => ({
+        data: [book, ...current.data.filter((item) => item.id !== book.id)],
+        ...(current.source === "fallback"
+          ? { message: "Runtime browser: import in anteprima.", source: "fallback" }
+          : { source: "desktop" }),
+      }));
+      setSelectedTariffBookId(book.id);
+      setVoicesState({ data: voices, source: "desktop" });
+      setImportPreview(null);
+      setCreateState("saved");
+      setCreateMessage(`${book.name} salvato con ${voices.length.toLocaleString("it-IT")} voci.`);
+      notify({
+        message: `${voices.length.toLocaleString("it-IT")} voci tariffarie salvate in locale.`,
+        title: "Importazione confermata",
+        tone: "success",
+      });
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Importazione non riuscita",
+        tone: "danger",
+      });
+    }
+  }
 
   useEffect(() => {
     const handleWorkflowAction = (event: Event) => {
@@ -306,8 +388,62 @@ export function TariffsScreen() {
 
   function handleSelectTariffBook(book: DesktopTariffBook) {
     setSelectedTariffBookId(book.id);
+    setEditingBookId(null);
     setCreateMessage(`${book.name} aperto per controllo e modifica.`);
     setCreateState("idle");
+  }
+
+  function handleStartEdit(book: DesktopTariffBook) {
+    setSelectedTariffBookId(book.id);
+    setEditingBookId(book.id);
+    setEditForm({
+      name: book.name,
+      sourceName: book.sourceName,
+      status: book.status,
+      year: String(book.year),
+    });
+  }
+
+  async function handleSaveEdit() {
+    const year = Number(editForm.year);
+    if (!Number.isInteger(year)) {
+      setCreateState("error");
+      setCreateMessage("Anno tariffario non valido.");
+      return;
+    }
+
+    setCreateState("saving");
+    try {
+      const updated = await updateDesktopTariffBook(selectedTariffBook.id, {
+        name: editForm.name.trim(),
+        sourceName: editForm.sourceName.trim(),
+        status: editForm.status,
+        year,
+      });
+
+      setTariffBooksState((current) => ({
+        data: current.data.map((book) => (book.id === updated.id ? updated : book)),
+        ...(current.source === "fallback"
+          ? { message: "Runtime browser: modifica in anteprima.", source: "fallback" }
+          : { source: "desktop" }),
+      }));
+      setEditingBookId(null);
+      setCreateState("saved");
+      setCreateMessage(`${updated.name} aggiornato.`);
+      notify({
+        message: "Dati tariffario aggiornati.",
+        title: "Tariffario modificato",
+        tone: "success",
+      });
+    } catch (error) {
+      setCreateState("error");
+      setCreateMessage(error instanceof Error ? error.message : String(error));
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Modifica tariffario non riuscita",
+        tone: "danger",
+      });
+    }
   }
 
   async function handleDeleteFromDropdown(bookId: string) {
@@ -404,18 +540,11 @@ export function TariffsScreen() {
             </div>
             <div className="mt-4 space-y-3">
               <QuickAction
-                detail="Carica un tariffario da documento PDF"
+                detail="Carica un tariffario da PDF o JSON parser"
                 icon={FileText}
-                label="Importa da PDF"
+                label="Importa PDF/JSON"
                 onClick={handlePdfImport}
                 tone="info"
-              />
-              <QuickAction
-                detail="Carica un file Excel (.xlsx)"
-                icon={FileSpreadsheet}
-                label="Importa da Excel"
-                onClick={handlePdfImport}
-                tone="success"
               />
               <QuickAction
                 detail="Crea una copia di un tariffario esistente"
@@ -494,8 +623,10 @@ export function TariffsScreen() {
                   onChange={(event) => setProjectFilter(event.target.value)}
                   value={projectFilter}
                 >
-                  <option value="all">Tutti i progetti</option>
-                  {contractsState.data.map((contract) => (
+                  <option value="all">
+                    {realContracts.length > 0 ? "Tutti i progetti" : "Nessun progetto locale"}
+                  </option>
+                  {realContracts.map((contract) => (
                     <option key={contract.id} value={contract.id}>
                       {contract.title}
                     </option>
@@ -544,6 +675,7 @@ export function TariffsScreen() {
                   isSelected={selectedTariffBook.id === book.id}
                   linkedProjectCount={linkedProjectCountByTariffBookId.get(book.id) ?? 0}
                   onDelete={() => handleDeleteFromDropdown(book.id)}
+                  onEdit={() => handleStartEdit(book)}
                   onSelect={() => handleSelectTariffBook(book)}
                   voiceCount={book.id === selectedTariffBook.id ? voicesState.data.length : null}
                 />
@@ -563,38 +695,88 @@ export function TariffsScreen() {
                 <Star className="size-4 fill-[var(--warning-base)] text-[var(--warning-base)]" />
                 Dettaglio tariffario
               </div>
-              <Button size="icon" type="button" variant="outline">
+              <Button
+                onClick={() => handleStartEdit(selectedTariffBook)}
+                size="icon"
+                type="button"
+                variant="outline"
+              >
                 <MoreVertical className="size-4" />
               </Button>
             </div>
-            <div className="mt-4">
-              <Badge
-                className="float-right"
-                variant={selectedTariffBook.status === "active" ? "success" : "info"}
-              >
-                {selectedTariffBook.status}
-              </Badge>
-              <div className="text-[20px] font-bold leading-tight text-[var(--text-primary)]">
-                {selectedTariffBook.name}
-              </div>
-              <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
-                ID: {selectedTariffBook.id}
-              </div>
-              <dl className="mt-6 space-y-3">
-                <SummaryLine label="Ente" value={selectedTariffBook.sourceName} />
-                <SummaryLine label="Anno" value={String(selectedTariffBook.year)} />
-                <SummaryLine label="Stato" value={selectedTariffBook.status} />
-                <SummaryLine
-                  label="Progetti collegati"
-                  value={`${linkedProjectCountByTariffBookId.get(selectedTariffBook.id) ?? 0} progetti`}
+            {editingBookId === selectedTariffBook.id ? (
+              <div className="mt-4 space-y-3">
+                <TariffEditField
+                  label="Nome"
+                  onChange={(value) => setEditForm((form) => ({ ...form, name: value }))}
+                  value={editForm.name}
                 />
-                <SummaryLine
-                  label="Voci totali"
-                  value={voicesState.data.length.toLocaleString("it-IT")}
+                <TariffEditField
+                  label="Ente"
+                  onChange={(value) => setEditForm((form) => ({ ...form, sourceName: value }))}
+                  value={editForm.sourceName}
                 />
-                <SummaryLine label="Ultimo aggiornamento" value="27 apr 2025" />
-              </dl>
-            </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <TariffEditField
+                    label="Anno"
+                    onChange={(value) => setEditForm((form) => ({ ...form, year: value }))}
+                    value={editForm.year}
+                  />
+                  <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                    Stato
+                    <select
+                      className="mt-1 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium normal-case tracking-normal text-[var(--text-primary)]"
+                      onChange={(event) =>
+                        setEditForm((form) => ({ ...form, status: event.target.value }))
+                      }
+                      value={editForm.status}
+                    >
+                      <option value="active">active</option>
+                      <option value="draft">draft</option>
+                      <option value="validated">validated</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button className="flex-1" onClick={handleSaveEdit} type="button">
+                    <Save className="size-4" />
+                    Salva
+                  </Button>
+                  <Button onClick={() => setEditingBookId(null)} type="button" variant="outline">
+                    Annulla
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <Badge
+                  className="float-right"
+                  variant={selectedTariffBook.status === "active" ? "success" : "info"}
+                >
+                  {selectedTariffBook.status}
+                </Badge>
+                <div className="text-[20px] font-bold leading-tight text-[var(--text-primary)]">
+                  {selectedTariffBook.name}
+                </div>
+                <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
+                  ID: {selectedTariffBook.id}
+                </div>
+                <dl className="mt-6 space-y-3">
+                  <SummaryLine label="Ente" value={selectedTariffBook.sourceName} />
+                  <SummaryLine label="Anno" value={String(selectedTariffBook.year)} />
+                  <SummaryLine label="Stato" value={selectedTariffBook.status} />
+                  <SummaryLine
+                    label="Progetti collegati"
+                    value={`${linkedProjectCountByTariffBookId.get(selectedTariffBook.id) ?? 0} progetti`}
+                  />
+                  <SummaryLine
+                    label="Voci totali"
+                    value={voicesState.data.length.toLocaleString("it-IT")}
+                  />
+                  <SummaryLine label="Ultimo aggiornamento" value="27 apr 2025" />
+                </dl>
+              </div>
+            )}
           </SectionPanel>
 
           <SectionPanel className="rounded-xl p-4">
@@ -609,10 +791,18 @@ export function TariffsScreen() {
                 <Download className="size-4" />
               </Button>
             </div>
-            <TariffVoicesPreview total={voicesState.data.length} />
+            <TariffVoicesPreview groups={previewVoicesByCategory} total={voicesState.data.length} />
           </SectionPanel>
         </aside>
       </section>
+      {importPreview ? (
+        <TariffImportPreviewModal
+          isBusy={createState === "saving" || isImporting}
+          metadata={importPreview}
+          onCancel={() => setImportPreview(null)}
+          onConfirm={handleConfirmImport}
+        />
+      ) : null}
     </ScreenShell>
   );
 }
@@ -705,6 +895,7 @@ function TariffBookRow({
   isSelected,
   linkedProjectCount,
   onDelete,
+  onEdit,
   onSelect,
   voiceCount,
 }: {
@@ -712,6 +903,7 @@ function TariffBookRow({
   isSelected: boolean;
   linkedProjectCount: number;
   onDelete: () => void;
+  onEdit: () => void;
   onSelect: () => void;
   voiceCount: null | number;
 }) {
@@ -787,7 +979,7 @@ function TariffBookRow({
                 <button
                   className="w-full px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
                   onClick={() => {
-                    onSelect();
+                    onEdit();
                     setIsOpen(false);
                   }}
                   type="button"
@@ -813,46 +1005,628 @@ function TariffBookRow({
   );
 }
 
-function TariffVoicesPreview({ total }: { total: number }) {
+function TariffEditField({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <label className="block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+      {label}
+      <input
+        className="mt-1 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium normal-case tracking-normal text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      />
+    </label>
+  );
+}
+
+function TariffVoicesPreview({
+  groups,
+  isExpandable = false,
+  total,
+}: {
+  groups: Array<{ children: DesktopTariffVoice[]; code: string; description: string }>;
+  isExpandable?: boolean;
+  total: number;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleGroups = showAll || !isExpandable ? groups : groups.slice(0, 3);
+  const visibleVoiceCount = visibleGroups.reduce((sum, group) => sum + group.children.length, 0);
+
   return (
     <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border-subtle)]/80">
-      <div className="grid grid-cols-[72px_minmax(0,1fr)_54px_72px] border-b border-[var(--border-subtle)]/80 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+      <div className="grid min-w-[860px] grid-cols-[150px_minmax(280px,1fr)_90px_110px_110px] border-b border-[var(--border-subtle)]/80 bg-[var(--bg-muted)]/35 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
         <span>Codice</span>
         <span>Descrizione</span>
         <span>U.M.</span>
+        <span className="text-right">Manodopera</span>
         <span className="text-right">Prezzo</span>
       </div>
-      {previewVoiceRows.map((group) => (
-        <div key={group.code}>
-          <div className="grid grid-cols-[72px_minmax(0,1fr)_54px_72px] border-b border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/45 px-3 py-2 text-[12px] font-bold text-[var(--text-primary)]">
-            <span>{group.code}</span>
-            <span>{group.description}</span>
-            <span>-</span>
-            <span className="text-right">-</span>
-          </div>
-          {group.children.map((voice) => (
-            <div
-              className="grid grid-cols-[72px_minmax(0,1fr)_54px_72px] border-b border-[var(--border-subtle)]/70 px-3 py-2 text-[12px] last:border-b-0"
-              key={voice.code}
-            >
-              <span className="font-medium text-[var(--text-secondary)]">{voice.code}</span>
-              <span className="min-w-0 truncate font-medium text-[var(--text-secondary)]">
-                {voice.description}
-              </span>
-              <span className="font-medium text-[var(--text-secondary)]">{voice.unit}</span>
-              <span className="text-right font-semibold text-[var(--text-primary)]">
-                {voice.price}
-              </span>
+      <div className="overflow-x-auto">
+        {visibleGroups.map((group) => (
+          <div className="min-w-[860px]" key={group.code}>
+            <div className="grid grid-cols-[150px_minmax(280px,1fr)_90px_110px_110px] border-b border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 py-3 text-[12px] font-bold text-[var(--text-primary)]">
+              <span className="break-words">{group.code}</span>
+              <span className="leading-5">{group.description}</span>
+              <span>-</span>
+              <span className="text-right">-</span>
+              <span className="text-right">-</span>
             </div>
-          ))}
-        </div>
-      ))}
+            {group.children.map((voice) => (
+              <div
+                className="grid grid-cols-[150px_minmax(280px,1fr)_90px_110px_110px] gap-x-3 border-b border-[var(--border-subtle)]/70 px-4 py-3 text-[12px] last:border-b-0"
+                key={voice.id}
+              >
+                <span className="break-words font-semibold leading-5 text-[var(--text-primary)]">
+                  {voice.officialCode}
+                </span>
+                <span className="min-w-0 whitespace-normal break-words font-medium leading-5 text-[var(--text-secondary)]">
+                  {voice.description || "Descrizione mancante"}
+                </span>
+                <span className="font-medium text-[var(--text-secondary)]">
+                  {voice.unitOfMeasure || "-"}
+                </span>
+                <span className="text-right font-semibold text-[var(--text-primary)]">
+                  {formatPercent(voice.laborPercentage)}
+                </span>
+                <span className="text-right font-semibold text-[var(--text-primary)]">
+                  {formatEuro(voice.unitPrice)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
       <div className="flex items-center justify-between gap-3 px-3 py-3 text-[12px] font-medium text-[var(--text-secondary)]">
-        <span>Mostra le prime 6 voci di {total.toLocaleString("it-IT")} totali</span>
-        <button className="font-bold text-[var(--info-base)]" type="button">
-          Vedi tutte le voci
-        </button>
+        <span>
+          Mostra {visibleVoiceCount.toLocaleString("it-IT")} di {total.toLocaleString("it-IT")} voci
+        </span>
+        {isExpandable && groups.length > 3 ? (
+          <button
+            className="font-bold text-[var(--info-base)]"
+            onClick={() => setShowAll((value) => !value)}
+            type="button"
+          >
+            {showAll ? "Riduci" : "Vedi tutte le voci"}
+          </button>
+        ) : null}
       </div>
     </div>
   );
+}
+
+function TariffImportPreviewModal({
+  isBusy,
+  metadata,
+  onCancel,
+  onConfirm,
+}: {
+  isBusy: boolean;
+  metadata: TariffPdfMetadata;
+  onCancel: () => void;
+  onConfirm: (metadata: TariffPdfMetadata) => void;
+}) {
+  const [editableVoices, setEditableVoices] = useState(metadata.voices);
+  const validation = getImportValidation(editableVoices);
+  const hasVoices = editableVoices.length > 0;
+  const canConfirm = hasVoices && validation.invalidCount === 0;
+  const duplicateCodes = useMemo(() => new Set(validation.duplicateExamples), [validation]);
+  const editableGroups = useMemo(() => groupEditableTariffVoices(editableVoices), [editableVoices]);
+  const invalidRows = useMemo(
+    () => validation.invalidRows.concat(validation.duplicateRows).slice(0, 8),
+    [validation],
+  );
+
+  function updateVoice(index: number, field: keyof DesktopTariffVoice, value: string) {
+    setEditableVoices((current) =>
+      current.map((voice, voiceIndex) =>
+        voiceIndex === index
+          ? {
+              ...voice,
+              [field]:
+                field === "unitPrice"
+                  ? parseEuroAmount(value)
+                  : field === "laborPercentage"
+                    ? parseOptionalPercent(value)
+                    : value,
+            }
+          : voice,
+      ),
+    );
+  }
+
+  function focusImportCell(rowIndex: number, field: string) {
+    const cell = document.getElementById(`import-cell-${rowIndex}-${field}`);
+    cell?.scrollIntoView({ block: "center", inline: "nearest" });
+    cell?.focus();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/35 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-xl">
+        <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <h3 className="text-[21px] font-bold leading-tight text-[var(--text-primary)]">
+              Preview importazione
+            </h3>
+            <p className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
+              Controlla i dati estratti dal PDF prima di confermarli nel catalogo.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-semibold text-[var(--text-secondary)]">
+              <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 py-1">
+                {metadata.name}
+              </span>
+              <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 py-1">
+                {metadata.sourceName}
+              </span>
+              <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 py-1">
+                {metadata.year}
+              </span>
+            </div>
+          </div>
+          <Button
+            aria-label="Chiudi preview"
+            onClick={onCancel}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="grid gap-3 md:grid-cols-4">
+            <ImportMetric
+              label="Righe rilevate"
+              value={metadata.voices.length.toLocaleString("it-IT")}
+            />
+            <ImportMetric
+              label="Valide"
+              tone={validation.validCount > 0 ? "success" : "warning"}
+              value={validation.validCount.toLocaleString("it-IT")}
+            />
+            <ImportMetric
+              label="Warning"
+              tone={validation.warningCount > 0 ? "warning" : "neutral"}
+              value={validation.warningCount.toLocaleString("it-IT")}
+            />
+            <ImportMetric
+              label="Duplicati"
+              tone={validation.duplicateCount > 0 ? "warning" : "neutral"}
+              value={validation.duplicateCount.toLocaleString("it-IT")}
+            />
+          </div>
+
+          <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
+            <EditableTariffVoicesGrid
+              duplicateCodes={duplicateCodes}
+              groups={editableGroups}
+              onChange={updateVoice}
+              validation={validation}
+            />
+            <div className="space-y-3 lg:sticky lg:top-0">
+              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                  Validazioni
+                </div>
+                <div className="mt-3 space-y-2 text-[12px] font-medium text-[var(--text-secondary)]">
+                  <ValidationLine ok={hasVoices} text="Voci prezzo rilevate" />
+                  <ValidationLine
+                    ok={validation.invalidCount === 0}
+                    text={`${validation.invalidCount.toLocaleString("it-IT")} voci con dati mancanti`}
+                  />
+                  <ValidationLine
+                    ok={validation.duplicateCount === 0}
+                    text={`${validation.duplicateCount.toLocaleString("it-IT")} codici duplicati`}
+                  />
+                  <ValidationLine
+                    ok={metadata.sourceName !== "Ente da confermare"}
+                    text="Ente riconosciuto"
+                  />
+                  <ValidationLine
+                    ok={metadata.year >= 1900 && metadata.year <= 2200}
+                    text="Anno coerente"
+                  />
+                </div>
+              </div>
+              {validation.duplicateExamples.length > 0 || validation.invalidExamples.length > 0 ? (
+                <div className="rounded-lg border border-[var(--warning-soft)] bg-[var(--warning-soft)] p-3 text-[12px] font-medium leading-5 text-[var(--warning-base)]">
+                  {validation.duplicateExamples.length > 0 ? (
+                    <div>Duplicati: {validation.duplicateExamples.join(", ")}</div>
+                  ) : null}
+                  {validation.invalidExamples.length > 0 ? (
+                    <div>Dati mancanti: {validation.invalidExamples.join(", ")}</div>
+                  ) : null}
+                  {invalidRows.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {invalidRows.map((row) => (
+                        <button
+                          className="rounded-md border border-current/25 bg-[var(--surface-base)] px-2 py-1 text-[11px] font-bold"
+                          key={`${row.index}-${row.field}`}
+                          onClick={() => focusImportCell(row.index, row.field)}
+                          type="button"
+                        >
+                          Riga {row.index + 1}: {row.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {!hasVoices ? (
+            <div className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
+              Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento
+              contenga codici, unita di misura e prezzi leggibili.
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <Button onClick={onCancel} type="button" variant="outline">
+            Annulla
+          </Button>
+          <Button
+            disabled={!canConfirm || isBusy}
+            onClick={() => onConfirm({ ...metadata, voices: editableVoices })}
+            type="button"
+          >
+            Conferma importazione
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditableTariffVoicesGrid({
+  duplicateCodes,
+  groups,
+  onChange,
+  validation,
+}: {
+  duplicateCodes: Set<string>;
+  groups: Array<{
+    children: Array<{ index: number; voice: DesktopTariffVoice }>;
+    code: string;
+    description: string;
+  }>;
+  onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  validation: ImportValidation;
+}) {
+  const invalidCellKeys = new Set(validation.invalidRows.map((row) => `${row.index}-${row.field}`));
+  const totalVoices = groups.reduce((sum, group) => sum + group.children.length, 0);
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border-subtle)]/80">
+      <div className="grid grid-cols-[minmax(86px,0.9fr)_minmax(140px,1.8fr)_minmax(46px,0.45fr)_minmax(76px,0.65fr)_minmax(76px,0.65fr)] gap-2 border-b border-[var(--border-subtle)]/80 bg-[var(--bg-muted)]/35 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+        <span>Codice</span>
+        <span>Descrizione</span>
+        <span>U.M.</span>
+        <span className="text-right">Manod.</span>
+        <span className="text-right">Prezzo</span>
+      </div>
+      <div>
+        {groups.map((group) => (
+          <div key={group.code}>
+            <div className="grid grid-cols-[minmax(86px,0.9fr)_minmax(140px,1.8fr)_minmax(46px,0.45fr)_minmax(76px,0.65fr)_minmax(76px,0.65fr)] gap-2 border-b border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-3 py-2 text-[12px] font-bold text-[var(--text-primary)]">
+              <span className="break-words leading-5">{group.code}</span>
+              <span className="min-w-0 break-words leading-5">{group.description}</span>
+              <span>-</span>
+              <span className="text-right">-</span>
+              <span className="text-right">-</span>
+            </div>
+            {group.children.map(({ index, voice }) => {
+              const code = voice.officialCode.trim();
+              const isDuplicate = duplicateCodes.has(code);
+
+              return (
+                <div
+                  className={`grid grid-cols-[minmax(86px,0.9fr)_minmax(140px,1.8fr)_minmax(46px,0.45fr)_minmax(76px,0.65fr)_minmax(76px,0.65fr)] gap-2 border-b border-[var(--border-subtle)]/65 px-3 py-2 last:border-b-0 ${
+                    isDuplicate ? "bg-[var(--warning-soft)]/35" : ""
+                  }`}
+                  key={voice.id}
+                >
+                  <ImportCell
+                    field="officialCode"
+                    index={index}
+                    isInvalid={invalidCellKeys.has(`${index}-officialCode`) || isDuplicate}
+                    onChange={onChange}
+                    value={voice.officialCode}
+                  />
+                  <ImportCell
+                    field="description"
+                    index={index}
+                    isInvalid={invalidCellKeys.has(`${index}-description`)}
+                    onChange={onChange}
+                    value={voice.description}
+                  />
+                  <ImportCell
+                    field="unitOfMeasure"
+                    index={index}
+                    isInvalid={invalidCellKeys.has(`${index}-unitOfMeasure`)}
+                    onChange={onChange}
+                    value={voice.unitOfMeasure}
+                  />
+                  <ImportCell
+                    align="right"
+                    field="laborPercentage"
+                    index={index}
+                    isInvalid={false}
+                    onChange={onChange}
+                    value={formatEditablePercent(voice.laborPercentage)}
+                  />
+                  <ImportCell
+                    align="right"
+                    field="unitPrice"
+                    index={index}
+                    isInvalid={invalidCellKeys.has(`${index}-unitPrice`)}
+                    onChange={onChange}
+                    value={
+                      Number.isFinite(voice.unitPrice)
+                        ? String(voice.unitPrice).replace(".", ",")
+                        : ""
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="px-3 py-3 text-[12px] font-medium text-[var(--text-secondary)]">
+        {totalVoices.toLocaleString("it-IT")} sottovoci modificabili in{" "}
+        {groups.length.toLocaleString("it-IT")} voci
+      </div>
+    </div>
+  );
+}
+
+function ImportCell({
+  align = "left",
+  field,
+  index,
+  isInvalid,
+  onChange,
+  value,
+}: {
+  align?: "left" | "right";
+  field: keyof DesktopTariffVoice;
+  index: number;
+  isInvalid: boolean;
+  onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  value: string;
+}) {
+  return (
+    <input
+      className={`h-9 min-w-0 rounded-md border bg-[var(--surface-base)] px-2 text-[12px] font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
+        align === "right" ? "text-right" : ""
+      } ${
+        isInvalid
+          ? "border-[var(--warning-base)] bg-[var(--warning-soft)]/40"
+          : "border-transparent hover:border-[var(--border-subtle)]"
+      }`}
+      id={`import-cell-${index}-${field}`}
+      onChange={(event) => onChange(index, field, event.target.value)}
+      value={value}
+    />
+  );
+}
+
+function ImportMetric({
+  label,
+  tone = "neutral",
+  value,
+}: {
+  label: string;
+  tone?: "neutral" | "success" | "warning";
+  value: string;
+}) {
+  const color =
+    tone === "success"
+      ? "text-[var(--success-base)]"
+      : tone === "warning"
+        ? "text-[var(--warning-base)]"
+        : "text-[var(--text-primary)]";
+
+  return (
+    <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+        {label}
+      </div>
+      <div className={`mt-2 text-[22px] font-bold ${color}`}>{value}</div>
+    </div>
+  );
+}
+
+function ValidationLine({ ok, text }: { ok: boolean; text: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <CheckCircle2
+        className={`size-4 ${ok ? "text-[var(--success-base)]" : "text-[var(--warning-base)]"}`}
+      />
+      <span>{text}</span>
+    </div>
+  );
+}
+
+type ImportValidation = ReturnType<typeof getImportValidation>;
+
+function getImportValidation(voices: DesktopTariffVoice[]) {
+  const codeCounts = new Map<string, number>();
+  const invalidExamples: string[] = [];
+  const invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }> = [];
+  let invalidCount = 0;
+
+  for (const [index, voice] of voices.entries()) {
+    const code = voice.officialCode.trim();
+    codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1);
+
+    const missingFields: Array<{ field: keyof DesktopTariffVoice; label: string }> = [];
+    if (code.length === 0) {
+      missingFields.push({ field: "officialCode", label: "codice" });
+    }
+    if (voice.description.trim().length === 0) {
+      missingFields.push({ field: "description", label: "descrizione" });
+    }
+    if (voice.unitOfMeasure.trim().length === 0) {
+      missingFields.push({ field: "unitOfMeasure", label: "U.M." });
+    }
+    if (!Number.isFinite(voice.unitPrice) || voice.unitPrice <= 0) {
+      missingFields.push({ field: "unitPrice", label: "prezzo" });
+    }
+
+    if (missingFields.length > 0) {
+      invalidCount += 1;
+      if (invalidExamples.length < 4) {
+        invalidExamples.push(code || voice.id);
+      }
+      for (const field of missingFields) {
+        invalidRows.push({ index, ...field });
+      }
+    }
+  }
+
+  const duplicateExamples = [...codeCounts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([code]) => code)
+    .slice(0, 4);
+  const duplicateCount = [...codeCounts.values()].reduce(
+    (sum, count) => sum + Math.max(0, count - 1),
+    0,
+  );
+  const duplicateRows = voices
+    .map((voice, index) => ({ code: voice.officialCode.trim(), index }))
+    .filter((row) => row.code.length > 0 && (codeCounts.get(row.code) ?? 0) > 1)
+    .map((row) => ({
+      field: "officialCode" as const,
+      index: row.index,
+      label: "codice duplicato",
+    }));
+
+  return {
+    duplicateCount,
+    duplicateExamples,
+    duplicateRows,
+    invalidCount,
+    invalidExamples,
+    invalidRows,
+    validCount: Math.max(0, voices.length - invalidCount),
+    warningCount: duplicateCount + invalidCount,
+  };
+}
+
+function groupTariffVoices(voices: DesktopTariffVoice[]) {
+  const groups = new Map<
+    string,
+    { children: DesktopTariffVoice[]; code: string; description: string }
+  >();
+
+  for (const voice of voices) {
+    const codeParts = voice.officialCode.split(".");
+    const groupCode =
+      codeParts.length >= 4 ? codeParts.slice(0, 4).join(".") : voice.officialCode || "Altro";
+    const group = groups.get(groupCode) ?? {
+      children: [],
+      code: groupCode,
+      description: inferGroupDescription(voice),
+    };
+    group.children.push(voice);
+    groups.set(groupCode, group);
+  }
+
+  return [...groups.values()];
+}
+
+function groupEditableTariffVoices(voices: DesktopTariffVoice[]) {
+  const groups = new Map<
+    string,
+    {
+      children: Array<{ index: number; voice: DesktopTariffVoice }>;
+      code: string;
+      description: string;
+    }
+  >();
+
+  for (const [index, voice] of voices.entries()) {
+    const codeParts = voice.officialCode.split(".");
+    const groupCode =
+      codeParts.length >= 4 ? codeParts.slice(0, 4).join(".") : voice.officialCode || "Altro";
+    const group = groups.get(groupCode) ?? {
+      children: [],
+      code: groupCode,
+      description: inferGroupDescription(voice),
+    };
+    group.children.push({ index, voice });
+    groups.set(groupCode, group);
+  }
+
+  return [...groups.values()];
+}
+
+function inferGroupDescription(voice: DesktopTariffVoice) {
+  if (voice.category.includes("VOCE")) {
+    return voice.category;
+  }
+  if (voice.category === "armament") {
+    return "Armamento ferroviario";
+  }
+  if (voice.category === "electrical") {
+    return "Impianti elettrici";
+  }
+  if (voice.category === "safety-os") {
+    return "Oneri sicurezza";
+  }
+  return "Opere civili";
+}
+
+function formatEuro(value: number) {
+  return new Intl.NumberFormat("it-IT", { currency: "EUR", style: "currency" }).format(value);
+}
+
+function formatPercent(value: null | number | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "-";
+  }
+
+  return `${new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value)}%`;
+}
+
+function formatEditablePercent(value: null | number | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "";
+  }
+
+  return String(value).replace(".", ",");
+}
+
+function parseOptionalPercent(value: string) {
+  const normalized = value.trim().replace("%", "");
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function createTariffBookId(metadata: TariffPdfMetadata) {
+  const base = sanitizeIdentifier(`${metadata.name}_${metadata.year}`) || "import";
+  return `tariff_${base}_${Date.now().toString(36)}`;
+}
+
+function sanitizeIdentifier(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }

@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS tariff_voices (
   description TEXT NOT NULL,
   category TEXT NOT NULL,
   unit_of_measure TEXT NOT NULL,
+  labor_percentage REAL,
   unit_price_cents INTEGER NOT NULL,
   UNIQUE(tariff_book_id, official_code)
 );

@@ -63,6 +63,7 @@ export type DesktopTariffVoiceRecord = {
   category: string;
   description: string;
   id: string;
+  laborPercentage?: number | null;
   officialCode: string;
   tariffBookId: string;
   unitOfMeasure: string;

@@ -1,7 +1,8 @@
-use std::path::Path;
+use std::{path::Path, process::Command};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager};
 
 use crate::{db::migrations::apply_migrations, models::app_error::AppError};
 
@@ -32,6 +33,7 @@ pub struct TariffVoiceRecord {
     pub category: String,
     pub description: String,
     pub id: String,
+    pub labor_percentage: Option<f64>,
     pub official_code: String,
     pub tariff_book_id: String,
     pub unit_of_measure: String,
@@ -55,6 +57,23 @@ pub struct TariffPdfImportPreview {
     pub source_name: String,
     pub voices: Vec<TariffVoiceRecord>,
     pub year: i32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RfiTariffRecord {
+    codice: String,
+    tariffa: String,
+    categoria: String,
+    gruppo: String,
+    voce: String,
+    voce_desc: String,
+    sottovoce: String,
+    descrizione: String,
+    unita_codice: String,
+    unita_label: String,
+    tipo_valore: String,
+    valore_euro: Option<f64>,
+    perc_manodopera: Option<f64>,
 }
 
 pub fn list_tariff_books(connection: &Connection) -> Result<Vec<TariffBookRecord>, AppError> {
@@ -179,7 +198,7 @@ pub fn list_tariff_voices(
 
     let mut statement = connection
         .prepare(
-            "SELECT id, tariff_book_id, official_code, description, category, unit_of_measure, unit_price_cents
+            "SELECT id, tariff_book_id, official_code, description, category, unit_of_measure, unit_price_cents, labor_percentage
              FROM tariff_voices
              WHERE tariff_book_id = ?1
              ORDER BY official_code ASC",
@@ -193,29 +212,253 @@ pub fn list_tariff_voices(
         .map_err(to_database_error)
 }
 
-pub fn import_tariff_pdf_preview(path: &Path) -> Result<TariffPdfImportPreview, AppError> {
-    let bytes = std::fs::read(path).map_err(|error| AppError::Database(error.to_string()))?;
+pub fn import_tariff_pdf_preview(
+    path: &Path,
+    app: Option<&AppHandle>,
+) -> Result<TariffPdfImportPreview, AppError> {
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if extension != "pdf" && extension != "json" {
+        return Err(AppError::Validation(
+            "only PDF or parser JSON tariff files can be imported".into(),
+        ));
+    }
+
+    let metadata =
+        std::fs::metadata(path).map_err(|error| AppError::Database(error.to_string()))?;
+    if metadata.len() > 80 * 1024 * 1024 {
+        return Err(AppError::Validation(
+            "tariff file is too large to import locally".into(),
+        ));
+    }
+
     let fallback_name = path
         .file_stem()
         .and_then(|value| value.to_str())
         .unwrap_or("Tariffario importato")
         .replace(['_', '-'], " ");
-    let extracted_text = extract_pdf_like_text(&bytes);
-    let source_text = if extracted_text.trim().is_empty() {
-        fallback_name.clone()
+
+    let records = if extension == "json" {
+        parse_rfi_json_file(path)?
     } else {
-        extracted_text
+        parse_rfi_pdf_with_python(path, app)?
     };
-    let year =
-        infer_year(&source_text).unwrap_or_else(|| infer_year(&fallback_name).unwrap_or(2026));
+
+    let source_text = records
+        .iter()
+        .map(|record| {
+            format!(
+                "{} {} {} {}",
+                record.codice, record.voce_desc, record.descrizione, record.tariffa
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let year = infer_year(&fallback_name).unwrap_or(2025);
     let source_name = infer_source_name(&source_text);
-    let voices = parse_tariff_voices(&source_text, "tariff_import_preview");
+    let voices = records
+        .iter()
+        .filter_map(|record| rfi_record_to_tariff_voice(record, "tariff_import_preview"))
+        .collect();
 
     Ok(TariffPdfImportPreview {
         name: fallback_name,
         source_name,
         voices,
         year,
+    })
+}
+
+fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
+    let bytes = std::fs::read(path).map_err(|error| AppError::Database(error.to_string()))?;
+    let parser_json = String::from_utf8_lossy(&bytes);
+    let parser_json = remove_json_surrogate_escapes(&parser_json);
+
+    serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json).map_err(|error| {
+        AppError::Validation(format!(
+            "parser JSON is not a valid RFI tariff export: {error}"
+        ))
+    })
+}
+
+fn parse_rfi_pdf_with_python(
+    path: &Path,
+    app: Option<&AppHandle>,
+) -> Result<Vec<RfiTariffRecord>, AppError> {
+    if !std::fs::read(path)
+        .map_err(|error| AppError::Database(error.to_string()))?
+        .starts_with(b"%PDF-")
+    {
+        return Err(AppError::Validation(
+            "selected file is not a valid PDF".into(),
+        ));
+    }
+
+    let output = run_bundled_rfi_parser(path, app).or_else(|bundled_error| {
+        Command::new("py")
+            .args(["-3", "-c", RFI_PYTHON_PARSER])
+            .arg(path)
+            .output()
+            .map_err(|fallback_error| {
+                AppError::Validation(format!(
+                    "RFI parser could not be started. Bundled parser error: {bundled_error}. Development fallback py -3 failed: {fallback_error}"
+                ))
+            })
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(AppError::Validation(format!(
+            "RFI PDF parser failed. Install pdfplumber in the active Python environment. {stderr}"
+        )));
+    }
+
+    let parser_json = String::from_utf8_lossy(&output.stdout);
+    let parser_json = remove_json_surrogate_escapes(&parser_json);
+
+    serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json)
+        .map_err(|error| AppError::Validation(format!("RFI parser returned invalid JSON: {error}")))
+}
+
+fn remove_json_surrogate_escapes(value: &str) -> String {
+    let mut cleaned = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+
+    while let Some(current) = chars.next() {
+        if current == '\\' && matches!(chars.peek(), Some('u')) {
+            let mut escape = String::from("\\");
+            escape.push(chars.next().unwrap_or_default());
+
+            for _ in 0..4 {
+                if let Some(hex) = chars.peek().copied() {
+                    if hex.is_ascii_hexdigit() {
+                        escape.push(chars.next().unwrap_or_default());
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            if is_json_surrogate_escape(&escape) {
+                continue;
+            }
+
+            cleaned.push_str(&escape);
+            continue;
+        }
+
+        cleaned.push(current);
+    }
+
+    cleaned
+}
+
+fn is_json_surrogate_escape(value: &str) -> bool {
+    if value.len() != 6 || !value.starts_with("\\u") {
+        return false;
+    }
+
+    u32::from_str_radix(&value[2..], 16)
+        .map(|code| (0xD800..=0xDFFF).contains(&code))
+        .unwrap_or(false)
+}
+
+fn run_bundled_rfi_parser(
+    path: &Path,
+    app: Option<&AppHandle>,
+) -> Result<std::process::Output, String> {
+    let Some(app) = app else {
+        return Err("app handle unavailable".into());
+    };
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let parser_exe = resource_dir.join("parser").join("rfi_tariffa_parser.exe");
+    if parser_exe.is_file() {
+        return Command::new(parser_exe)
+            .arg(path)
+            .output()
+            .map_err(|error| error.to_string());
+    }
+
+    let parser_script = resource_dir.join("parser").join("rfi_tariffa_parser.py");
+    let python_exe = resource_dir.join("python").join(if cfg!(windows) {
+        "python.exe"
+    } else {
+        "bin/python3"
+    });
+    if python_exe.is_file() && parser_script.is_file() {
+        return Command::new(python_exe)
+            .arg(parser_script)
+            .arg(path)
+            .output()
+            .map_err(|error| error.to_string());
+    }
+    if parser_script.is_file() {
+        return Command::new("py")
+            .args(["-3"])
+            .arg(parser_script)
+            .arg(path)
+            .output()
+            .map_err(|error| error.to_string());
+    }
+
+    Err(format!(
+        "bundled parser not found under {}",
+        resource_dir.display()
+    ))
+}
+
+fn rfi_record_to_tariff_voice(
+    record: &RfiTariffRecord,
+    tariff_book_id: &str,
+) -> Option<TariffVoiceRecord> {
+    let unit_price = record.valore_euro?;
+    if !unit_price.is_finite() || record.codice.trim().is_empty() {
+        return None;
+    }
+
+    let voice_label = clean_text(&record.voce_desc);
+    let mut category = format!(
+        "{}.{}.{} - VOCE {}.{}",
+        record.tariffa.trim(),
+        record.categoria.trim(),
+        record.gruppo.trim(),
+        record.voce.trim(),
+        record.sottovoce.trim()
+    );
+    if !voice_label.is_empty() {
+        category.push_str(" - ");
+        category.push_str(&voice_label);
+    }
+    if !record.tipo_valore.trim().is_empty() {
+        category.push_str(" | ");
+        category.push_str(record.tipo_valore.trim());
+    }
+    let unit = if record.unita_codice.trim().is_empty() {
+        record.unita_label.trim()
+    } else {
+        record.unita_codice.trim()
+    };
+
+    Some(TariffVoiceRecord {
+        category,
+        description: clean_text(&record.descrizione),
+        id: format!(
+            "voice_{}_{}",
+            tariff_book_id,
+            sanitize_identifier(&record.codice)
+        ),
+        labor_percentage: record.perc_manodopera.filter(|value| value.is_finite()),
+        official_code: record.codice.trim().to_string(),
+        tariff_book_id: tariff_book_id.to_string(),
+        unit_of_measure: unit.to_string(),
+        unit_price,
     })
 }
 
@@ -249,8 +492,9 @@ fn insert_tariff_voice(
                 description,
                 category,
                 unit_of_measure,
+                labor_percentage,
                 unit_price_cents
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 voice.id,
                 tariff_book_id,
@@ -258,6 +502,7 @@ fn insert_tariff_voice(
                 voice.description,
                 voice.category,
                 voice.unit_of_measure,
+                voice.labor_percentage,
                 money_to_cents(voice.unit_price)
             ],
         )
@@ -287,6 +532,7 @@ fn map_tariff_voice_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TariffVoice
         category: row.get(4)?,
         unit_of_measure: row.get(5)?,
         unit_price: cents_to_money(amount_cents),
+        labor_percentage: row.get(7)?,
     })
 }
 
@@ -329,143 +575,6 @@ fn validate_tariff_book_update_request(request: &UpdateTariffBookRequest) -> Res
     Ok(())
 }
 
-fn extract_pdf_like_text(bytes: &[u8]) -> String {
-    let raw = String::from_utf8_lossy(bytes);
-    let mut values = Vec::new();
-    let mut current = String::new();
-    let mut in_literal = false;
-
-    for character in raw.chars() {
-        if in_literal {
-            if character == ')' {
-                if current.trim().len() > 2 {
-                    values.push(current.trim().to_string());
-                }
-                current.clear();
-                in_literal = false;
-            } else if !character.is_control() || character == '\n' {
-                current.push(character);
-            }
-            continue;
-        }
-
-        if character == '(' {
-            in_literal = true;
-        }
-    }
-
-    for line in raw.lines() {
-        let printable: String = line
-            .chars()
-            .filter(|character| {
-                character.is_ascii_graphic()
-                    || character.is_ascii_whitespace()
-                    || !character.is_ascii()
-            })
-            .collect();
-        if printable.chars().any(|character| character.is_alphabetic()) && printable.len() > 8 {
-            values.push(printable);
-        }
-    }
-
-    values.join("\n")
-}
-
-fn parse_tariff_voices(text: &str, tariff_book_id: &str) -> Vec<TariffVoiceRecord> {
-    text.lines()
-        .filter_map(|line| parse_tariff_voice_line(line, tariff_book_id))
-        .take(500)
-        .collect()
-}
-
-fn parse_tariff_voice_line(line: &str, tariff_book_id: &str) -> Option<TariffVoiceRecord> {
-    let compact_line = line.split_whitespace().collect::<Vec<_>>().join(" ");
-    let parts = compact_line.split_whitespace().collect::<Vec<_>>();
-    let code = parts
-        .first()?
-        .trim_matches(|character: char| !character.is_alphanumeric() && character != '.');
-
-    if !is_supported_tariff_code(code) {
-        return None;
-    }
-
-    let price_token = parts.iter().rev().find(|part| {
-        part.chars().any(|character| character.is_ascii_digit()) && part.contains(',')
-    })?;
-    let price = parse_price(price_token)?;
-    let price_index = parts
-        .iter()
-        .position(|part| part == price_token)
-        .unwrap_or(parts.len().saturating_sub(1));
-    let unit = parts
-        .get(price_index.checked_sub(1)?)
-        .copied()
-        .filter(|part| !part.contains('€'))
-        .or_else(|| {
-            price_index
-                .checked_sub(2)
-                .and_then(|index| parts.get(index).copied())
-        })
-        .unwrap_or("cad");
-    let description = compact_line
-        .replace(code, "")
-        .replace(price_token, "")
-        .trim()
-        .to_string();
-
-    if description.len() < 8 {
-        return None;
-    }
-
-    Some(TariffVoiceRecord {
-        category: infer_voice_category(&description),
-        description,
-        id: format!("voice_{}_{}", tariff_book_id, sanitize_identifier(code)),
-        official_code: code.to_string(),
-        tariff_book_id: tariff_book_id.to_string(),
-        unit_of_measure: unit.trim_matches('/').to_string(),
-        unit_price: price,
-    })
-}
-
-fn parse_price(value: &str) -> Option<f64> {
-    let normalized = value
-        .replace("€", "")
-        .replace('.', "")
-        .replace(',', ".")
-        .trim()
-        .to_string();
-
-    normalized.parse::<f64>().ok()
-}
-
-fn is_supported_tariff_code(value: &str) -> bool {
-    let has_structured_segments = value.contains('.') && value.len() >= 5;
-    let is_rfi_code = value.len() == 6
-        && value.starts_with("50")
-        && value.chars().all(|char| char.is_ascii_digit());
-
-    has_structured_segments || is_rfi_code
-}
-
-fn infer_voice_category(description: &str) -> String {
-    let lower_description = description.to_lowercase();
-
-    if lower_description.contains("sicurezza") || lower_description.contains("oneri") {
-        return "safety-os".into();
-    }
-
-    if lower_description.contains("binario") || lower_description.contains("armamento") {
-        return "armament".into();
-    }
-
-    if lower_description.contains("elettric") || lower_description.contains("contatto") {
-        return "electrical".into();
-    }
-
-    "civil-works".into()
-}
-
 fn infer_year(value: &str) -> Option<i32> {
     value
         .split(|character: char| !character.is_ascii_digit())
@@ -476,16 +585,16 @@ fn infer_year(value: &str) -> Option<i32> {
 fn infer_source_name(value: &str) -> String {
     let lower_value = value.to_lowercase();
 
+    if lower_value.contains("ac.") || lower_value.contains("acc") || lower_value.contains("rfi") {
+        return "RFI".into();
+    }
+
     if lower_value.contains("lombardia") {
         return "Regione Lombardia".into();
     }
 
     if lower_value.contains("piemonte") {
         return "Regione Piemonte".into();
-    }
-
-    if lower_value.contains("rfi") {
-        return "RFI".into();
     }
 
     if lower_value.contains("anas") {
@@ -509,6 +618,10 @@ fn sanitize_identifier(value: &str) -> String {
         .collect()
 }
 
+fn clean_text(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn money_to_cents(amount: f64) -> i64 {
     (amount * 100.0).round() as i64
 }
@@ -521,13 +634,15 @@ fn to_database_error(error: rusqlite::Error) -> AppError {
     AppError::Database(error.to_string())
 }
 
+const RFI_PYTHON_PARSER: &str = include_str!("../../resources/parser/rfi_tariffa_parser.py");
+
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
 
     use super::{
-        CreateTariffBookRequest, TariffVoiceRecord, create_tariff_book, list_tariff_books,
-        list_tariff_voices, parse_tariff_voices,
+        CreateTariffBookRequest, TariffVoiceRecord, create_tariff_book, import_tariff_pdf_preview,
+        list_tariff_books, list_tariff_voices, remove_json_surrogate_escapes,
     };
 
     #[test]
@@ -545,6 +660,7 @@ mod tests {
                     category: "armament".into(),
                     description: "Fornitura e posa binario tipo 60E1".into(),
                     id: "voice_binario_60e1".into(),
+                    labor_percentage: Some(12.5),
                     official_code: "03.C01.C10.035".into(),
                     tariff_book_id: "tariff_lombardia_2025".into(),
                     unit_of_measure: "m".into(),
@@ -564,6 +680,7 @@ mod tests {
             list_tariff_voices(&connection, "tariff_lombardia_2025").expect("tariff voices listed");
         assert_eq!(voices.len(), 1);
         assert_eq!(voices[0].unit_price, 1250.0);
+        assert_eq!(voices[0].labor_percentage, Some(12.5));
     }
 
     #[test]
@@ -586,28 +703,50 @@ mod tests {
     }
 
     #[test]
-    fn parses_tariff_voices_from_text_lines() {
-        let voices = parse_tariff_voices(
-            "03.C01.C10.035 Fornitura e posa binario tipo 60E1 m € 1.250,00",
-            "tariff_test",
-        );
+    fn imports_rfi_parser_json_export() {
+        let path = std::env::temp_dir().join("quantara_rfi_tariff_test_2025.json");
+        std::fs::write(
+            &path,
+            r#"[{
+                "codice":"AC.IR.A.2001.A",
+                "tariffa":"AC",
+                "categoria":"IR",
+                "gruppo":"A",
+                "voce":"2001",
+                "voce_desc":"Fornitura ISA Report ACC/ACCM/PPACC/PPACEI per Safety Assessment di Applicazione Generica e 1^ Applicazione Specifica.",
+                "sottovoce":"A",
+                "descrizione":"Fornitura ISA REPORT per Applicazione Generica e ISA REPORT per 1^ Applicazione Specifica per ACC/ACCM/PPACC/PPACEI di SIZE 1",
+                "unita_codice":"CAD",
+                "unita_label":"Cadauna",
+                "tipo_valore":"EURO",
+                "valore_euro":20337.48,
+                "perc_manodopera":100.0
+            }]"#,
+        )
+        .expect("write test json");
 
-        assert_eq!(voices.len(), 1);
-        assert_eq!(voices[0].official_code, "03.C01.C10.035");
-        assert_eq!(voices[0].unit_of_measure, "m");
-        assert_eq!(voices[0].unit_price, 1250.0);
+        let preview = import_tariff_pdf_preview(&path, None).expect("rfi parser json preview");
+
+        assert_eq!(preview.source_name, "RFI");
+        assert_eq!(preview.year, 2025);
+        assert_eq!(preview.voices.len(), 1);
+        assert_eq!(preview.voices[0].official_code, "AC.IR.A.2001.A");
+        assert_eq!(preview.voices[0].unit_of_measure, "CAD");
+        assert_eq!(preview.voices[0].unit_price, 20337.48);
+        assert_eq!(preview.voices[0].labor_percentage, Some(100.0));
+        assert!(preview.voices[0].category.contains("VOCE 2001"));
+        assert!(!preview.voices[0].category.contains("Manodopera"));
     }
 
     #[test]
-    fn parses_rfi_tariff_codes_from_text_lines() {
-        let voices = parse_tariff_voices(
-            "501234 Rimozione e posa apparecchiatura ferroviaria cad € 240,50",
-            "tariff_rfi",
-        );
+    fn removes_invalid_json_surrogate_escapes_from_parser_output() {
+        let broken = r#"[{"descrizione":"Seduta operativa \udce0 con testo valido"}]"#;
+        let cleaned = remove_json_surrogate_escapes(broken);
 
-        assert_eq!(voices.len(), 1);
-        assert_eq!(voices[0].official_code, "501234");
-        assert_eq!(voices[0].unit_of_measure, "cad");
-        assert_eq!(voices[0].unit_price, 240.5);
+        assert_eq!(
+            cleaned,
+            r#"[{"descrizione":"Seduta operativa  con testo valido"}]"#
+        );
+        assert!(serde_json::from_str::<serde_json::Value>(&cleaned).is_ok());
     }
 }

@@ -196,7 +196,7 @@ export async function selectTariffPdfMetadata(): Promise<TariffPdfMetadata | nul
 
   const { open } = await import("@tauri-apps/plugin-dialog");
   const selectedPath = await open({
-    filters: [{ extensions: ["pdf"], name: "PDF tariffario" }],
+    filters: [{ extensions: ["pdf", "json"], name: "Tariffario PDF o JSON parser" }],
     multiple: false,
   });
 
@@ -208,8 +208,10 @@ export async function selectTariffPdfMetadata(): Promise<TariffPdfMetadata | nul
 
   try {
     return await invoke<TariffPdfMetadata>("import_tariff_pdf_preview", { path: selectedPath });
-  } catch {
-    return fallback;
+  } catch (error) {
+    throw new Error(
+      `Import tariffario non riuscito per ${fallback.name}: ${formatDesktopError(error)}`,
+    );
   }
 }
 
@@ -218,7 +220,7 @@ function inferTariffMetadataFromPath(path: string): TariffPdfMetadata {
     path
       .split(/[\\/]/)
       .pop()
-      ?.replace(/\.pdf$/i, "") ?? "Tariffario importato";
+      ?.replace(/\.(pdf|json)$/i, "") ?? "Tariffario importato";
   const normalized = fileName.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   const yearMatch = normalized.match(/\b(20\d{2}|19\d{2})\b/);
   const year = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear();

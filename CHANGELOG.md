@@ -2,6 +2,13 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.53 - 2026-04-28
+
+- Corretto l'import RFI AC 2025: il parser PDF mantiene le descrizioni multilinea, filtra intestazioni e avvertenze di pagina, normalizza gli escape Unicode non validi e conserva la percentuale di manodopera per ogni singola sottovoce.
+- Aggiornata la preview import tariffari con la colonna Manodopera editabile e persistita come dato separato dalla categoria della voce.
+- Sistemati i filtri progetto del catalogo Tariffari: ora usano solo i contratti realmente presenti nel database locale e non mostrano piu dati dimostrativi quando l'app gira in desktop.
+- Preparato il bundling del parser RFI per distribuire l'eseguibile aggiornato insieme alla release desktop.
+
 ## 0.1.52 - 2026-04-28
 
 - Hotfix Tariffario: ridisegnato il catalogo tariffari con layout a tre aree, KPI compatti, registro centrale esteso, pannello dettaglio e anteprima voci coerenti con il nuovo stile desktop.
