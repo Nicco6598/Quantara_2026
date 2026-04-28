@@ -12,8 +12,13 @@ export function roundCurrency(amount: number): number {
 
 export function parseEuroAmount(value: string): number {
   const normalized = value.replace("€", "").replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const result = Number(normalized);
 
-  return Number(normalized);
+  if (!Number.isFinite(result)) {
+    return 0;
+  }
+
+  return result;
 }
 
 export function formatEuroDisplay(value: number): string {

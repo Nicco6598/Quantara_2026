@@ -1,15 +1,14 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
-  buildSalDocumentView,
   createId,
   type SalDocument,
-  type SalDocumentView,
   type SalLine,
   type SalProject,
   type SalSurchargeKind,
   type SalTariffVoice,
 } from "@/features/sal/domain/sal-workflow";
+import { generateSalTitle } from "@/features/sal/domain/sal-utils";
 
 type CreateProjectInput = Omit<SalProject, "id">;
 type CreateTariffVoiceInput = Omit<SalTariffVoice, "id">;
@@ -34,9 +33,6 @@ type SalWorkflowStore = {
   createTariffVoice: (input: CreateTariffVoiceInput) => SalTariffVoice;
   deleteLineFromSal: (salId: string, lineId: string) => void;
   deleteSal: (salId: string) => void;
-  getActiveProject: () => SalProject | null;
-  getActiveSalView: () => SalDocumentView | null;
-  getProjectSals: (projectId: string) => SalDocumentView[];
   projects: SalProject[];
   salDocuments: SalDocument[];
   setActiveProject: (projectId: string) => void;
@@ -128,7 +124,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           notes: input.notes,
           projectId: input.projectId,
           status: "closed",
-          title: input.title.trim() || `SAL ${currentCount + 1}`,
+          title: generateSalTitle(input.title, currentCount),
           closedAt: new Date().toISOString().slice(0, 10),
         };
 
@@ -149,7 +145,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           id: createId("sal"),
           lines: [],
           status: "draft",
-          title: input.title.trim() || `SAL ${currentCount + 1}`,
+          title: generateSalTitle(input.title, currentCount),
         };
 
         set((state) => ({
@@ -179,7 +175,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           notes: input.notes,
           projectId: input.projectId,
           status: "draft",
-          title: input.title.trim() || `SAL ${currentCount + 1}`,
+          title: generateSalTitle(input.title, currentCount),
         };
 
         set((state) => ({
@@ -219,25 +215,6 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           salDocuments: state.salDocuments.filter((sal) => sal.id !== salId),
           activeSalId: state.activeSalId === salId ? "" : state.activeSalId,
         })),
-      getActiveProject: () => {
-        const state = get();
-
-        return state.projects.find((project) => project.id === state.activeProjectId) ?? null;
-      },
-      getActiveSalView: () => {
-        const state = get();
-        const sal = state.salDocuments.find((item) => item.id === state.activeSalId);
-
-        return sal ? buildSalDocumentView(sal, state.tariffVoices) : null;
-      },
-      getProjectSals: (projectId) => {
-        const state = get();
-
-        return state.salDocuments
-          .filter((sal) => sal.projectId === projectId)
-          .map((sal) => buildSalDocumentView(sal, state.tariffVoices))
-          .sort((left, right) => right.date.localeCompare(left.date));
-      },
       projects: [],
       salDocuments: [],
       setActiveProject: (projectId) =>

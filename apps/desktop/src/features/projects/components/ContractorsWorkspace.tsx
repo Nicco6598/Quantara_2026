@@ -15,7 +15,7 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -43,9 +43,11 @@ export function ContractorsWorkspace({
   recentSalsCount,
   totalPortfolioValue,
 }: ContractorsWorkspaceProps) {
-  const stableFolders = folders.filter(
-    (folder) => folder.criticalCount === 0 && folder.salWindowCount === 0,
-  ).length;
+  const stableFolders = useMemo(
+    () =>
+      folders.filter((folder) => folder.criticalCount === 0 && folder.salWindowCount === 0).length,
+    [folders],
+  );
 
   return (
     <div className="pt-2">

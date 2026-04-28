@@ -156,19 +156,25 @@ export function normalizeContractorName(value: string): string {
   return normalized || "Appaltatore da assegnare";
 }
 
+const contractorIdCache = new Map<string, string>();
+
 export function createContractorId(contractor: string): string {
-  return normalizeContractorName(contractor)
+  const normalized = normalizeContractorName(contractor);
+  const cached = contractorIdCache.get(normalized);
+  if (cached !== undefined) return cached;
+
+  const id = normalized
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+  contractorIdCache.set(normalized, id);
+  return id;
 }
 
 export function mergeContractorRegistry(current: string[], contractorName: string): string[] {
   const normalized = normalizeContractorName(contractorName);
-  if (
-    !normalized ||
-    current.some((item) => createContractorId(item) === createContractorId(normalized))
-  ) {
+  const normalizedId = createContractorId(normalized);
+  if (!normalized || current.some((item) => createContractorId(item) === normalizedId)) {
     return current;
   }
   return [...current, normalized].sort((left, right) => left.localeCompare(right));
@@ -247,7 +253,7 @@ export function downloadWorkbook(bytes: Uint8Array, fileName: string): void {
   link.href = url;
   link.download = fileName;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 export function createMigrationId(title: string, timestamp: number, index: number): string {

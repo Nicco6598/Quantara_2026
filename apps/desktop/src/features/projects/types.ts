@@ -1,4 +1,5 @@
 import type { Money } from "@quantara/shared-types";
+import type { LucideIcon } from "lucide-react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 
 export type LaneTone = Extract<StatusTone, "success" | "warning" | "danger">;
@@ -35,4 +36,69 @@ export type ContractorFolder = {
   salCount: number;
   salExposure: number;
   salWindowCount: number;
+};
+
+export type MigrationAction = "commit" | "export" | "idle" | "import" | "template";
+
+export type ProjectEditState = {
+  contractId: string;
+  values: {
+    applicationContractCode: string;
+    contractorName: string;
+    contractualAmount: string;
+    frameworkAgreementCode: string;
+    tariffBookId: string;
+    title: string;
+  };
+};
+
+export type ProjectActionDialogState = {
+  mode: "actions" | "delete";
+  project: PortfolioProject;
+};
+
+export type PriorityItem = {
+  deadline: string;
+  detail: string;
+  owner: string;
+  projectId: string;
+  title: string;
+  tone: StatusTone;
+};
+
+export type ApprovalItem = {
+  amount: Money;
+  dueDays: number;
+  label: string;
+  owner: string;
+  projectId: string;
+  tone: StatusTone;
+};
+
+export type ControlSignal = {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  tone: StatusTone;
+  value: string;
+};
+
+export type ActivityItem = {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  projectId: string;
+  tone: StatusTone;
+};
+
+export type RecentSalItem = {
+  closedAt?: string;
+  date: string;
+  description: string;
+  id: string;
+  lines: { id: string; quantity: number; surcharge: "day" | "night" | "none"; voiceId: string }[];
+  notes: string;
+  projectId: string;
+  status: string;
+  title: string;
 };

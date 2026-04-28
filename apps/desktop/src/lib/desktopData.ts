@@ -10,6 +10,7 @@ import type {
   TariffPdfMetadataRecord,
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
+import { invokeWithFallback } from "./tauri-wrapper";
 
 export type DesktopMoney = Money;
 export type DesktopTariffPriority = DesktopTariffPriorityRecord;
@@ -35,28 +36,7 @@ export type DesktopDataResult<T> =
 export async function listDesktopContracts(
   fallback: DesktopContract[],
 ): Promise<DesktopDataResult<DesktopContract[]>> {
-  if (!isTauriRuntime()) {
-    return {
-      data: fallback,
-      message: "Runtime browser: dati dimostrativi.",
-      source: "fallback",
-    };
-  }
-
-  try {
-    const data = await invoke<DesktopContract[]>("list_contracts");
-
-    return {
-      data,
-      source: "desktop",
-    };
-  } catch (error) {
-    return {
-      data: fallback,
-      message: formatDesktopError(error),
-      source: "fallback",
-    };
-  }
+  return invokeWithFallback("list_contracts", {}, fallback, "dati dimostrativi");
 }
 
 export async function createDesktopContract(
@@ -103,28 +83,7 @@ export async function deleteDesktopContract(contractId: string): Promise<void> {
 export async function listDesktopTariffBooks(
   fallback: DesktopTariffBook[],
 ): Promise<DesktopDataResult<DesktopTariffBook[]>> {
-  if (!isTauriRuntime()) {
-    return {
-      data: fallback,
-      message: "Runtime browser: dati dimostrativi.",
-      source: "fallback",
-    };
-  }
-
-  try {
-    const data = await invoke<DesktopTariffBook[]>("list_tariff_books");
-
-    return {
-      data,
-      source: "desktop",
-    };
-  } catch (error) {
-    return {
-      data: fallback,
-      message: formatDesktopError(error),
-      source: "fallback",
-    };
-  }
+  return invokeWithFallback("list_tariff_books", {}, fallback, "dati dimostrativi");
 }
 
 export async function createDesktopTariffBook(
@@ -165,28 +124,7 @@ export async function listDesktopTariffVoices(
   tariffBookId: string,
   fallback: DesktopTariffVoice[],
 ): Promise<DesktopDataResult<DesktopTariffVoice[]>> {
-  if (!isTauriRuntime()) {
-    return {
-      data: fallback,
-      message: "Runtime browser: voci dimostrative.",
-      source: "fallback",
-    };
-  }
-
-  try {
-    const data = await invoke<DesktopTariffVoice[]>("list_tariff_voices", { tariffBookId });
-
-    return {
-      data,
-      source: "desktop",
-    };
-  } catch (error) {
-    return {
-      data: fallback,
-      message: formatDesktopError(error),
-      source: "fallback",
-    };
-  }
+  return invokeWithFallback("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative");
 }
 
 export async function selectTariffPdfMetadata(): Promise<TariffPdfMetadata | null> {

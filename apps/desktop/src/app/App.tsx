@@ -66,9 +66,7 @@ function AppShell() {
       if (actionId === "new-project") {
         navigate("projects");
         window.setTimeout(() => {
-          window.dispatchEvent(
-            new CustomEvent("project-workflow-action", { detail: "new-project" }),
-          );
+          useAppStore.getState().setPendingWorkflowAction("new-project");
         }, 0);
         notify({
           message: "Aperta la creazione guidata del progetto.",
@@ -83,7 +81,7 @@ function AppShell() {
           navigate("projects");
         }
         window.setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("sal-modal-action", { detail: "create" }));
+          useAppStore.getState().setPendingWorkflowAction("new-sal");
         }, 0);
         notify({
           message: "Aperta la creazione guidata del SAL.",
@@ -96,7 +94,7 @@ function AppShell() {
       if (actionId === "import-tariff") {
         navigate("tariffs");
         window.setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("tariff-workflow-action", { detail: "import" }));
+          useAppStore.getState().setPendingWorkflowAction("import-tariff");
         }, 0);
         notify({
           message: "Pronta la schermata di importazione tariffario.",
@@ -274,18 +272,11 @@ function AppShell() {
         <section className="flex h-full min-w-0 overflow-hidden rounded-[18px] bg-[var(--surface-base)] shadow-none ring-1 ring-[color-mix(in_srgb,var(--surface-base)_72%,var(--accent-primary)_28%)]">
           <div className="flex min-w-0 flex-1 flex-col">
             <TopToolbar
-              activeRoute={activeRoute}
-              canGoBack={canGoBack}
-              canGoForward={canGoForward}
               onOpenCommandPalette={(anchorRect) => {
                 setCommandPaletteAnchor(anchorRect);
                 setIsCommandPaletteOpen(true);
               }}
-              onNavigateBack={navigateBack}
-              onNavigateForward={navigateForward}
               onPageAction={handleTopbarAction}
-              onToggleTheme={toggleTheme}
-              themeMode={themeMode}
             />
 
             <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">

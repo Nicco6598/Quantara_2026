@@ -49,6 +49,10 @@ export function calculateAccountingRowFinalPrice(
   f3: number,
   quantityReference: number,
 ): number {
+  const factors = [unitPrice, f1, f2, f3, quantityReference];
+  if (factors.some((f) => !Number.isFinite(f) || f < 0)) {
+    return 0;
+  }
   return unitPrice * f1 * f2 * f3 * quantityReference;
 }
 
@@ -84,7 +88,11 @@ export function summarizeSal(sal: SalRecord): SalEconomicSummary {
 }
 
 function adjustmentMultiplier(percent: number): number {
-  return 1 + percent / 100;
+  if (!Number.isFinite(percent)) {
+    return 1;
+  }
+  const clamped = Math.max(-100, Math.min(percent, 500));
+  return 1 + clamped / 100;
 }
 
 function composeTariffLookupKey(tariffBookId: TariffBookId, officialCode: string): string {

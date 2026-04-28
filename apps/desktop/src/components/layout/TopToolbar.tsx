@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { QuantaraRoute, ThemeMode } from "@/store/app-store";
+import { useAppStore, type QuantaraRoute } from "@/store/app-store";
 
 type RouteMeta = {
   dateLabel: string;
@@ -98,42 +98,19 @@ const routeActionOverrides: Partial<Record<QuantaraRoute, PageAction[]>> = {
 };
 
 type TopToolbarProps = {
-  activeRoute: QuantaraRoute;
-  canGoBack: boolean;
-  canGoForward: boolean;
   onOpenCommandPalette: (anchorRect: DOMRect) => void;
-  onNavigateBack: () => void;
-  onNavigateForward: () => void;
   onPageAction: (actionId: string) => void;
-  onToggleTheme: () => void;
-  themeMode: ThemeMode;
 };
 
-export function TopToolbar({
-  activeRoute,
-  canGoBack,
-  canGoForward,
-  onOpenCommandPalette,
-  onNavigateBack,
-  onNavigateForward,
-  onPageAction,
-  onToggleTheme,
-  themeMode,
-}: TopToolbarProps) {
+export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarProps) {
+  const activeRoute = useAppStore((s) => s.activeRoute);
   const meta = routeMetaMap[activeRoute];
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
 
   return (
     <header className="z-30 flex h-[88px] shrink-0 items-center justify-between gap-6 border-b border-[var(--border-subtle)] px-8">
       <div className="flex min-w-0 items-center gap-4">
-        {activeRoute !== "dashboard" ? (
-          <HistoryNavigator
-            canGoBack={canGoBack}
-            canGoForward={canGoForward}
-            onNavigateBack={onNavigateBack}
-            onNavigateForward={onNavigateForward}
-          />
-        ) : null}
+        {activeRoute !== "dashboard" ? <HistoryNavigator /> : null}
 
         <div className="min-w-0">
           <h1 className="truncate text-[20px] font-bold leading-6 tracking-[-0.02em] text-[var(--text-primary)]">
@@ -156,37 +133,32 @@ export function TopToolbar({
         <div className="mx-2 h-8 w-px bg-[var(--border-subtle)]" />
         <PageActions actions={pageActions} onAction={onPageAction} />
         <div className="mx-2 h-8 w-px bg-[var(--border-subtle)]" />
-        <UtilityButtons onToggleTheme={onToggleTheme} themeMode={themeMode} />
+        <UtilityButtons />
       </div>
     </header>
   );
 }
 
-function HistoryNavigator({
-  canGoBack,
-  canGoForward,
-  onNavigateBack,
-  onNavigateForward,
-}: {
-  canGoBack: boolean;
-  canGoForward: boolean;
-  onNavigateBack: () => void;
-  onNavigateForward: () => void;
-}) {
+function HistoryNavigator() {
+  const canGoBack = useAppStore((s) => s.canGoBack);
+  const canGoForward = useAppStore((s) => s.canGoForward);
+  const navigateBack = useAppStore((s) => s.navigateBack);
+  const navigateForward = useAppStore((s) => s.navigateForward);
+
   return (
     <div className="flex items-center gap-1 rounded-xl bg-[var(--bg-muted)] p-1">
       <HistoryButton
         disabled={!canGoBack}
         icon={ChevronLeft}
         label="Torna indietro"
-        onClick={onNavigateBack}
+        onClick={navigateBack}
       />
       <div className="h-4 w-px bg-[var(--border-subtle)]" />
       <HistoryButton
         disabled={!canGoForward}
         icon={ChevronRight}
         label="Vai avanti"
-        onClick={onNavigateForward}
+        onClick={navigateForward}
       />
     </div>
   );
@@ -362,13 +334,9 @@ function PageActionMenu({
   );
 }
 
-function UtilityButtons({
-  onToggleTheme,
-  themeMode,
-}: {
-  onToggleTheme: () => void;
-  themeMode: ThemeMode;
-}) {
+function UtilityButtons() {
+  const themeMode = useAppStore((s) => s.themeMode);
+  const toggleTheme = useAppStore((s) => s.toggleTheme);
   const ThemeIcon = themeMode === "light" ? Moon : Sun;
 
   return (
@@ -377,7 +345,7 @@ function UtilityButtons({
       <UtilityButton
         icon={ThemeIcon}
         label={themeMode === "light" ? "Modo scuro" : "Modo chiaro"}
-        onClick={onToggleTheme}
+        onClick={toggleTheme}
       />
       <UtilityButton icon={RefreshCw} label="Aggiorna" />
     </div>

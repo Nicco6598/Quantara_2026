@@ -13,15 +13,19 @@ export type QuantaraRoute =
 export type MotionMode = "full" | "reduced";
 export type ThemeMode = "light" | "dark";
 
+type WorkflowAction = "new-project" | "new-sal" | "import-tariff" | null;
+
 type NavigationSlice = {
   activeRoute: QuantaraRoute;
   canGoBack: boolean;
   canGoForward: boolean;
   navigateBack: () => void;
   navigateForward: () => void;
+  pendingWorkflowAction: WorkflowAction;
   routeHistory: QuantaraRoute[];
   routeHistoryIndex: number;
   setActiveRoute: (route: QuantaraRoute) => void;
+  setPendingWorkflowAction: (action: WorkflowAction) => void;
 };
 
 type ThemeSlice = {
@@ -34,9 +38,11 @@ type PreferenceSlice = {
   autoCheckUpdatesOnLaunch: boolean;
   hasHydratedPreferences: boolean;
   motionMode: MotionMode;
+  selectedProjectId: string;
   setAutoCheckUpdatesOnLaunch: (enabled: boolean) => void;
   setHasHydratedPreferences: (value: boolean) => void;
   setMotionMode: (motionMode: MotionMode) => void;
+  setSelectedProjectId: (projectId: string) => void;
   setShowReleaseNotesAfterUpdate: (enabled: boolean) => void;
   showReleaseNotesAfterUpdate: boolean;
 };
@@ -62,6 +68,7 @@ export const useAppStore = create<AppStore>()(
       autoCheckUpdatesOnLaunch: true,
       hasHydratedPreferences: false,
       motionMode: "full",
+      selectedProjectId: "",
       navigateBack: () =>
         set((state) => {
           if (!state.canGoBack) {
@@ -82,6 +89,7 @@ export const useAppStore = create<AppStore>()(
             ...createNavigationState(state.routeHistory, state.routeHistoryIndex + 1),
           };
         }),
+      pendingWorkflowAction: null,
       setActiveRoute: (route) =>
         set((state) => {
           const currentRoute = state.routeHistory[state.routeHistoryIndex];
@@ -97,6 +105,10 @@ export const useAppStore = create<AppStore>()(
             ...createNavigationState(nextHistory, nextHistory.length - 1),
           };
         }),
+      setPendingWorkflowAction: (pendingWorkflowAction) =>
+        set({
+          pendingWorkflowAction,
+        }),
       setAutoCheckUpdatesOnLaunch: (autoCheckUpdatesOnLaunch) =>
         set({
           autoCheckUpdatesOnLaunch,
@@ -108,6 +120,10 @@ export const useAppStore = create<AppStore>()(
       setMotionMode: (motionMode) =>
         set({
           motionMode,
+        }),
+      setSelectedProjectId: (selectedProjectId) =>
+        set({
+          selectedProjectId,
         }),
       setShowReleaseNotesAfterUpdate: (showReleaseNotesAfterUpdate) =>
         set({
@@ -132,6 +148,7 @@ export const useAppStore = create<AppStore>()(
       partialize: (state) => ({
         autoCheckUpdatesOnLaunch: state.autoCheckUpdatesOnLaunch,
         motionMode: state.motionMode,
+        selectedProjectId: state.selectedProjectId,
         showReleaseNotesAfterUpdate: state.showReleaseNotesAfterUpdate,
         themeMode: state.themeMode,
       }),
