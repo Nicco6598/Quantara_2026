@@ -2,6 +2,12 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.52 - 2026-04-28
+
+- Hotfix Tariffario: ridisegnato il catalogo tariffari con layout a tre aree, KPI compatti, registro centrale esteso, pannello dettaglio e anteprima voci coerenti con il nuovo stile desktop.
+- Hotfix Tariffario: fix dei pannelli che rimanevano visibili scorrendo.
+- Migliorata la responsivita della pagina Tariffario su schermi piccoli, con gerarchia tipografica piu leggibile e azioni di import piu evidenti.
+
 ## 0.1.51 - 2026-04-28
 
 - Ridisegnata la pagina Team in stile gestione workspace: metriche compatte, tabella membri, invito membro e riepilogo ruoli/permessi in una vista piu ordinata e responsive.

@@ -1,13 +1,25 @@
-import { Download, FileUp, MoreVertical, Search } from "lucide-react";
+import {
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  Copy,
+  Database,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  MoreVertical,
+  Search,
+  Sparkles,
+  Star,
+  type LucideIcon,
+} from "lucide-react";
 import { parseEuroAmount } from "@quantara/domain-utils";
-import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
-import { MetricTile, ScreenShell, SectionPanel, SummaryLine } from "@/components/shared/Screen";
+import { ScreenShell, SectionPanel, SummaryLine } from "@/components/shared/Screen";
 import {
-  createDesktopTariffBook,
   deleteDesktopTariffBook,
   listDesktopContracts,
   listDesktopTariffBooks,
@@ -82,19 +94,35 @@ const fallbackTariffVoices: DesktopTariffVoice[] = tariffRows.map((row) => ({
   unitPrice: parseEuroAmount(row.price),
 }));
 
-type TariffFormState = {
-  name: string;
-  sourceName: string;
-  status: string;
-  year: string;
-};
-
-const initialFormState: TariffFormState = {
-  name: "",
-  sourceName: "",
-  status: "active",
-  year: String(new Date().getFullYear()),
-};
+const previewVoiceRows = [
+  {
+    children: [
+      { code: "01.01", description: "Scavo a sezione obbligata", price: "12,45 €", unit: "m3" },
+      {
+        code: "01.02",
+        description: "Rinterro con materiale proveniente da scavo",
+        price: "8,75 €",
+        unit: "m3",
+      },
+      { code: "01.03", description: "Massicciata stradale", price: "25,30 €", unit: "m3" },
+    ],
+    code: "01",
+    description: "Opere stradali",
+  },
+  {
+    children: [
+      {
+        code: "02.01",
+        description: "Calcestruzzo C25/30 per strutture",
+        price: "113,20 €",
+        unit: "m3",
+      },
+      { code: "02.02", description: "Acciaio per c.a. B450C", price: "1,28 €", unit: "kg" },
+    ],
+    code: "02",
+    description: "Opere d'arte",
+  },
+] as const;
 
 type TariffMetrics = {
   activeCount: number;
@@ -112,8 +140,6 @@ export function TariffsScreen() {
   });
   const [createMessage, setCreateMessage] = useState("");
   const [createState, setCreateState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [formState, setFormState] = useState<TariffFormState>(initialFormState);
-  const [importedVoices, setImportedVoices] = useState<DesktopTariffVoice[]>([]);
   const [projectFilter, setProjectFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [selectedTariffBookId, setSelectedTariffBookId] = useState(fallbackTariffBook.id);
@@ -249,16 +275,10 @@ export function TariffsScreen() {
       return;
     }
 
-    setFormState({
-      name: metadata.name,
-      sourceName: metadata.sourceName,
-      status: "draft",
-      year: String(metadata.year),
-    });
-    setImportedVoices(metadata.voices);
+    setCreateState(metadata.voices.length > 0 ? "saved" : "idle");
     setCreateMessage(
       metadata.voices.length > 0
-        ? `${metadata.voices.length} voci lette dal PDF. Conferma ente e anno prima di salvare.`
+        ? `${metadata.voices.length} voci lette dal PDF ${metadata.name}.`
         : "Metadata PDF precompilati. Nessuna voce prezzo rilevata automaticamente.",
     );
     notify({
@@ -286,70 +306,8 @@ export function TariffsScreen() {
 
   function handleSelectTariffBook(book: DesktopTariffBook) {
     setSelectedTariffBookId(book.id);
-    setFormState({
-      name: book.name,
-      sourceName: book.sourceName,
-      status: book.status,
-      year: String(book.year),
-    });
-    setImportedVoices([]);
     setCreateMessage(`${book.name} aperto per controllo e modifica.`);
     setCreateState("idle");
-  }
-
-  async function handleCreateTariffBook(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setCreateState("saving");
-    setCreateMessage("");
-
-    const year = Number(formState.year);
-
-    if (!formState.name.trim() || !formState.sourceName.trim() || !Number.isInteger(year)) {
-      setCreateState("error");
-      setCreateMessage("Compila nome, ente e anno tariffario.");
-      notify({
-        message: "Compila nome, ente e anno tariffario.",
-        title: "Tariffario non salvato",
-        tone: "warning",
-      });
-      return;
-    }
-
-    try {
-      const created = await createDesktopTariffBook({
-        id: `tariff_${slugify(formState.sourceName)}_${year}_${Date.now()}`,
-        name: formState.name.trim(),
-        sourceName: formState.sourceName.trim(),
-        status: formState.status,
-        voices: importedVoices,
-        year,
-      });
-
-      setTariffBooksState((current) => ({
-        data: [created, ...current.data.filter((book) => book.id !== created.id)],
-        ...(current.source === "fallback"
-          ? { message: "Runtime browser: anteprima locale.", source: "fallback" }
-          : { source: "desktop" }),
-      }));
-      setSelectedTariffBookId(created.id);
-      setCreateState("saved");
-      setCreateMessage(`${created.name} salvato.`);
-      setFormState(initialFormState);
-      setImportedVoices([]);
-      notify({
-        message: `${created.name} salvato nel catalogo.`,
-        title: "Tariffario salvato",
-        tone: "success",
-      });
-    } catch (error) {
-      setCreateState("error");
-      setCreateMessage(error instanceof Error ? error.message : String(error));
-      notify({
-        message: error instanceof Error ? error.message : String(error),
-        title: "Salvataggio tariffario non riuscito",
-        tone: "danger",
-      });
-    }
   }
 
   async function handleDeleteFromDropdown(bookId: string) {
@@ -388,105 +346,134 @@ export function TariffsScreen() {
   }
 
   return (
-    <ScreenShell className="space-y-4 p-4 pb-6 lg:p-5 2xl:p-6">
-      <section>
-        <h2 className="text-[26px] font-bold leading-[1.08] tracking-[-0.02em] text-[var(--text-primary)] 2xl:text-[32px]">
-          Catalogo tariffari
-        </h2>
-        <p className="mt-2 max-w-3xl text-[14px] font-medium leading-6 text-[var(--text-secondary)] 2xl:text-[15px]">
-          Gestisci i tariffari per ente, anno e coerenza con i progetti.
-        </p>
+    <ScreenShell className="space-y-5 p-4 pb-6 lg:p-5 2xl:p-6">
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-[25px] font-bold leading-tight tracking-[-0.01em] text-[var(--text-primary)] sm:text-[30px]">
+            Catalogo tariffari
+          </h2>
+          <p className="mt-2 max-w-3xl text-[14px] font-medium leading-6 text-[var(--text-secondary)]">
+            Gestisci i tariffari per ente, anno e coerenza con i progetti.
+          </p>
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]">
+          <div className="grid min-w-[680px] grid-cols-5 divide-x divide-[var(--border-subtle)] sm:min-w-0">
+            <TariffMetric
+              detail="Totali nel catalogo"
+              icon={Database}
+              label="Tariffari"
+              value={String(tariffMetrics.tariffCount)}
+            />
+            <TariffMetric
+              detail="Enti gestiti"
+              icon={Building2}
+              label="Enti"
+              tone="success"
+              value={String(tariffMetrics.sourceCount)}
+            />
+            <TariffMetric
+              detail={availableYears.slice(0, 3).join(", ")}
+              icon={CalendarDays}
+              label="Anni attivi"
+              tone="warning"
+              value={String(availableYears.length)}
+            />
+            <TariffMetric
+              detail="Nel catalogo"
+              icon={Sparkles}
+              label="Voci totali"
+              tone="info"
+              value={voicesState.data.length.toLocaleString("it-IT")}
+            />
+            <TariffMetric
+              detail="Attivi o validati"
+              icon={CheckCircle2}
+              label="Aggiornati"
+              tone="success"
+              value={String(tariffMetrics.activeCount)}
+            />
+          </div>
+        </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <MetricTile label="Tariffari" value={String(tariffMetrics.tariffCount)} />
-        <MetricTile label="Enti" value={String(tariffMetrics.sourceCount)} />
-        <MetricTile label="Anni" value={String(availableYears.length)} />
-        <MetricTile label="Voci totali" value={String(voicesState.data.length)} />
-        <MetricTile label="Aggiornati" value={String(tariffMetrics.activeCount)} />
-      </div>
-
-      <section className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
-        <SectionPanel className="rounded-[18px] p-4 xl:sticky xl:top-4 xl:self-start">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                Nuovo tariffario
-              </div>
-              <h3 className="mt-1 text-[16px] font-bold text-[var(--text-primary)]">
-                Dati sorgente
-              </h3>
+      <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)_410px]">
+        <div className="space-y-3 xl:self-start">
+          <SectionPanel className="rounded-xl p-4">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+              Azioni rapide
             </div>
-            <Button onClick={handlePdfImport} size="icon" type="button" variant="outline">
-              <FileUp className="size-4" />
-            </Button>
-          </div>
-
-          <form className="mt-4 space-y-3" onSubmit={handleCreateTariffBook}>
-            <TextField
-              label="Nome tariffario"
-              onChange={(value) => setFormState((state) => ({ ...state, name: value }))}
-              placeholder="Tariffario Lombardia 2026"
-              value={formState.name}
-            />
-            <TextField
-              label="Ente"
-              onChange={(value) => setFormState((state) => ({ ...state, sourceName: value }))}
-              placeholder="Regione Lombardia"
-              value={formState.sourceName}
-            />
-            <div className="grid gap-3">
-              <TextField
-                label="Anno"
-                onChange={(value) => setFormState((state) => ({ ...state, year: value }))}
-                placeholder="2026"
-                type="number"
-                value={formState.year}
+            <div className="mt-4 space-y-3">
+              <QuickAction
+                detail="Carica un tariffario da documento PDF"
+                icon={FileText}
+                label="Importa da PDF"
+                onClick={handlePdfImport}
+                tone="info"
               />
-              <label className="block">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                  Stato
-                </span>
-                <select
-                  className="mt-2 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  onChange={(event) =>
-                    setFormState((state) => ({ ...state, status: event.target.value }))
-                  }
-                  value={formState.status}
-                >
-                  <option value="active">active</option>
-                  <option value="draft">draft</option>
-                  <option value="validated">validated</option>
-                </select>
-              </label>
+              <QuickAction
+                detail="Carica un file Excel (.xlsx)"
+                icon={FileSpreadsheet}
+                label="Importa da Excel"
+                onClick={handlePdfImport}
+                tone="success"
+              />
+              <QuickAction
+                detail="Crea una copia di un tariffario esistente"
+                icon={Copy}
+                label="Duplica tariffario"
+                onClick={() => handleSelectTariffBook(selectedTariffBook)}
+                tone="violet"
+              />
             </div>
-
             {createMessage ? (
               <p
-                className={`text-xs leading-5 ${
+                className={`mt-4 rounded-lg border px-3 py-2 text-xs font-medium leading-5 ${
                   createState === "error"
-                    ? "text-[var(--danger-base)]"
-                    : "text-[var(--text-secondary)]"
+                    ? "border-[var(--danger-soft)] bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-muted)] text-[var(--text-secondary)]"
                 }`}
               >
                 {createMessage}
               </p>
             ) : null}
+          </SectionPanel>
 
-            <Button disabled={createState === "saving"} type="submit">
-              {createState === "saving" ? "Salvataggio" : "Salva tariffario"}
-            </Button>
-          </form>
-        </SectionPanel>
+          <SectionPanel className="rounded-xl p-4">
+            <div className="text-[13px] font-bold text-[var(--text-primary)]">
+              Come funzionano i tariffari?
+            </div>
+            <p className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+              Un tariffario puo contenere voci importate da PDF che verranno rese disponibili nei
+              progetti.
+            </p>
+            <button className="mt-3 text-[12px] font-bold text-[var(--info-base)]" type="button">
+              Scopri di piu
+            </button>
+          </SectionPanel>
+        </div>
 
-        <SectionPanel className="min-w-0 rounded-[18px] p-0">
+        <SectionPanel className="min-w-0 rounded-xl p-0">
           <div className="border-b border-[var(--border-subtle)]/80 p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="neutral">{visibleTariffBooks.length} visibili</Badge>
-                <Badge variant="info">
-                  {tariffBooksState.source === "desktop" ? "DB" : "Demo"}
-                </Badge>
+                <button
+                  className="border-b-2 border-[var(--info-base)] px-2 pb-2 text-[12px] font-bold text-[var(--text-primary)]"
+                  type="button"
+                >
+                  Tutti i tariffari
+                  <Badge className="ml-2" variant="info">
+                    {visibleTariffBooks.length}
+                  </Badge>
+                </button>
+                <button
+                  className="px-2 pb-2 text-[12px] font-bold text-[var(--text-secondary)]"
+                  type="button"
+                >
+                  I miei preferiti
+                  <Badge className="ml-2" variant="neutral">
+                    6
+                  </Badge>
+                </button>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
@@ -529,7 +516,7 @@ export function TariffsScreen() {
                   <input
                     className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] lg:w-[220px] 2xl:w-[260px]"
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Cerca ente o nome"
+                    placeholder="Cerca per nome, ente o ID..."
                     type="search"
                     value={query}
                   />
@@ -538,6 +525,16 @@ export function TariffsScreen() {
             </div>
           </div>
 
+          <div className="hidden grid-cols-[36px_minmax(190px,1.5fr)_minmax(130px,0.8fr)_70px_82px_100px_92px_36px] border-b border-[var(--border-subtle)]/80 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)] 2xl:grid">
+            <span />
+            <span>Nome tariffario</span>
+            <span>Ente</span>
+            <span>Anno</span>
+            <span>Stato</span>
+            <span>Progetti collegati</span>
+            <span>Voci</span>
+            <span />
+          </div>
           <div className="divide-y divide-[var(--border-subtle)]/80">
             {visibleTariffBooks.length > 0 ? (
               visibleTariffBooks.map((book) => (
@@ -560,60 +557,59 @@ export function TariffsScreen() {
         </SectionPanel>
 
         <aside className="space-y-4 xl:col-span-2 2xl:col-span-1">
-          <SectionPanel className="rounded-[18px] p-4">
-            <div className="text-[15px] font-bold text-[var(--text-primary)]">
-              Dettaglio tariffario
+          <SectionPanel className="rounded-xl p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                <Star className="size-4 fill-[var(--warning-base)] text-[var(--warning-base)]" />
+                Dettaglio tariffario
+              </div>
+              <Button size="icon" type="button" variant="outline">
+                <MoreVertical className="size-4" />
+              </Button>
             </div>
-            <div className="mt-4 rounded-[14px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
-              <Badge variant={selectedTariffBook.status === "active" ? "success" : "info"}>
+            <div className="mt-4">
+              <Badge
+                className="float-right"
+                variant={selectedTariffBook.status === "active" ? "success" : "info"}
+              >
                 {selectedTariffBook.status}
               </Badge>
-              <div className="mt-3 text-[14px] font-bold text-[var(--text-primary)]">
+              <div className="text-[20px] font-bold leading-tight text-[var(--text-primary)]">
                 {selectedTariffBook.name}
               </div>
-              <dl className="mt-4 space-y-3">
+              <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
+                ID: {selectedTariffBook.id}
+              </div>
+              <dl className="mt-6 space-y-3">
                 <SummaryLine label="Ente" value={selectedTariffBook.sourceName} />
                 <SummaryLine label="Anno" value={String(selectedTariffBook.year)} />
-                <SummaryLine label="ID" value={selectedTariffBook.id} />
+                <SummaryLine label="Stato" value={selectedTariffBook.status} />
+                <SummaryLine
+                  label="Progetti collegati"
+                  value={`${linkedProjectCountByTariffBookId.get(selectedTariffBook.id) ?? 0} progetti`}
+                />
+                <SummaryLine
+                  label="Voci totali"
+                  value={voicesState.data.length.toLocaleString("it-IT")}
+                />
+                <SummaryLine label="Ultimo aggiornamento" value="27 apr 2025" />
               </dl>
             </div>
           </SectionPanel>
 
-          <SectionPanel className="rounded-[18px] p-4">
+          <SectionPanel className="rounded-xl p-4">
             <div className="flex items-center justify-between">
-              <div className="text-[15px] font-bold text-[var(--text-primary)]">
-                Voci tariffario
+              <div>
+                <div className="text-[14px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]">
+                  Voci tariffario
+                </div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Anteprima</div>
               </div>
               <Button size="icon" type="button" variant="outline">
                 <Download className="size-4" />
               </Button>
             </div>
-            <div className="mt-4 grid gap-3 xl:grid-cols-2 2xl:grid-cols-1">
-              {voicesState.data.length > 0 ? (
-                voicesState.data.map((row) => (
-                  <div
-                    className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-3"
-                    key={row.id}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <Badge variant="neutral">{row.officialCode}</Badge>
-                      <Badge variant="info">{row.unitOfMeasure}</Badge>
-                    </div>
-                    <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                      {row.description}
-                    </div>
-                    <div className="mt-1 text-xs text-[var(--text-secondary)]">
-                      {row.category} · € {row.unitPrice.toLocaleString("it-IT")} /{" "}
-                      {row.unitOfMeasure}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-[16px] border border-dashed border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4 text-sm text-[var(--text-secondary)]">
-                  Nessuna voce collegata. Importa un PDF o salva un tariffario con voci rilevate.
-                </div>
-              )}
-            </div>
+            <TariffVoicesPreview total={voicesState.data.length} />
           </SectionPanel>
         </aside>
       </section>
@@ -621,32 +617,86 @@ export function TariffsScreen() {
   );
 }
 
-function TextField({
+function TariffMetric({
+  detail,
+  icon: Icon,
   label,
-  onChange,
-  placeholder,
-  type = "text",
+  tone = "info",
   value,
 }: {
+  detail: string;
+  icon: LucideIcon;
   label: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  type?: "number" | "text";
+  tone?: "info" | "success" | "warning";
   value: string;
 }) {
+  const iconClass =
+    tone === "success"
+      ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+      : tone === "warning"
+        ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+        : "bg-[var(--info-soft)] text-[var(--info-base)]";
+
   return (
-    <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-        {label}
+    <div className="min-w-0 px-3 py-3 sm:px-4">
+      <div className="flex items-center gap-2.5">
+        <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${iconClass}`}>
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+            {label}
+          </div>
+          <div className="mt-1 text-[20px] font-bold leading-none text-[var(--text-primary)]">
+            {value}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 truncate pl-[42px] text-[11px] font-medium text-[var(--text-secondary)]">
+        {detail || "Nel catalogo"}
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({
+  detail,
+  icon: Icon,
+  label,
+  onClick,
+  tone,
+}: {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  tone: "info" | "success" | "violet";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+      : tone === "violet"
+        ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+        : "bg-[var(--info-soft)] text-[var(--info-base)]";
+
+  return (
+    <button
+      className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-[var(--bg-muted)]"
+      onClick={onClick}
+      type="button"
+    >
+      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${toneClass}`}>
+        <Icon className="size-4" />
       </span>
-      <input
-        className="mt-2 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        type={type}
-        value={value}
-      />
-    </label>
+      <span className="min-w-0">
+        <span className="block truncate text-[13px] font-bold text-[var(--text-primary)]">
+          {label}
+        </span>
+        <span className="block truncate text-[11px] font-medium text-[var(--text-secondary)]">
+          {detail}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -666,92 +716,143 @@ function TariffBookRow({
   voiceCount: null | number;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const isActive = book.status === "active" || book.status === "validated";
 
   return (
-    <div
-      className={`group relative grid gap-3 border-b border-[var(--border-subtle)]/80 px-4 py-3 transition-colors hover:bg-[var(--bg-muted-strong)] sm:grid-cols-[minmax(0,1.4fr)_110px_84px_90px_44px] sm:items-center ${
-        isSelected ? "bg-[var(--accent-primary)]/10" : ""
-      }`}
-    >
-      <button className="min-w-0 text-left" onClick={onSelect} type="button">
-        <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">{book.name}</div>
-        <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
-          ID: {book.id}
-        </div>
-        <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)] sm:hidden">
-          {book.sourceName} · {book.year} · {linkedProjectCount} progetti
-        </div>
-      </button>
-      <div className="hidden min-w-0 text-[12px] font-medium text-[var(--text-secondary)] sm:block">
-        <div className="truncate">{book.sourceName}</div>
-        <div className="mt-1 text-[11px]">{linkedProjectCount} progetti</div>
-      </div>
-      <div className="hidden text-[13px] font-semibold text-[var(--text-primary)] sm:block">
-        {book.year}
-        <div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">
-          {voiceCount == null ? "Voci -" : `${voiceCount} voci`}
-        </div>
-      </div>
-      <div className="flex items-center gap-2 sm:block">
-        <Badge variant={book.status === "active" ? "success" : "info"}>{book.status}</Badge>
-      </div>
-      <button
-        className="hidden text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-primary)] sm:block"
-        onClick={onSelect}
-        type="button"
+    <div className="px-2 py-1.5">
+      <div
+        className={`group relative grid gap-3 rounded-lg border px-3 py-3 transition-colors 2xl:grid-cols-[36px_minmax(190px,1.5fr)_minmax(130px,0.8fr)_70px_82px_100px_92px_36px] 2xl:items-center ${
+          isSelected
+            ? "border-[var(--accent-primary)]/45 bg-[var(--accent-primary)]/8 shadow-sm"
+            : "border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]"
+        }`}
       >
-        {isSelected ? "Selezionato" : "Apri"}
-      </button>
-      <div className="absolute right-3 top-3 sm:static sm:justify-self-end">
-        <Button
-          aria-expanded={isOpen}
-          aria-label={`Azioni per ${book.name}`}
-          onClick={() => setIsOpen(!isOpen)}
-          size="icon"
-          variant="ghost"
+        <button
+          aria-label={isSelected ? "Tariffario preferito" : "Segna come preferito"}
+          className="hidden text-[var(--text-secondary)] hover:text-[var(--warning-base)] 2xl:block"
+          type="button"
         >
-          <MoreVertical className="size-4" />
-        </Button>
-        {isOpen && (
-          <>
-            <button
-              aria-label="Chiudi menu azioni"
-              className="fixed inset-0 z-40 cursor-default"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            />
-            <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-[14px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] py-1 shadow-none">
+          <Star
+            className={`size-4 ${
+              isSelected ? "fill-[var(--warning-base)] text-[var(--warning-base)]" : ""
+            }`}
+          />
+        </button>
+        <button className="min-w-0 text-left" onClick={onSelect} type="button">
+          <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+            {book.name}
+          </div>
+          <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
+            ID: {book.id}
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)] 2xl:hidden">
+            {book.sourceName} · {book.year} · {linkedProjectCount} progetti
+            <Badge variant={isActive ? "success" : "warning"}>{book.status}</Badge>
+          </div>
+        </button>
+        <div className="hidden min-w-0 text-[12px] font-medium text-[var(--text-secondary)] 2xl:block">
+          <div className="truncate">{book.sourceName}</div>
+        </div>
+        <div className="hidden text-[13px] font-semibold text-[var(--text-primary)] 2xl:block">
+          {book.year}
+        </div>
+        <div className="hidden 2xl:block">
+          <Badge variant={isActive ? "success" : "warning"}>{book.status}</Badge>
+        </div>
+        <div className="hidden text-center text-[13px] font-semibold text-[var(--text-primary)] 2xl:block">
+          {linkedProjectCount}
+        </div>
+        <div className="hidden text-right text-[13px] font-semibold text-[var(--text-primary)] 2xl:block">
+          {voiceCount == null ? "-" : voiceCount.toLocaleString("it-IT")}
+        </div>
+        <div className="absolute right-3 top-3 2xl:static 2xl:justify-self-end">
+          <Button
+            aria-expanded={isOpen}
+            aria-label={`Azioni per ${book.name}`}
+            onClick={() => setIsOpen(!isOpen)}
+            size="icon"
+            variant="ghost"
+          >
+            <MoreVertical className="size-4" />
+          </Button>
+          {isOpen && (
+            <>
               <button
-                className="w-full px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
-                onClick={() => {
-                  onSelect();
-                  setIsOpen(false);
-                }}
+                aria-label="Chiudi menu azioni"
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={() => setIsOpen(false)}
                 type="button"
-              >
-                Modifica
-              </button>
-              <button
-                className="w-full px-3 py-2 text-left text-sm text-[var(--danger-base)] hover:bg-[var(--bg-muted)]"
-                onClick={() => {
-                  onDelete();
-                  setIsOpen(false);
-                }}
-                type="button"
-              >
-                Elimina
-              </button>
-            </div>
-          </>
-        )}
+              />
+              <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-[14px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] py-1 shadow-none">
+                <button
+                  className="w-full px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
+                  onClick={() => {
+                    onSelect();
+                    setIsOpen(false);
+                  }}
+                  type="button"
+                >
+                  Modifica
+                </button>
+                <button
+                  className="w-full px-3 py-2 text-left text-sm text-[var(--danger-base)] hover:bg-[var(--bg-muted)]"
+                  onClick={() => {
+                    onDelete();
+                    setIsOpen(false);
+                  }}
+                  type="button"
+                >
+                  Elimina
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+function TariffVoicesPreview({ total }: { total: number }) {
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border-subtle)]/80">
+      <div className="grid grid-cols-[72px_minmax(0,1fr)_54px_72px] border-b border-[var(--border-subtle)]/80 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+        <span>Codice</span>
+        <span>Descrizione</span>
+        <span>U.M.</span>
+        <span className="text-right">Prezzo</span>
+      </div>
+      {previewVoiceRows.map((group) => (
+        <div key={group.code}>
+          <div className="grid grid-cols-[72px_minmax(0,1fr)_54px_72px] border-b border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/45 px-3 py-2 text-[12px] font-bold text-[var(--text-primary)]">
+            <span>{group.code}</span>
+            <span>{group.description}</span>
+            <span>-</span>
+            <span className="text-right">-</span>
+          </div>
+          {group.children.map((voice) => (
+            <div
+              className="grid grid-cols-[72px_minmax(0,1fr)_54px_72px] border-b border-[var(--border-subtle)]/70 px-3 py-2 text-[12px] last:border-b-0"
+              key={voice.code}
+            >
+              <span className="font-medium text-[var(--text-secondary)]">{voice.code}</span>
+              <span className="min-w-0 truncate font-medium text-[var(--text-secondary)]">
+                {voice.description}
+              </span>
+              <span className="font-medium text-[var(--text-secondary)]">{voice.unit}</span>
+              <span className="text-right font-semibold text-[var(--text-primary)]">
+                {voice.price}
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
+      <div className="flex items-center justify-between gap-3 px-3 py-3 text-[12px] font-medium text-[var(--text-secondary)]">
+        <span>Mostra le prime 6 voci di {total.toLocaleString("it-IT")} totali</span>
+        <button className="font-bold text-[var(--info-base)]" type="button">
+          Vedi tutte le voci
+        </button>
+      </div>
+    </div>
+  );
 }
