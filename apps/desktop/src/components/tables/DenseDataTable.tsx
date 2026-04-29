@@ -1,6 +1,6 @@
 import type { Money } from "@quantara/shared-types";
-import { formatMoney } from "@/lib/formatters";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { formatMoney } from "@/lib/formatters";
 
 type DenseDataTableRow = {
   budget: Money;

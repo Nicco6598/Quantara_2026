@@ -1,3 +1,4 @@
+import { summarizeSal } from "@quantara/domain-utils";
 import {
   Calculator,
   CheckCircle2,
@@ -9,16 +10,15 @@ import {
   FileCheck2,
   FileText,
   Info,
+  type LucideIcon,
   ReceiptText,
   ShieldCheck,
   WalletCards,
-  type LucideIcon,
 } from "lucide-react";
-import { summarizeSal } from "@quantara/domain-utils";
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
 import { currentSal } from "@/features/dashboard/demo-data";
 import { formatMoney } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 
 type Tone = "blue" | "green" | "orange" | "purple" | "success" | "warning";
 

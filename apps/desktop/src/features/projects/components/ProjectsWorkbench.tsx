@@ -8,10 +8,10 @@ import {
   Upload,
 } from "lucide-react";
 import { SectionPanel } from "@/components/shared/Screen";
-import { formatMoney, formatPercent } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
+import { formatMoney, formatPercent } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 import { EmptyState } from "./workspace-ui";
 
 type ProjectsWorkbenchProps = {

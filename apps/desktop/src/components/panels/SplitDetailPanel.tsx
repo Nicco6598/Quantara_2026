@@ -1,5 +1,5 @@
-import { formatMoney } from "@/lib/formatters";
 import type { SalEconomicSummary } from "@quantara/shared-types";
+import { formatMoney } from "@/lib/formatters";
 
 type SplitDetailPanelProps = {
   summary: SalEconomicSummary;

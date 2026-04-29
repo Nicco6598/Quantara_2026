@@ -1,4 +1,9 @@
 export {
+  calculateAccountingRowFinalPrice,
+  resolveTariffVoice,
+  summarizeSal,
+} from "./accounting";
+export {
   addMoney,
   eur,
   formatEuroDisplay,
@@ -6,8 +11,3 @@ export {
   parseEuroAmount,
   roundCurrency,
 } from "./money";
-export {
-  calculateAccountingRowFinalPrice,
-  resolveTariffVoice,
-  summarizeSal,
-} from "./accounting";

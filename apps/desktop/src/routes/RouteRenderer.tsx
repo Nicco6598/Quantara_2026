@@ -1,13 +1,14 @@
-import type { QuantaraRoute } from "@/store/app-store";
 import { AccountingScreen } from "@/features/accounting/AccountingScreen";
 import { DashboardScreen } from "@/features/dashboard/DashboardScreen";
 import { MaterialsScreen } from "@/features/materials/MaterialsScreen";
-import { ProjectsScreen } from "@/features/projects/ProjectsScreen";
 import { ProjectDetailScreen } from "@/features/project-detail/ProjectDetailScreen";
+import { ProjectsScreen } from "@/features/projects/ProjectsScreen";
+import { SalCreationScreen } from "@/features/sal/SalCreationScreen";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { TariffsScreen } from "@/features/tariffs/TariffsScreen";
-import { PlaceholderScreen } from "@/routes/PlaceholderScreen";
 import { TeamScreen } from "@/features/team/TeamScreen";
+import { PlaceholderScreen } from "@/routes/PlaceholderScreen";
+import type { QuantaraRoute } from "@/store/app-store";
 
 type RouteRendererProps = {
   activeRoute: QuantaraRoute;
@@ -24,6 +25,10 @@ export function RouteRenderer({ activeRoute }: RouteRendererProps) {
 
   if (activeRoute === "project-detail") {
     return <ProjectDetailScreen />;
+  }
+
+  if (activeRoute === "sal-create") {
+    return <SalCreationScreen />;
   }
 
   if (activeRoute === "tariffs") {

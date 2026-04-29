@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { generateSalTitle } from "@/features/sal/domain/sal-utils";
 import {
   createId,
   type SalDocument,
@@ -8,7 +9,6 @@ import {
   type SalSurchargeKind,
   type SalTariffVoice,
 } from "@/features/sal/domain/sal-workflow";
-import { generateSalTitle } from "@/features/sal/domain/sal-utils";
 
 type CreateProjectInput = Omit<SalProject, "id">;
 type CreateTariffVoiceInput = Omit<SalTariffVoice, "id">;

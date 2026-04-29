@@ -1,5 +1,5 @@
-import type { AccountingRow, ContractRecord, SalRecord, TariffVoice } from "@quantara/shared-types";
 import { calculateAccountingRowFinalPrice, eur } from "@quantara/domain-utils";
+import type { AccountingRow, ContractRecord, SalRecord, TariffVoice } from "@quantara/shared-types";
 
 export const activeContract: ContractRecord = {
   applicationContractCode: "CA-2025-AVAC-018",

@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { ReactNode } from "react";
+import type { StatusTone } from "@/components/shared/StatusBadge";
+import { cn } from "@/lib/utils";
 
 export function PortfolioMetric({
   detail,

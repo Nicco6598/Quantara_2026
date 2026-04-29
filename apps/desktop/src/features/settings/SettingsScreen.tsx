@@ -1,11 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import { CheckCircle2, Clock3, Moon, RefreshCcw, Sparkles, Sun, WandSparkles } from "lucide-react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
-import { useAppStore, type MotionMode, type ThemeMode } from "@/store/app-store";
+import { cn } from "@/lib/utils";
+import { type MotionMode, type ThemeMode, useAppStore } from "@/store/app-store";
 
 type UpdateViewState = { kind: "idle" } | UpdateCheckResult;
 

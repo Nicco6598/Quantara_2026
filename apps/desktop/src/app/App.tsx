@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { TopToolbar } from "@/components/layout/TopToolbar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
 import { ShortcutHelpDialog } from "@/components/shared/ShortcutHelpDialog";
 import { ToastProvider, useToast } from "@/components/shared/ToastProvider";
 import { UpdateExperienceDialog } from "@/components/shared/UpdateExperienceDialog";
-import { TopToolbar } from "@/components/layout/TopToolbar";
 import { UpdateReleaseNotesDialog } from "@/components/shared/UpdateReleaseNotesDialog";
-import { RouteRenderer } from "@/routes/RouteRenderer";
+import { useNavigate } from "@/hooks/useNavigate";
 import {
   APP_UPDATE_AVAILABLE_EVENT,
+  type AvailableAppUpdate,
   dismissPendingAppUpdate,
   installPendingAppUpdate,
-  type AvailableAppUpdate,
   type UpdateInstallState,
 } from "@/lib/appUpdater";
-import { useNavigate } from "@/hooks/useNavigate";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
-import { useAppStore } from "@/store/app-store";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
+import { RouteRenderer } from "@/routes/RouteRenderer";
+import { useAppStore } from "@/store/app-store";
 
 export function App() {
   return (

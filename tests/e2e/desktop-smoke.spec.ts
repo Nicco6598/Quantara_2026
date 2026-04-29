@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Quantara desktop web shell", () => {
   test("loads the dashboard shell", async ({ page }) => {

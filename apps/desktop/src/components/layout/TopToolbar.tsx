@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { useAppStore, type QuantaraRoute } from "@/store/app-store";
+import { type QuantaraRoute, useAppStore } from "@/store/app-store";
 
 type RouteMeta = {
   dateLabel: string;
@@ -48,6 +48,7 @@ const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
     title: "Dettaglio progetto",
   },
   projects: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Progetti" },
+  "sal-create": { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Nuova SAL" },
   settings: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Impostazioni" },
   tariffs: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Tariffario" },
   team: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Team" },

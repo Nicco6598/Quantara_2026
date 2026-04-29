@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useAppStore, type QuantaraRoute } from "@/store/app-store";
+import { type QuantaraRoute, useAppStore } from "@/store/app-store";
 
 export function useNavigate() {
   const setActiveRoute = useAppStore((state) => state.setActiveRoute);

@@ -1,7 +1,7 @@
+import { contractSchema } from "@quantara/validation";
 import { ArrowLeft, ArrowRight, CheckCircle2, FileText, X } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { contractSchema } from "@quantara/validation";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import type {

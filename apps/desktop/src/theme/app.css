@@ -8,6 +8,64 @@ body,
   min-height: 100%;
 }
 
+.sal-panel {
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background: var(--surface-card);
+  box-shadow: 0 18px 44px rgb(15 23 42 / 5%);
+}
+
+.sal-hero-icon {
+  display: flex;
+  width: 72px;
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--info-soft);
+  color: var(--info-base);
+}
+
+.sal-outline-button,
+.sal-primary-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 700;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.sal-outline-button {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--text-primary);
+}
+
+.sal-outline-button:hover {
+  border-color: rgb(37 99 235 / 35%);
+  background: var(--surface-muted);
+}
+
+.sal-primary-button {
+  border: 1px solid #ff4d12;
+  background: linear-gradient(180deg, #ff5a1f 0%, #ff3d00 100%);
+  color: white;
+  box-shadow: 0 10px 22px rgb(255 77 18 / 25%);
+}
+
+.sal-primary-button:hover {
+  background: linear-gradient(180deg, #ff682f 0%, #f43a00 100%);
+}
+
 body {
   background: var(--bg-app);
   color: var(--text-primary);

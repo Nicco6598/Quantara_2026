@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import type {
   CreateDesktopContractRecordRequest,
   CreateDesktopTariffBookRecordRequest,
@@ -10,6 +9,7 @@ import type {
   TariffPdfMetadataRecord,
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
+import { invoke } from "@tauri-apps/api/core";
 import { invokeWithFallback } from "./tauri-wrapper";
 
 export type DesktopMoney = Money;

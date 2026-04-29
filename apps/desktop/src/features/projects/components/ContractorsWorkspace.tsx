@@ -17,9 +17,9 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
+import type { ContractorFolder } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import type { ContractorFolder } from "@/features/projects/types";
 import { PortfolioMetric } from "./workspace-ui";
 
 type ContractorsWorkspaceProps = {

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { eur, resolveTariffVoice, summarizeSal } from "@quantara/domain-utils";
 import type { ContractRecord, SalRecord, TariffVoice } from "@quantara/shared-types";
+import { describe, expect, it } from "vitest";
 
 const contract: ContractRecord = {
   applicationContractCode: "CA-001",
