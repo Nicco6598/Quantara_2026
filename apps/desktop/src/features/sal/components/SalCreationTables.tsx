@@ -1,12 +1,4 @@
-import {
-  Check,
-  ChevronDown,
-  Download,
-  Filter,
-  MoreHorizontal,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { Check, ChevronDown, Download, Filter, MoreHorizontal, Search, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { SalLineView, SalVerificationCheck, SalVoiceDraft } from "../types";
@@ -32,7 +24,11 @@ export function Currency({ value }: { value: number }) {
 }
 
 export function NumberValue({ value }: { value: number }) {
-  return <span>{value.toLocaleString("it-IT", { maximumFractionDigits: 3, minimumFractionDigits: 3 })}</span>;
+  return (
+    <span>
+      {value.toLocaleString("it-IT", { maximumFractionDigits: 3, minimumFractionDigits: 3 })}
+    </span>
+  );
 }
 
 export function CatalogPanel({
@@ -51,7 +47,9 @@ export function CatalogPanel({
       normalizedQuery.length === 0
         ? voices
         : voices.filter((voice) =>
-            `${voice.code} ${voice.description} ${voice.category}`.toLowerCase().includes(normalizedQuery),
+            `${voice.code} ${voice.description} ${voice.category}`
+              .toLowerCase()
+              .includes(normalizedQuery),
           ),
     [normalizedQuery, voices],
   );
@@ -88,7 +86,13 @@ export function CatalogPanel({
           <span className="text-right">Prezzo unitario</span>
         </div>
         {filteredVoices.length === 0 ? (
-          <EmptyTableState message={voices.length === 0 ? "Nessuna voce reale caricata per questo tariffario." : "Nessuna voce corrisponde alla ricerca."} />
+          <EmptyTableState
+            message={
+              voices.length === 0
+                ? "Nessuna voce reale caricata per questo tariffario."
+                : "Nessuna voce corrisponde alla ricerca."
+            }
+          />
         ) : (
           <div className="max-h-[318px] overflow-y-auto">
             {groupedVoices.map((group) => {
@@ -108,7 +112,12 @@ export function CatalogPanel({
                     }
                     type="button"
                   >
-                    <ChevronDown className={cn("size-4 text-primary transition-transform", !isExpanded && "-rotate-90")} />
+                    <ChevronDown
+                      className={cn(
+                        "size-4 text-primary transition-transform",
+                        !isExpanded && "-rotate-90",
+                      )}
+                    />
                     <span>{group.macroCode}</span>
                     <span className="truncate">{group.category}</span>
                     <span>{group.voices.length}</span>
@@ -174,32 +183,32 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   return (
     <div className="overflow-x-auto rounded-[12px] border border-subtle">
       <div className="min-w-[960px]">
-      <div className="grid grid-cols-[42px_112px_minmax(220px,1fr)_58px_82px_104px_96px_118px_118px_42px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
-        <span>#</span>
-        <span>Codice</span>
-        <span>Descrizione</span>
-        <span>U.M.</span>
-        <span className="text-right">Manod.</span>
-        <span>Quantita</span>
-        <span>Magg.</span>
-        <span>Ribasso</span>
-        <span>Totale riga</span>
-        <span />
-      </div>
-      {lines.length === 0 ? (
-        <EmptyTableState message="Seleziona una voce reale dal catalogo per iniziare la bozza SAL." />
-      ) : (
-        lines.map((line, index) => (
-          <SelectedVoiceRow
-            index={index}
-            key={line.id}
-            line={line}
-            onQuantity={onQuantity}
-            onRemove={onRemove}
-            onSurcharge={onSurcharge}
-          />
-        ))
-      )}
+        <div className="grid grid-cols-[42px_112px_minmax(220px,1fr)_58px_82px_104px_96px_118px_118px_42px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
+          <span>#</span>
+          <span>Codice</span>
+          <span>Descrizione</span>
+          <span>U.M.</span>
+          <span className="text-right">Manod.</span>
+          <span>Quantita</span>
+          <span>Magg.</span>
+          <span>Ribasso</span>
+          <span>Totale riga</span>
+          <span />
+        </div>
+        {lines.length === 0 ? (
+          <EmptyTableState message="Seleziona una voce reale dal catalogo per iniziare la bozza SAL." />
+        ) : (
+          lines.map((line, index) => (
+            <SelectedVoiceRow
+              index={index}
+              key={line.id}
+              line={line}
+              onQuantity={onQuantity}
+              onRemove={onRemove}
+              onSurcharge={onSurcharge}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -240,13 +249,22 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                 onClick={() => setExpandedId(expanded ? null : line.id)}
                 type="button"
               >
-                <ChevronDown className={cn("size-4 text-primary transition-transform", !expanded && "-rotate-90")} />
+                <ChevronDown
+                  className={cn(
+                    "size-4 text-primary transition-transform",
+                    !expanded && "-rotate-90",
+                  )}
+                />
                 <span>{line.voice.tariffBookName}</span>
                 <span>{line.voice.code}</span>
                 <span className="font-semibold">{line.voice.description}</span>
                 <span>{line.voice.unit}</span>
-                <span className="font-semibold"><NumberValue value={line.quantity} /></span>
-                <span className="font-semibold"><Currency value={line.totalAmount} /></span>
+                <span className="font-semibold">
+                  <NumberValue value={line.quantity} />
+                </span>
+                <span className="font-semibold">
+                  <Currency value={line.totalAmount} />
+                </span>
                 <StatusPill tone={line.status === "complete" ? "success" : "warning"}>
                   {line.status === "complete" ? "Completa" : "Da completare"}
                 </StatusPill>
@@ -255,7 +273,15 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
               {expanded ? (
                 <div className="grid gap-3 border-t border-subtle bg-muted/20 p-3 lg:grid-cols-[1.25fr_1fr]">
                   <NestedTable
-                    columns={["Descrizione misura", "U.M.", "Fattore 1", "Fattore 2", "Fattore 3", "Quantita", "Note"]}
+                    columns={[
+                      "Descrizione misura",
+                      "U.M.",
+                      "Fattore 1",
+                      "Fattore 2",
+                      "Fattore 3",
+                      "Quantita",
+                      "Note",
+                    ]}
                     title="A) Misure"
                   >
                     {line.measurementRows.length === 0 ? (
@@ -269,10 +295,18 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                         <tr className="border-t border-subtle" key={row.id}>
                           <td className="px-3 py-2">{row.description}</td>
                           <td className="px-3 py-2">{row.unit}</td>
-                          <td className="px-3 py-2 text-right">{row.factor1.toLocaleString("it-IT")}</td>
-                          <td className="px-3 py-2 text-right">{row.factor2.toLocaleString("it-IT")}</td>
-                          <td className="px-3 py-2 text-right">{row.factor3.toLocaleString("it-IT")}</td>
-                          <td className="px-3 py-2 text-right font-semibold">{row.partialQuantity.toLocaleString("it-IT")}</td>
+                          <td className="px-3 py-2 text-right">
+                            {row.factor1.toLocaleString("it-IT")}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {row.factor2.toLocaleString("it-IT")}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {row.factor3.toLocaleString("it-IT")}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold">
+                            {row.partialQuantity.toLocaleString("it-IT")}
+                          </td>
                           <td className="px-3 py-2">{row.notes}</td>
                         </tr>
                       ))
@@ -293,9 +327,15 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                         <tr className="border-t border-subtle" key={charge.id}>
                           <td className="px-3 py-2">{charge.code}</td>
                           <td className="px-3 py-2">{charge.description}</td>
-                          <td className="px-3 py-2"><Currency value={charge.baseAmount} /></td>
-                          <td className="px-3 py-2 text-right">{charge.percent.toLocaleString("it-IT")} %</td>
-                          <td className="px-3 py-2 text-right font-semibold"><Currency value={charge.total} /></td>
+                          <td className="px-3 py-2">
+                            <Currency value={charge.baseAmount} />
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {charge.percent.toLocaleString("it-IT")} %
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold">
+                            <Currency value={charge.total} />
+                          </td>
                         </tr>
                       ))
                     )}
@@ -310,21 +350,50 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   );
 }
 
-export function DocumentPreview({ compact = false, lines = [] }: { compact?: boolean; lines?: SalLineView[] }) {
+export function DocumentPreview({
+  compact = false,
+  lines = [],
+}: {
+  compact?: boolean;
+  lines?: SalLineView[];
+}) {
   const total = lines.reduce((sum, line) => sum + line.totalAmount, 0);
   return (
-    <div className={cn("rounded-[12px] border border-subtle bg-white p-4 text-[#10182f] shadow-inner", compact && "p-3 text-[11px]")}>
+    <div
+      className={cn(
+        "rounded-[12px] border border-subtle bg-white p-4 text-[#10182f] shadow-inner",
+        compact && "p-3 text-[11px]",
+      )}
+    >
       <div className="grid grid-cols-3 border border-[#c9d2e3] text-center text-xs font-semibold">
-        <div className="p-3 text-left">COMUNE DI ESEMPIO<br />Ufficio Tecnico</div>
-        <div className="border-x border-[#c9d2e3] p-3">LIBRETTO DELLE MISURE<br />Stato Avanzamento Lavori n. 1</div>
-        <div className="p-3 text-left">Progetto: TEST<br />Codice: QNT-01<br />Anno: 2026</div>
+        <div className="p-3 text-left">
+          COMUNE DI ESEMPIO
+          <br />
+          Ufficio Tecnico
+        </div>
+        <div className="border-x border-[#c9d2e3] p-3">
+          LIBRETTO DELLE MISURE
+          <br />
+          Stato Avanzamento Lavori n. 1
+        </div>
+        <div className="p-3 text-left">
+          Progetto: TEST
+          <br />
+          Codice: QNT-01
+          <br />
+          Anno: 2026
+        </div>
       </div>
       <table className="mt-3 w-full border-collapse text-xs">
         <thead>
           <tr className="bg-[#f4f6fa]">
-            {["N.", "Codice", "Descrizione", "U.M.", "Quantita", "Prezzo", "Importo"].map((head) => (
-              <th className="border border-[#c9d2e3] p-2 text-left" key={head}>{head}</th>
-            ))}
+            {["N.", "Codice", "Descrizione", "U.M.", "Quantita", "Prezzo", "Importo"].map(
+              (head) => (
+                <th className="border border-[#c9d2e3] p-2 text-left" key={head}>
+                  {head}
+                </th>
+              ),
+            )}
           </tr>
         </thead>
         <tbody>
@@ -341,9 +410,15 @@ export function DocumentPreview({ compact = false, lines = [] }: { compact?: boo
                 <td className="border border-[#c9d2e3] p-2">{line.voice.code}</td>
                 <td className="border border-[#c9d2e3] p-2">{line.voice.description}</td>
                 <td className="border border-[#c9d2e3] p-2">{line.voice.unit}</td>
-                <td className="border border-[#c9d2e3] p-2 text-right">{line.quantity.toLocaleString("it-IT")}</td>
-                <td className="border border-[#c9d2e3] p-2 text-right">{line.voice.unitPrice.toLocaleString("it-IT")}</td>
-                <td className="border border-[#c9d2e3] p-2 text-right">{line.totalAmount.toLocaleString("it-IT")}</td>
+                <td className="border border-[#c9d2e3] p-2 text-right">
+                  {line.quantity.toLocaleString("it-IT")}
+                </td>
+                <td className="border border-[#c9d2e3] p-2 text-right">
+                  {line.voice.unitPrice.toLocaleString("it-IT")}
+                </td>
+                <td className="border border-[#c9d2e3] p-2 text-right">
+                  {line.totalAmount.toLocaleString("it-IT")}
+                </td>
               </tr>
             ))
           )}
@@ -351,15 +426,30 @@ export function DocumentPreview({ compact = false, lines = [] }: { compact?: boo
       </table>
       <div className="mt-3 grid grid-cols-[1fr_180px] border border-[#c9d2e3] text-xs font-semibold">
         <div className="p-2">TOTALE COMPLESSIVO DOCUMENTO</div>
-        <div className="border-l border-[#c9d2e3] p-2 text-right text-[#006BFF]">{total.toLocaleString("it-IT", { minimumFractionDigits: 2 })}</div>
+        <div className="border-l border-[#c9d2e3] p-2 text-right text-[#006BFF]">
+          {total.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+        </div>
       </div>
     </div>
   );
 }
 
-export function OutputRow({ disabled, icon, label }: { disabled?: boolean; icon: ReactNode; label: string }) {
+export function OutputRow({
+  disabled,
+  icon,
+  label,
+}: {
+  disabled?: boolean;
+  icon: ReactNode;
+  label: string;
+}) {
   return (
-    <div className={cn("flex items-center justify-between rounded-[12px] border border-subtle bg-card px-3 py-3", disabled && "opacity-60")}>
+    <div
+      className={cn(
+        "flex items-center justify-between rounded-[12px] border border-subtle bg-card px-3 py-3",
+        disabled && "opacity-60",
+      )}
+    >
       <div className="flex min-w-0 items-center gap-3">
         {icon}
         <span className="truncate text-sm font-semibold">{label}</span>
@@ -376,7 +466,16 @@ export function CheckRow({ check }: { check: SalVerificationCheck }) {
   return (
     <div className="grid grid-cols-[minmax(220px,1fr)_120px_minmax(220px,1.4fr)] items-center border-b border-subtle px-3 py-3 text-[13px] last:border-b-0">
       <span className="flex items-center gap-2 font-semibold">
-        <Check className={cn("size-4", check.tone === "success" ? "text-success" : check.tone === "danger" ? "text-danger" : "text-warning")} />
+        <Check
+          className={cn(
+            "size-4",
+            check.tone === "success"
+              ? "text-success"
+              : check.tone === "danger"
+                ? "text-danger"
+                : "text-warning",
+          )}
+        />
         {check.label}
       </span>
       <StatusPill tone={check.tone}>{check.result}</StatusPill>
@@ -424,7 +523,9 @@ function NestedTable({
           <thead className="bg-muted/45 text-secondary">
             <tr>
               {columns.map((column) => (
-                <th className="px-3 py-2 font-semibold" key={column}>{column}</th>
+                <th className="px-3 py-2 font-semibold" key={column}>
+                  {column}
+                </th>
               ))}
             </tr>
           </thead>
@@ -530,7 +631,9 @@ function SelectedVoiceRow({
                     <td className="px-3 py-2 text-right">{row.factor1.toLocaleString("it-IT")}</td>
                     <td className="px-3 py-2 text-right">{row.factor2.toLocaleString("it-IT")}</td>
                     <td className="px-3 py-2 text-right">{row.factor3.toLocaleString("it-IT")}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{row.partialQuantity.toLocaleString("it-IT")}</td>
+                    <td className="px-3 py-2 text-right font-semibold">
+                      {row.partialQuantity.toLocaleString("it-IT")}
+                    </td>
                     <td className="px-3 py-2">{row.notes}</td>
                   </tr>
                 ))
@@ -551,9 +654,15 @@ function SelectedVoiceRow({
                   <tr className="border-t border-subtle" key={charge.id}>
                     <td className="px-3 py-2">{charge.code}</td>
                     <td className="px-3 py-2">{charge.description}</td>
-                    <td className="px-3 py-2 text-right"><Currency value={charge.baseAmount} /></td>
-                    <td className="px-3 py-2 text-right">{charge.percent.toLocaleString("it-IT")}</td>
-                    <td className="px-3 py-2 text-right font-semibold"><Currency value={charge.total} /></td>
+                    <td className="px-3 py-2 text-right">
+                      <Currency value={charge.baseAmount} />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {charge.percent.toLocaleString("it-IT")}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold">
+                      <Currency value={charge.total} />
+                    </td>
                   </tr>
                 ))
               )}
@@ -626,5 +735,9 @@ function truncateDescription(description: string): string {
 }
 
 function EmptyTableState({ message }: { message: string }) {
-  return <div className="border-t border-subtle px-4 py-8 text-center text-[13px] text-secondary">{message}</div>;
+  return (
+    <div className="border-t border-subtle px-4 py-8 text-center text-[13px] text-secondary">
+      {message}
+    </div>
+  );
 }

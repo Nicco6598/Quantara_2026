@@ -1,8 +1,4 @@
-import type {
-  DesktopContract,
-  DesktopTariffBook,
-  DesktopTariffVoice,
-} from "@/lib/desktopData";
+import type { DesktopContract, DesktopTariffBook, DesktopTariffVoice } from "@/lib/desktopData";
 
 export type SalCreationStep = 1 | 2 | 3 | 4 | 5;
 

@@ -79,9 +79,7 @@ export function useSalCreationData() {
         setState((current) => ({
           ...current,
           error:
-            error instanceof Error
-              ? error.message
-              : "Impossibile caricare contratti e tariffari.",
+            error instanceof Error ? error.message : "Impossibile caricare contratti e tariffari.",
           isLoading: false,
         }));
       }
@@ -135,8 +133,7 @@ export function useSalCreationData() {
     } catch (error) {
       setState((current) => ({
         ...current,
-        error:
-          error instanceof Error ? error.message : "Impossibile caricare le voci tariffarie.",
+        error: error instanceof Error ? error.message : "Impossibile caricare le voci tariffarie.",
         isLoading: false,
       }));
     }
@@ -176,4 +173,3 @@ function readSelectedProjectId(): string | null {
     return null;
   }
 }
-

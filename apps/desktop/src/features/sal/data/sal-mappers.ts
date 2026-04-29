@@ -1,5 +1,5 @@
-import type { DesktopContract, DesktopTariffBook, DesktopTariffVoice } from "@/lib/desktopData";
 import { createDesktopVoiceKey } from "@/features/projects/utils/projects-helpers";
+import type { DesktopContract, DesktopTariffBook, DesktopTariffVoice } from "@/lib/desktopData";
 import type { SalProjectContext, SalTariffBookOption, SalVoiceDraft } from "../types";
 
 export function mapContractToSalProject(contract: DesktopContract): SalProjectContext {
@@ -83,4 +83,3 @@ function isSafetyVoice(voice: DesktopTariffVoice) {
     voice.category.toLowerCase().includes("safety")
   );
 }
-

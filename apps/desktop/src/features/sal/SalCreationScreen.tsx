@@ -11,23 +11,18 @@ import {
   ShieldCheck,
   Wallet,
 } from "lucide-react";
-import { useCallback, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import {
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+  useCallback,
+  useMemo,
+  useState,
+} from "react";
 import { ScreenShell } from "@/components/shared/Screen";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
-import {
-  buildLineViews,
-  buildVerificationChecks,
-  defaultSalEconomicRules,
-  summarizeSalLines,
-} from "./domain/sal-calculations";
-import { useSalCreationData } from "./hooks/useSalCreationData";
-import {
-  SalCard,
-  SalHero,
-  SalStepper,
-  SalWorkflowTopbar,
-} from "./components/SalCreationChrome";
+import { SalCard, SalHero, SalStepper, SalWorkflowTopbar } from "./components/SalCreationChrome";
 import {
   AccountingRows,
   CatalogPanel,
@@ -39,10 +34,17 @@ import {
   SelectedVoicesPanel,
   StatusPill,
 } from "./components/SalCreationTables";
+import {
+  buildLineViews,
+  buildVerificationChecks,
+  defaultSalEconomicRules,
+  summarizeSalLines,
+} from "./domain/sal-calculations";
+import { useSalCreationData } from "./hooks/useSalCreationData";
 import type {
   SalCreationStep,
-  SalEconomicSummary,
   SalEconomicRules,
+  SalEconomicSummary,
   SalLineDraft,
   SalLineView,
   SalProjectContext,
@@ -59,8 +61,7 @@ export function SalCreationScreen() {
   const createClosedSal = useSalWorkflowStore((state) => state.createClosedSal);
   const [step, setStep] = useState<SalCreationStep>(1);
   const [lines, setLines] = useState<SalLineDraft[]>([]);
-  const [economicRules, setEconomicRules] =
-    useState<SalEconomicRules>(defaultSalEconomicRules);
+  const [economicRules, setEconomicRules] = useState<SalEconomicRules>(defaultSalEconomicRules);
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
 
   const lineViews = useMemo(() => buildLineViews(lines, economicRules), [economicRules, lines]);
@@ -107,9 +108,7 @@ export function SalCreationScreen() {
 
   const setSurcharge = useCallback((voiceId: string, surchargePercent: number) => {
     setLines((current) =>
-      current.map((line) =>
-        line.voice.id === voiceId ? { ...line, surchargePercent } : line,
-      ),
+      current.map((line) => (line.voice.id === voiceId ? { ...line, surchargePercent } : line)),
     );
   }, []);
 
@@ -157,7 +156,8 @@ export function SalCreationScreen() {
       lines: lineViews.map((line) => ({
         id: line.id,
         quantity: line.quantity,
-        surcharge: line.surchargePercent >= 20 ? "night" : line.surchargePercent > 0 ? "day" : "none",
+        surcharge:
+          line.surchargePercent >= 20 ? "night" : line.surchargePercent > 0 ? "day" : "none",
         voiceId: line.voice.id,
       })),
       notes: "",
@@ -180,7 +180,11 @@ export function SalCreationScreen() {
     <ScreenShell className="min-h-full space-y-4 bg-[var(--bg-muted)] p-0">
       <SalWorkflowTopbar
         canGoBack={step > 1}
-        onBack={() => (step === 5 ? setStep(4) : setStep((current) => Math.max(1, current - 1) as SalCreationStep))}
+        onBack={() =>
+          step === 5
+            ? setStep(4)
+            : setStep((current) => Math.max(1, current - 1) as SalCreationStep)
+        }
         onDraft={saveDraft}
         onPrimary={goPrimary}
         primaryLabel={primaryLabel}
@@ -188,8 +192,16 @@ export function SalCreationScreen() {
       />
 
       <div className="space-y-4 px-7 pb-7">
-        {data.error ? <FeedbackBanner tone="danger" title="Caricamento SAL non riuscito" message={data.error} /> : null}
-        {data.isLoading ? <FeedbackBanner tone="info" title="Caricamento dati reali" message="Sto leggendo contratti, tariffari e voci disponibili nel database locale." /> : null}
+        {data.error ? (
+          <FeedbackBanner tone="danger" title="Caricamento SAL non riuscito" message={data.error} />
+        ) : null}
+        {data.isLoading ? (
+          <FeedbackBanner
+            tone="info"
+            title="Caricamento dati reali"
+            message="Sto leggendo contratti, tariffari e voci disponibili nel database locale."
+          />
+        ) : null}
 
         {step === 5 ? (
           <DetailView
@@ -202,7 +214,15 @@ export function SalCreationScreen() {
         ) : (
           <>
             <SalHero
-              icon={step === 1 ? FileText : step === 2 ? BarChart3 : step === 3 ? BarChart3 : CheckCircle2}
+              icon={
+                step === 1
+                  ? FileText
+                  : step === 2
+                    ? BarChart3
+                    : step === 3
+                      ? BarChart3
+                      : CheckCircle2
+              }
               step={step}
               subtitle={
                 step === 1
@@ -233,7 +253,9 @@ export function SalCreationScreen() {
                 lineViews={lineViews}
                 lines={lines}
                 onQuantity={setQuantity}
-                onRemove={(voiceId) => setLines((current) => current.filter((line) => line.voice.id !== voiceId))}
+                onRemove={(voiceId) =>
+                  setLines((current) => current.filter((line) => line.voice.id !== voiceId))
+                }
                 onSurcharge={setSurcharge}
                 onToggle={upsertLine}
                 selectedIds={selectedIds}
@@ -243,7 +265,12 @@ export function SalCreationScreen() {
               />
             ) : null}
             {step === 3 ? (
-              <VerifyStep checks={checks} economicRules={economicRules} lineViews={lineViews} summary={summary} />
+              <VerifyStep
+                checks={checks}
+                economicRules={economicRules}
+                lineViews={lineViews}
+                summary={summary}
+              />
             ) : null}
             {step === 4 ? (
               <ConfirmStep economicRules={economicRules} lineViews={lineViews} summary={summary} />
@@ -277,77 +304,108 @@ function SetupStep({
   return (
     <div className="space-y-4">
       <div className="sal-panel grid gap-0 overflow-hidden p-0 md:grid-cols-4">
-        <ContextTile label="Contratto" value={project?.applicationContractCode ?? "Non disponibile"} />
+        <ContextTile
+          label="Contratto"
+          value={project?.applicationContractCode ?? "Non disponibile"}
+        />
         <ContextTile label="Documento" value={project?.salTitle ?? "SAL da creare"} />
         <ContextTile label="Tariffario" value={selectedTariffBook?.name ?? "Non selezionato"} />
-        <ContextTile label="Residuo stimato" tone="success" value={<Currency value={summary.budgetResidual} />} />
+        <ContextTile
+          label="Residuo stimato"
+          tone="success"
+          value={<Currency value={summary.budgetResidual} />}
+        />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_380px_340px]">
-      <SalCard title="Contesto contrattuale e documento">
-        {project ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-3">
-              <ReadOnlyField label="Appaltatore" value={project.contractor} />
-              <ReadOnlyField label="Impresa" value={project.contractor} />
-              <ReadOnlyField label="Progetto / Contratto" value={project.title} />
-              <ReadOnlyField label="Atto contrattuale" value={project.applicationContractCode} />
-              <ReadOnlyField label="Linea / Lotto" value={project.location} />
-              <ReadOnlyField label="Tipo documento" value="SAL" />
-            </div>
-            <div className="mt-5 grid gap-4 md:grid-cols-[1fr_260px]">
-              <ReadOnlyField label="Nome documento / Nome SAL" value={project.salTitle} />
-              <ReadOnlyField label="Anno tariffario" value={String(selectedTariffBook?.year ?? "Non selezionato")} />
-            </div>
-            <div className="mt-5 rounded-[14px] border border-subtle bg-muted/20 p-4">
-              <div className="mb-3 flex items-center gap-2 font-semibold">
-                <Calculator className="size-4 text-primary" />
-                Regole economiche
+        <SalCard title="Contesto contrattuale e documento">
+          {project ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <ReadOnlyField label="Appaltatore" value={project.contractor} />
+                <ReadOnlyField label="Impresa" value={project.contractor} />
+                <ReadOnlyField label="Progetto / Contratto" value={project.title} />
+                <ReadOnlyField label="Atto contrattuale" value={project.applicationContractCode} />
+                <ReadOnlyField label="Linea / Lotto" value={project.location} />
+                <ReadOnlyField label="Tipo documento" value="SAL" />
               </div>
-              <div className="grid gap-3 md:grid-cols-[minmax(260px,1.1fr)_1fr_1fr_1fr]">
-                <DiscountControl economicRules={economicRules} setEconomicRules={setEconomicRules} />
-                <RuleChip label={economicRules.discountEnabled ? "Ribasso attivo" : "Ribasso disattivato"} />
-                <RuleChip label="Arrotonda al centesimo" />
-                <RuleChip label="Voci OS abilitate" />
+              <div className="mt-5 grid gap-4 md:grid-cols-[1fr_260px]">
+                <ReadOnlyField label="Nome documento / Nome SAL" value={project.salTitle} />
+                <ReadOnlyField
+                  label="Anno tariffario"
+                  value={String(selectedTariffBook?.year ?? "Non selezionato")}
+                />
+              </div>
+              <div className="mt-5 rounded-[14px] border border-subtle bg-muted/20 p-4">
+                <div className="mb-3 flex items-center gap-2 font-semibold">
+                  <Calculator className="size-4 text-primary" />
+                  Regole economiche
+                </div>
+                <div className="grid gap-3 md:grid-cols-[minmax(260px,1.1fr)_1fr_1fr_1fr]">
+                  <DiscountControl
+                    economicRules={economicRules}
+                    setEconomicRules={setEconomicRules}
+                  />
+                  <RuleChip
+                    label={economicRules.discountEnabled ? "Ribasso attivo" : "Ribasso disattivato"}
+                  />
+                  <RuleChip label="Arrotonda al centesimo" />
+                  <RuleChip label="Voci OS abilitate" />
+                </div>
+              </div>
+            </>
+          ) : (
+            <EmptyPanel message="Nessun contratto reale disponibile. Crea o importa un contratto prima di generare una SAL." />
+          )}
+        </SalCard>
+
+        <SalCard icon={ShieldCheck} title="Presidio economico">
+          <SummaryLine
+            label="Importo contrattuale"
+            value={<Currency value={project?.contractAmount ?? 0} />}
+          />
+          <SummaryLine
+            label="Ribasso gara"
+            value={
+              economicRules.discountEnabled
+                ? `${economicRules.discountPercent.toLocaleString("it-IT")} %`
+                : "Disattivo"
+            }
+          />
+          <SummaryLine
+            label="Impegnato precedente"
+            value={<Currency value={summary.previousProgressiveAmount} />}
+          />
+          <SummaryLine label="Documento corrente" value={<Currency value={summary.total} />} />
+          <SummaryLine
+            label="Residuo stimato"
+            value={<Currency value={summary.budgetResidual} />}
+            tone="success"
+          />
+          <SummaryLine label="Voci OS" value="Escluse dal ribasso" />
+          <SummaryLine label="Tariffari attivi" value={String(tariffBooks.length)} />
+        </SalCard>
+
+        <SalCard icon={ClipboardList} title="Workflow documento">
+          {[
+            "Contesto contrattuale",
+            "Regole economiche",
+            "Setup valorizzazione",
+            "Inserimento voci",
+            "Verifica contabile",
+            "Conferma / Export",
+          ].map((item, index) => (
+            <div className="flex gap-3 pb-4 text-sm last:pb-0" key={item}>
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                {index + 1}
+              </span>
+              <div>
+                <div className="font-semibold">{item}</div>
+                <div className="text-xs text-secondary">Configurazione guidata del documento</div>
               </div>
             </div>
-          </>
-        ) : (
-          <EmptyPanel message="Nessun contratto reale disponibile. Crea o importa un contratto prima di generare una SAL." />
-        )}
-      </SalCard>
-
-      <SalCard icon={ShieldCheck} title="Presidio economico">
-        <SummaryLine label="Importo contrattuale" value={<Currency value={project?.contractAmount ?? 0} />} />
-        <SummaryLine label="Ribasso gara" value={economicRules.discountEnabled ? `${economicRules.discountPercent.toLocaleString("it-IT")} %` : "Disattivo"} />
-        <SummaryLine label="Impegnato precedente" value={<Currency value={summary.previousProgressiveAmount} />} />
-        <SummaryLine label="Documento corrente" value={<Currency value={summary.total} />} />
-        <SummaryLine label="Residuo stimato" value={<Currency value={summary.budgetResidual} />} tone="success" />
-        <SummaryLine label="Voci OS" value="Escluse dal ribasso" />
-        <SummaryLine label="Tariffari attivi" value={String(tariffBooks.length)} />
-      </SalCard>
-
-      <SalCard icon={ClipboardList} title="Workflow documento">
-        {[
-          "Contesto contrattuale",
-          "Regole economiche",
-          "Setup valorizzazione",
-          "Inserimento voci",
-          "Verifica contabile",
-          "Conferma / Export",
-        ].map((item, index) => (
-          <div className="flex gap-3 pb-4 text-sm last:pb-0" key={item}>
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-              {index + 1}
-            </span>
-            <div>
-              <div className="font-semibold">{item}</div>
-              <div className="text-xs text-secondary">Configurazione guidata del documento</div>
-            </div>
-          </div>
-        ))}
-      </SalCard>
-
+          ))}
+        </SalCard>
       </div>
 
       <SalCard title="Setup valorizzazione">
@@ -355,7 +413,9 @@ function SetupStep({
           <div className="rounded-[14px] border border-subtle bg-muted/20 p-4">
             <div className="text-sm font-semibold">Anno tariffario documento</div>
             <div className="mt-4 text-3xl font-semibold">{selectedTariffBook?.year ?? "-"}</div>
-            <p className="mt-3 text-xs text-secondary">Le voci vengono lette dal tariffario selezionato.</p>
+            <p className="mt-3 text-xs text-secondary">
+              Le voci vengono lette dal tariffario selezionato.
+            </p>
           </div>
           <div className="rounded-[14px] border border-primary/35 bg-primary/5 p-4">
             <div className="mb-3 text-sm font-semibold text-primary">Tariffe attive</div>
@@ -431,21 +491,40 @@ function VoicesStep({
           <CatalogPanel onToggle={onToggle} selectedIds={selectedIds} voices={voices} />
         </SalCard>
         <SalCard title={`Voci selezionate (${lines.length})`}>
-          <SelectedVoicesPanel lines={lineViews} onQuantity={onQuantity} onRemove={onRemove} onSurcharge={onSurcharge} />
+          <SelectedVoicesPanel
+            lines={lineViews}
+            onQuantity={onQuantity}
+            onRemove={onRemove}
+            onSurcharge={onSurcharge}
+          />
         </SalCard>
         <SalCard icon={Wallet} title="Riepilogo bozza SAL">
           <SummaryLine label="Voci inserite" value={String(lines.length)} />
-          <SummaryLine label="Quantita totale (misurata)" value={<NumberValue value={totalQuantity} />} />
+          <SummaryLine
+            label="Quantita totale (misurata)"
+            value={<NumberValue value={totalQuantity} />}
+          />
           <SummaryLine label="Voci collegate (magg./interf.)" value={String(linkedCount)} />
-          <SummaryLine label="Ribasso gara" value={economicRules.discountEnabled ? `${economicRules.discountPercent.toLocaleString("it-IT")} %` : "Disattivo"} />
+          <SummaryLine
+            label="Ribasso gara"
+            value={
+              economicRules.discountEnabled
+                ? `${economicRules.discountPercent.toLocaleString("it-IT")} %`
+                : "Disattivo"
+            }
+          />
           <div className="mt-4 border-t border-dashed border-subtle pt-5">
             <div className="flex justify-between text-lg font-semibold">
               <span>Totale progressivo</span>
-              <span className="text-primary"><Currency value={summary.total} /></span>
+              <span className="text-primary">
+                <Currency value={summary.total} />
+              </span>
             </div>
             <div className="mt-3 flex justify-between text-sm">
               <span className="text-secondary">Budget residuo</span>
-              <strong><Currency value={summary.budgetResidual} /></strong>
+              <strong>
+                <Currency value={summary.budgetResidual} />
+              </strong>
             </div>
           </div>
         </SalCard>
@@ -453,7 +532,9 @@ function VoicesStep({
       <AccountingRows lines={lineViews} />
       <div className="sal-panel flex flex-wrap items-center justify-end gap-8 px-7 py-5 text-lg font-semibold">
         <span>Totale SAL</span>
-        <span className="text-primary"><Currency value={summary.total} /></span>
+        <span className="text-primary">
+          <Currency value={summary.total} />
+        </span>
       </div>
     </div>
   );
@@ -474,15 +555,36 @@ function VerifyStep({
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-4">
         <Metric label="TOTALE SAL" value={<Currency value={summary.total} />} />
-        <Metric label="VOCI PRINCIPALI" value={String(lineViews.filter((line) => !line.voice.isSafetyCost).length)} />
-        <Metric label="CONTROLLI CONTABILI OK" tone="success" value={`${checks.filter((check) => check.tone === "success").length} / ${checks.length}`} />
-        <Metric label="BUDGET RESIDUO" tone="warning" value={<Currency value={summary.budgetResidual} />} />
+        <Metric
+          label="VOCI PRINCIPALI"
+          value={String(lineViews.filter((line) => !line.voice.isSafetyCost).length)}
+        />
+        <Metric
+          label="CONTROLLI CONTABILI OK"
+          tone="success"
+          value={`${checks.filter((check) => check.tone === "success").length} / ${checks.length}`}
+        />
+        <Metric
+          label="BUDGET RESIDUO"
+          tone="warning"
+          value={<Currency value={summary.budgetResidual} />}
+        />
       </div>
       <div className="grid gap-4 xl:grid-cols-[1.1fr_1fr]">
         <SalCard title="Riepilogo economico">
-          <SummaryLine label="Imponibile soggetto a ribasso" value={<Currency value={summary.discountableAmount} />} />
-          <SummaryLine label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`} value={<Currency value={-summary.discountAmount} />} tone="danger" />
-          <SummaryLine label="Importo maggiorazioni" value={<Currency value={summary.linkedChargeAmount} />} />
+          <SummaryLine
+            label="Imponibile soggetto a ribasso"
+            value={<Currency value={summary.discountableAmount} />}
+          />
+          <SummaryLine
+            label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`}
+            value={<Currency value={-summary.discountAmount} />}
+            tone="danger"
+          />
+          <SummaryLine
+            label="Importo maggiorazioni"
+            value={<Currency value={summary.linkedChargeAmount} />}
+          />
           <SummaryLine label="Importo voci OS" value={<Currency value={summary.safetyAmount} />} />
           <SummaryLine label="TOTALE SAL" value={<Currency value={summary.total} />} tone="info" />
         </SalCard>
@@ -533,19 +635,48 @@ function ConfirmStep({
       />
       <div className="grid gap-4 xl:grid-cols-[360px_360px_minmax(0,1fr)]">
         <SalCard title="Chiusura economica documento">
-          <SummaryLine label="Importo lordo tariffa" value={<Currency value={summary.grossAmount} />} />
-          <SummaryLine label={`Ribasso gara (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`} value={<Currency value={-summary.discountAmount} />} tone="danger" />
-          <SummaryLine label="Totale lavori al netto" value={<Currency value={summary.netDiscountableAmount} />} />
+          <SummaryLine
+            label="Importo lordo tariffa"
+            value={<Currency value={summary.grossAmount} />}
+          />
+          <SummaryLine
+            label={`Ribasso gara (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`}
+            value={<Currency value={-summary.discountAmount} />}
+            tone="danger"
+          />
+          <SummaryLine
+            label="Totale lavori al netto"
+            value={<Currency value={summary.netDiscountableAmount} />}
+          />
           <SummaryLine label="Totale voci OS" value={<Currency value={summary.safetyAmount} />} />
-          <SummaryLine label="Totale maggiorazioni" value={<Currency value={summary.linkedChargeAmount} />} />
-          <SummaryLine label="Totale complessivo documento" value={<Currency value={summary.total} />} tone="info" />
+          <SummaryLine
+            label="Totale maggiorazioni"
+            value={<Currency value={summary.linkedChargeAmount} />}
+          />
+          <SummaryLine
+            label="Totale complessivo documento"
+            value={<Currency value={summary.total} />}
+            tone="info"
+          />
         </SalCard>
         <div className="space-y-4">
           <SalCard title="Output documentali">
             <div className="space-y-3">
-              <OutputRow disabled icon={<FileText className="size-5 text-danger" />} label="PDF libretto" />
-              <OutputRow disabled icon={<FileSpreadsheet className="size-5 text-success" />} label="Excel dettaglio" />
-              <OutputRow disabled icon={<Printer className="size-5 text-primary" />} label="Stampa contabilita" />
+              <OutputRow
+                disabled
+                icon={<FileText className="size-5 text-danger" />}
+                label="PDF libretto"
+              />
+              <OutputRow
+                disabled
+                icon={<FileSpreadsheet className="size-5 text-success" />}
+                label="Excel dettaglio"
+              />
+              <OutputRow
+                disabled
+                icon={<Printer className="size-5 text-primary" />}
+                label="Stampa contabilita"
+              />
             </div>
           </SalCard>
           <SalCard title="Conteggio voci">
@@ -597,20 +728,46 @@ function DetailView({
         <div className="space-y-4">
           <SalCard title="Presidio SAL">
             <SummaryLine label="Progetto" value={project?.title ?? "Non disponibile"} />
-            <SummaryLine label="Periodo" value={`${project?.periodStart ?? "-"} - ${project?.periodEnd ?? "-"}`} />
+            <SummaryLine
+              label="Periodo"
+              value={`${project?.periodStart ?? "-"} - ${project?.periodEnd ?? "-"}`}
+            />
             <SummaryLine label="Responsabile" value={project?.manager ?? "Non assegnato"} />
-            <SummaryLine label="Totale documento" value={<Currency value={summary.total} />} tone="info" />
+            <SummaryLine
+              label="Totale documento"
+              value={<Currency value={summary.total} />}
+              tone="info"
+            />
           </SalCard>
           <SalCard title="Struttura economica SAL">
-            <SummaryLine label="Importo lordo tariffa" value={<Currency value={summary.grossAmount} />} />
-            <SummaryLine label="Ribasso gara" value={<Currency value={-summary.discountAmount} />} tone="danger" />
+            <SummaryLine
+              label="Importo lordo tariffa"
+              value={<Currency value={summary.grossAmount} />}
+            />
+            <SummaryLine
+              label="Ribasso gara"
+              value={<Currency value={-summary.discountAmount} />}
+              tone="danger"
+            />
             <SummaryLine label="Totale voci OS" value={<Currency value={summary.safetyAmount} />} />
-            <SummaryLine label="Totale complessivo" value={<Currency value={summary.total} />} tone="info" />
+            <SummaryLine
+              label="Totale complessivo"
+              value={<Currency value={summary.total} />}
+              tone="info"
+            />
           </SalCard>
           <SalCard title="Documenti collegati">
-            <OutputRow disabled icon={<FileText className="size-5 text-danger" />} label={`${createdSalTitle}.pdf`} />
+            <OutputRow
+              disabled
+              icon={<FileText className="size-5 text-danger" />}
+              label={`${createdSalTitle}.pdf`}
+            />
             <div className="mt-3">
-              <OutputRow disabled icon={<FileSpreadsheet className="size-5 text-success" />} label={`${createdSalTitle}.xlsx`} />
+              <OutputRow
+                disabled
+                icon={<FileSpreadsheet className="size-5 text-success" />}
+                label={`${createdSalTitle}.xlsx`}
+              />
             </div>
           </SalCard>
           <SalCard title="Attivita recenti">
@@ -618,11 +775,17 @@ function DetailView({
               <ReceiptText className="mt-0.5 size-4 text-success" />
               <div>
                 <div className="font-semibold">SAL confermata</div>
-                <div className="text-xs text-secondary">Documento registrato nel flusso locale SAL.</div>
+                <div className="text-xs text-secondary">
+                  Documento registrato nel flusso locale SAL.
+                </div>
               </div>
             </div>
           </SalCard>
-          <button className="sal-primary-button w-full justify-center" onClick={onNew} type="button">
+          <button
+            className="sal-primary-button w-full justify-center"
+            onClick={onNew}
+            type="button"
+          >
             Nuova revisione
           </button>
         </div>
@@ -647,7 +810,17 @@ function Metric({
       </div>
       <div>
         <div className="text-xs font-semibold text-secondary">{label}</div>
-        <div className={tone === "success" ? "mt-2 text-2xl font-semibold text-success" : tone === "warning" ? "mt-2 text-2xl font-semibold text-warning" : "mt-2 text-2xl font-semibold text-primary"}>{value}</div>
+        <div
+          className={
+            tone === "success"
+              ? "mt-2 text-2xl font-semibold text-success"
+              : tone === "warning"
+                ? "mt-2 text-2xl font-semibold text-warning"
+                : "mt-2 text-2xl font-semibold text-primary"
+          }
+        >
+          {value}
+        </div>
       </div>
     </div>
   );
@@ -675,7 +848,9 @@ function ContextTile({
 }) {
   return (
     <div className="border-b border-subtle px-5 py-4 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-secondary">{label}</div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-secondary">
+        {label}
+      </div>
       <div
         className={
           tone === "success"
@@ -806,7 +981,13 @@ function FeedbackBanner({
       }
     >
       <div className="flex items-center gap-3">
-        {tone === "success" ? <CheckCircle2 className="size-6" /> : tone === "danger" ? <ShieldCheck className="size-6" /> : <Building2 className="size-6" />}
+        {tone === "success" ? (
+          <CheckCircle2 className="size-6" />
+        ) : tone === "danger" ? (
+          <ShieldCheck className="size-6" />
+        ) : (
+          <Building2 className="size-6" />
+        )}
         <div>
           <div className="font-semibold">{title}</div>
           <div className="mt-0.5 text-sm opacity-90">{message}</div>

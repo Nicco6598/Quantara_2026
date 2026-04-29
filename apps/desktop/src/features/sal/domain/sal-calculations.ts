@@ -24,7 +24,8 @@ export function buildLineViews(
     const grossAmount = roundCurrency(quantity * line.voice.unitPrice);
     const linkedCharges = buildLinkedCharges(line, grossAmount);
     const linkedTotal = linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
-    const discountable = line.voice.isSafetyCost && !rules.applyDiscountToSafetyCosts ? 0 : grossAmount;
+    const discountable =
+      line.voice.isSafetyCost && !rules.applyDiscountToSafetyCosts ? 0 : grossAmount;
     const discountAmount = rules.discountEnabled
       ? roundCurrency(discountable * (rules.discountPercent / 100))
       : 0;

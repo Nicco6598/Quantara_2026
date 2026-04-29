@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,7 +9,6 @@ import {
   Save,
   Search,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { SalCreationStep } from "../types";
@@ -71,7 +71,10 @@ export function SalWorkflowTopbar({
             <ArrowRight className="size-4" />
           </button>
         ) : null}
-        <button className="relative flex size-10 items-center justify-center rounded-[12px] text-secondary hover:bg-muted" type="button">
+        <button
+          className="relative flex size-10 items-center justify-center rounded-[12px] text-secondary hover:bg-muted"
+          type="button"
+        >
           <Bell className="size-5" />
           <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-[#ff4d12] text-[10px] font-bold text-white">
             8
