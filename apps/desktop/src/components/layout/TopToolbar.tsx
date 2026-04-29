@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { type QuantaraRoute, useAppStore } from "@/store/app-store";
+import { type QuantaraRoute, useNavigationState, useThemeState } from "@/store/app-store";
 
 type RouteMeta = {
   dateLabel: string;
@@ -104,7 +104,7 @@ type TopToolbarProps = {
 };
 
 export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarProps) {
-  const activeRoute = useAppStore((s) => s.activeRoute);
+  const { activeRoute } = useNavigationState();
   const meta = routeMetaMap[activeRoute];
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
 
@@ -141,10 +141,7 @@ export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarPro
 }
 
 function HistoryNavigator() {
-  const canGoBack = useAppStore((s) => s.canGoBack);
-  const canGoForward = useAppStore((s) => s.canGoForward);
-  const navigateBack = useAppStore((s) => s.navigateBack);
-  const navigateForward = useAppStore((s) => s.navigateForward);
+  const { canGoBack, canGoForward, navigateBack, navigateForward } = useNavigationState();
 
   return (
     <div className="flex items-center gap-1 rounded-xl bg-[var(--bg-muted)] p-1">
@@ -336,8 +333,7 @@ function PageActionMenu({
 }
 
 function UtilityButtons() {
-  const themeMode = useAppStore((s) => s.themeMode);
-  const toggleTheme = useAppStore((s) => s.toggleTheme);
+  const { themeMode, toggleTheme } = useThemeState();
   const ThemeIcon = themeMode === "light" ? Moon : Sun;
 
   return (

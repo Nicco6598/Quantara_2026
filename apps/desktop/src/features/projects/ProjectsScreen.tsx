@@ -1,4 +1,13 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  type ChangeEvent,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { ScreenShell } from "@/components/shared/Screen";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
@@ -127,6 +136,10 @@ export function ProjectsScreen() {
     [salDocuments],
   );
   const recentSals = useMemo(() => allSals.slice(0, 5), [allSals]);
+  const totalPortfolioValue = useMemo(
+    () => activeProjects.reduce((sum, project) => sum + project.budget.amount, 0),
+    [activeProjects],
+  );
 
   useEffect(() => {
     let active = true;
@@ -227,6 +240,39 @@ export function ProjectsScreen() {
     await deleteProject(project.id);
   }
 
+  const handleBackFromContractor = useCallback(() => {
+    setSelectedContractorId(null);
+    setQuery("");
+    setFocus("all");
+  }, []);
+
+  const handleOpenCreateProject = useCallback(() => {
+    setEditingProject(null);
+    setIsCreateProjectModalOpen(true);
+  }, []);
+
+  const handleOpenFolder = useCallback((folderId: string) => {
+    setSelectedContractorId(folderId);
+    setQuery("");
+    setFocus("all");
+  }, []);
+
+  const handleImportFileChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        void importMigrationFile(file);
+      }
+      event.currentTarget.value = "";
+    },
+    [importMigrationFile],
+  );
+
+  const handleCloseCreateProjectModal = useCallback(() => {
+    setIsCreateProjectModalOpen(false);
+    setEditingProject(null);
+  }, []);
+
   const {
     contractorFolders,
     focusCounts,
@@ -247,6 +293,25 @@ export function ProjectsScreen() {
     projectSalIndex,
     selectedContractorId,
   });
+
+  const createProjectInitialValues = useMemo(() => {
+    if (editingProject) {
+      return editingProject.values;
+    }
+
+    if (!selectedContractor) {
+      return undefined;
+    }
+
+    return {
+      applicationContractCode: "",
+      contractorName: selectedContractor.contractor,
+      contractualAmount: "",
+      frameworkAgreementCode: "",
+      tariffBookId: tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id,
+      title: "",
+    };
+  }, [editingProject, selectedContractor, tariffBooksState]);
   const { averageProgress, criticalCount, salExposure, salWindowCount, totalBudget } =
     portfolioMetrics;
 
@@ -276,15 +341,8 @@ export function ProjectsScreen() {
           focusOptions={focusOptions}
           isPending={isPending}
           managerLoadCount={managerLoad.length}
-          onBack={() => {
-            setSelectedContractorId(null);
-            setQuery("");
-            setFocus("all");
-          }}
-          onCreateProject={() => {
-            setEditingProject(null);
-            setIsCreateProjectModalOpen(true);
-          }}
+          onBack={handleBackFromContractor}
+          onCreateProject={handleOpenCreateProject}
           onExport={exportMigrationWorkbook}
           onFocusChange={(nextFocus) => startTransition(() => setFocus(nextFocus))}
           onImport={() => fileInputRef.current?.click()}
@@ -307,30 +365,17 @@ export function ProjectsScreen() {
           folders={contractorFolders}
           onImport={() => fileInputRef.current?.click()}
           onOpenCreateContractor={() => setIsContractorModalOpen(true)}
-          onOpenFolder={(folderId) => {
-            setSelectedContractorId(folderId);
-            setQuery("");
-            setFocus("all");
-          }}
+          onOpenFolder={handleOpenFolder}
           onOpenNotifications={() => setIsSalModalOpen(true)}
           recentSalsCount={recentSals.length}
-          totalPortfolioValue={activeProjects.reduce(
-            (sum, project) => sum + project.budget.amount,
-            0,
-          )}
+          totalPortfolioValue={totalPortfolioValue}
         />
       )}
 
       <input
         accept=".xlsx"
         className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) {
-            void importMigrationFile(file);
-          }
-          event.currentTarget.value = "";
-        }}
+        onChange={handleImportFileChange}
         ref={fileInputRef}
         type="file"
       />
@@ -339,25 +384,9 @@ export function ProjectsScreen() {
         <CreateProjectModal
           contractorOptions={contractorRegistry}
           defaultTariffBookId={tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id}
-          {...(editingProject
-            ? { initialValues: editingProject.values }
-            : selectedContractor
-              ? {
-                  initialValues: {
-                    applicationContractCode: "",
-                    contractorName: selectedContractor.contractor,
-                    contractualAmount: "",
-                    frameworkAgreementCode: "",
-                    tariffBookId: tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id,
-                    title: "",
-                  },
-                }
-              : {})}
+          {...(createProjectInitialValues ? { initialValues: createProjectInitialValues } : {})}
           isSaving={createState === "saving"}
-          onClose={() => {
-            setIsCreateProjectModalOpen(false);
-            setEditingProject(null);
-          }}
+          onClose={handleCloseCreateProjectModal}
           onCreate={editingProject ? updateProject : createProject}
           submitLabel={editingProject ? "Salva modifiche" : "Crea progetto"}
           tariffBooks={tariffBooksState}

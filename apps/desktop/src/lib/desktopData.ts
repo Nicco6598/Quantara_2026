@@ -33,10 +33,30 @@ export type DesktopDataResult<T> =
       source: "fallback";
     };
 
+type InflightKey = "contracts" | `tariff-books:${number}` | `tariff-voices:${string}:${number}`;
+
+const inflightRequests = new Map<InflightKey, Promise<DesktopDataResult<unknown>>>();
+
+function withInflightCache<T>(key: InflightKey, run: () => Promise<DesktopDataResult<T>>) {
+  const existing = inflightRequests.get(key);
+  if (existing) {
+    return existing as Promise<DesktopDataResult<T>>;
+  }
+
+  const request = run().finally(() => {
+    inflightRequests.delete(key);
+  });
+
+  inflightRequests.set(key, request as Promise<DesktopDataResult<unknown>>);
+  return request;
+}
+
 export async function listDesktopContracts(
   fallback: DesktopContract[],
 ): Promise<DesktopDataResult<DesktopContract[]>> {
-  return invokeWithFallback("list_contracts", {}, fallback, "dati dimostrativi");
+  return withInflightCache("contracts", () =>
+    invokeWithFallback("list_contracts", {}, fallback, "dati dimostrativi"),
+  );
 }
 
 export async function createDesktopContract(
@@ -83,7 +103,9 @@ export async function deleteDesktopContract(contractId: string): Promise<void> {
 export async function listDesktopTariffBooks(
   fallback: DesktopTariffBook[],
 ): Promise<DesktopDataResult<DesktopTariffBook[]>> {
-  return invokeWithFallback("list_tariff_books", {}, fallback, "dati dimostrativi");
+  return withInflightCache(`tariff-books:${fallback.length}`, () =>
+    invokeWithFallback("list_tariff_books", {}, fallback, "dati dimostrativi"),
+  );
 }
 
 export async function createDesktopTariffBook(
@@ -124,7 +146,9 @@ export async function listDesktopTariffVoices(
   tariffBookId: string,
   fallback: DesktopTariffVoice[],
 ): Promise<DesktopDataResult<DesktopTariffVoice[]>> {
-  return invokeWithFallback("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative");
+  return withInflightCache(`tariff-voices:${tariffBookId}:${fallback.length}`, () =>
+    invokeWithFallback("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative"),
+  );
 }
 
 export async function selectTariffPdfMetadata(): Promise<TariffPdfMetadata | null> {

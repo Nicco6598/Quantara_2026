@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { DesktopTariffVoice } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 import { formatEditablePercent } from "../utils/tariffs-validation";
@@ -34,7 +34,7 @@ function ImportCell({
   );
 }
 
-export function EditableTariffVoicesGrid({
+export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   duplicateCodes,
   groups,
   onChange,
@@ -141,4 +141,4 @@ export function EditableTariffVoicesGrid({
       </div>
     </div>
   );
-}
+});

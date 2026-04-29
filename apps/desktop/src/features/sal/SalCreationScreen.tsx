@@ -41,8 +41,13 @@ import {
   summarizeSalLines,
 } from "./domain/sal-calculations";
 import { useSalCreationData } from "./hooks/useSalCreationData";
+import {
+  buildWorkflowStages,
+  getNextPhase,
+  getPreviousPhase,
+  type SalWorkflowPhase,
+} from "./state/workflow";
 import type {
-  SalCreationStep,
   SalEconomicRules,
   SalEconomicSummary,
   SalLineDraft,
@@ -59,27 +64,47 @@ export function SalCreationScreen() {
   const data = useSalCreationData();
   const createSalProjectWithId = useSalWorkflowStore((state) => state.createProjectWithId);
   const createClosedSal = useSalWorkflowStore((state) => state.createClosedSal);
-  const [step, setStep] = useState<SalCreationStep>(1);
+  const [phase, setPhase] = useState<SalWorkflowPhase>("context");
   const [lines, setLines] = useState<SalLineDraft[]>([]);
   const [economicRules, setEconomicRules] = useState<SalEconomicRules>(defaultSalEconomicRules);
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
+  const derived = useMemo(() => {
+    const contractAmount = data.project?.contractAmount ?? 0;
+    const lineViews = buildLineViews(lines, economicRules);
+    const summary = summarizeSalLines(lineViews, contractAmount, previousProgressiveAmount);
+    const checks = buildVerificationChecks(lineViews, summary);
+    const selectedIds = new Set(lines.map((line) => line.voice.id));
 
-  const lineViews = useMemo(() => buildLineViews(lines, economicRules), [economicRules, lines]);
-  const contractAmount = data.project?.contractAmount ?? 0;
-  const summary = useMemo(
-    () => summarizeSalLines(lineViews, contractAmount, previousProgressiveAmount),
-    [contractAmount, lineViews],
-  );
-  const checks = useMemo(() => buildVerificationChecks(lineViews, summary), [lineViews, summary]);
-  const selectedIds = useMemo(() => new Set(lines.map((line) => line.voice.id)), [lines]);
-  const canContinue =
-    step === 1
-      ? Boolean(data.project && data.selectedTariffBook)
-      : step === 2
-        ? lines.length > 0 && lineViews.every((line) => line.status === "complete")
-        : step === 3
-          ? checks.every((check) => check.tone !== "danger") && lines.length > 0
-          : true;
+    return { checks, lineViews, selectedIds, summary };
+  }, [data.project?.contractAmount, economicRules, lines]);
+  const { checks, lineViews, selectedIds, summary } = derived;
+  const hasDangerChecks = checks.some((check) => check.tone === "danger");
+  const blockedPhases = useMemo(() => {
+    const blocked = new Set<SalWorkflowPhase>();
+
+    if (!data.project || !data.selectedTariffBook) {
+      blocked.add("context");
+    }
+
+    if (lines.length === 0 || lineViews.some((line) => line.status !== "complete")) {
+      blocked.add("review");
+    }
+
+    if (lines.length === 0 || hasDangerChecks) {
+      blocked.add("confirm");
+    }
+
+    return blocked;
+  }, [data.project, data.selectedTariffBook, hasDangerChecks, lineViews, lines.length]);
+  const stages = useMemo(() => buildWorkflowStages(phase, blockedPhases), [blockedPhases, phase]);
+
+  const currentStep = useMemo(() => {
+    if (phase === "context") return 1;
+    if (phase === "voices") return 2;
+    if (phase === "review") return 3;
+    if (phase === "confirm") return 4;
+    return 5;
+  }, [phase]);
 
   const upsertLine = useCallback((voice: SalVoiceDraft) => {
     setLines((current) => {
@@ -91,8 +116,11 @@ export function SalCreationScreen() {
         ...current,
         {
           id: `draft-${voice.id}`,
+          factor1: 1,
+          factor2: 1,
+          factor3: 1,
           notes: "",
-          quantity: 0,
+          quantity: 1,
           surchargePercent: 0,
           voice,
         },
@@ -100,16 +128,42 @@ export function SalCreationScreen() {
     });
   }, []);
 
-  const setQuantity = useCallback((voiceId: string, quantity: number) => {
-    setLines((current) =>
-      current.map((line) => (line.voice.id === voiceId ? { ...line, quantity } : line)),
-    );
-  }, []);
-
   const setSurcharge = useCallback((voiceId: string, surchargePercent: number) => {
     setLines((current) =>
       current.map((line) => (line.voice.id === voiceId ? { ...line, surchargePercent } : line)),
     );
+  }, []);
+
+  const setFactor = useCallback(
+    (voiceId: string, field: "factor1" | "factor2" | "factor3", value: number) => {
+      setLines((current) =>
+        current.map((line) =>
+          line.voice.id === voiceId
+            ? {
+                ...line,
+                [field]: Number.isFinite(value) && value >= 0 ? value : 0,
+                quantity:
+                  field === "factor1"
+                    ? (Number.isFinite(value) && value >= 0 ? value : 0) *
+                      line.factor2 *
+                      line.factor3
+                    : field === "factor2"
+                      ? line.factor1 *
+                        (Number.isFinite(value) && value >= 0 ? value : 0) *
+                        line.factor3
+                      : line.factor1 *
+                        line.factor2 *
+                        (Number.isFinite(value) && value >= 0 ? value : 0),
+              }
+            : line,
+        ),
+      );
+    },
+    [],
+  );
+
+  const removeLine = useCallback((voiceId: string) => {
+    setLines((current) => current.filter((line) => line.voice.id !== voiceId));
   }, []);
 
   function saveDraft() {
@@ -124,17 +178,34 @@ export function SalCreationScreen() {
   }
 
   function goPrimary() {
+    const canContinue =
+      phase === "context"
+        ? Boolean(data.project && data.selectedTariffBook)
+        : phase === "voices"
+          ? lines.length > 0 && lineViews.every((line) => line.status === "complete")
+          : phase === "review"
+            ? checks.every((check) => check.tone !== "danger") && lines.length > 0
+            : phase === "confirm"
+              ? lines.length > 0 && !hasDangerChecks
+              : true;
+
     if (!canContinue) {
       notify({
-        message: disabledReason(step, data.project, data.selectedTariffBook, lineViews),
+        message: disabledReason(
+          phase,
+          data.project,
+          data.selectedTariffBook,
+          lineViews,
+          hasDangerChecks,
+        ),
         title: "Azione non disponibile",
         tone: "warning",
       });
       return;
     }
 
-    if (step < 4) {
-      setStep((current) => (current + 1) as SalCreationStep);
+    if (phase !== "confirm" && phase !== "completed") {
+      setPhase(getNextPhase(phase));
       return;
     }
 
@@ -166,7 +237,7 @@ export function SalCreationScreen() {
     });
 
     setCreatedSalTitle(created.title);
-    setStep(5);
+    setPhase("completed");
     notify({
       message: `${created.title} confermata. Gli export sono disponibili quando il backend documentale li abilita.`,
       title: "SAL confermata",
@@ -174,21 +245,19 @@ export function SalCreationScreen() {
     });
   }
 
-  const primaryLabel = step === 3 ? "Conferma" : step === 4 ? "Conferma" : "Continua";
+  const primaryLabel = phase === "review" || phase === "confirm" ? "Conferma" : "Continua";
 
   return (
     <ScreenShell className="min-h-full space-y-4 bg-[var(--bg-muted)] p-0">
       <SalWorkflowTopbar
-        canGoBack={step > 1}
+        canGoBack={phase !== "context"}
         onBack={() =>
-          step === 5
-            ? setStep(4)
-            : setStep((current) => Math.max(1, current - 1) as SalCreationStep)
+          phase === "completed" ? setPhase("confirm") : setPhase(getPreviousPhase(phase))
         }
         onDraft={saveDraft}
         onPrimary={goPrimary}
         primaryLabel={primaryLabel}
-        showPrimary={step !== 5}
+        showPrimary={phase !== "completed"}
       />
 
       <div className="space-y-4 px-7 pb-7">
@@ -203,11 +272,11 @@ export function SalCreationScreen() {
           />
         ) : null}
 
-        {step === 5 ? (
+        {phase === "completed" ? (
           <DetailView
             createdSalTitle={createdSalTitle}
             lineViews={lineViews}
-            onNew={() => setStep(1)}
+            onNew={() => setPhase("context")}
             project={data.project}
             summary={summary}
           />
@@ -215,28 +284,34 @@ export function SalCreationScreen() {
           <>
             <SalHero
               icon={
-                step === 1
+                phase === "context"
                   ? FileText
-                  : step === 2
+                  : phase === "voices"
                     ? BarChart3
-                    : step === 3
+                    : phase === "review"
                       ? BarChart3
                       : CheckCircle2
               }
-              step={step}
+              step={currentStep}
               subtitle={
-                step === 1
+                phase === "context"
                   ? "Configura il contesto contrattuale, le regole economiche e il motore di valorizzazione del documento."
-                  : step === 2
+                  : phase === "voices"
                     ? "Seleziona le voci dal tariffario e compila quantita e misurazioni per generare la bozza SAL."
-                    : step === 3
+                    : phase === "review"
                       ? "Controlla la coerenza contabile e i riepiloghi prima della conferma finale."
                       : "Conferma la SAL ed esporta i documenti."
               }
-              title={step === 3 ? "Verifica SAL" : step === 4 ? "Conferma SAL" : "Nuova SAL"}
+              title={
+                phase === "review"
+                  ? "Verifica SAL"
+                  : phase === "confirm"
+                    ? "Conferma SAL"
+                    : "Nuova SAL"
+              }
             />
-            <SalStepper current={step} />
-            {step === 1 ? (
+            <SalStepper stages={stages} />
+            {phase === "context" ? (
               <SetupStep
                 project={data.project}
                 selectedTariffBook={data.selectedTariffBook}
@@ -248,14 +323,12 @@ export function SalCreationScreen() {
                 voicesCount={data.voices.length}
               />
             ) : null}
-            {step === 2 ? (
+            {phase === "voices" ? (
               <VoicesStep
                 lineViews={lineViews}
                 lines={lines}
-                onQuantity={setQuantity}
-                onRemove={(voiceId) =>
-                  setLines((current) => current.filter((line) => line.voice.id !== voiceId))
-                }
+                onFactorChange={setFactor}
+                onRemove={removeLine}
                 onSurcharge={setSurcharge}
                 onToggle={upsertLine}
                 selectedIds={selectedIds}
@@ -264,7 +337,7 @@ export function SalCreationScreen() {
                 economicRules={economicRules}
               />
             ) : null}
-            {step === 3 ? (
+            {phase === "review" ? (
               <VerifyStep
                 checks={checks}
                 economicRules={economicRules}
@@ -272,7 +345,7 @@ export function SalCreationScreen() {
                 summary={summary}
               />
             ) : null}
-            {step === 4 ? (
+            {phase === "confirm" ? (
               <ConfirmStep economicRules={economicRules} lineViews={lineViews} summary={summary} />
             ) : null}
           </>
@@ -462,7 +535,7 @@ function VoicesStep({
   economicRules,
   lineViews,
   lines,
-  onQuantity,
+  onFactorChange,
   onRemove,
   onSurcharge,
   onToggle,
@@ -473,7 +546,11 @@ function VoicesStep({
   economicRules: SalEconomicRules;
   lineViews: SalLineView[];
   lines: SalLineDraft[];
-  onQuantity: (voiceId: string, quantity: number) => void;
+  onFactorChange: (
+    voiceId: string,
+    field: "factor1" | "factor2" | "factor3",
+    value: number,
+  ) => void;
   onRemove: (voiceId: string) => void;
   onSurcharge: (voiceId: string, percent: number) => void;
   onToggle: (voice: SalVoiceDraft) => void;
@@ -486,19 +563,21 @@ function VoicesStep({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(420px,1fr)_minmax(520px,1.25fr)_360px]">
-        <SalCard title="Catalogo tariffari">
+      <div className="grid gap-4 xl:grid-cols-[minmax(420px,0.95fr)_minmax(560px,1.35fr)]">
+        <SalCard title="Catalogo tariffario (selezione voci)">
           <CatalogPanel onToggle={onToggle} selectedIds={selectedIds} voices={voices} />
         </SalCard>
         <SalCard title={`Voci selezionate (${lines.length})`}>
           <SelectedVoicesPanel
             lines={lineViews}
-            onQuantity={onQuantity}
+            onFactorChange={onFactorChange}
             onRemove={onRemove}
             onSurcharge={onSurcharge}
           />
         </SalCard>
-        <SalCard icon={Wallet} title="Riepilogo bozza SAL">
+      </div>
+      <SalCard icon={Wallet} title="Riepilogo bozza SAL">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <SummaryLine label="Voci inserite" value={String(lines.length)} />
           <SummaryLine
             label="Quantita totale (misurata)"
@@ -513,22 +592,21 @@ function VoicesStep({
                 : "Disattivo"
             }
           />
-          <div className="mt-4 border-t border-dashed border-subtle pt-5">
-            <div className="flex justify-between text-lg font-semibold">
-              <span>Totale progressivo</span>
-              <span className="text-primary">
-                <Currency value={summary.total} />
-              </span>
-            </div>
-            <div className="mt-3 flex justify-between text-sm">
-              <span className="text-secondary">Budget residuo</span>
-              <strong>
-                <Currency value={summary.budgetResidual} />
-              </strong>
-            </div>
-          </div>
-        </SalCard>
-      </div>
+        </div>
+        <div className="mt-2 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <SummaryLine
+            label="Valore ribasso applicato"
+            tone="danger"
+            value={<Currency value={summary.discountAmount} />}
+          />
+          <SummaryLine label="Budget residuo" value={<Currency value={summary.budgetResidual} />} />
+          <SummaryLine
+            label="Totale progressivo SAL"
+            tone="info"
+            value={<Currency value={summary.total} />}
+          />
+        </div>
+      </SalCard>
       <AccountingRows lines={lineViews} />
       <div className="sal-panel flex flex-wrap items-center justify-end gap-8 px-7 py-5 text-lg font-semibold">
         <span>Totale SAL</span>
@@ -998,22 +1076,26 @@ function FeedbackBanner({
 }
 
 function disabledReason(
-  step: SalCreationStep,
+  phase: SalWorkflowPhase,
   project: SalProjectContext | null,
   tariffBook: SalTariffBookOption | null,
   lineViews: SalLineView[],
+  hasDangerChecks: boolean,
 ) {
-  if (step === 1 && !project) {
+  if (phase === "context" && !project) {
     return "Serve un contratto reale prima di configurare una SAL.";
   }
-  if (step === 1 && !tariffBook) {
+  if (phase === "context" && !tariffBook) {
     return "Serve almeno un tariffario reale caricato nel sistema.";
   }
-  if (step === 2 && lineViews.length === 0) {
+  if (phase === "voices" && lineViews.length === 0) {
     return "Seleziona almeno una voce tariffaria reale.";
   }
-  if (step === 2) {
+  if (phase === "voices") {
     return "Completa le quantita delle voci selezionate.";
+  }
+  if (phase === "review" && hasDangerChecks) {
+    return "Risolvi gli errori bloccanti evidenziati nella verifica.";
   }
   return "Controlla le validazioni prima di procedere.";
 }

@@ -5,23 +5,27 @@ import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { cn } from "@/lib/utils";
-import { type MotionMode, type ThemeMode, useAppStore } from "@/store/app-store";
+import {
+  type MotionMode,
+  type ThemeMode,
+  usePreferenceState,
+  useThemeState,
+} from "@/store/app-store";
 
 type UpdateViewState = { kind: "idle" } | UpdateCheckResult;
 
 const updaterReady = import.meta.env.PROD;
 
 export function SettingsScreen() {
-  const autoCheckUpdatesOnLaunch = useAppStore((state) => state.autoCheckUpdatesOnLaunch);
-  const motionMode = useAppStore((state) => state.motionMode);
-  const setAutoCheckUpdatesOnLaunch = useAppStore((state) => state.setAutoCheckUpdatesOnLaunch);
-  const setMotionMode = useAppStore((state) => state.setMotionMode);
-  const setShowReleaseNotesAfterUpdate = useAppStore(
-    (state) => state.setShowReleaseNotesAfterUpdate,
-  );
-  const setThemeMode = useAppStore((state) => state.setThemeMode);
-  const showReleaseNotesAfterUpdate = useAppStore((state) => state.showReleaseNotesAfterUpdate);
-  const themeMode = useAppStore((state) => state.themeMode);
+  const {
+    autoCheckUpdatesOnLaunch,
+    motionMode,
+    setAutoCheckUpdatesOnLaunch,
+    setMotionMode,
+    setShowReleaseNotesAfterUpdate,
+    showReleaseNotesAfterUpdate,
+  } = usePreferenceState();
+  const { setThemeMode, themeMode } = useThemeState();
   const { pendingReleaseNotes } = usePendingReleaseNotes();
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateViewState>({ kind: "idle" });

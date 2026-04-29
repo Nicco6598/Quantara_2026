@@ -7,6 +7,7 @@ import {
   Plus,
   Upload,
 } from "lucide-react";
+import { memo } from "react";
 import { SectionPanel } from "@/components/shared/Screen";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
@@ -25,7 +26,7 @@ type ProjectsWorkbenchProps = {
   selectedProjectId: string;
 };
 
-export function ProjectsWorkbench({
+export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   onCreateProject,
   onExport,
   onImport,
@@ -139,7 +140,7 @@ export function ProjectsWorkbench({
       </div>
     </SectionPanel>
   );
-}
+});
 
 function WorkbenchRow({
   isSelected,

@@ -41,6 +41,9 @@ export type SalVoiceDraft = {
 
 export type SalLineDraft = {
   id: string;
+  factor1: number;
+  factor2: number;
+  factor3: number;
   notes: string;
   quantity: number;
   surchargePercent: number;

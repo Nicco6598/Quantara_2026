@@ -62,111 +62,114 @@ export function useProjectPortfolioView({
     [contractorProjects],
   );
 
-  const visibleProjects = useMemo(
-    () =>
-      contractorProjects
-        .filter(
-          (project) => matchesFocus(project, focus) && matchesProjectSearch(project, deferredQuery),
-        )
-        .sort(compareProjects),
-    [contractorProjects, deferredQuery, focus],
-  );
+  const visibleProjects = useMemo(() => {
+    const projects = contractorProjects.filter(
+      (project) => matchesFocus(project, focus) && matchesProjectSearch(project, deferredQuery),
+    );
 
-  const visibleQueue = useMemo(
-    () =>
-      priorityQueue.filter((item) => {
-        const project = projectByIdMap.get(item.projectId);
+    projects.sort(compareProjects);
+    return projects;
+  }, [contractorProjects, deferredQuery, focus]);
 
-        if (!project || !matchesFocus(project, focus)) {
-          return false;
-        }
+  const derivedView = useMemo(() => {
+    const visibleQueue = priorityQueue.filter((item) => {
+      const project = projectByIdMap.get(item.projectId);
 
-        return matchesSearch(
-          `${project.title} ${project.lot} ${project.location} ${item.title} ${item.detail} ${item.owner}`,
-          deferredQuery,
-        );
-      }),
-    [projectByIdMap, deferredQuery, focus],
-  );
+      if (!project || !matchesFocus(project, focus)) {
+        return false;
+      }
 
-  const visibleApprovals = useMemo(
-    () =>
-      approvalWindow.filter((item) => {
-        const project = projectByIdMap.get(item.projectId);
+      return matchesSearch(
+        `${project.title} ${project.lot} ${project.location} ${item.title} ${item.detail} ${item.owner}`,
+        deferredQuery,
+      );
+    });
 
-        if (!project || !matchesFocus(project, focus)) {
-          return false;
-        }
+    const visibleApprovals = approvalWindow.filter((item) => {
+      const project = projectByIdMap.get(item.projectId);
 
-        return matchesSearch(
-          `${project.title} ${project.lot} ${project.location} ${item.label} ${item.owner}`,
-          deferredQuery,
-        );
-      }),
-    [projectByIdMap, deferredQuery, focus],
-  );
+      if (!project || !matchesFocus(project, focus)) {
+        return false;
+      }
 
-  const visibleActivities = useMemo(
-    () =>
-      activityFeed.filter((item) => {
-        const project = projectByIdMap.get(item.projectId);
+      return matchesSearch(
+        `${project.title} ${project.lot} ${project.location} ${item.label} ${item.owner}`,
+        deferredQuery,
+      );
+    });
 
-        if (!project || !matchesFocus(project, focus)) {
-          return false;
-        }
+    const visibleActivities = activityFeed.filter((item) => {
+      const project = projectByIdMap.get(item.projectId);
 
-        return matchesSearch(`${project.title} ${item.label} ${item.detail}`, deferredQuery);
-      }),
-    [projectByIdMap, deferredQuery, focus],
-  );
+      if (!project || !matchesFocus(project, focus)) {
+        return false;
+      }
 
-  const portfolioMetrics = useMemo(() => {
-    const totalBudget = visibleProjects.reduce((sum, project) => sum + project.budget.amount, 0);
-    const salExposure = visibleProjects.reduce((sum, project) => sum + project.salValue.amount, 0);
-    const criticalCount = visibleProjects.filter((project) => project.tone === "danger").length;
-    const salWindowCount = visibleProjects.filter((project) => isSalWindow(project)).length;
-    const averageProgress = visibleProjects.length
-      ? Math.round(
-          visibleProjects.reduce((sum, project) => sum + project.progress, 0) /
-            visibleProjects.length,
-        )
-      : 0;
+      return matchesSearch(`${project.title} ${item.label} ${item.detail}`, deferredQuery);
+    });
 
-    return { averageProgress, criticalCount, salExposure, salWindowCount, totalBudget };
-  }, [visibleProjects]);
-
-  const managerLoad = useMemo(() => buildManagerLoad(visibleProjects), [visibleProjects]);
-  const focusCounts = useMemo(() => {
-    const counts: Record<PortfolioFocus, number> = {
+    let totalBudget = 0;
+    let salExposure = 0;
+    let criticalCount = 0;
+    let salWindowCount = 0;
+    let progressSum = 0;
+    const focusCounts: Record<PortfolioFocus, number> = {
       all: visibleProjects.length,
       critical: 0,
       sal: 0,
     };
 
     for (const project of visibleProjects) {
+      totalBudget += project.budget.amount;
+      salExposure += project.salValue.amount;
+      progressSum += project.progress;
+
+      if (project.tone === "danger") {
+        criticalCount += 1;
+      }
+
+      if (isSalWindow(project)) {
+        salWindowCount += 1;
+      }
+
       if (matchesFocus(project, "critical")) {
-        counts.critical += 1;
+        focusCounts.critical += 1;
       }
 
       if (matchesFocus(project, "sal")) {
-        counts.sal += 1;
+        focusCounts.sal += 1;
       }
     }
 
-    return counts;
-  }, [visibleProjects]);
+    return {
+      focusCounts,
+      managerLoad: buildManagerLoad(visibleProjects),
+      portfolioMetrics: {
+        averageProgress: visibleProjects.length
+          ? Math.round(progressSum / visibleProjects.length)
+          : 0,
+        criticalCount,
+        salExposure,
+        salWindowCount,
+        totalBudget,
+      },
+      visibleActivities,
+      visibleApprovals,
+      visibleQueue,
+    };
+  }, [deferredQuery, focus, projectByIdMap, visibleProjects]);
 
   return {
     contractorFolders,
     contractorProjects,
-    focusCounts,
-    managerLoad,
+    focusCounts: derivedView.focusCounts,
+    managerLoad: derivedView.managerLoad,
     modalSals,
-    portfolioMetrics,
+    portfolioMetrics: derivedView.portfolioMetrics,
     selectedContractor,
-    visibleActivities,
-    visibleApprovals,
+    visibleActivities: derivedView.visibleActivities,
+    visibleApprovals: derivedView.visibleApprovals,
     visibleProjects,
-    visibleQueue,
+    visibleQueue: derivedView.visibleQueue,
   };
 }

@@ -15,7 +15,7 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { type ReactNode, useMemo } from "react";
+import { memo, type ReactNode, useMemo } from "react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
@@ -33,7 +33,7 @@ type ContractorsWorkspaceProps = {
   totalPortfolioValue: number;
 };
 
-export function ContractorsWorkspace({
+export const ContractorsWorkspace = memo(function ContractorsWorkspace({
   activeProjectsCount,
   folders,
   onImport,
@@ -156,7 +156,7 @@ export function ContractorsWorkspace({
       </div>
     </div>
   );
-}
+});
 
 function WorkspaceFilterBar({
   onImport,

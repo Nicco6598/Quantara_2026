@@ -17,7 +17,12 @@ import {
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 import { RouteRenderer } from "@/routes/RouteRenderer";
-import { useAppStore } from "@/store/app-store";
+import {
+  useAppStore,
+  useNavigationState,
+  usePreferenceState,
+  useThemeState,
+} from "@/store/app-store";
 
 export function App() {
   return (
@@ -30,17 +35,12 @@ export function App() {
 function AppShell() {
   useAutomaticUpdater();
 
-  const activeRoute = useAppStore((state) => state.activeRoute);
-  const canGoBack = useAppStore((state) => state.canGoBack);
-  const canGoForward = useAppStore((state) => state.canGoForward);
-  const navigateBack = useAppStore((state) => state.navigateBack);
-  const navigateForward = useAppStore((state) => state.navigateForward);
+  const { activeRoute, canGoBack, canGoForward, navigateBack, navigateForward } =
+    useNavigationState();
   const navigate = useNavigate();
   const { notify } = useToast();
-  const motionMode = useAppStore((state) => state.motionMode);
-  const showReleaseNotesAfterUpdate = useAppStore((state) => state.showReleaseNotesAfterUpdate);
-  const themeMode = useAppStore((state) => state.themeMode);
-  const toggleTheme = useAppStore((state) => state.toggleTheme);
+  const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();
+  const { themeMode, toggleTheme } = useThemeState();
   const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [commandPaletteAnchor, setCommandPaletteAnchor] = useState<DOMRect | null>(null);

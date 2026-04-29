@@ -1,24 +1,9 @@
 import type { LucideIcon } from "lucide-react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Bell,
-  Building2,
-  Check,
-  FileText,
-  Save,
-  Search,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, FileText, Save } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import type { SalWorkflowStage } from "../state/workflow";
 import type { SalCreationStep } from "../types";
-
-const steps = [
-  { id: 1, label: "Impostazione", helper: "Configura contesto e tariffari" },
-  { id: 2, label: "Voci e quantita", helper: "Seleziona e inserisci le voci" },
-  { id: 3, label: "Verifica", helper: "Controlla importi e coerenze" },
-  { id: 4, label: "Conferma", helper: "Anteprima e conferma SAL" },
-] as const;
 
 export function SalWorkflowTopbar({
   canGoBack,
@@ -36,25 +21,8 @@ export function SalWorkflowTopbar({
   showPrimary?: boolean;
 }) {
   return (
-    <div className="flex min-h-14 items-center justify-between gap-4 border-b border-subtle bg-card/95 px-7">
-      <div className="flex items-center gap-3 text-[13px] font-medium text-secondary">
-        <span>Portfolio</span>
-        <span>/</span>
-        <span>Progetti</span>
-        <span>/</span>
-        <span>TEST</span>
-        <span>/</span>
-        <span className="text-foreground">Nuova SAL</span>
-      </div>
+    <div className="flex min-h-14 items-center justify-end gap-3 border-b border-subtle bg-card/95 px-7">
       <div className="flex items-center gap-3">
-        <label className="relative hidden h-10 w-[380px] items-center rounded-[12px] border border-subtle bg-card lg:flex">
-          <Search className="ml-3 size-4 text-secondary" />
-          <input
-            className="h-full flex-1 bg-transparent px-3 text-sm outline-none"
-            placeholder="Cerca progetti, appaltatori, materiali..."
-          />
-          <kbd className="mr-2 rounded-[8px] bg-muted px-2 py-1 text-xs text-secondary">⌘ K</kbd>
-        </label>
         {canGoBack ? (
           <button className="sal-outline-button" onClick={onBack} type="button">
             <ArrowLeft className="size-4" />
@@ -71,15 +39,6 @@ export function SalWorkflowTopbar({
             <ArrowRight className="size-4" />
           </button>
         ) : null}
-        <button
-          className="relative flex size-10 items-center justify-center rounded-[12px] text-secondary hover:bg-muted"
-          type="button"
-        >
-          <Bell className="size-5" />
-          <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-[#ff4d12] text-[10px] font-bold text-white">
-            8
-          </span>
-        </button>
       </div>
     </div>
   );
@@ -132,37 +91,66 @@ export function SalHero({
   );
 }
 
-export function SalStepper({ current }: { current: SalCreationStep }) {
+export function SalStepper({ stages }: { stages: SalWorkflowStage[] }) {
   return (
-    <nav className="sal-panel grid grid-cols-4 overflow-hidden p-0">
-      {steps.map((step) => {
-        const done = current > step.id;
-        const active = current === step.id;
+    <nav className="sal-panel grid gap-3 p-3 lg:grid-cols-5">
+      {stages.map((stage) => {
+        const isCompleted = stage.status === "completed";
+        const isCurrent = stage.status === "current";
+        const isBlocked = stage.status === "blocked";
+
         return (
           <div
             className={cn(
-              "relative flex items-center gap-4 px-7 py-5",
-              active && "bg-primary/5",
-              step.id < 4 &&
-                "after:absolute after:right-0 after:top-1/2 after:size-9 after:-translate-y-1/2 after:translate-x-1/2 after:rotate-45 after:border-r after:border-t after:border-subtle after:bg-inherit",
+              "relative rounded-[14px] border px-4 py-3 transition-colors",
+              isCurrent &&
+                "border-primary/45 bg-primary/8 shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_24%,transparent)]",
+              isCompleted && "border-success/30 bg-success/8",
+              isBlocked && "border-warning/35 bg-warning/10",
+              !isCurrent && !isCompleted && !isBlocked && "border-subtle bg-card",
             )}
-            key={step.id}
+            key={stage.id}
           >
-            <span
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span
+                className={cn(
+                  "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]",
+                  isCurrent && "bg-primary text-white",
+                  isCompleted && "bg-success/16 text-success",
+                  isBlocked && "bg-warning/20 text-warning",
+                  !isCurrent && !isCompleted && !isBlocked && "bg-muted text-secondary",
+                )}
+              >
+                {isCompleted
+                  ? "Completato"
+                  : isCurrent
+                    ? "In corso"
+                    : isBlocked
+                      ? "Bloccato"
+                      : "Pronto"}
+              </span>
+              <span
+                className={cn(
+                  "size-2 rounded-full",
+                  isCurrent && "bg-primary animate-pulse",
+                  isCompleted && "bg-success",
+                  isBlocked && "bg-warning",
+                  !isCurrent && !isCompleted && !isBlocked && "bg-secondary/45",
+                )}
+              />
+            </div>
+            <div
               className={cn(
-                "z-10 flex size-9 items-center justify-center rounded-full border border-subtle bg-muted text-sm font-semibold text-secondary",
-                active && "border-primary bg-primary text-white",
-                done && "border-success/20 bg-success/10 text-success",
+                "text-sm font-semibold",
+                isCurrent && "text-primary",
+                isCompleted && "text-success",
+                isBlocked && "text-warning",
+                !isCurrent && !isCompleted && !isBlocked && "text-foreground",
               )}
             >
-              {done ? <Check className="size-5" /> : step.id}
-            </span>
-            <span className="z-10 min-w-0">
-              <span className={cn("block text-sm font-semibold", active && "text-primary")}>
-                {step.label}
-              </span>
-              <span className="mt-1 block truncate text-xs text-secondary">{step.helper}</span>
-            </span>
+              {stage.label}
+            </div>
+            <p className="mt-1 text-xs text-secondary">{stage.description}</p>
           </div>
         );
       })}

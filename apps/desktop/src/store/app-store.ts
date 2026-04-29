@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { useShallow } from "zustand/react/shallow";
 
 export type QuantaraRoute =
   | "dashboard"
@@ -15,6 +16,7 @@ export type MotionMode = "full" | "reduced";
 export type ThemeMode = "light" | "dark";
 
 type WorkflowAction = "new-project" | "new-sal" | "import-tariff" | null;
+export type PendingWorkflowAction = WorkflowAction;
 
 type NavigationSlice = {
   activeRoute: QuantaraRoute;
@@ -157,3 +159,45 @@ export const useAppStore = create<AppStore>()(
     },
   ),
 );
+
+export function useNavigationState() {
+  return useAppStore(
+    useShallow((state) => ({
+      activeRoute: state.activeRoute,
+      canGoBack: state.canGoBack,
+      canGoForward: state.canGoForward,
+      navigateBack: state.navigateBack,
+      navigateForward: state.navigateForward,
+      pendingWorkflowAction: state.pendingWorkflowAction,
+      setActiveRoute: state.setActiveRoute,
+      setPendingWorkflowAction: state.setPendingWorkflowAction,
+    })),
+  );
+}
+
+export function usePreferenceState() {
+  return useAppStore(
+    useShallow((state) => ({
+      autoCheckUpdatesOnLaunch: state.autoCheckUpdatesOnLaunch,
+      hasHydratedPreferences: state.hasHydratedPreferences,
+      motionMode: state.motionMode,
+      selectedProjectId: state.selectedProjectId,
+      setAutoCheckUpdatesOnLaunch: state.setAutoCheckUpdatesOnLaunch,
+      setHasHydratedPreferences: state.setHasHydratedPreferences,
+      setMotionMode: state.setMotionMode,
+      setSelectedProjectId: state.setSelectedProjectId,
+      setShowReleaseNotesAfterUpdate: state.setShowReleaseNotesAfterUpdate,
+      showReleaseNotesAfterUpdate: state.showReleaseNotesAfterUpdate,
+    })),
+  );
+}
+
+export function useThemeState() {
+  return useAppStore(
+    useShallow((state) => ({
+      setThemeMode: state.setThemeMode,
+      themeMode: state.themeMode,
+      toggleTheme: state.toggleTheme,
+    })),
+  );
+}

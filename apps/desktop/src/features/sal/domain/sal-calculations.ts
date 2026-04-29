@@ -20,7 +20,7 @@ export function buildLineViews(
   rules: SalEconomicRules,
 ): SalLineView[] {
   return lines.map((line, index) => {
-    const quantity = normalizeQuantity(line.quantity);
+    const quantity = normalizeQuantity(line.factor1 * line.factor2 * line.factor3);
     const grossAmount = roundCurrency(quantity * line.voice.unitPrice);
     const linkedCharges = buildLinkedCharges(line, grossAmount);
     const linkedTotal = linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
@@ -148,7 +148,7 @@ export function buildVerificationChecks(
 }
 
 function buildMeasurementRows(line: SalLineDraft, index: number): SalMeasurementRow[] {
-  const quantity = normalizeQuantity(line.quantity);
+  const quantity = normalizeQuantity(line.factor1 * line.factor2 * line.factor3);
   if (quantity <= 0) {
     return [];
   }
@@ -156,9 +156,9 @@ function buildMeasurementRows(line: SalLineDraft, index: number): SalMeasurement
   return [
     {
       description: "Misura corrente",
-      factor1: quantity,
-      factor2: 1,
-      factor3: 1,
+      factor1: line.factor1,
+      factor2: line.factor2,
+      factor3: line.factor3,
       id: `${line.id}-measurement-current`,
       notes: line.notes.trim() || `Riga ${index + 1} da tariffario reale`,
       partialQuantity: quantity,

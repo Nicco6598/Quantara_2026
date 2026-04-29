@@ -11,6 +11,172 @@ type CatalogGroup = {
   voices: SalVoiceDraft[];
 };
 
+export function SalExcelGrid({
+  lineViews,
+  onQuantity,
+  onRemove,
+  onSurcharge,
+  onToggle,
+  selectedIds,
+  voices,
+}: {
+  lineViews: SalLineView[];
+  onQuantity: (voiceId: string, quantity: number) => void;
+  onRemove: (voiceId: string) => void;
+  onSurcharge: (voiceId: string, percent: number) => void;
+  onToggle: (voice: SalVoiceDraft) => void;
+  selectedIds: Set<string>;
+  voices: SalVoiceDraft[];
+}) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredVoices = useMemo(
+    () =>
+      normalizedQuery.length === 0
+        ? voices
+        : voices.filter((voice) =>
+            `${voice.code} ${voice.description} ${voice.category}`
+              .toLowerCase()
+              .includes(normalizedQuery),
+          ),
+    [normalizedQuery, voices],
+  );
+  const groups = useMemo(() => groupCatalogVoices(filteredVoices), [filteredVoices]);
+  const lineByVoiceId = useMemo(
+    () => new Map(lineViews.map((line) => [line.voice.id, line])),
+    [lineViews],
+  );
+
+  return (
+    <div className="space-y-3">
+      <label className="relative flex h-10 items-center rounded-[10px] border border-subtle bg-card">
+        <Search className="ml-3 size-4 text-secondary" />
+        <input
+          aria-label="Cerca voce per codice o descrizione"
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-[13px] outline-none"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Cerca voce, codice o categoria..."
+          value={query}
+        />
+      </label>
+      <div className="overflow-x-auto rounded-[12px] border border-subtle">
+        <div className="min-w-[1040px]">
+          <div className="grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
+            <span />
+            <span>Codice</span>
+            <span>Descrizione</span>
+            <span>U.M.</span>
+            <span className="text-right">Quantita</span>
+            <span className="text-right">Magg.</span>
+            <span className="text-right">Ribasso</span>
+            <span className="text-right">Totale</span>
+          </div>
+          {groups.length === 0 ? (
+            <EmptyTableState
+              message={
+                voices.length === 0
+                  ? "Nessuna voce reale disponibile per il tariffario selezionato."
+                  : "Nessuna voce corrisponde alla ricerca corrente."
+              }
+            />
+          ) : (
+            groups.map((group) => {
+              const selectedInGroup = group.voices.filter((voice) =>
+                selectedIds.has(voice.id),
+              ).length;
+              return (
+                <div className="border-t border-subtle" key={group.id}>
+                  <div className="grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] items-center bg-muted/25 px-3 py-2 text-[12px] font-semibold">
+                    <span className="text-primary">
+                      {selectedInGroup}/{group.voices.length}
+                    </span>
+                    <span className="min-w-0 truncate">{group.macroCode}</span>
+                    <span className="min-w-0 truncate">
+                      {truncateDescription(group.category, 72)}
+                    </span>
+                    <span className="text-secondary">-</span>
+                    <span className="text-right text-secondary">-</span>
+                    <span className="text-right text-secondary">-</span>
+                    <span className="text-right text-secondary">-</span>
+                    <span className="text-right text-secondary">{group.tariffBookName}</span>
+                  </div>
+                  {group.voices.map((voice) => {
+                    const selected = selectedIds.has(voice.id);
+                    const line = lineByVoiceId.get(voice.id);
+
+                    return (
+                      <div
+                        className={cn(
+                          "grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] items-center border-t border-subtle px-3 py-2 text-[13px]",
+                          selected && "bg-primary/5",
+                        )}
+                        key={voice.id}
+                      >
+                        <button
+                          aria-label={
+                            selected ? `Deseleziona ${voice.code}` : `Seleziona ${voice.code}`
+                          }
+                          className={cn(
+                            "ml-2 flex size-5 items-center justify-center rounded-[6px] border border-subtle",
+                            selected && "border-primary bg-primary text-white",
+                          )}
+                          onClick={() => (selected ? onRemove(voice.id) : onToggle(voice))}
+                          type="button"
+                        >
+                          {selected ? <Check className="size-3.5" /> : null}
+                        </button>
+                        <span className="min-w-0 truncate font-semibold">{voice.code}</span>
+                        <span className="min-w-0 truncate" title={voice.description}>
+                          {truncateDescription(voice.description, 76)}
+                        </span>
+                        <span>{voice.unit}</span>
+                        <input
+                          aria-label={`Quantita ${voice.code}`}
+                          className="h-8 rounded-[8px] border border-subtle bg-card px-2 text-right text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                          disabled={!selected}
+                          min={0}
+                          onChange={(event) =>
+                            onQuantity(
+                              voice.id,
+                              Number.isFinite(event.target.valueAsNumber)
+                                ? event.target.valueAsNumber
+                                : 0,
+                            )
+                          }
+                          step="0.001"
+                          type="number"
+                          value={line?.quantity ?? 0}
+                        />
+                        <select
+                          aria-label={`Maggiorazione ${voice.code}`}
+                          className="h-8 rounded-[8px] border border-subtle bg-card px-2 text-right text-[12px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                          disabled={!selected}
+                          onChange={(event) => onSurcharge(voice.id, Number(event.target.value))}
+                          value={line?.surchargePercent ?? 0}
+                        >
+                          <option value={0}>0%</option>
+                          <option value={10}>10%</option>
+                          <option value={25}>25%</option>
+                        </select>
+                        <span className="text-right font-semibold text-danger">
+                          <Currency value={line?.discountAmount ?? 0} />
+                        </span>
+                        <span className="text-right font-semibold text-primary">
+                          <Currency value={line?.totalAmount ?? 0} />
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Currency({ value }: { value: number }) {
   return (
     <span>
@@ -171,44 +337,49 @@ export function CatalogPanel({
 
 export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   lines,
-  onQuantity,
+  onFactorChange,
   onRemove,
   onSurcharge,
 }: {
   lines: SalLineView[];
-  onQuantity: (voiceId: string, quantity: number) => void;
+  onFactorChange: (
+    voiceId: string,
+    field: "factor1" | "factor2" | "factor3",
+    value: number,
+  ) => void;
   onRemove: (voiceId: string) => void;
   onSurcharge: (voiceId: string, percent: number) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-[12px] border border-subtle">
-      <div className="min-w-[960px]">
-        <div className="grid grid-cols-[42px_112px_minmax(220px,1fr)_58px_82px_104px_96px_118px_118px_42px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
-          <span>#</span>
-          <span>Codice</span>
-          <span>Descrizione</span>
-          <span>U.M.</span>
-          <span className="text-right">Manod.</span>
-          <span>Quantita</span>
-          <span>Magg.</span>
-          <span>Ribasso</span>
-          <span>Totale riga</span>
-          <span />
+    <div className="overflow-hidden rounded-[12px] border border-subtle">
+      <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
+        <div className="min-w-[1060px]">
+          <div className="grid grid-cols-[116px_minmax(220px,1fr)_72px_84px_84px_84px_96px_96px_120px_44px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
+            <span>Codice</span>
+            <span>Descrizione</span>
+            <span>U.M.</span>
+            <span className="text-right">Fattore 1</span>
+            <span className="text-right">Fattore 2</span>
+            <span className="text-right">Fattore 3</span>
+            <span className="text-right">Quantita</span>
+            <span className="text-right">Magg.</span>
+            <span className="text-right">Totale riga</span>
+            <span />
+          </div>
+          {lines.length === 0 ? (
+            <EmptyTableState message="Seleziona una voce reale dal catalogo per iniziare la bozza SAL." />
+          ) : (
+            lines.map((line) => (
+              <SelectedVoiceRow
+                key={line.id}
+                line={line}
+                onFactorChange={onFactorChange}
+                onRemove={onRemove}
+                onSurcharge={onSurcharge}
+              />
+            ))
+          )}
         </div>
-        {lines.length === 0 ? (
-          <EmptyTableState message="Seleziona una voce reale dal catalogo per iniziare la bozza SAL." />
-        ) : (
-          lines.map((line, index) => (
-            <SelectedVoiceRow
-              index={index}
-              key={line.id}
-              line={line}
-              onQuantity={onQuantity}
-              onRemove={onRemove}
-              onSurcharge={onSurcharge}
-            />
-          ))
-        )}
       </div>
     </div>
   );
@@ -537,53 +708,43 @@ function NestedTable({
 }
 
 function SelectedVoiceRow({
-  index,
   line,
-  onQuantity,
+  onFactorChange,
   onRemove,
   onSurcharge,
 }: {
-  index: number;
   line: SalLineView;
-  onQuantity: (voiceId: string, quantity: number) => void;
+  onFactorChange: (
+    voiceId: string,
+    field: "factor1" | "factor2" | "factor3",
+    value: number,
+  ) => void;
   onRemove: (voiceId: string) => void;
   onSurcharge: (voiceId: string, percent: number) => void;
 }) {
-  const [expanded, setExpanded] = useState(index === 0);
-
   return (
     <div className="border-t border-subtle">
-      <div className="grid grid-cols-[42px_112px_minmax(220px,1fr)_58px_82px_104px_96px_118px_118px_42px] items-center px-3 py-2 text-[13px]">
-        <button
-          aria-expanded={expanded}
-          aria-label={`Espandi ${line.voice.code}`}
-          className="flex size-7 items-center justify-center rounded-[8px] bg-primary/10 text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-          onClick={() => setExpanded((current) => !current)}
-          type="button"
-        >
-          <ChevronDown className={cn("size-4 transition-transform", !expanded && "-rotate-90")} />
-        </button>
+      <div className="grid grid-cols-[116px_minmax(220px,1fr)_72px_84px_84px_84px_96px_96px_120px_44px] items-center px-3 py-2 text-[13px]">
         <span className="font-semibold">{line.voice.code}</span>
-        <span className="truncate font-semibold" title={line.voice.description}>
-          {truncateDescription(line.voice.description)}
+        <span className="min-w-0 truncate font-semibold leading-5" title={line.voice.description}>
+          {truncateDescription(line.voice.description, 84)}
         </span>
         <span>{line.voice.unit}</span>
-        <span className="text-right font-semibold">
-          {line.voice.laborPercentage.toLocaleString("it-IT", {
-            maximumFractionDigits: 2,
-            minimumFractionDigits: 0,
-          })}
-          %
-        </span>
-        <input
-          aria-label={`Quantita per ${line.voice.code}`}
-          className="h-8 rounded-[8px] border border-subtle bg-card px-2 text-right text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-          min={0}
-          onChange={(event) => onQuantity(line.voice.id, Number(event.target.value))}
-          step="0.001"
-          type="number"
-          value={line.quantity}
+        <EditableFactorInput
+          value={line.factor1}
+          onChange={(value) => onFactorChange(line.voice.id, "factor1", value)}
         />
+        <EditableFactorInput
+          value={line.factor2}
+          onChange={(value) => onFactorChange(line.voice.id, "factor2", value)}
+        />
+        <EditableFactorInput
+          value={line.factor3}
+          onChange={(value) => onFactorChange(line.voice.id, "factor3", value)}
+        />
+        <span className="text-right font-semibold text-primary">
+          <NumberValue value={line.quantity} />
+        </span>
         <select
           aria-label={`Maggiorazione per ${line.voice.code}`}
           className="h-8 rounded-[8px] border border-subtle bg-card px-2 text-[12px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
@@ -594,9 +755,6 @@ function SelectedVoiceRow({
           <option value={10}>10%</option>
           <option value={25}>25%</option>
         </select>
-        <span className="text-right font-semibold text-danger">
-          -<Currency value={line.discountAmount} />
-        </span>
         <span className="text-right font-bold text-primary">
           <Currency value={line.totalAmount} />
         </span>
@@ -609,68 +767,85 @@ function SelectedVoiceRow({
           <Trash2 className="size-4" />
         </button>
       </div>
-      {expanded ? (
-        <div className="border-t border-subtle bg-muted/20 px-3 py-3">
-          <div className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr]">
-            <NestedTable
-              columns={["#", "Descrizione misura", "U.M.", "F1", "F2", "F3", "Quantita", "Note"]}
-              title="Sottorighe misura"
-            >
-              {line.measurementRows.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-3 text-secondary" colSpan={8}>
-                    Inserisci una quantita nella riga padre per generare il sommario misura.
+      <div className="border-t border-subtle bg-muted/20 px-3 py-3">
+        <div className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr]">
+          <NestedTable
+            columns={["#", "Descrizione misura", "U.M.", "F1", "F2", "F3", "Quantita", "Note"]}
+            title="Sottorighe misura"
+          >
+            {line.measurementRows.length === 0 ? (
+              <tr>
+                <td className="px-3 py-3 text-secondary" colSpan={8}>
+                  Compila i fattori per generare la misura.
+                </td>
+              </tr>
+            ) : (
+              line.measurementRows.map((row, rowIndex) => (
+                <tr className="border-t border-subtle" key={row.id}>
+                  <td className="px-3 py-2">{rowIndex + 1}</td>
+                  <td className="px-3 py-2">{row.description}</td>
+                  <td className="px-3 py-2">{row.unit}</td>
+                  <td className="px-3 py-2 text-right">{row.factor1.toLocaleString("it-IT")}</td>
+                  <td className="px-3 py-2 text-right">{row.factor2.toLocaleString("it-IT")}</td>
+                  <td className="px-3 py-2 text-right">{row.factor3.toLocaleString("it-IT")}</td>
+                  <td className="px-3 py-2 text-right font-semibold">
+                    {row.partialQuantity.toLocaleString("it-IT")}
+                  </td>
+                  <td className="px-3 py-2">{row.notes}</td>
+                </tr>
+              ))
+            )}
+          </NestedTable>
+          <NestedTable
+            columns={["Codice", "Tipo", "Base", "%", "Importo"]}
+            title="Collegate / maggiorazioni"
+          >
+            {line.linkedCharges.length === 0 ? (
+              <tr>
+                <td className="px-3 py-3 text-secondary" colSpan={5}>
+                  Nessuna voce collegata attiva.
+                </td>
+              </tr>
+            ) : (
+              line.linkedCharges.map((charge) => (
+                <tr className="border-t border-subtle" key={charge.id}>
+                  <td className="px-3 py-2">{charge.code}</td>
+                  <td className="px-3 py-2">{charge.description}</td>
+                  <td className="px-3 py-2 text-right">
+                    <Currency value={charge.baseAmount} />
+                  </td>
+                  <td className="px-3 py-2 text-right">{charge.percent.toLocaleString("it-IT")}</td>
+                  <td className="px-3 py-2 text-right font-semibold">
+                    <Currency value={charge.total} />
                   </td>
                 </tr>
-              ) : (
-                line.measurementRows.map((row, rowIndex) => (
-                  <tr className="border-t border-subtle" key={row.id}>
-                    <td className="px-3 py-2">{rowIndex + 1}</td>
-                    <td className="px-3 py-2">{row.description}</td>
-                    <td className="px-3 py-2">{row.unit}</td>
-                    <td className="px-3 py-2 text-right">{row.factor1.toLocaleString("it-IT")}</td>
-                    <td className="px-3 py-2 text-right">{row.factor2.toLocaleString("it-IT")}</td>
-                    <td className="px-3 py-2 text-right">{row.factor3.toLocaleString("it-IT")}</td>
-                    <td className="px-3 py-2 text-right font-semibold">
-                      {row.partialQuantity.toLocaleString("it-IT")}
-                    </td>
-                    <td className="px-3 py-2">{row.notes}</td>
-                  </tr>
-                ))
-              )}
-            </NestedTable>
-            <NestedTable
-              columns={["Codice", "Tipo", "Base", "%", "Importo"]}
-              title="Collegate / maggiorazioni"
-            >
-              {line.linkedCharges.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-3 text-secondary" colSpan={5}>
-                    Nessuna voce collegata attiva.
-                  </td>
-                </tr>
-              ) : (
-                line.linkedCharges.map((charge) => (
-                  <tr className="border-t border-subtle" key={charge.id}>
-                    <td className="px-3 py-2">{charge.code}</td>
-                    <td className="px-3 py-2">{charge.description}</td>
-                    <td className="px-3 py-2 text-right">
-                      <Currency value={charge.baseAmount} />
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {charge.percent.toLocaleString("it-IT")}
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold">
-                      <Currency value={charge.total} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </NestedTable>
-          </div>
+              ))
+            )}
+          </NestedTable>
         </div>
-      ) : null}
+      </div>
     </div>
+  );
+}
+
+function EditableFactorInput({
+  onChange,
+  value,
+}: {
+  onChange: (value: number) => void;
+  value: number;
+}) {
+  return (
+    <input
+      className="h-8 rounded-[8px] border border-subtle bg-card px-2 text-right text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+      min={0}
+      onChange={(event) =>
+        onChange(Number.isFinite(event.target.valueAsNumber) ? event.target.valueAsNumber : 0)
+      }
+      step="0.001"
+      type="number"
+      value={value}
+    />
   );
 }
 
@@ -726,12 +901,12 @@ function inferVoiceGroupLabel(voice: SalVoiceDraft, macroCode: string): string {
   return macroCode ? `Macro voce ${macroCode}` : "Voci tariffario";
 }
 
-function truncateDescription(description: string): string {
+function truncateDescription(description: string, maxLength = 100): string {
   const normalized = description.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 100) {
+  if (normalized.length <= maxLength) {
     return normalized;
   }
-  return `${normalized.slice(0, 97)}...`;
+  return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
 function EmptyTableState({ message }: { message: string }) {

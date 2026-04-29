@@ -2,6 +2,16 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.55 - 2026-04-29
+
+- Rework del flusso SAL: separati selezione voci, tabella di modifica e recap economico per avere una vista piu chiara e usabile.
+- Resi modificabili i fattori delle righe SAL con ricalcolo automatico di quantita e importi.
+- Catalogo SAL: descrizioni troncate in modo controllato e righe raggruppate con selezione piu leggibile.
+- Riepilogo SAL: aggiunto il valore del ribasso gara applicato, calcolato sulla percentuale impostata nello step di contesto.
+- Timeline SAL: sostituiti gli step numerici con una timeline a stati piu moderna e coerente con il workflow reale.
+- Topbar SAL: rimossi elementi duplicati rispetto alla barra globale, lasciando solo i comandi del wizard.
+- Cleanup prestazionale generale su store, Projects e SAL per ridurre rerender e calcoli ripetuti.
+
 ## 0.1.54 - 2026-04-28
 
 - Pagina Progetti: la schermata si apre molto piu velocemente grazie a una riorganizzazione interna dei componenti.

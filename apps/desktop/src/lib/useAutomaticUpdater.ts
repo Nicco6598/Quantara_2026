@@ -1,12 +1,11 @@
 import { useEffect, useRef } from "react";
 import { runAppUpdateCheck } from "@/lib/appUpdater";
-import { useAppStore } from "@/store/app-store";
+import { usePreferenceState } from "@/store/app-store";
 
 export function useAutomaticUpdater() {
   const hasCheckedRef = useRef(false);
-  const autoCheckUpdatesOnLaunch = useAppStore((state) => state.autoCheckUpdatesOnLaunch);
-  const hasHydratedPreferences = useAppStore((state) => state.hasHydratedPreferences);
-  const showReleaseNotesAfterUpdate = useAppStore((state) => state.showReleaseNotesAfterUpdate);
+  const { autoCheckUpdatesOnLaunch, hasHydratedPreferences, showReleaseNotesAfterUpdate } =
+    usePreferenceState();
 
   useEffect(() => {
     if (!import.meta.env.PROD || !hasHydratedPreferences || !autoCheckUpdatesOnLaunch) {
