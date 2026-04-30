@@ -14,18 +14,21 @@ import {
   WalletCards,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  mapContractToProject,
-  type PortfolioProject,
-  portfolioProjects,
-} from "@/features/projects/ProjectsScreen";
+import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
 import { formatDueWindow, formatForecastDelta } from "@/features/projects/utils/projects-helpers";
+import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { useNavigate } from "@/hooks/useNavigate";
 import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 export function ProjectDetailScreen() {
-  const [projects, setProjects] = useState<PortfolioProject[]>(portfolioProjects);
+  const navigate = useNavigate();
+  const [projects, setProjects] = useState<PortfolioProject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
+  const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
 
   useEffect(() => {
     let active = true;
@@ -35,8 +38,8 @@ export function ProjectDetailScreen() {
         return;
       }
 
-      const runtimeProjects = contracts.data.map(mapContractToProject);
-      setProjects(runtimeProjects.length > 0 ? runtimeProjects : portfolioProjects);
+      setProjects(contracts.data.map(mapContractToProject));
+      setIsLoading(false);
     });
 
     return () => {
@@ -51,14 +54,106 @@ export function ProjectDetailScreen() {
       return projects.find((project) => project.id === storedProject.id) ?? storedProject;
     }
 
-    return projects[0] ?? getFallbackProject();
+    return projects[0] ?? null;
   }, [projects]);
 
-  const detail = useMemo(() => buildProjectDetail(selectedProject), [selectedProject]);
-  const milestoneRows = useMemo(() => buildMilestoneRows(selectedProject), [selectedProject]);
-  const projectTeam = useMemo(() => buildProjectTeam(selectedProject), [selectedProject]);
-  const recentActivities = useMemo(() => buildRecentActivities(selectedProject), [selectedProject]);
-  const salRows = useMemo(() => buildSalRows(selectedProject), [selectedProject]);
+  const salViews = useMemo(() => {
+    if (!selectedProject) {
+      return [];
+    }
+    return salDocuments
+      .filter((document) => document.projectId === selectedProject.id)
+      .map((document) => buildSalDocumentView(document, tariffVoices))
+      .sort((left, right) => {
+        const leftDate = left.closedAt ?? left.date;
+        const rightDate = right.closedAt ?? right.date;
+        return rightDate.localeCompare(leftDate);
+      });
+  }, [salDocuments, selectedProject, tariffVoices]);
+
+  const financials = useMemo(() => {
+    const contractual = selectedProject?.budget.amount ?? 0;
+    const committed = salViews.reduce((sum, row) => sum + row.total, 0);
+    const executed = salViews
+      .filter((row) => row.status === "closed")
+      .reduce((sum, row) => sum + row.total, 0);
+    const residual = contractual - committed;
+    const progress = contractual > 0 ? Math.min(100, (committed / contractual) * 100) : 0;
+    const currentSalAmount = salViews[0]?.total ?? 0;
+
+    return { committed, contractual, currentSalAmount, executed, progress, residual };
+  }, [salViews, selectedProject]);
+
+  const salRows = useMemo(
+    () =>
+      salViews.map((row) => ({
+        amount: row.total,
+        date: row.closedAt ?? row.date,
+        period: row.description || row.title,
+        sal: row.title,
+        status: row.status === "closed" ? "Approvata" : "Bozza",
+        tone: (row.status === "closed" ? "success" : "warning") as
+          | "danger"
+          | "info"
+          | "success"
+          | "warning",
+      })),
+    [salViews],
+  );
+
+  const detail = useMemo(
+    () =>
+      selectedProject
+        ? buildProjectDetail(selectedProject, financials, salRows[0]?.sal ?? "SAL da creare")
+        : null,
+    [financials, salRows, selectedProject],
+  );
+  const milestoneRows = useMemo(
+    () => (selectedProject ? buildMilestoneRows(selectedProject, salRows.length) : []),
+    [salRows.length, selectedProject],
+  );
+  const projectTeam = useMemo(
+    () => (selectedProject ? buildProjectTeam(selectedProject) : []),
+    [selectedProject],
+  );
+  const recentActivities = useMemo(
+    () => (selectedProject ? buildRecentActivities(selectedProject, salRows) : []),
+    [salRows, selectedProject],
+  );
+
+  function handleCreateSal() {
+    if (!selectedProject) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        "quantara.selectedProjectDetail.v1",
+        JSON.stringify(selectedProject),
+      );
+    } catch {
+      // Continue with navigation even if session storage is unavailable.
+    }
+    navigate("sal-create");
+  }
+
+  if (isLoading) {
+    return (
+      <div className="pt-4 text-sm font-medium text-[var(--text-secondary)]">
+        Caricamento progetto...
+      </div>
+    );
+  }
+
+  if (!selectedProject || !detail) {
+    return (
+      <div className="pt-4">
+        <div className="rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 text-sm text-[var(--text-secondary)]">
+          Nessun progetto locale disponibile.
+        </div>
+      </div>
+    );
+  }
+
   const kpiCards = [
     {
       caption: "Budget totale del contratto",
@@ -72,14 +167,14 @@ export function ProjectDetailScreen() {
       icon: Layers3,
       label: "Impegnato",
       tone: "green",
-      value: formatMoney({ amount: detail.budget.committed, currency: "EUR" }),
+      value: formatMoney({ amount: financials.committed, currency: "EUR" }),
     },
     {
       caption: "Ultima SAL approvata",
       icon: Clock3,
       label: "SAL corrente",
       tone: "orange",
-      value: formatMoney({ amount: detail.sal.amount, currency: "EUR" }),
+      value: formatMoney({ amount: financials.currentSalAmount, currency: "EUR" }),
     },
     {
       caption: "Avanzamento fisico del lotto",
@@ -203,6 +298,7 @@ export function ProjectDetailScreen() {
                 Registro SAL
               </h3>
               <button
+                onClick={handleCreateSal}
                 className="flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-3 text-[13px] font-bold text-[var(--text-inverse)] shadow-sm transition-all hover:bg-[var(--accent-primary-hover)]"
                 type="button"
               >
@@ -224,13 +320,9 @@ export function ProjectDetailScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {salRows.map((row, index) => (
+                  {salRows.map((row) => (
                     <tr
-                      className={cn(
-                        "border-b border-[var(--border-subtle)]",
-                        index === 0 &&
-                          "rounded-lg bg-[var(--info-soft)] outline outline-1 outline-[var(--info-base)]/40",
-                      )}
+                      className={cn("border-b border-[var(--border-subtle)] last:border-b-0")}
                       key={row.sal}
                     >
                       <td className="px-3 py-3 font-bold text-[var(--text-primary)]">{row.sal}</td>
@@ -247,6 +339,16 @@ export function ProjectDetailScreen() {
                       </td>
                     </tr>
                   ))}
+                  {salRows.length === 0 ? (
+                    <tr>
+                      <td
+                        className="px-3 py-5 text-[13px] text-[var(--text-secondary)]"
+                        colSpan={6}
+                      >
+                        Nessuna SAL registrata per questo progetto.
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -264,6 +366,10 @@ export function ProjectDetailScreen() {
               <SummaryRow label="Responsabile" value={detail.manager} />
               <SummaryRow label="Prossima milestone" value={detail.nextMilestone} />
               <SummaryRow label="Rischio materiale" value={detail.materialRisk} />
+              <SummaryRow
+                label="Residuo budget"
+                value={formatMoney({ amount: financials.residual, currency: "EUR" })}
+              />
             </dl>
           </section>
 
@@ -502,30 +608,25 @@ function readSelectedProjectDetail(): PortfolioProject | null {
   }
 }
 
-function getFallbackProject(): PortfolioProject {
-  const fallbackProject = portfolioProjects[0];
-
-  if (!fallbackProject) {
-    throw new Error("Portfolio demo non configurato.");
-  }
-
-  return fallbackProject;
-}
-
-function buildProjectDetail(project: PortfolioProject) {
-  const contractual = project.budget.amount;
-  const executed = Math.round(contractual * (project.progress / 100));
-  const committed = Math.max(
-    executed,
-    Math.round(contractual * Math.min(0.92, project.progress / 100 + 0.18)),
-  );
-  const costPerformance = committed > 0 ? executed / committed : 1;
+function buildProjectDetail(
+  project: PortfolioProject,
+  financials: {
+    committed: number;
+    contractual: number;
+    currentSalAmount: number;
+    executed: number;
+    progress: number;
+    residual: number;
+  },
+  currentSalLabel: string,
+) {
+  const costPerformance = financials.committed > 0 ? financials.executed / financials.committed : 1;
 
   return {
     budget: {
-      committed,
-      contractual,
-      executed,
+      committed: financials.committed,
+      contractual: financials.contractual,
+      executed: financials.executed,
     },
     cpi: costPerformance.toLocaleString("it-IT", {
       maximumFractionDigits: 2,
@@ -545,16 +646,16 @@ function buildProjectDetail(project: PortfolioProject) {
     materialRisk: project.materialRisk,
     name: project.title,
     nextMilestone: project.nextMilestone,
-    progress: project.progress,
+    progress: Number(financials.progress.toFixed(1)),
     sal: {
-      amount: project.salValue.amount,
-      current: project.salState,
+      amount: financials.currentSalAmount,
+      current: currentSalLabel,
     },
     startDate: "Dossier operativo",
   };
 }
 
-function buildMilestoneRows(project: PortfolioProject) {
+function buildMilestoneRows(project: PortfolioProject, salCount: number) {
   const completed = Math.max(1, Math.min(3, Math.floor(project.progress / 30)));
   const labels = ["Avvio lotto", project.phase, project.nextMilestone, "Chiusura contabilita"];
 
@@ -562,7 +663,7 @@ function buildMilestoneRows(project: PortfolioProject) {
     date:
       index === 0
         ? "Completata"
-        : index === completed
+        : index === completed && salCount > 0
           ? formatDueWindow(project.salDays)
           : formatForecastDelta(project.forecastDeltaDays),
     label,
@@ -579,50 +680,19 @@ function buildProjectTeam(project: PortfolioProject) {
   ];
 }
 
-function buildRecentActivities(project: PortfolioProject) {
+function buildRecentActivities(
+  project: PortfolioProject,
+  salRows: Array<{ date: string; sal: string; status: string }>,
+) {
+  const latestSal = salRows[0];
   return [
-    { date: "Oggi", text: `${project.salState} su ${project.title}` },
+    {
+      date: latestSal?.date ?? "N/A",
+      text: `${latestSal?.sal ?? "Nessuna SAL"} su ${project.title}`,
+    },
     { date: formatDueWindow(project.salDays), text: project.nextMilestone },
     { date: "Ultimo aggiornamento", text: project.materialRisk },
     { date: "Registro", text: `Avanzamento fisico al ${project.progress}%` },
-  ];
-}
-
-function buildSalRows(project: PortfolioProject) {
-  const currentAmount = project.salValue.amount;
-  const previousAmount = Math.round(currentAmount * 0.82);
-  const historicalAmount = Math.round(currentAmount * 0.58);
-
-  return [
-    {
-      amount: currentAmount,
-      date: formatDueWindow(project.salDays),
-      period: "Periodo corrente",
-      sal: project.salState,
-      status:
-        project.tone === "danger"
-          ? "Bloccata"
-          : project.tone === "warning"
-            ? "Da chiudere"
-            : "In linea",
-      tone: project.tone,
-    },
-    {
-      amount: previousAmount,
-      date: "Ciclo precedente",
-      period: "Periodo precedente",
-      sal: "SAL precedente",
-      status: "Approvata",
-      tone: "success" as const,
-    },
-    {
-      amount: historicalAmount,
-      date: "Storico",
-      period: "Progressivo lotto",
-      sal: "Progressivo",
-      status: "Consolidata",
-      tone: "success" as const,
-    },
   ];
 }
 

@@ -10,15 +10,14 @@ export const contractSchema = z.object({
   contractualAmount: moneySchema,
   frameworkAgreementCode: z.string().min(1),
   id: z.string().startsWith("contract_"),
-  tariffPriorities: z
-    .array(
-      z.object({
-        priority: z.number().int().positive(),
-        reason: z.string().min(1),
-        tariffBookId: z.string().startsWith("tariff_"),
-      }),
-    )
-    .min(1),
+  safetyCostsNotSubjectToDiscount: moneySchema,
+  tariffPriorities: z.array(
+    z.object({
+      priority: z.number().int().positive(),
+      reason: z.string().min(1),
+      tariffBookId: z.string().startsWith("tariff_"),
+    }),
+  ),
   title: z.string().min(1),
 });
 

@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { StatusBadge, type StatusTone } from "@/components/shared/StatusBadge";
 import type { PortfolioProject } from "@/features/projects/ProjectsScreen";
@@ -88,7 +89,8 @@ export function MetricCard({
   );
 }
 
-export function PriorityActions() {
+export function PriorityActions({ summary }: { summary: { critical: number; warning: number } }) {
+  const urgentActions = summary.critical + summary.warning;
   return (
     <section className="rounded-[12px] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--accent-primary)_10%,transparent),color-mix(in_srgb,var(--accent-primary)_3.5%,transparent))] px-4 py-4 2xl:px-5">
       <div className="mb-4 flex items-center justify-between">
@@ -97,7 +99,7 @@ export function PriorityActions() {
             Azioni prioritarie
           </span>
           <span className="rounded-[6px] bg-[color-mix(in_srgb,var(--surface-base)_70%,transparent)] px-2 py-1 text-[11px] font-medium text-[var(--accent-primary)]">
-            2 azioni urgenti
+            {urgentActions.toLocaleString("it-IT")} azioni urgenti
           </span>
         </div>
         <button
@@ -114,7 +116,7 @@ export function PriorityActions() {
           copy="Intervento richiesto per evitare impatti sulle lavorazioni."
           cta="Apri alert materiali"
           icon={AlertTriangle}
-          title="2 materiali critici su opere civili"
+          title={`${summary.critical.toLocaleString("it-IT")} criticita ad alta priorita`}
           tone="danger"
         />
         <div className="hidden h-14 w-px bg-[var(--accent-primary)]/20 xl:block" />
@@ -122,7 +124,7 @@ export function PriorityActions() {
           copy="Verifica e conferma per mantenere il programma."
           cta="Vai alle forniture"
           icon={Clock3}
-          title="1 fornitura in conferma consegna"
+          title={`${summary.warning.toLocaleString("it-IT")} avvisi da monitorare`}
           tone="warning"
         />
       </div>
@@ -169,7 +171,32 @@ function PriorityItem({
   );
 }
 
-export function OperationalSites({ projects }: { projects: PortfolioProject[] }) {
+export function OperationalSites({
+  onDeleteProject,
+  operationalByProjectId,
+  projects,
+}: {
+  onDeleteProject: (projectId: string) => void;
+  operationalByProjectId: Map<
+    string,
+    { approvedAmount: number; committedAmount: number; progressPercent: number }
+  >;
+  projects: PortfolioProject[];
+}) {
+  const PAGE_SIZE = 10;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visibleProjects = useMemo(
+    () => projects.slice(0, Math.min(visibleCount, projects.length)),
+    [projects, visibleCount],
+  );
+  const canShowMore = visibleCount < projects.length;
+
+  useEffect(() => {
+    setVisibleCount((current) =>
+      Math.min(Math.max(current, PAGE_SIZE), Math.max(PAGE_SIZE, projects.length)),
+    );
+  }, [projects.length]);
+
   return (
     <section className="rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none">
       <div className="flex flex-col gap-3 px-4 py-4 xl:flex-row xl:items-center xl:justify-between 2xl:px-5">
@@ -213,19 +240,39 @@ export function OperationalSites({ projects }: { projects: PortfolioProject[] })
             <span className="text-right">Azioni</span>
           </div>
 
-          {projects.map((project) => (
-            <ProjectRow key={project.id} project={project} />
-          ))}
+          {visibleProjects.map((project) => {
+            const operational = operationalByProjectId.get(project.id);
+            return (
+              <ProjectRow
+                key={project.id}
+                {...(operational ? { operational } : {})}
+                onDelete={() => onDeleteProject(project.id)}
+                project={project}
+              />
+            );
+          })}
         </div>
       </div>
 
       <div className="flex h-12 items-center justify-between px-5 text-[12px] font-medium text-[var(--text-secondary)]">
         <span>
-          Vista 1-{projects.length} di {projects.length} cantieri
+          Vista 1-{visibleProjects.length} di {projects.length} cantieri
         </span>
-        <span>
-          Mostra <strong className="text-[var(--text-primary)]">10</strong> per pagina
-        </span>
+        <div className="flex items-center gap-3">
+          <span>
+            Mostra <strong className="text-[var(--text-primary)]">10</strong> per pagina
+          </span>
+          {canShowMore ? (
+            <Button
+              onClick={() => setVisibleCount((value) => value + PAGE_SIZE)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Mostra altro
+            </Button>
+          ) : null}
+        </div>
       </div>
     </section>
   );
@@ -250,7 +297,19 @@ function SearchIcon() {
   );
 }
 
-function ProjectRow({ project }: { project: PortfolioProject }) {
+function ProjectRow({
+  onDelete,
+  operational,
+  project,
+}: {
+  onDelete: () => void;
+  operational?: { approvedAmount: number; committedAmount: number; progressPercent: number };
+  project: PortfolioProject;
+}) {
+  const salApprovedAmount = operational?.approvedAmount ?? project.salValue.amount;
+  const progressPercent = operational?.progressPercent ?? project.progress;
+  const committedAmount = operational?.committedAmount ?? 0;
+
   return (
     <div className="grid min-h-[70px] grid-cols-[1.55fr_0.85fr_0.75fr_0.75fr_0.72fr_112px] items-center border-t border-[var(--border-subtle)] px-4">
       <div className="flex items-center gap-3">
@@ -283,9 +342,11 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
 
       <div>
         <div className="text-[13px] font-medium text-[var(--text-primary)]">
-          {formatMoney(project.salValue)}
+          {formatMoney({ amount: salApprovedAmount, currency: "EUR" })}
         </div>
-        <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">0,0%</div>
+        <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+          {progressPercent.toFixed(1).replace(".", ",")}%
+        </div>
       </div>
 
       <div>
@@ -295,7 +356,7 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
             project.tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--info-base)]",
           )}
         >
-          {project.progress}%
+          {progressPercent.toFixed(0)}%
         </div>
         <div className="mt-2 h-1.5 w-[80px] overflow-hidden rounded-full bg-[var(--bg-muted-strong)] md:w-[96px] 2xl:w-[120px]">
           <div
@@ -307,7 +368,7 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
                   ? "bg-[var(--warning-base)]"
                   : "bg-[var(--info-base)]",
             )}
-            style={{ width: `${project.progress}%` }}
+            style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
           />
         </div>
       </div>
@@ -317,7 +378,7 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
           {formatMoney(project.budget)}
         </div>
         <div className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">
-          Impegnato 18.000 EUR
+          Impegnato {formatMoney({ amount: committedAmount, currency: "EUR" })}
         </div>
       </div>
 
@@ -340,23 +401,26 @@ function ProjectRow({ project }: { project: PortfolioProject }) {
         >
           Apri
         </Button>
+        <Button
+          className="h-9 rounded-[9px] border-[var(--danger-soft)] bg-[var(--surface-base)] px-3 text-[12px] font-medium text-[var(--danger-base)]"
+          onClick={onDelete}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          Elimina
+        </Button>
         <MoreVertical className="size-4 text-[var(--text-secondary)]" />
       </div>
     </div>
   );
 }
 
-export function Milestones() {
-  const items = [
-    { date: "30 Apr", title: "Configurare SAL e tariffari", place: "Milano-Verona · Lotto 3A" },
-    {
-      date: "05 Mag",
-      title: "Fine prevista in linea con piano",
-      place: "Milano-Verona · Lotto 3A",
-    },
-    { date: "12 Mag", title: "Chiusura contabilità stimata", place: "Nodo di Firenze · Lotto 2B" },
-  ];
-
+export function Milestones({
+  items,
+}: {
+  items: Array<{ date: string; place: string; title: string }>;
+}) {
   return (
     <section className="grid gap-3 rounded-[13px] bg-[var(--info-soft)]/62 px-4 py-4 xl:grid-cols-[180px_1fr_1fr_1fr_130px] xl:items-center 2xl:h-[78px] 2xl:grid-cols-[210px_1fr_1fr_1fr_150px] 2xl:px-5 2xl:py-0">
       <div className="flex items-center gap-3 text-[12px] font-medium uppercase tracking-[0.12em] text-[var(--info-base)]">
@@ -390,15 +454,23 @@ export function Milestones() {
 export function RightRail({
   activities,
   distribution,
+  projectCount,
 }: {
   activities: string[];
   distribution: Array<{ label: string; tone: StatusTone; value: string }>;
+  projectCount: number;
 }) {
+  const totalDistribution = distribution.reduce((sum, row) => sum + Number(row.value), 0);
+
   return (
     <aside className="grid gap-4 lg:grid-cols-2 2xl:block 2xl:space-y-4">
       <RailCard icon={ShieldCheck} title="Salute sistema">
         <div className="space-y-3">
-          {["Database", "Servizi", "Integrazioni"].map((item) => (
+          {[
+            ["Database", "Operativo"],
+            ["Servizi", projectCount > 0 ? "Operativo" : "In attesa dati"],
+            ["Integrazioni", projectCount > 0 ? "Operativo" : "In attesa dati"],
+          ].map(([item, status]) => (
             <div
               className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 last:border-0 last:pb-0"
               key={item}
@@ -409,7 +481,7 @@ export function RightRail({
               </div>
               <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--success-base)]">
                 <span className="size-2 rounded-full bg-[var(--success-base)]" />
-                Operativo
+                {status}
               </div>
             </div>
           ))}
@@ -422,7 +494,7 @@ export function RightRail({
           {activities.slice(0, 3).map((activity, index) => (
             <div className="grid grid-cols-[40px_1fr] gap-3" key={activity}>
               <div className="text-[11px] font-medium text-[var(--text-secondary)]">
-                {["17:32", "16:41", "15:28"][index]}
+                {["17:32", "16:41", "15:28"][index] ?? "--:--"}
               </div>
               <div>
                 <div className="text-[12px] font-medium leading-4 text-[var(--text-primary)]">
@@ -462,7 +534,10 @@ export function RightRail({
               </div>
             ))}
             <div className="border-t border-[var(--border-subtle)] pt-2 text-[12px] font-medium text-[var(--text-secondary)]">
-              Totale <span className="float-right text-[var(--text-primary)]">3</span>
+              Totale{" "}
+              <span className="float-right text-[var(--text-primary)]">
+                {totalDistribution.toLocaleString("it-IT")}
+              </span>
             </div>
           </div>
         </div>
@@ -529,7 +604,7 @@ function RailLink({ label }: { label: string }) {
 export function buildOverviewMetrics(projects: PortfolioProject[]) {
   const totalBudget = projects.reduce((total, project) => total + project.budget.amount, 0);
   const escalationCount = projects.filter((project) => project.tone === "danger").length;
-  const salCount = projects.filter((project) => project.salDays <= 7).length || 1;
+  const salCount = projects.filter((project) => project.salDays <= 7).length;
 
   return [
     {
@@ -558,14 +633,14 @@ export function buildOverviewMetrics(projects: PortfolioProject[]) {
       icon: AlertTriangle,
       label: "Criticità / Escalation",
       tone: "red" as const,
-      value: String(escalationCount || 2),
+      value: String(escalationCount),
     },
   ];
 }
 
 export function buildFocusRows(projects: PortfolioProject[]) {
-  const success = projects.filter((project) => project.tone === "success").length || 2;
-  const warning = projects.filter((project) => project.tone === "warning").length || 1;
+  const success = projects.filter((project) => project.tone === "success").length;
+  const warning = projects.filter((project) => project.tone === "warning").length;
   const danger = projects.filter((project) => project.tone === "danger").length;
 
   return [
@@ -576,17 +651,56 @@ export function buildFocusRows(projects: PortfolioProject[]) {
 }
 
 export function buildActivityRows(projects: PortfolioProject[]) {
-  const runtimeRows = projects
+  return projects
     .slice()
     .sort((left, right) => left.salDays - right.salDays)
     .slice(0, 3)
     .map((project) => `${project.salState} · ${project.title} · ${project.lot}`);
+}
 
-  return runtimeRows.length > 0
-    ? runtimeRows
-    : [
-        "SAL da creare su TEST · Milano-Verona · Lotto 3A",
-        "Nuovo alert materiali · BIN-60E1 · Armamento",
-        "SAL approvata · Milano-Verona · Lotto 3A",
-      ];
+export function buildActionSummary(projects: PortfolioProject[]) {
+  return {
+    critical: projects.filter((project) => project.tone === "danger").length,
+    warning: projects.filter((project) => project.tone === "warning").length,
+  };
+}
+
+export function buildMilestones(projects: PortfolioProject[]) {
+  const today = new Date();
+  const months = [
+    "Gen",
+    "Feb",
+    "Mar",
+    "Apr",
+    "Mag",
+    "Giu",
+    "Lug",
+    "Ago",
+    "Set",
+    "Ott",
+    "Nov",
+    "Dic",
+  ];
+  const fallback = [
+    {
+      date: `${today.getDate()} ${months[today.getMonth()]}`,
+      title: "Nessuna milestone disponibile",
+      place: "Aggiungi progetti per popolare la timeline",
+    },
+  ];
+
+  if (projects.length === 0) {
+    return fallback;
+  }
+
+  return projects.slice(0, 3).map((project, index) => {
+    const milestoneDate = new Date(today);
+    milestoneDate.setDate(today.getDate() + (index + 1) * 7);
+
+    return {
+      date: `${milestoneDate.getDate()} ${months[milestoneDate.getMonth()]}`,
+      place: `${project.title} · ${project.lot}`,
+      title: project.salState,
+    };
+  });
 }

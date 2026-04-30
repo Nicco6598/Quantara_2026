@@ -6,20 +6,24 @@ import type { DesktopTariffBook } from "@/lib/desktopData";
 
 export function TariffBookRow({
   book,
+  isFavorite,
   isSelected,
   linkedProjectCount,
   onDelete,
   onEdit,
   onSelect,
+  onToggleFavorite,
   voiceCount,
 }: {
   book: DesktopTariffBook;
+  isFavorite: boolean;
   isSelected: boolean;
   linkedProjectCount: number;
   onDelete: () => void;
   onEdit: () => void;
   onSelect: () => void;
-  voiceCount: null | number;
+  onToggleFavorite: () => void;
+  voiceCount: number | undefined;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const isActive = book.status === "active" || book.status === "validated";
@@ -34,13 +38,14 @@ export function TariffBookRow({
         }`}
       >
         <button
-          aria-label={isSelected ? "Tariffario preferito" : "Segna come preferito"}
+          aria-label={isFavorite ? "Rimuovi dai preferiti" : "Segna come preferito"}
           className="hidden text-[var(--text-secondary)] hover:text-[var(--warning-base)] 2xl:block"
+          onClick={onToggleFavorite}
           type="button"
         >
           <Star
             className={`size-4 ${
-              isSelected ? "fill-[var(--warning-base)] text-[var(--warning-base)]" : ""
+              isFavorite ? "fill-[var(--warning-base)] text-[var(--warning-base)]" : ""
             }`}
           />
         </button>
@@ -52,7 +57,8 @@ export function TariffBookRow({
             ID: {book.id}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)] 2xl:hidden">
-            {book.sourceName} · {book.year} · {linkedProjectCount} progetti
+            {book.sourceName} · {book.year} · {linkedProjectCount} progetti ·{" "}
+            {voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT")} voci
             <Badge variant={isActive ? "success" : "warning"}>{book.status}</Badge>
           </div>
         </button>
@@ -69,7 +75,7 @@ export function TariffBookRow({
           {linkedProjectCount}
         </div>
         <div className="hidden text-right text-[13px] font-semibold text-[var(--text-primary)] 2xl:block">
-          {voiceCount == null ? "-" : voiceCount.toLocaleString("it-IT")}
+          {voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT")}
         </div>
         <div className="absolute right-3 top-3 2xl:static 2xl:justify-self-end">
           <Button

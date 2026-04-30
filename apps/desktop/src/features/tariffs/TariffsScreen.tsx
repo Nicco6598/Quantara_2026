@@ -35,7 +35,7 @@ import { TariffBookRow } from "./components/TariffBookRow";
 import { TariffEditField } from "./components/TariffEditField";
 import { TariffImportPreviewModal } from "./components/TariffImportPreviewModal";
 import { TariffMetric } from "./components/TariffMetric";
-import { TariffVoicesPreview } from "./components/TariffVoicesPreview";
+import { TariffVoicesExplorerModal } from "./components/TariffVoicesExplorerModal";
 import {
   fallbackContracts,
   fallbackTariffBook,
@@ -47,6 +47,7 @@ import { groupTariffVoices } from "./utils/tariff-grouping";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
 
 export function TariffsScreen() {
+  const FAVORITES_STORAGE_KEY = "quantara.tariffs.favoriteBookIds";
   const { notify } = useToast();
   const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
     data: fallbackContracts,
@@ -78,7 +79,39 @@ export function TariffsScreen() {
     message: "Runtime browser: voci dimostrative.",
     source: "fallback",
   });
+  const [favoriteBookIds, setFavoriteBookIds] = useState<string[]>([]);
+  const [activeCatalogTab, setActiveCatalogTab] = useState<"all" | "favorites">("all");
+  const [voiceCountByBookId, setVoiceCountByBookId] = useState<Record<string, number>>({});
+  const [isVoicesExplorerOpen, setIsVoicesExplorerOpen] = useState(false);
   const [yearFilter, setYearFilter] = useState("all");
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const rawValue = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!rawValue) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (Array.isArray(parsed) && parsed.every((value) => typeof value === "string")) {
+        setFavoriteBookIds(parsed);
+      }
+    } catch {
+      window.localStorage.removeItem(FAVORITES_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteBookIds));
+  }, [favoriteBookIds]);
 
   useEffect(() => {
     let active = true;
@@ -163,7 +196,7 @@ export function TariffsScreen() {
 
   const availableYears = tariffMetrics.years;
 
-  const visibleTariffBooks = useMemo(() => {
+  const baseFilteredTariffBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const selectedYear = Number(yearFilter);
 
@@ -180,6 +213,20 @@ export function TariffsScreen() {
       return matchesQuery && matchesYear && matchesStatus && matchesProject;
     });
   }, [projectTariffBookIds, query, statusFilter, tariffBooksState.data, yearFilter]);
+
+  const favoriteBookIdSet = useMemo(() => new Set(favoriteBookIds), [favoriteBookIds]);
+  const favoriteCount = useMemo(
+    () => baseFilteredTariffBooks.filter((book) => favoriteBookIdSet.has(book.id)).length,
+    [baseFilteredTariffBooks, favoriteBookIdSet],
+  );
+
+  const visibleTariffBooks = useMemo(
+    () =>
+      activeCatalogTab === "favorites"
+        ? baseFilteredTariffBooks.filter((book) => favoriteBookIdSet.has(book.id))
+        : baseFilteredTariffBooks,
+    [activeCatalogTab, baseFilteredTariffBooks, favoriteBookIdSet],
+  );
 
   const selectedTariffBook =
     tariffBooksState.data.find((book) => book.id === selectedTariffBookId) ??
@@ -199,6 +246,31 @@ export function TariffsScreen() {
       active = false;
     };
   }, [selectedTariffBook.id]);
+
+  useEffect(() => {
+    let active = true;
+    const books = tariffBooksState.data;
+
+    Promise.all(
+      books.map(async (book) => {
+        const fallbackForBook = fallbackTariffVoices.filter(
+          (voice) => voice.tariffBookId === book.id,
+        );
+        const result = await listDesktopTariffVoices(book.id, fallbackForBook);
+        return [book.id, result.data.length] as const;
+      }),
+    ).then((entries) => {
+      if (!active) {
+        return;
+      }
+
+      setVoiceCountByBookId(Object.fromEntries(entries));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [tariffBooksState.data]);
 
   const groupedVoices = useMemo(() => groupTariffVoices(voicesState.data), [voicesState.data]);
 
@@ -323,6 +395,12 @@ export function TariffsScreen() {
     setCreateState("idle");
   }
 
+  function handleToggleFavorite(bookId: string) {
+    setFavoriteBookIds((current) =>
+      current.includes(bookId) ? current.filter((id) => id !== bookId) : [...current, bookId],
+    );
+  }
+
   function handleStartEdit(book: DesktopTariffBook) {
     setSelectedTariffBookId(book.id);
     setEditingBookId(book.id);
@@ -393,6 +471,7 @@ export function TariffsScreen() {
       if (selectedTariffBookId === bookId) {
         setSelectedTariffBookId(tariffBooksState.data.find((b) => b.id !== bookId)?.id ?? "");
       }
+      setFavoriteBookIds((current) => current.filter((id) => id !== bookId));
       setCreateState("saved");
       setCreateMessage(`${deletedBook?.name ?? "Tariffario"} eliminato.`);
       notify({
@@ -516,21 +595,31 @@ export function TariffsScreen() {
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  className="border-b-2 border-[var(--info-base)] px-2 pb-2 text-[12px] font-bold text-[var(--text-primary)]"
+                  className={`border-b-2 px-2 pb-2 text-[12px] font-bold ${
+                    activeCatalogTab === "all"
+                      ? "border-[var(--info-base)] text-[var(--text-primary)]"
+                      : "border-transparent text-[var(--text-secondary)]"
+                  }`}
+                  onClick={() => setActiveCatalogTab("all")}
                   type="button"
                 >
                   Tutti i tariffari
                   <Badge className="ml-2" variant="info">
-                    {visibleTariffBooks.length}
+                    {baseFilteredTariffBooks.length}
                   </Badge>
                 </button>
                 <button
-                  className="px-2 pb-2 text-[12px] font-bold text-[var(--text-secondary)]"
+                  className={`border-b-2 px-2 pb-2 text-[12px] font-bold ${
+                    activeCatalogTab === "favorites"
+                      ? "border-[var(--warning-base)] text-[var(--text-primary)]"
+                      : "border-transparent text-[var(--text-secondary)]"
+                  }`}
+                  onClick={() => setActiveCatalogTab("favorites")}
                   type="button"
                 >
                   I miei preferiti
-                  <Badge className="ml-2" variant="neutral">
-                    6
+                  <Badge className="ml-2" variant={favoriteCount > 0 ? "warning" : "neutral"}>
+                    {favoriteCount}
                   </Badge>
                 </button>
               </div>
@@ -582,6 +671,18 @@ export function TariffsScreen() {
                     value={query}
                   />
                 </label>
+                <Button
+                  onClick={() => {
+                    setYearFilter("all");
+                    setProjectFilter("all");
+                    setStatusFilter("all");
+                    setQuery("");
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Reset filtri
+                </Button>
               </div>
             </div>
           </div>
@@ -602,17 +703,21 @@ export function TariffsScreen() {
                 <TariffBookRow
                   key={book.id}
                   book={book}
+                  isFavorite={favoriteBookIdSet.has(book.id)}
                   isSelected={selectedTariffBook.id === book.id}
                   linkedProjectCount={linkedProjectCountByTariffBookId.get(book.id) ?? 0}
                   onDelete={() => handleDeleteFromDropdown(book.id)}
                   onEdit={() => handleStartEdit(book)}
                   onSelect={() => handleSelectTariffBook(book)}
-                  voiceCount={book.id === selectedTariffBook.id ? voicesState.data.length : null}
+                  onToggleFavorite={() => handleToggleFavorite(book.id)}
+                  voiceCount={voiceCountByBookId[book.id]}
                 />
               ))
             ) : (
               <div className="p-8 text-sm text-[var(--text-secondary)]">
-                Nessun tariffario nel filtro corrente.
+                {activeCatalogTab === "favorites"
+                  ? "Nessun preferito trovato con i filtri correnti."
+                  : "Nessun tariffario nel filtro corrente."}
               </div>
             )}
           </div>
@@ -710,12 +815,21 @@ export function TariffsScreen() {
           </SectionPanel>
 
           <SectionPanel className="rounded-xl p-4">
-            <div className="text-[13px] font-bold text-[var(--text-primary)]">Voci tariffarie</div>
-            <TariffVoicesPreview
-              groups={groupedVoices}
-              isExpandable
-              total={voicesState.data.length}
-            />
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[13px] font-bold text-[var(--text-primary)]">
+                Voci tariffarie
+              </div>
+              <Button onClick={() => setIsVoicesExplorerOpen(true)} type="button" variant="outline">
+                Apri vista completa
+              </Button>
+            </div>
+            <p className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+              Consulta voci e sottovoci in una vista dedicata con ricerca e righe apribili.
+            </p>
+            <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)]">
+              {groupedVoices.length.toLocaleString("it-IT")} voci principali ·{" "}
+              {voicesState.data.length.toLocaleString("it-IT")} sottovoci
+            </div>
           </SectionPanel>
         </aside>
       </section>
@@ -725,6 +839,14 @@ export function TariffsScreen() {
           metadata={importPreview}
           onCancel={() => setImportPreview(null)}
           onConfirm={handleConfirmImport}
+        />
+      ) : null}
+      {isVoicesExplorerOpen ? (
+        <TariffVoicesExplorerModal
+          groups={groupedVoices}
+          onClose={() => setIsVoicesExplorerOpen(false)}
+          tariffBookName={selectedTariffBook.name}
+          total={voicesState.data.length}
         />
       ) : null}
     </ScreenShell>

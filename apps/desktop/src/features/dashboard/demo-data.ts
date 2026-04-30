@@ -6,6 +6,7 @@ export const activeContract: ContractRecord = {
   contractualAmount: eur(24850000),
   frameworkAgreementCode: "AQ-RFI-2025-LN",
   id: "contract_avac_milano_verona",
+  safetyCostsNotSubjectToDiscount: eur(250000),
   tariffPriorities: [
     { priority: 1, reason: "Contratto applicativo", tariffBookId: "tariff_lombardia_2025" },
     { priority: 2, reason: "Accordo quadro", tariffBookId: "tariff_rfi_2024" },

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS contracts (
   application_contract_code TEXT NOT NULL,
   framework_agreement_code TEXT NOT NULL,
   contractual_amount_cents INTEGER NOT NULL,
+  safety_costs_not_subject_to_discount_cents INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

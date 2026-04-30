@@ -17,6 +17,7 @@ export const fallbackContracts: DesktopContract[] = [
     contractualAmount: { amount: 26_150_000, currency: "EUR" },
     frameworkAgreementCode: "AQ-RFI-2026",
     id: "contract_demo_milano_verona",
+    safetyCostsNotSubjectToDiscount: { amount: 0, currency: "EUR" },
     tariffPriorities: [
       {
         priority: 1,

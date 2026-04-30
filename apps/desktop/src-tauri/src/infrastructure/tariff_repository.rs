@@ -1,5 +1,8 @@
 use std::{path::Path, process::Command};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -106,7 +109,12 @@ pub fn create_tariff_book(
     transaction
         .execute(
             "INSERT INTO tariff_books (id, name, source_name, year, status)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(id) DO UPDATE SET
+               name = excluded.name,
+               source_name = excluded.source_name,
+               year = excluded.year,
+               status = excluded.status",
             params![
                 request.id,
                 request.name,
@@ -114,6 +122,13 @@ pub fn create_tariff_book(
                 request.year,
                 request.status
             ],
+        )
+        .map_err(to_database_error)?;
+
+    transaction
+        .execute(
+            "DELETE FROM tariff_voices WHERE tariff_book_id = ?1",
+            [&request.id],
         )
         .map_err(to_database_error)?;
 
@@ -298,16 +313,10 @@ fn parse_rfi_pdf_with_python(
         ));
     }
 
-    let output = run_bundled_rfi_parser(path, app).or_else(|bundled_error| {
-        Command::new("py")
-            .args(["-3", "-c", RFI_PYTHON_PARSER])
-            .arg(path)
-            .output()
-            .map_err(|fallback_error| {
-                AppError::Validation(format!(
-                    "RFI parser could not be started. Bundled parser error: {bundled_error}. Development fallback py -3 failed: {fallback_error}"
-                ))
-            })
+    let output = run_bundled_rfi_parser(path, app).map_err(|error| {
+        AppError::Validation(format!(
+            "Parser PDF non incluso in questa build. {error}"
+        ))
     })?;
 
     if !output.status.success() {
@@ -317,11 +326,60 @@ fn parse_rfi_pdf_with_python(
         )));
     }
 
-    let parser_json = String::from_utf8_lossy(&output.stdout);
+    let parser_json = parser_output_to_utf8(output.stdout)?;
     let parser_json = remove_json_surrogate_escapes(&parser_json);
 
     serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json)
         .map_err(|error| AppError::Validation(format!("RFI parser returned invalid JSON: {error}")))
+}
+
+fn parser_output_to_utf8(output: Vec<u8>) -> Result<String, AppError> {
+    String::from_utf8(output).or_else(|error| decode_windows_1252(error.into_bytes())).map_err(
+        |error| AppError::Validation(format!("Output parser non UTF-8 valido: {error}")),
+    )
+}
+
+fn decode_windows_1252(bytes: Vec<u8>) -> Result<String, std::str::Utf8Error> {
+    let mut output = String::with_capacity(bytes.len());
+
+    for byte in bytes {
+        match byte {
+            0x00..=0x7f => output.push(byte as char),
+            0x80 => output.push('€'),
+            0x82 => output.push('‚'),
+            0x83 => output.push('ƒ'),
+            0x84 => output.push('„'),
+            0x85 => output.push('…'),
+            0x86 => output.push('†'),
+            0x87 => output.push('‡'),
+            0x88 => output.push('ˆ'),
+            0x89 => output.push('‰'),
+            0x8a => output.push('Š'),
+            0x8b => output.push('‹'),
+            0x8c => output.push('Œ'),
+            0x8e => output.push('Ž'),
+            0x91 => output.push('‘'),
+            0x92 => output.push('’'),
+            0x93 => output.push('“'),
+            0x94 => output.push('”'),
+            0x95 => output.push('•'),
+            0x96 => output.push('–'),
+            0x97 => output.push('—'),
+            0x98 => output.push('˜'),
+            0x99 => output.push('™'),
+            0x9a => output.push('š'),
+            0x9b => output.push('›'),
+            0x9c => output.push('œ'),
+            0x9e => output.push('ž'),
+            0x9f => output.push('Ÿ'),
+            0x81 | 0x8d | 0x8f | 0x90 | 0x9d => {
+                return Err(std::str::from_utf8(&[byte]).unwrap_err());
+            }
+            _ => output.push(char::from_u32(byte as u32).unwrap_or_default()),
+        }
+    }
+
+    Ok(output)
 }
 
 fn remove_json_surrogate_escapes(value: &str) -> String {
@@ -378,12 +436,11 @@ fn run_bundled_rfi_parser(
         .path()
         .resource_dir()
         .map_err(|error| error.to_string())?;
-    let parser_exe = resource_dir.join("parser").join("rfi_tariffa_parser.exe");
-    if parser_exe.is_file() {
-        return Command::new(parser_exe)
-            .arg(path)
-            .output()
-            .map_err(|error| error.to_string());
+
+    for parser_executable in parser_executable_candidates(&resource_dir) {
+        if parser_executable.is_file() {
+            return run_parser_command(Command::new(parser_executable).arg(path));
+        }
     }
 
     let parser_script = resource_dir.join("parser").join("rfi_tariffa_parser.py");
@@ -393,25 +450,36 @@ fn run_bundled_rfi_parser(
         "bin/python3"
     });
     if python_exe.is_file() && parser_script.is_file() {
-        return Command::new(python_exe)
-            .arg(parser_script)
-            .arg(path)
-            .output()
-            .map_err(|error| error.to_string());
-    }
-    if parser_script.is_file() {
-        return Command::new("py")
-            .args(["-3"])
-            .arg(parser_script)
-            .arg(path)
-            .output()
-            .map_err(|error| error.to_string());
+        return run_parser_command(Command::new(python_exe).arg(parser_script).arg(path));
     }
 
     Err(format!(
-        "bundled parser not found under {}",
+        "Bundled parser not found under {}",
         resource_dir.display()
     ))
+}
+
+fn run_parser_command(command: &mut Command) -> Result<std::process::Output, String> {
+    #[cfg(windows)]
+    command.creation_flags(0x08000000);
+
+    command.output().map_err(|error| error.to_string())
+}
+
+fn parser_executable_candidates(resource_dir: &Path) -> Vec<std::path::PathBuf> {
+    let executable_name = if cfg!(windows) {
+        "rfi_tariffa_parser.exe"
+    } else {
+        "rfi_tariffa_parser"
+    };
+
+    vec![
+        resource_dir.join("parser").join(executable_name),
+        resource_dir
+            .join("resources")
+            .join("parser")
+            .join(executable_name),
+    ]
 }
 
 fn rfi_record_to_tariff_voice(
@@ -634,15 +702,13 @@ fn to_database_error(error: rusqlite::Error) -> AppError {
     AppError::Database(error.to_string())
 }
 
-const RFI_PYTHON_PARSER: &str = include_str!("../../resources/parser/rfi_tariffa_parser.py");
-
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
 
     use super::{
         CreateTariffBookRequest, TariffVoiceRecord, create_tariff_book, import_tariff_pdf_preview,
-        list_tariff_books, list_tariff_voices, remove_json_surrogate_escapes,
+        list_tariff_books, list_tariff_voices, parser_output_to_utf8, remove_json_surrogate_escapes,
     };
 
     #[test]
@@ -703,6 +769,49 @@ mod tests {
     }
 
     #[test]
+    fn reimport_replaces_existing_tariff_voices() {
+        let mut connection = Connection::open_in_memory().expect("in-memory db");
+        let mut request = CreateTariffBookRequest {
+            id: "tariff_rfi_2025".into(),
+            name: "RFI 2025".into(),
+            source_name: "RFI".into(),
+            status: "active".into(),
+            voices: vec![TariffVoiceRecord {
+                category: "AC.PC.B - VOCE 3101.A - Unit� di Backup".into(),
+                description: "Fornitura Unit� di Backup".into(),
+                id: "voice_tariff_rfi_2025_ac_pc_b_3101_a".into(),
+                labor_percentage: Some(100.0),
+                official_code: "AC.PC.B.3101.A".into(),
+                tariff_book_id: "tariff_rfi_2025".into(),
+                unit_of_measure: "CAD".into(),
+                unit_price: 100.0,
+            }],
+            year: 2025,
+        };
+
+        create_tariff_book(&mut connection, request.clone()).expect("initial import");
+        request.voices = vec![TariffVoiceRecord {
+            category: "AC.PC.B - VOCE 3101.A - Unità di Backup".into(),
+            description: "Fornitura Unità di Backup".into(),
+            id: "voice_tariff_rfi_2025_ac_pc_b_3101_a".into(),
+            labor_percentage: Some(100.0),
+            official_code: "AC.PC.B.3101.A".into(),
+            tariff_book_id: "tariff_rfi_2025".into(),
+            unit_of_measure: "CAD".into(),
+            unit_price: 120.0,
+        }];
+
+        create_tariff_book(&mut connection, request).expect("reimport replaces voices");
+
+        let voices = list_tariff_voices(&connection, "tariff_rfi_2025").expect("voices listed");
+        assert_eq!(voices.len(), 1);
+        assert_eq!(voices[0].description, "Fornitura Unità di Backup");
+        assert_eq!(voices[0].unit_price, 120.0);
+        assert!(!voices[0].description.contains('\u{fffd}'));
+        assert!(!voices[0].category.contains('\u{fffd}'));
+    }
+
+    #[test]
     fn imports_rfi_parser_json_export() {
         let path = std::env::temp_dir().join("quantara_rfi_tariff_test_2025.json");
         std::fs::write(
@@ -748,5 +857,21 @@ mod tests {
             r#"[{"descrizione":"Seduta operativa  con testo valido"}]"#
         );
         assert!(serde_json::from_str::<serde_json::Value>(&cleaned).is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_utf8_parser_output() {
+        let result = parser_output_to_utf8(vec![0x81]);
+
+        assert!(result.is_err());
+        assert!(format!("{}", result.unwrap_err()).contains("Output parser non UTF-8 valido"));
+    }
+
+    #[test]
+    fn decodes_windows_1252_parser_output() {
+        let output = parser_output_to_utf8(br#"[{"descrizione":"Unit"#.iter().copied().chain([0xe0]).chain(br#" di Backup"}]"#.iter().copied()).collect())
+            .expect("windows-1252 parser output decoded");
+
+        assert_eq!(output, r#"[{"descrizione":"Unità di Backup"}]"#);
     }
 }

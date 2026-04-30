@@ -17,7 +17,7 @@ type LoadState = {
   contracts: DesktopContract[];
   error: string | null;
   isLoading: boolean;
-  selectedTariffBookId: string;
+  selectedTariffBookIds: string[];
   tariffBooks: DesktopTariffBook[];
   voices: SalVoiceDraft[];
 };
@@ -26,7 +26,7 @@ const initialLoadState: LoadState = {
   contracts: [],
   error: null,
   isLoading: true,
-  selectedTariffBookId: "",
+  selectedTariffBookIds: [],
   tariffBooks: [],
   voices: [],
 };
@@ -53,10 +53,18 @@ export function useSalCreationData() {
         const tariffBooks = tariffBooksResult.data;
         const selectedContract = selectContract(contracts);
         const orderedBooks = mapTariffBooksForContract(tariffBooks, selectedContract);
-        const selectedTariffBook = orderedBooks[0] ?? tariffBooks[0] ?? null;
-        const voicesResult = selectedTariffBook
-          ? await listDesktopTariffVoices(selectedTariffBook.id, [])
-          : { data: [] as const, source: "desktop" as const };
+        const defaultSelectedIds =
+          orderedBooks
+            .filter((book) => book.isPriority)
+            .map((book) => book.id)
+            .slice(0, 3) ?? [];
+        const selectedTariffBookIds =
+          defaultSelectedIds.length > 0
+            ? defaultSelectedIds
+            : orderedBooks[0]
+              ? [orderedBooks[0].id]
+              : [];
+        const voices = await loadVoicesForBooks(selectedTariffBookIds, tariffBooks);
 
         if (!active) {
           return;
@@ -66,11 +74,9 @@ export function useSalCreationData() {
           contracts,
           error: null,
           isLoading: false,
-          selectedTariffBookId: selectedTariffBook?.id ?? "",
+          selectedTariffBookIds,
           tariffBooks,
-          voices: selectedTariffBook
-            ? voicesResult.data.map((voice) => mapVoiceToDraft(voice, selectedTariffBook))
-            : [],
+          voices,
         });
       } catch (error) {
         if (!active) {
@@ -103,15 +109,26 @@ export function useSalCreationData() {
   );
   const selectedTariffBook = useMemo(
     () =>
-      tariffBookOptions.find((book) => book.id === state.selectedTariffBookId) ??
+      tariffBookOptions.find((book) => state.selectedTariffBookIds.includes(book.id)) ??
       tariffBookOptions[0] ??
       null,
-    [state.selectedTariffBookId, tariffBookOptions],
+    [state.selectedTariffBookIds, tariffBookOptions],
+  );
+  const selectedTariffBooks = useMemo(
+    () => tariffBookOptions.filter((book) => state.selectedTariffBookIds.includes(book.id)),
+    [state.selectedTariffBookIds, tariffBookOptions],
   );
 
   async function selectTariffBook(tariffBookId: string) {
-    const tariffBook = state.tariffBooks.find((book) => book.id === tariffBookId);
-    if (!tariffBook) {
+    const exists = state.tariffBooks.some((book) => book.id === tariffBookId);
+    if (!exists) {
+      return;
+    }
+    const isSelected = state.selectedTariffBookIds.includes(tariffBookId);
+    const nextSelectedIds = isSelected
+      ? state.selectedTariffBookIds.filter((id) => id !== tariffBookId)
+      : [...state.selectedTariffBookIds, tariffBookId];
+    if (nextSelectedIds.length === 0) {
       return;
     }
 
@@ -119,16 +136,16 @@ export function useSalCreationData() {
       ...current,
       error: null,
       isLoading: true,
-      selectedTariffBookId: tariffBookId,
+      selectedTariffBookIds: nextSelectedIds,
     }));
 
     try {
-      const voicesResult = await listDesktopTariffVoices(tariffBookId, []);
+      const voices = await loadVoicesForBooks(nextSelectedIds, state.tariffBooks);
       setState((current) => ({
         ...current,
         error: null,
         isLoading: false,
-        voices: voicesResult.data.map((voice) => mapVoiceToDraft(voice, tariffBook)),
+        voices,
       }));
     } catch (error) {
       setState((current) => ({
@@ -145,10 +162,31 @@ export function useSalCreationData() {
     isLoading: state.isLoading,
     project,
     selectedTariffBook,
+    selectedTariffBooks,
     selectTariffBook,
     tariffBookOptions,
     voices: state.voices,
   };
+}
+
+async function loadVoicesForBooks(
+  tariffBookIds: string[],
+  tariffBooks: readonly DesktopTariffBook[],
+): Promise<SalVoiceDraft[]> {
+  const selectedBooks = tariffBookIds
+    .map((id) => tariffBooks.find((book) => book.id === id))
+    .filter((book): book is DesktopTariffBook => book != null);
+  const results = await Promise.all(
+    selectedBooks.map(async (book) => {
+      const voicesResult = await listDesktopTariffVoices(book.id, []);
+      return voicesResult.data.map((voice) => mapVoiceToDraft(voice, book));
+    }),
+  );
+  const uniqueById = new Map<string, SalVoiceDraft>();
+  for (const voice of results.flat()) {
+    uniqueById.set(voice.id, voice);
+  }
+  return [...uniqueById.values()];
 }
 
 function selectContract(contracts: readonly DesktopContract[]): DesktopContract | null {

@@ -2,6 +2,7 @@
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 pdfplumber = None
@@ -33,7 +34,7 @@ WARNING_RE = re.compile(r"^(?:AVVERTENZE|AVVERTENZA|\d{6,}\s+AVVERTENZA)\b", re.
 
 def clean(value):
     safe_value = "".join(" " if 0xD800 <= ord(char) <= 0xDFFF else char for char in value)
-    return " ".join(safe_value.split())
+    return unicodedata.normalize("NFC", " ".join(safe_value.split()))
 
 
 def it_float(value):
@@ -186,4 +187,8 @@ def parse(lines):
 
 
 if __name__ == "__main__":
-    print(json.dumps(safe_json_value(parse(extract_text(Path(sys.argv[1])))), ensure_ascii=False))
+    payload = json.dumps(
+        safe_json_value(parse(extract_text(Path(sys.argv[1])))),
+        ensure_ascii=False,
+    )
+    sys.stdout.buffer.write(payload.encode("utf-8"))

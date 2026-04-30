@@ -24,6 +24,7 @@ export type ContractRecord = {
   applicationContractCode: string;
   frameworkAgreementCode: string;
   contractualAmount: Money;
+  safetyCostsNotSubjectToDiscount: Money;
   tariffPriorities: readonly TariffPriority[];
 };
 
@@ -38,6 +39,7 @@ export type DesktopContractRecord = {
   contractualAmount: Money;
   frameworkAgreementCode: string;
   id: string;
+  safetyCostsNotSubjectToDiscount: Money;
   tariffPriorities: DesktopTariffPriorityRecord[];
   title: string;
 };
@@ -47,6 +49,7 @@ export type CreateDesktopContractRecordRequest = {
   contractualAmount: number;
   frameworkAgreementCode: string;
   id: string;
+  safetyCostsNotSubjectToDiscount: number;
   tariffPriorities: DesktopTariffPriorityRecord[];
   title: string;
 };

@@ -354,13 +354,14 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     <div className="overflow-hidden rounded-[12px] border border-subtle">
       <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
         <div className="min-w-[1060px]">
-          <div className="grid grid-cols-[116px_minmax(220px,1fr)_72px_84px_84px_84px_96px_96px_120px_44px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
+          <div className="grid grid-cols-[116px_minmax(220px,1fr)_72px_84px_84px_84px_196px_96px_96px_120px_44px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
             <span>Codice</span>
             <span>Descrizione</span>
             <span>U.M.</span>
             <span className="text-right">Fattore 1</span>
             <span className="text-right">Fattore 2</span>
             <span className="text-right">Fattore 3</span>
+            <span className="text-right">F1 × F2 × F3</span>
             <span className="text-right">Quantita</span>
             <span className="text-right">Magg.</span>
             <span className="text-right">Totale riga</span>
@@ -724,7 +725,7 @@ function SelectedVoiceRow({
 }) {
   return (
     <div className="border-t border-subtle">
-      <div className="grid grid-cols-[116px_minmax(220px,1fr)_72px_84px_84px_84px_96px_96px_120px_44px] items-center px-3 py-2 text-[13px]">
+      <div className="grid grid-cols-[116px_minmax(220px,1fr)_72px_84px_84px_84px_196px_96px_96px_120px_44px] items-center px-3 py-2 text-[13px]">
         <span className="font-semibold">{line.voice.code}</span>
         <span className="min-w-0 truncate font-semibold leading-5" title={line.voice.description}>
           {truncateDescription(line.voice.description, 84)}
@@ -742,6 +743,22 @@ function SelectedVoiceRow({
           value={line.factor3}
           onChange={(value) => onFactorChange(line.voice.id, "factor3", value)}
         />
+        <span className="text-right font-mono text-[12px] text-secondary">
+          {line.factor1.toLocaleString("it-IT", {
+            maximumFractionDigits: 3,
+            minimumFractionDigits: 0,
+          })}{" "}
+          ×{" "}
+          {line.factor2.toLocaleString("it-IT", {
+            maximumFractionDigits: 3,
+            minimumFractionDigits: 0,
+          })}{" "}
+          ×{" "}
+          {line.factor3.toLocaleString("it-IT", {
+            maximumFractionDigits: 3,
+            minimumFractionDigits: 0,
+          })}
+        </span>
         <span className="text-right font-semibold text-primary">
           <NumberValue value={line.quantity} />
         </span>
@@ -906,7 +923,31 @@ function truncateDescription(description: string, maxLength = 100): string {
   if (normalized.length <= maxLength) {
     return normalized;
   }
-  return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`;
+
+  const sentenceMatches = [...normalized.matchAll(/[.!?;:]/g)].map((match) => match.index ?? -1);
+  const nextSentenceEnd = sentenceMatches.find(
+    (index) => index >= maxLength && index <= maxLength + 40,
+  );
+  if (nextSentenceEnd != null && nextSentenceEnd > 0) {
+    return `${normalized.slice(0, nextSentenceEnd + 1).trim()}...`;
+  }
+
+  const previousSentenceEnds = sentenceMatches.filter(
+    (index) => index >= maxLength - 40 && index < maxLength,
+  );
+  if (previousSentenceEnds.length > 0) {
+    const previousEnd = previousSentenceEnds[previousSentenceEnds.length - 1];
+    if (previousEnd != null) {
+      return `${normalized.slice(0, previousEnd + 1).trim()}...`;
+    }
+  }
+
+  const fallbackWordBreak = normalized.lastIndexOf(" ", maxLength);
+  if (fallbackWordBreak > 0) {
+    return `${normalized.slice(0, fallbackWordBreak).trim()}...`;
+  }
+
+  return `${normalized.slice(0, maxLength).trim()}...`;
 }
 
 function EmptyTableState({ message }: { message: string }) {

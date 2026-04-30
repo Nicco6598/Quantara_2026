@@ -92,6 +92,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build bundled RFI parser
+        run: pnpm parser:bundle
+
       - name: Prepare release notes
         id: release_notes
         run: pnpm release:notes

@@ -70,6 +70,10 @@ export async function createDesktopContract(
     },
     frameworkAgreementCode: request.frameworkAgreementCode,
     id: request.id,
+    safetyCostsNotSubjectToDiscount: {
+      amount: request.safetyCostsNotSubjectToDiscount,
+      currency: "EUR",
+    },
     tariffPriorities: request.tariffPriorities,
     title: request.title,
   };

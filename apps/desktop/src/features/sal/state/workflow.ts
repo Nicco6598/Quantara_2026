@@ -17,20 +17,20 @@ const stageMeta: Record<SalWorkflowPhase, { description: string; label: string }
     label: "Chiusura",
   },
   confirm: {
-    description: "Conferma finale con controlli bloccanti.",
+    description: "Anteprima e conferma SAL.",
     label: "Conferma",
   },
   context: {
-    description: "Contratto, tariffario e regole economiche.",
-    label: "Contesto",
+    description: "Configura contesto e tariffari.",
+    label: "Impostazione",
   },
   review: {
-    description: "Verifica economica, tecnica e budget.",
+    description: "Controlla importi e coerenze.",
     label: "Verifica",
   },
   voices: {
-    description: "Compilazione voci con tabella operativa.",
-    label: "Voci",
+    description: "Seleziona e inserisci le voci.",
+    label: "Voci e quantita",
   },
 };
 

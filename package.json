@@ -1,6 +1,6 @@
 {
   "name": "quantara",
-  "version": "0.1.55",
+  "version": "0.1.60",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -14,7 +14,7 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
-    "parser:bundle": "powershell -ExecutionPolicy Bypass -File scripts/prepare-rfi-parser-runtime.ps1",
+    "parser:bundle": "node scripts/prepare-rfi-parser-runtime.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "pnpm -r typecheck",

@@ -21,6 +21,7 @@ import {
 } from "react";
 import { ScreenShell } from "@/components/shared/Screen";
 import { useToast } from "@/components/shared/ToastProvider";
+import { useNavigate } from "@/hooks/useNavigate";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { SalCard, SalHero, SalStepper, SalWorkflowTopbar } from "./components/SalCreationChrome";
 import {
@@ -40,6 +41,7 @@ import {
   defaultSalEconomicRules,
   summarizeSalLines,
 } from "./domain/sal-calculations";
+import { buildSalDocumentView } from "./domain/sal-workflow";
 import { useSalCreationData } from "./hooks/useSalCreationData";
 import {
   buildWorkflowStages,
@@ -57,17 +59,27 @@ import type {
   SalVoiceDraft,
 } from "./types";
 
-const previousProgressiveAmount = 18_000;
-
 export function SalCreationScreen() {
   const { notify } = useToast();
+  const navigate = useNavigate();
   const data = useSalCreationData();
   const createSalProjectWithId = useSalWorkflowStore((state) => state.createProjectWithId);
   const createClosedSal = useSalWorkflowStore((state) => state.createClosedSal);
+  const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
+  const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
   const [phase, setPhase] = useState<SalWorkflowPhase>("context");
   const [lines, setLines] = useState<SalLineDraft[]>([]);
   const [economicRules, setEconomicRules] = useState<SalEconomicRules>(defaultSalEconomicRules);
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
+  const previousProgressiveAmount = useMemo(() => {
+    const projectId = data.project?.id;
+    if (!projectId) {
+      return 0;
+    }
+    return salDocuments
+      .filter((sal) => sal.projectId === projectId && sal.status === "closed")
+      .reduce((sum, sal) => sum + buildSalDocumentView(sal, tariffVoices).total, 0);
+  }, [data.project?.id, salDocuments, tariffVoices]);
   const derived = useMemo(() => {
     const contractAmount = data.project?.contractAmount ?? 0;
     const lineViews = buildLineViews(lines, economicRules);
@@ -76,13 +88,13 @@ export function SalCreationScreen() {
     const selectedIds = new Set(lines.map((line) => line.voice.id));
 
     return { checks, lineViews, selectedIds, summary };
-  }, [data.project?.contractAmount, economicRules, lines]);
+  }, [data.project?.contractAmount, economicRules, lines, previousProgressiveAmount]);
   const { checks, lineViews, selectedIds, summary } = derived;
   const hasDangerChecks = checks.some((check) => check.tone === "danger");
   const blockedPhases = useMemo(() => {
     const blocked = new Set<SalWorkflowPhase>();
 
-    if (!data.project || !data.selectedTariffBook) {
+    if (!data.project || data.selectedTariffBooks.length === 0) {
       blocked.add("context");
     }
 
@@ -95,8 +107,11 @@ export function SalCreationScreen() {
     }
 
     return blocked;
-  }, [data.project, data.selectedTariffBook, hasDangerChecks, lineViews, lines.length]);
-  const stages = useMemo(() => buildWorkflowStages(phase, blockedPhases), [blockedPhases, phase]);
+  }, [data.project, data.selectedTariffBooks.length, hasDangerChecks, lineViews, lines.length]);
+  const stages = useMemo(
+    () => buildWorkflowStages(phase, blockedPhases).filter((stage) => stage.id !== "completed"),
+    [blockedPhases, phase],
+  );
 
   const currentStep = useMemo(() => {
     if (phase === "context") return 1;
@@ -180,7 +195,7 @@ export function SalCreationScreen() {
   function goPrimary() {
     const canContinue =
       phase === "context"
-        ? Boolean(data.project && data.selectedTariffBook)
+        ? Boolean(data.project && data.selectedTariffBooks.length > 0)
         : phase === "voices"
           ? lines.length > 0 && lineViews.every((line) => line.status === "complete")
           : phase === "review"
@@ -194,7 +209,7 @@ export function SalCreationScreen() {
         message: disabledReason(
           phase,
           data.project,
-          data.selectedTariffBook,
+          data.selectedTariffBooks[0] ?? null,
           lineViews,
           hasDangerChecks,
         ),
@@ -245,7 +260,7 @@ export function SalCreationScreen() {
     });
   }
 
-  const primaryLabel = phase === "review" || phase === "confirm" ? "Conferma" : "Continua";
+  const primaryLabel = phase === "confirm" ? "Conferma" : "Continua";
 
   return (
     <ScreenShell className="min-h-full space-y-4 bg-[var(--bg-muted)] p-0">
@@ -276,6 +291,19 @@ export function SalCreationScreen() {
           <DetailView
             createdSalTitle={createdSalTitle}
             lineViews={lineViews}
+            onClose={() => {
+              if (data.project) {
+                try {
+                  window.sessionStorage.setItem(
+                    "quantara.selectedProjectDetail.v1",
+                    JSON.stringify({ id: data.project.id }),
+                  );
+                } catch {
+                  // no-op
+                }
+              }
+              navigate("project-detail");
+            }}
             onNew={() => setPhase("context")}
             project={data.project}
             summary={summary}
@@ -314,6 +342,7 @@ export function SalCreationScreen() {
             {phase === "context" ? (
               <SetupStep
                 project={data.project}
+                selectedTariffBooks={data.selectedTariffBooks}
                 selectedTariffBook={data.selectedTariffBook}
                 selectTariffBook={data.selectTariffBook}
                 setEconomicRules={setEconomicRules}
@@ -358,6 +387,7 @@ export function SalCreationScreen() {
 function SetupStep({
   economicRules,
   project,
+  selectedTariffBooks,
   selectedTariffBook,
   selectTariffBook,
   setEconomicRules,
@@ -367,6 +397,7 @@ function SetupStep({
 }: {
   economicRules: SalEconomicRules;
   project: SalProjectContext | null;
+  selectedTariffBooks: SalTariffBookOption[];
   selectedTariffBook: SalTariffBookOption | null;
   selectTariffBook: (tariffBookId: string) => Promise<void>;
   setEconomicRules: Dispatch<SetStateAction<SalEconomicRules>>;
@@ -406,11 +437,15 @@ function SetupStep({
                 <ReadOnlyField label="Nome documento / Nome SAL" value={project.salTitle} />
                 <ReadOnlyField
                   label="Anno tariffario"
-                  value={String(selectedTariffBook?.year ?? "Non selezionato")}
+                  value={
+                    selectedTariffBooks.length > 1
+                      ? "Multi tariffario"
+                      : String(selectedTariffBook?.year ?? "Non selezionato")
+                  }
                 />
               </div>
-              <div className="mt-5 rounded-[14px] border border-subtle bg-muted/20 p-4">
-                <div className="mb-3 flex items-center gap-2 font-semibold">
+              <div className="mt-5 rounded-[14px] border border-subtle bg-muted/30 p-4">
+                <div className="mb-3 flex items-center gap-2 text-[15px] font-bold text-foreground">
                   <Calculator className="size-4 text-primary" />
                   Regole economiche
                 </div>
@@ -483,15 +518,19 @@ function SetupStep({
 
       <SalCard title="Setup valorizzazione">
         <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]">
-          <div className="rounded-[14px] border border-subtle bg-muted/20 p-4">
-            <div className="text-sm font-semibold">Anno tariffario documento</div>
-            <div className="mt-4 text-3xl font-semibold">{selectedTariffBook?.year ?? "-"}</div>
+          <div className="rounded-[14px] border border-subtle bg-muted/30 p-4">
+            <div className="text-sm font-bold text-foreground">Anno tariffario documento</div>
+            <div className="mt-4 text-3xl font-bold text-foreground">
+              {selectedTariffBook?.year ?? "-"}
+            </div>
             <p className="mt-3 text-xs text-secondary">
               Le voci vengono lette dal tariffario selezionato.
             </p>
           </div>
           <div className="rounded-[14px] border border-primary/35 bg-primary/5 p-4">
-            <div className="mb-3 text-sm font-semibold text-primary">Tariffe attive</div>
+            <div className="mb-3 text-sm font-bold text-primary">
+              Tariffe attive ({selectedTariffBooks.length})
+            </div>
             <div className="grid gap-2">
               {tariffBooks.length === 0 ? (
                 <div className="text-sm text-secondary">Nessun tariffario caricato.</div>
@@ -504,8 +543,18 @@ function SetupStep({
                     type="button"
                   >
                     <span className="font-semibold">{book.name}</span>
-                    <StatusPill tone={selectedTariffBook?.id === book.id ? "info" : "success"}>
-                      {book.isPriority ? `Priorita ${book.priority}` : book.status}
+                    <StatusPill
+                      tone={
+                        selectedTariffBooks.some((selected) => selected.id === book.id)
+                          ? "info"
+                          : "success"
+                      }
+                    >
+                      {selectedTariffBooks.some((selected) => selected.id === book.id)
+                        ? "Selezionato"
+                        : book.isPriority
+                          ? `Priorita ${book.priority}`
+                          : book.status}
                     </StatusPill>
                   </button>
                 ))
@@ -513,14 +562,14 @@ function SetupStep({
             </div>
           </div>
           <div className="rounded-[14px] border border-subtle p-4">
-            <div className="text-sm font-semibold">Maggiorazioni compatibili</div>
+            <div className="text-sm font-bold text-foreground">Maggiorazioni compatibili</div>
             <div className="mt-4 grid gap-3">
               <RuleChip label="Diurna +10%" />
               <RuleChip label="Notturna +25%" />
             </div>
           </div>
           <div className="rounded-[14px] border border-subtle p-4">
-            <div className="text-sm font-semibold">Criteri di ribasso</div>
+            <div className="text-sm font-bold text-foreground">Criteri di ribasso</div>
             <SummaryLine label="Voci ordinarie" value="Soggette" />
             <SummaryLine label="Voci OS" value="Escluse" tone="warning" />
             <SummaryLine label="Voci disponibili" value={String(voicesCount)} />
@@ -775,12 +824,14 @@ function ConfirmStep({
 function DetailView({
   createdSalTitle,
   lineViews,
+  onClose,
   onNew,
   project,
   summary,
 }: {
   createdSalTitle: string;
   lineViews: SalLineView[];
+  onClose: () => void;
   onNew: () => void;
   project: SalProjectContext | null;
   summary: SalEconomicSummary;
@@ -860,6 +911,13 @@ function DetailView({
             </div>
           </SalCard>
           <button
+            className="sal-secondary-button w-full justify-center"
+            onClick={onClose}
+            type="button"
+          >
+            Chiudi
+          </button>
+          <button
             className="sal-primary-button w-full justify-center"
             onClick={onNew}
             type="button"
@@ -906,9 +964,11 @@ function Metric({
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="text-xs font-semibold text-secondary">
-      <span>{label}</span>
-      <div className="mt-1 min-h-10 rounded-[10px] border border-subtle bg-card px-3 py-2 text-sm font-semibold text-foreground">
+    <div>
+      <span className="text-xs font-semibold uppercase tracking-[0.06em] text-secondary">
+        {label}
+      </span>
+      <div className="mt-1 min-h-10 rounded-[10px] border border-subtle bg-muted/40 px-3 py-2 text-sm font-semibold text-foreground">
         {value}
       </div>
     </div>
@@ -926,14 +986,12 @@ function ContextTile({
 }) {
   return (
     <div className="border-b border-subtle px-5 py-4 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-secondary">
-        {label}
-      </div>
+      <div className="text-xs font-semibold uppercase tracking-[0.1em] text-secondary">{label}</div>
       <div
         className={
           tone === "success"
-            ? "mt-1 truncate text-[15px] font-bold text-success"
-            : "mt-1 truncate text-[15px] font-bold text-foreground"
+            ? "mt-1.5 truncate text-[17px] font-bold text-success"
+            : "mt-1.5 truncate text-[17px] font-bold text-foreground"
         }
       >
         {value}
@@ -953,18 +1011,18 @@ function SummaryLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-subtle py-3 text-sm last:border-b-0">
-      <span className="text-secondary">{label}</span>
+      <span className="font-medium text-secondary">{label}</span>
       <strong
         className={
           tone === "danger"
-            ? "text-danger"
+            ? "font-bold text-danger"
             : tone === "success"
-              ? "text-success"
+              ? "font-bold text-success"
               : tone === "warning"
-                ? "text-warning"
+                ? "font-bold text-warning"
                 : tone === "info"
-                  ? "text-primary"
-                  : "text-foreground"
+                  ? "font-bold text-primary"
+                  : "font-bold text-foreground"
         }
       >
         {value}

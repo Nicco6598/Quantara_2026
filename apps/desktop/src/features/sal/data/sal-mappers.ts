@@ -52,7 +52,7 @@ export function mapVoiceToDraft(
   return {
     category: voice.category,
     code: voice.officialCode,
-    description: voice.description,
+    description: truncateVoiceDescription(voice.description),
     id: createDesktopVoiceKey(voice.tariffBookId, voice.id),
     isSafetyCost: isSafetyVoice(voice),
     laborPercentage: voice.laborPercentage ?? 0,
@@ -82,4 +82,34 @@ function isSafetyVoice(voice: DesktopTariffVoice) {
     searchable.startsWith("os") ||
     voice.category.toLowerCase().includes("safety")
   );
+}
+
+function truncateVoiceDescription(description: string, maxLength = 100): string {
+  const normalized = description.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  const sentenceMatches = [...normalized.matchAll(/[.!?;:]/g)].map((match) => match.index ?? -1);
+  const after = sentenceMatches.find((index) => index >= maxLength && index <= maxLength + 40);
+  if (after != null && after > 0) {
+    return `${normalized.slice(0, after + 1).trim()}...`;
+  }
+
+  const beforeCandidates = sentenceMatches.filter(
+    (index) => index >= maxLength - 40 && index < maxLength,
+  );
+  if (beforeCandidates.length > 0) {
+    const before = beforeCandidates[beforeCandidates.length - 1];
+    if (before != null) {
+      return `${normalized.slice(0, before + 1).trim()}...`;
+    }
+  }
+
+  const fallbackSplit = normalized.lastIndexOf(" ", maxLength);
+  if (fallbackSplit > 0) {
+    return `${normalized.slice(0, fallbackSplit).trim()}...`;
+  }
+
+  return `${normalized.slice(0, maxLength).trim()}...`;
 }

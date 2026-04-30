@@ -2,6 +2,13 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.60 - 2026-04-30
+
+- Fix import tariffari cross-platform: il bundle Tauri include ora il parser nella posizione corretta e la release desktop non dipende piu da `py -3` sul client.
+- Fix caratteri speciali nell'import: l'output del parser viene letto in modo strict e con fallback Windows-1252, cosi accenti e simboli tecnici non diventano piu `?` o `�` nei nuovi import.
+- Vari Fix applicati a schermate Dashboard, Creazione Progetto e Creazione SAL.
+- Migliorata la UX dell'import: il parser gira senza finestra terminal visibile durante il caricamento.
+
 ## 0.1.55 - 2026-04-29
 
 - Rework del flusso SAL: separati selezione voci, tabella di modifica e recap economico per avere una vista piu chiara e usabile.

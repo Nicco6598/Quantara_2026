@@ -20,6 +20,7 @@ pub struct CreateContractRequest {
     pub contractual_amount: f64,
     pub framework_agreement_code: String,
     pub id: String,
+    pub safety_costs_not_subject_to_discount: f64,
     pub tariff_priorities: Vec<TariffPriorityRecord>,
     pub title: String,
 }
@@ -33,6 +34,7 @@ pub struct ContractRecord {
     pub contractual_amount: Money,
     pub framework_agreement_code: String,
     pub id: String,
+    pub safety_costs_not_subject_to_discount: Money,
     pub tariff_priorities: Vec<TariffPriorityRecord>,
     pub title: String,
 }
@@ -43,6 +45,7 @@ pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, Ap
     let mut statement = connection
         .prepare(
             "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
+             , safety_costs_not_subject_to_discount_cents
              FROM contracts
              ORDER BY updated_at DESC, title ASC",
         )
@@ -72,6 +75,7 @@ pub fn get_contract(
     let mut contract = connection
         .query_row(
             "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
+             , safety_costs_not_subject_to_discount_cents
              FROM contracts
              WHERE id = ?1",
             [contract_id],
@@ -96,6 +100,7 @@ pub fn create_contract(
 
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
+    let safety_costs_cents = money_to_cents(request.safety_costs_not_subject_to_discount);
 
     transaction
         .execute(
@@ -104,14 +109,16 @@ pub fn create_contract(
                 title,
                 application_contract_code,
                 framework_agreement_code,
-                contractual_amount_cents
-             ) VALUES (?1, ?2, ?3, ?4, ?5)",
+                contractual_amount_cents,
+                safety_costs_not_subject_to_discount_cents
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 request.id,
                 request.title,
                 request.application_contract_code,
                 request.framework_agreement_code,
-                amount_cents
+                amount_cents,
+                safety_costs_cents
             ],
         )
         .map_err(to_database_error)?;
@@ -147,6 +154,7 @@ pub fn update_contract(
 
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
+    let safety_costs_cents = money_to_cents(request.safety_costs_not_subject_to_discount);
 
     let updated = transaction
         .execute(
@@ -155,13 +163,15 @@ pub fn update_contract(
                  application_contract_code = ?2,
                  framework_agreement_code = ?3,
                  contractual_amount_cents = ?4,
+                 safety_costs_not_subject_to_discount_cents = ?5,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?5",
+             WHERE id = ?6",
             params![
                 request.title,
                 request.application_contract_code,
                 request.framework_agreement_code,
                 amount_cents,
+                safety_costs_cents,
                 contract_id
             ],
         )
@@ -210,7 +220,10 @@ pub fn delete_contract(connection: &mut Connection, contract_id: &str) -> Result
         )
         .map_err(to_database_error)?;
     transaction
-        .execute("DELETE FROM sal_documents WHERE contract_id = ?1", [contract_id])
+        .execute(
+            "DELETE FROM sal_documents WHERE contract_id = ?1",
+            [contract_id],
+        )
         .map_err(to_database_error)?;
     transaction
         .execute("DELETE FROM contracts WHERE id = ?1", [contract_id])
@@ -248,6 +261,7 @@ fn list_priorities(
 
 fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord> {
     let amount_cents: i64 = row.get(4)?;
+    let safety_costs_cents: i64 = row.get(5)?;
 
     Ok(ContractRecord {
         application_contract_code: row.get(2)?,
@@ -257,6 +271,10 @@ fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord>
         },
         framework_agreement_code: row.get(3)?,
         id: row.get(0)?,
+        safety_costs_not_subject_to_discount: Money {
+            amount: cents_to_money(safety_costs_cents),
+            currency: "EUR",
+        },
         tariff_priorities: Vec::new(),
         title: row.get(1)?,
     })
@@ -279,9 +297,17 @@ fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppE
         ));
     }
 
-    if request.tariff_priorities.is_empty() {
+    if !request.safety_costs_not_subject_to_discount.is_finite()
+        || request.safety_costs_not_subject_to_discount < 0.0
+    {
         return Err(AppError::Validation(
-            "at least one tariff priority is required".into(),
+            "safety costs must be a finite non-negative number".into(),
+        ));
+    }
+
+    if request.safety_costs_not_subject_to_discount > request.contractual_amount {
+        return Err(AppError::Validation(
+            "safety costs cannot exceed contractual amount".into(),
         ));
     }
 
@@ -331,6 +357,10 @@ mod tests {
 
         assert_eq!(created.id, "contract_milano_verona");
         assert_eq!(created.contractual_amount.amount, 26_150_000.25);
+        assert_eq!(
+            created.safety_costs_not_subject_to_discount.amount,
+            250_000.45
+        );
         assert_eq!(created.tariff_priorities.len(), 2);
 
         let contracts = list_contracts(&connection).expect("contracts listed");
@@ -377,14 +407,14 @@ mod tests {
     }
 
     #[test]
-    fn rejects_contract_without_tariff_priorities() {
+    fn creates_contract_without_tariff_priorities() {
         let mut connection = Connection::open_in_memory().expect("in-memory db");
         let mut request = sample_contract();
         request.tariff_priorities = Vec::new();
 
-        let result = create_contract(&mut connection, request);
+        let created = create_contract(&mut connection, request).expect("contract created");
 
-        assert!(result.is_err());
+        assert!(created.tariff_priorities.is_empty());
     }
 
     fn sample_contract() -> CreateContractRequest {
@@ -393,6 +423,7 @@ mod tests {
             contractual_amount: 26_150_000.25,
             framework_agreement_code: "AQ-RFI-2026".into(),
             id: "contract_milano_verona".into(),
+            safety_costs_not_subject_to_discount: 250_000.45,
             tariff_priorities: vec![
                 TariffPriorityRecord {
                     priority: 1,

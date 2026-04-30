@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, ArrowRight, Building2, FileText, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Check, FileText, Save } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { SalWorkflowStage } from "../state/workflow";
@@ -21,7 +21,7 @@ export function SalWorkflowTopbar({
   showPrimary?: boolean;
 }) {
   return (
-    <div className="flex min-h-14 items-center justify-end gap-3 border-b border-subtle bg-card/95 px-7">
+    <div className="flex min-h-16 items-center justify-end gap-3 border-b border-subtle bg-card px-7">
       <div className="flex items-center gap-3">
         {canGoBack ? (
           <button className="sal-outline-button" onClick={onBack} type="button">
@@ -62,7 +62,7 @@ export function SalHero({
           <Icon className="size-8" />
         </div>
         <div>
-          <h1 className="text-[30px] font-semibold leading-tight text-foreground">{title}</h1>
+          <h1 className="text-[52px] font-semibold leading-[1] text-foreground">{title}</h1>
           <p className="mt-1 text-[15px] text-secondary">{subtitle}</p>
         </div>
       </div>
@@ -93,8 +93,8 @@ export function SalHero({
 
 export function SalStepper({ stages }: { stages: SalWorkflowStage[] }) {
   return (
-    <nav className="sal-panel grid gap-3 p-3 lg:grid-cols-5">
-      {stages.map((stage) => {
+    <nav className="sal-panel grid gap-2 p-2 lg:grid-cols-4">
+      {stages.map((stage, index) => {
         const isCompleted = stage.status === "completed";
         const isCurrent = stage.status === "current";
         const isBlocked = stage.status === "blocked";
@@ -102,53 +102,37 @@ export function SalStepper({ stages }: { stages: SalWorkflowStage[] }) {
         return (
           <div
             className={cn(
-              "relative rounded-[14px] border px-4 py-3 transition-colors",
-              isCurrent &&
-                "border-primary/45 bg-primary/8 shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_24%,transparent)]",
-              isCompleted && "border-success/30 bg-success/8",
+              "relative rounded-[12px] border px-4 py-3 transition-colors",
+              isCurrent && "border-primary/45 bg-primary/8",
+              isCompleted && "border-success/25 bg-success/8",
               isBlocked && "border-warning/35 bg-warning/10",
               !isCurrent && !isCompleted && !isBlocked && "border-subtle bg-card",
             )}
             key={stage.id}
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="mb-2 flex items-center gap-3">
               <span
                 className={cn(
-                  "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]",
+                  "inline-flex size-8 items-center justify-center rounded-full text-sm font-bold",
                   isCurrent && "bg-primary text-white",
-                  isCompleted && "bg-success/16 text-success",
-                  isBlocked && "bg-warning/20 text-warning",
+                  isCompleted && "bg-success/15 text-success",
+                  isBlocked && "bg-warning/15 text-warning",
                   !isCurrent && !isCompleted && !isBlocked && "bg-muted text-secondary",
                 )}
               >
-                {isCompleted
-                  ? "Completato"
-                  : isCurrent
-                    ? "In corso"
-                    : isBlocked
-                      ? "Bloccato"
-                      : "Pronto"}
+                {isCompleted ? <Check className="size-4" /> : index + 1}
               </span>
-              <span
+              <div
                 className={cn(
-                  "size-2 rounded-full",
-                  isCurrent && "bg-primary animate-pulse",
-                  isCompleted && "bg-success",
-                  isBlocked && "bg-warning",
-                  !isCurrent && !isCompleted && !isBlocked && "bg-secondary/45",
+                  "text-[15px] font-semibold",
+                  isCurrent && "text-primary",
+                  isCompleted && "text-success",
+                  isBlocked && "text-warning",
+                  !isCurrent && !isCompleted && !isBlocked && "text-foreground",
                 )}
-              />
-            </div>
-            <div
-              className={cn(
-                "text-sm font-semibold",
-                isCurrent && "text-primary",
-                isCompleted && "text-success",
-                isBlocked && "text-warning",
-                !isCurrent && !isCompleted && !isBlocked && "text-foreground",
-              )}
-            >
-              {stage.label}
+              >
+                {stage.label}
+              </div>
             </div>
             <p className="mt-1 text-xs text-secondary">{stage.description}</p>
           </div>
@@ -170,10 +154,12 @@ export function SalCard({
   title: string;
 }) {
   return (
-    <section className={cn("sal-panel p-4", className)}>
-      <div className="mb-4 flex items-center gap-2">
-        <Icon className="size-5 text-primary" />
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+    <section className={cn("sal-panel p-5", className)}>
+      <div className="mb-4 flex items-center gap-2.5">
+        <div className="flex size-8 items-center justify-center rounded-[10px] bg-primary/10">
+          <Icon className="size-4 text-primary" />
+        </div>
+        <h2 className="text-[15px] font-bold text-foreground">{title}</h2>
       </div>
       {children}
     </section>

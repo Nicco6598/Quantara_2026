@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/shared/ToastProvider";
 import {
+  buildActionSummary,
   buildActivityRows,
   buildFocusRows,
+  buildMilestones,
   buildOverviewMetrics,
   Hero,
   MetricCard,
@@ -10,15 +13,16 @@ import {
   PriorityActions,
   RightRail,
 } from "@/features/dashboard/components/DashboardSections";
-import {
-  mapContractToProject,
-  type PortfolioProject,
-  portfolioProjects,
-} from "@/features/projects/ProjectsScreen";
-import { listDesktopContracts } from "@/lib/desktopData";
+import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
+import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 export function DashboardScreen() {
-  const [projects, setProjects] = useState<PortfolioProject[]>(portfolioProjects);
+  const { notify } = useToast();
+  const [projects, setProjects] = useState<PortfolioProject[]>([]);
+  const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
+  const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
 
   useEffect(() => {
     let active = true;
@@ -28,8 +32,7 @@ export function DashboardScreen() {
         return;
       }
 
-      const runtimeProjects = contracts.data.map(mapContractToProject);
-      setProjects(runtimeProjects.length > 0 ? runtimeProjects : portfolioProjects);
+      setProjects(contracts.data.map(mapContractToProject));
     });
 
     return () => {
@@ -38,9 +41,62 @@ export function DashboardScreen() {
   }, []);
 
   const metrics = useMemo(() => buildOverviewMetrics(projects), [projects]);
-  const rows = useMemo(() => projects.slice(0, 2), [projects]);
+  const rows = useMemo(() => projects, [projects]);
   const distribution = useMemo(() => buildFocusRows(projects), [projects]);
   const activities = useMemo(() => buildActivityRows(projects), [projects]);
+  const priorityActions = useMemo(() => buildActionSummary(projects), [projects]);
+  const milestones = useMemo(() => buildMilestones(projects), [projects]);
+  const operationalByProjectId = useMemo(() => {
+    const totals = new Map<
+      string,
+      { approvedAmount: number; committedAmount: number; progressPercent: number }
+    >();
+    const contractBudgetById = new Map(
+      projects.map((project) => [project.id, project.budget.amount]),
+    );
+
+    for (const document of salDocuments) {
+      const view = buildSalDocumentView(document, tariffVoices);
+      const current = totals.get(document.projectId) ?? {
+        approvedAmount: 0,
+        committedAmount: 0,
+        progressPercent: 0,
+      };
+
+      const committedAmount = current.committedAmount + view.total;
+      const approvedAmount =
+        document.status === "closed" ? current.approvedAmount + view.total : current.approvedAmount;
+      const budgetAmount = contractBudgetById.get(document.projectId) ?? 0;
+      const progressPercent =
+        budgetAmount > 0 ? Math.min(100, (committedAmount / budgetAmount) * 100) : 0;
+
+      totals.set(document.projectId, {
+        approvedAmount,
+        committedAmount,
+        progressPercent,
+      });
+    }
+
+    return totals;
+  }, [projects, salDocuments, tariffVoices]);
+
+  async function handleDeleteProject(projectId: string) {
+    try {
+      await deleteDesktopContract(projectId);
+      setProjects((current) => current.filter((project) => project.id !== projectId));
+      notify({
+        message: "Il progetto e stato rimosso dalla dashboard.",
+        title: "Progetto eliminato",
+        tone: "success",
+      });
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Eliminazione non riuscita",
+        tone: "danger",
+      });
+    }
+  }
 
   return (
     <div className="pt-4 md:pt-6 2xl:pt-7">
@@ -54,14 +110,22 @@ export function DashboardScreen() {
             ))}
           </div>
 
-          <PriorityActions />
+          <PriorityActions summary={priorityActions} />
 
-          <OperationalSites projects={rows} />
+          <OperationalSites
+            onDeleteProject={handleDeleteProject}
+            operationalByProjectId={operationalByProjectId}
+            projects={rows}
+          />
 
-          <Milestones />
+          <Milestones items={milestones} />
         </div>
 
-        <RightRail activities={activities} distribution={distribution} />
+        <RightRail
+          activities={activities}
+          distribution={distribution}
+          projectCount={projects.length}
+        />
       </div>
     </div>
   );

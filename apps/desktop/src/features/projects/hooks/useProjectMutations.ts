@@ -174,6 +174,9 @@ export function useProjectMutations({
         contractorName: projectContractors[contract.id] ?? "",
         contractualAmount: String(contract.contractualAmount.amount),
         frameworkAgreementCode: contract.frameworkAgreementCode,
+        safetyCostsNotSubjectToDiscount: String(
+          contract.safetyCostsNotSubjectToDiscount?.amount ?? 0,
+        ),
         tariffBookId: contract.tariffPriorities[0]?.tariffBookId ?? tariffBookId,
         title: contract.title,
       },
