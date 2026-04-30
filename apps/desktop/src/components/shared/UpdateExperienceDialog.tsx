@@ -1,7 +1,8 @@
-import { CheckCircle2, Clock3, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Clock3, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react";
+import { motion } from "framer-motion";
 import { createPortal } from "react-dom";
-import { Button } from "@/components/shared/Button";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
+import { cn } from "@/lib/utils";
 
 type UpdateExperienceDialogProps = {
   installState: UpdateInstallState | { message: string; phase: "error" } | { phase: "idle" };
@@ -18,6 +19,7 @@ export function UpdateExperienceDialog({
 }: UpdateExperienceDialogProps) {
   const notes = normalizeNotes(update.notes);
   const isBusy = installState.phase === "installing";
+  const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
 
   return createPortal(
     <div
@@ -32,99 +34,144 @@ export function UpdateExperienceDialog({
         onClick={onClose}
         type="button"
       />
-      <section className="relative max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-[24px] border border-subtle bg-card shadow-panel">
-        <div className="flex items-center justify-between gap-4 border-b border-subtle px-5 py-4">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
-              Aggiornamento disponibile
-            </div>
-            <h3 className="mt-1 text-lg font-semibold text-foreground">
-              Da v{update.currentVersion} a v{update.version}
-            </h3>
-          </div>
-          <button
-            aria-label="Chiudi updater"
-            className="flex size-9 items-center justify-center rounded-[14px] text-secondary transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={isBusy}
-            onClick={onClose}
-            type="button"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="grid min-h-0 lg:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="min-h-0 p-5">
+      <motion.div
+        className="relative w-full max-w-3xl overflow-hidden rounded-[30px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        initial={{ opacity: 0, y: 24, scale: 0.96 }}
+        transition={{ duration: 0.5, ease: SOFT_EASE }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+      >
+        <div className="rounded-[24px] bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          <div className="flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-info/25 bg-info-soft px-3 py-1 text-xs font-semibold text-info">
-                <Sparkles className="size-3.5" />
-                Nuova versione pronta
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                Aggiornamento disponibile
               </div>
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
-                Controlla cosa cambia prima di installare
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-secondary">
-                Quantara scarichera la patch, applichera l&apos;update e riaprira l&apos;app sulla
-                nuova versione. In sviluppo il pulsante installazione serve solo a verificare lo
-                stato errore.
-              </p>
+              <h3 className="mt-1 text-[18px] font-semibold text-[var(--text-primary)]">
+                Da v{update.currentVersion} a v{update.version}
+              </h3>
             </div>
-
-            <div className="mt-5 max-h-[38vh] space-y-2 overflow-y-auto pr-1 text-sm leading-6">
-              {notes.length > 0 ? (
-                notes.map((note) => (
-                  <div
-                    className="flex gap-3 rounded-[18px] border border-subtle bg-muted/35 px-4 py-3"
-                    key={note.key}
-                  >
-                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                    {note.text}
-                  </div>
-                ))
-              ) : (
-                <p className="rounded-[18px] border border-dashed border-subtle bg-muted/35 px-4 py-4 text-secondary">
-                  Nessuna nota release disponibile per questa build.
-                </p>
-              )}
-            </div>
+            <button
+              aria-label="Chiudi updater"
+              className="flex size-9 items-center justify-center rounded-[14px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isBusy}
+              onClick={onClose}
+              type="button"
+            >
+              <X className="size-4" />
+            </button>
           </div>
 
-          <aside className="border-t border-subtle bg-muted/30 p-5 lg:border-l lg:border-t-0">
-            <div className="space-y-3">
-              <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
-              <MetricPill icon={Clock3} label="Check" value={formatTimestamp(update.checkedAt)} />
-              <MetricPill icon={ShieldCheck} label="Canale" value="Stable" />
-            </div>
+          <div className="grid min-h-0 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="p-5">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+                <Sparkles className="size-3" />
+                Nuova versione pronta
+              </span>
+              <h2 className="mt-4 text-[22px] font-semibold leading-tight text-[var(--text-primary)]">
+                Cosa cambia in v{update.version}
+              </h2>
+              <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+                Quantara scaricherà la patch, applicherà l'update e riaprirà l'app sulla nuova versione.
+              </p>
 
-            {installState.phase === "error" ? (
-              <div className="mt-4 rounded-[18px] border border-danger/25 bg-danger/10 px-4 py-3 text-sm leading-6 text-danger">
-                {installState.message}
-              </div>
-            ) : null}
-
-            <div className="mt-5 flex flex-col gap-2">
-              <Button disabled={isBusy} onClick={onInstall} type="button">
-                {isBusy ? (
-                  <>
-                    <LoaderCircle className="size-4 animate-spin" />
-                    Installazione
-                  </>
+              <div className="mt-5 max-h-[38vh] space-y-2 overflow-y-auto pr-1">
+                {notes.length > 0 ? (
+                  notes.map((note, i) => (
+                    <div
+                      className="flex items-start gap-3 rounded-[14px] bg-[var(--bg-muted)] px-4 py-3 ring-1 ring-[var(--border-subtle)]"
+                      key={note.key}
+                    >
+                      <span
+                        className={cn(
+                          "mt-1 size-2 shrink-0 rounded-full",
+                          i < notes.length / 3
+                            ? "bg-[var(--success-base)]"
+                            : i < (notes.length * 2) / 3
+                              ? "bg-[var(--info-base)]"
+                              : "bg-[var(--accent-primary)]",
+                        )}
+                      />
+                      <span className="text-[13px] leading-5 text-[var(--text-primary)]">{note.text}</span>
+                    </div>
+                  ))
                 ) : (
-                  <>
-                    <CheckCircle2 className="size-4" />
-                    Aggiorna e riavvia
-                  </>
+                  <div className="rounded-[14px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 py-4 text-center text-[13px] text-[var(--text-secondary)]">
+                    Nessuna nota release disponibile per questa build.
+                  </div>
                 )}
-              </Button>
-              <Button disabled={isBusy} onClick={onClose} type="button" variant="secondary">
-                Piu tardi
-              </Button>
+              </div>
             </div>
-          </aside>
+
+            <aside className="border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_30%,transparent)] p-5 lg:border-l lg:border-t-0">
+              <div className="space-y-3">
+                <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
+                <MetricPill icon={Clock3} label="Controllo" value={formatTimestamp(update.checkedAt)} />
+                <MetricPill icon={ShieldCheck} label="Canale" value="Stable" />
+              </div>
+
+              {installState.phase === "error" ? (
+                <div className="mt-4 rounded-[14px] bg-[var(--danger-soft)] px-4 py-3 text-[13px] font-medium text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)]">
+                  {installState.message}
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex flex-col gap-2">
+                <ActionButton disabled={isBusy} onClick={onInstall}>
+                  {isBusy ? (
+                    <>
+                      <LoaderCircle className="size-4 animate-spin" />
+                      Installazione in corso...
+                    </>
+                  ) : (
+                    <>
+                      Aggiorna e riavvia
+                    </>
+                  )}
+                </ActionButton>
+                <button
+                  className="group inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-5 text-[13px] font-semibold text-[var(--text-primary)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isBusy}
+                  onClick={onClose}
+                  type="button"
+                >
+                  Più tardi
+                </button>
+              </div>
+            </aside>
+          </div>
         </div>
-      </section>
+      </motion.div>
     </div>,
     document.body,
+  );
+}
+
+function ActionButton({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      className="group inline-flex h-11 w-full shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+      {...(!disabled ? { whileHover: { y: -1 }, whileTap: { scale: 0.97 } } : {})}
+    >
+      <span>{children}</span>
+      <span className="flex size-9 items-center justify-center rounded-full bg-white/16 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-105">
+        {disabled ? (
+          <LoaderCircle className="size-4 animate-spin" />
+        ) : (
+          <ArrowUpRight className="size-4" />
+        )}
+      </span>
+    </motion.button>
   );
 }
 
@@ -138,14 +185,14 @@ function MetricPill({
   value: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-subtle bg-card px-4 py-3">
+    <div className="rounded-[16px] bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
       <div className="flex items-center gap-3">
-        <Icon className="size-4 text-primary" />
+        <Icon className="size-4 text-[var(--info-base)]" />
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-secondary">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
             {label}
           </div>
-          <div className="text-sm font-semibold text-foreground">{value}</div>
+          <div className="mt-0.5 text-[13px] font-semibold text-[var(--text-primary)]">{value}</div>
         </div>
       </div>
     </div>
