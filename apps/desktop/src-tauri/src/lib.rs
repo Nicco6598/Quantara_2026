@@ -28,7 +28,14 @@ pub fn run() {
             commands::tariffs::update_tariff_book,
             commands::tariffs::delete_tariff_book,
             commands::tariffs::list_tariff_voices,
-            commands::tariffs::import_tariff_pdf_preview
+            commands::tariffs::import_tariff_pdf_preview,
+            commands::materials::list_materials,
+            commands::materials::create_material,
+            commands::materials::update_material,
+            commands::materials::delete_material,
+            commands::materials::adjust_material_stock,
+            commands::materials::deduct_materials,
+            commands::materials::list_material_transactions,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Quantara desktop");

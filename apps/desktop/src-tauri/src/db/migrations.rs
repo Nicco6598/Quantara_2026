@@ -12,6 +12,8 @@ pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<(
     ensure_tariff_voice_labor_percentage(connection)?;
     ensure_contract_safety_cost_column(connection)?;
 
+    connection.execute_batch(include_str!("../../migrations/0003_materials.sql"))?;
+
     Ok(())
 }
 
