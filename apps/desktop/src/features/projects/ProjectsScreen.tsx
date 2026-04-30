@@ -8,7 +8,6 @@ import {
   useState,
   useTransition,
 } from "react";
-import { ScreenShell } from "@/components/shared/Screen";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
 import { ContractorModal } from "@/features/projects/components/ContractorModal";
@@ -34,6 +33,7 @@ import {
   listDesktopTariffBooks,
 } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
+import { dispatchDataChanged } from "@/lib/sync-events";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { fallbackProjectTariffBook, focusOptions } from "./projects-data";
@@ -224,6 +224,7 @@ export function ProjectsScreen() {
     setIsContractorModalOpen(false);
     setCreateState("saved");
     setCreateMessage(`${contractorName} creato tra gli appaltatori.`);
+    dispatchDataChanged();
   }
 
   function handleEditFromActions(project: PortfolioProject) {
@@ -317,14 +318,16 @@ export function ProjectsScreen() {
     portfolioMetrics;
 
   return (
-    <ScreenShell>
+    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
+
       {createMessage ? (
         <div
           className={cn(
-            "mb-4 rounded-[16px] border px-4 py-3 text-[13px] font-medium shadow-none",
+            "mb-4 rounded-[14px] border px-4 py-3 text-[13px] font-medium",
             createState === "error"
-              ? "border-[var(--danger-base)]/25 bg-[var(--danger-soft)] text-[var(--danger-base)]"
-              : "border-[var(--success-base)]/25 bg-[var(--success-soft)] text-[var(--success-base)]",
+              ? "border-[var(--danger-soft)] bg-[var(--danger-soft)] text-[var(--danger-base)]"
+              : "border-[var(--success-soft)] bg-[var(--success-soft)] text-[var(--success-base)]",
           )}
           role="status"
         >
@@ -426,6 +429,6 @@ export function ProjectsScreen() {
         onUpdateQuantity={updateSalLineQuantity}
         onUpdateSurcharge={updateSalLineSurcharge}
       />
-    </ScreenShell>
+    </main>
   );
 }

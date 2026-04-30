@@ -14,6 +14,7 @@ import {
   deleteDesktopContract,
   updateDesktopContract,
 } from "@/lib/desktopData";
+import { dispatchDataChanged } from "@/lib/sync-events";
 
 type CreateState = "idle" | "saving" | "saved" | "error";
 
@@ -82,6 +83,7 @@ export function useProjectMutations({
       setSelectedContractId(created.id);
       setCreateState("saved");
       setCreateMessage(`${created.title} creato.`);
+      dispatchDataChanged();
       notify({
         message: `${created.title} e pronto nel registro progetti.`,
         title: "Progetto creato",
@@ -134,6 +136,7 @@ export function useProjectMutations({
       setCreateState("saved");
       setCreateMessage(`${updated.title} aggiornato.`);
       setEditingProject(null);
+      dispatchDataChanged();
       notify({
         message: `${updated.title} aggiornato correttamente.`,
         title: "Progetto aggiornato",
@@ -205,6 +208,7 @@ export function useProjectMutations({
       }
       setCreateState("saved");
       setCreateMessage(`${deletedContract?.title ?? "Progetto"} eliminato.`);
+      dispatchDataChanged();
       notify({
         message: `${deletedContract?.title ?? "Progetto"} eliminato dal registro.`,
         title: "Progetto eliminato",

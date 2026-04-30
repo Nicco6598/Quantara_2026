@@ -12,6 +12,7 @@ import {
   type AvailableAppUpdate,
   dismissPendingAppUpdate,
   installPendingAppUpdate,
+  runAppUpdateCheck,
   type UpdateInstallState,
 } from "@/lib/appUpdater";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
@@ -104,11 +105,44 @@ function AppShell() {
         return;
       }
 
-      notify({
-        message: "I filtri globali saranno disponibili dalla command palette.",
-        title: "Filtri",
-        tone: "info",
-      });
+      if (actionId === "notifications") {
+        notify({
+          message: "Pannello notifiche in arrivo con una delle prossime release.",
+          title: "Notifiche",
+          tone: "info",
+        });
+        return;
+      }
+
+      if (actionId === "check-updates") {
+        notify({
+          message: "Verifica aggiornamenti in corso...",
+          title: "Aggiornamenti",
+          tone: "info",
+        });
+        runAppUpdateCheck({ promptForInstall: false }).then((result) => {
+          if (result.kind === "up-to-date") {
+            notify({
+              message: "Build allineata all'ultima release disponibile.",
+              title: "Aggiornato",
+              tone: "success",
+            });
+          } else if (result.kind === "available") {
+            notify({
+              message: `${result.version} disponibile per installazione.`,
+              title: "Nuova release",
+              tone: "warning",
+            });
+          } else if (result.kind === "error" || result.kind === "unsupported") {
+            notify({
+              message: result.message,
+              title: "Controllo non riuscito",
+              tone: "danger",
+            });
+          }
+        });
+        return;
+      }
     },
     [activeRoute, navigate, notify],
   );
@@ -268,8 +302,8 @@ function AppShell() {
 
       <AppSidebar activeRoute={activeRoute} onRouteChange={navigate} />
 
-      <main className="min-w-0 flex-1 overflow-hidden p-[14px] pl-[16px]">
-        <section className="flex h-full min-w-0 overflow-hidden rounded-[18px] bg-[var(--surface-base)] shadow-none ring-1 ring-[color-mix(in_srgb,var(--surface-base)_72%,var(--accent-primary)_28%)]">
+      <main className="min-w-0 flex-1 overflow-hidden p-0">
+        <section className="main-content-shell flex h-full min-w-0 overflow-hidden rounded-l-[28px] rounded-r-none bg-[var(--surface-base)]">
           <div className="flex min-w-0 flex-1 flex-col">
             <TopToolbar
               onOpenCommandPalette={(anchorRect) => {
