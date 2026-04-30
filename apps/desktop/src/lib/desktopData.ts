@@ -33,7 +33,7 @@ export type DesktopDataResult<T> =
       source: "fallback";
     };
 
-type InflightKey = "contracts" | `tariff-books:${number}` | `tariff-voices:${string}:${number}`;
+type InflightKey = "contracts" | "materials" | `tariff-books:${number}` | `tariff-voices:${string}:${number}`;
 
 const inflightRequests = new Map<InflightKey, Promise<DesktopDataResult<unknown>>>();
 
@@ -155,7 +155,13 @@ export async function listDesktopTariffVoices(
   );
 }
 
-export async function selectTariffPdfMetadata(): Promise<TariffPdfMetadata | null> {
+export async function selectTariffPdfMetadata({
+  onFileSelected,
+  onPreviewStart,
+}: {
+  onFileSelected?: (path: string) => void;
+  onPreviewStart?: (metadata: TariffPdfMetadata) => void;
+} = {}): Promise<TariffPdfMetadata | null> {
   if (!isTauriRuntime()) {
     return null;
   }
@@ -171,6 +177,8 @@ export async function selectTariffPdfMetadata(): Promise<TariffPdfMetadata | nul
   }
 
   const fallback = inferTariffMetadataFromPath(selectedPath);
+  onFileSelected?.(selectedPath);
+  onPreviewStart?.(fallback);
 
   try {
     return await invoke<TariffPdfMetadata>("import_tariff_pdf_preview", { path: selectedPath });
@@ -229,3 +237,118 @@ function isTauriRuntime() {
 function formatDesktopError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
+
+// ── Materials ────────────────────────────────────────────────────────────────
+
+export type DesktopMaterial = {
+  id: string;
+  code: string;
+  description: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  minQuantity: number;
+  notes: string;
+};
+
+export type CreateDesktopMaterialRequest = {
+  id: string;
+  code: string;
+  description: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  minQuantity: number;
+  notes: string;
+};
+
+export type UpdateDesktopMaterialRequest = {
+  code: string;
+  description: string;
+  category: string;
+  unit: string;
+  minQuantity: number;
+  notes: string;
+};
+
+export type DesktopMaterialTransaction = {
+  id: string;
+  materialId: string;
+  quantityChange: number;
+  quantityAfter: number;
+  transactionType: string;
+  referenceId: string | null;
+  description: string;
+  createdAt: string;
+};
+
+export async function listDesktopMaterials(
+  fallback: DesktopMaterial[],
+): Promise<DesktopDataResult<DesktopMaterial[]>> {
+  return withInflightCache("materials", () =>
+    invokeWithFallback("list_materials", {}, fallback, "materiali dimostrativi"),
+  );
+}
+
+export async function createDesktopMaterial(
+  request: CreateDesktopMaterialRequest,
+): Promise<DesktopMaterial> {
+  if (!isTauriRuntime()) {
+    return request;
+  }
+
+  return invoke<DesktopMaterial>("create_material", { request });
+}
+
+export async function updateDesktopMaterial(
+  materialId: string,
+  request: UpdateDesktopMaterialRequest,
+): Promise<DesktopMaterial> {
+  if (!isTauriRuntime()) {
+    return { id: materialId, quantity: 0, ...request };
+  }
+
+  return invoke<DesktopMaterial>("update_material", { materialId, request });
+}
+
+export async function deleteDesktopMaterial(materialId: string): Promise<void> {
+  if (!isTauriRuntime()) {
+    return;
+  }
+
+  await invoke<void>("delete_material", { materialId });
+}
+
+export async function adjustDesktopMaterialStock(
+  materialId: string,
+  newQuantity: number,
+  description: string,
+): Promise<DesktopMaterial> {
+  if (!isTauriRuntime()) {
+    return { id: materialId, code: "", description: "", category: "", unit: "", notes: "", minQuantity: 0, quantity: newQuantity };
+  }
+
+  return invoke<DesktopMaterial>("adjust_material_stock", { materialId, newQuantity, description });
+}
+
+export async function deductDesktopMaterials(
+  deductions: Array<[string, number, string]>,
+): Promise<DesktopMaterial[]> {
+  if (!isTauriRuntime()) {
+    return [];
+  }
+
+  return invoke<DesktopMaterial[]>("deduct_materials", { deductions });
+}
+
+export async function listDesktopMaterialTransactions(
+  materialId: string,
+): Promise<DesktopMaterialTransaction[]> {
+  if (!isTauriRuntime()) {
+    return [];
+  }
+
+  return invoke<DesktopMaterialTransaction[]>("list_material_transactions", { materialId });
+}
+
+

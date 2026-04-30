@@ -1,266 +1,227 @@
 import {
   AlertTriangle,
   Bell,
-  Box,
-  ChevronDown,
-  ChevronRight,
-  Download,
-  Filter,
   type LucideIcon,
-  MoreVertical,
   Package,
+  Plus,
   Search,
   ShieldCheck,
   ShoppingCart,
+  Trash2,
   Warehouse,
   X,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
+import {
+  type DesktopMaterial,
+  listDesktopMaterials,
+  deleteDesktopMaterial,
+} from "@/lib/desktopData";
+import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 
-type MaterialTone = "danger" | "success" | "warning";
+type StockTone = "danger" | "success" | "warning";
+type CategoryTone = "blue" | "green" | "orange" | "purple";
 
-type MaterialRow = {
-  available: string;
-  availableHint: string;
-  category: string;
-  code: string;
-  committed: string;
-  coverage: number;
-  demand: string;
-  description: string;
-  iconTone: "blue" | "green" | "red";
-  status: string;
-  tone: MaterialTone;
-  unit: string;
+const categoryColorMap: Record<string, CategoryTone> = {
+  Armamento: "blue",
+  Sottofondo: "orange",
+  "Opere civili": "purple",
+  Impianti: "green",
 };
 
-export const materialRows: MaterialRow[] = [
-  {
-    available: "12.450 m",
-    availableHint: "Disponibile",
-    category: "Armamento",
-    code: "BIN-60E1",
-    committed: "8.750 m",
-    coverage: 82,
-    demand: "15.200 m",
-    description: "Binario tipo 60E1",
-    iconTone: "blue",
-    status: "Disponibile",
-    tone: "success",
-    unit: "m",
-  },
-  {
-    available: "1.250 cad",
-    availableHint: "Critico",
-    category: "Armamento",
-    code: "TRV-B70",
-    committed: "980 cad",
-    coverage: 60,
-    demand: "2.100 cad",
-    description: "Traversa in c.a. B70",
-    iconTone: "red",
-    status: "In esaurimento",
-    tone: "warning",
-    unit: "cad",
-  },
-  {
-    available: "2.980 t",
-    availableHint: "Disponibile",
-    category: "Sottofondo",
-    code: "BAL-A32",
-    committed: "2.400 t",
-    coverage: 54,
-    demand: "5.500 t",
-    description: "Pietrisco ballast 32/50",
-    iconTone: "blue",
-    status: "Critico",
-    tone: "danger",
-    unit: "t",
-  },
-  {
-    available: "850 m3",
-    availableHint: "Basso",
-    category: "Opere civili",
-    code: "CLS-R425",
-    committed: "1.200 m3",
-    coverage: 37,
-    demand: "2.300 m3",
-    description: "Calcestruzzo R425",
-    iconTone: "blue",
-    status: "Critico",
-    tone: "danger",
-    unit: "m3",
-  },
-  {
-    available: "4.200 m",
-    availableHint: "Disponibile",
-    category: "Impianti",
-    code: "CAV-FIBRA",
-    committed: "1.100 m",
-    coverage: 116,
-    demand: "3.600 m",
-    description: "Cavo fibra ottica",
-    iconTone: "green",
-    status: "Disponibile",
-    tone: "success",
-    unit: "m",
-  },
-  {
-    available: "6.150 set",
-    availableHint: "Disponibile",
-    category: "Opere civili",
-    code: "ACC-PALF",
-    committed: "3.200 set",
-    coverage: 154,
-    demand: "4.000 set",
-    description: "Accessori pali fondazione",
-    iconTone: "blue",
-    status: "Disponibile",
-    tone: "success",
-    unit: "set",
-  },
-  {
-    available: "1.780 set",
-    availableHint: "Basso",
-    category: "Impianti",
-    code: "TUB-PEHD",
-    committed: "1.600 m",
-    coverage: 56,
-    demand: "3.200 m",
-    description: "Tubo PEHD corrugato",
-    iconTone: "blue",
-    status: "In esaurimento",
-    tone: "warning",
-    unit: "m",
-  },
-  {
-    available: "3.410 t",
-    availableHint: "Disponibile",
-    category: "Opere civili",
-    code: "FER-B450C",
-    committed: "1.900 t",
-    coverage: 98,
-    demand: "2.800 t",
-    description: "Ferro tondo B450C",
-    iconTone: "green",
-    status: "Disponibile",
-    tone: "success",
-    unit: "t",
-  },
+function toneForQuantity(quantity: number, minQuantity: number): StockTone {
+  if (quantity === 0) return "danger";
+  if (quantity < minQuantity) return "warning";
+  return "success";
+}
+
+function formatQuantity(value: number, unit: string): string {
+  const n = Number.isInteger(value) ? value : Math.round(value * 100) / 100;
+  return `${n} ${unit}`;
+}
+
+export const fallbackMaterials: DesktopMaterial[] = [
+  { id: "mat_demo_1", code: "BIN-60E1", description: "Binario tipo 60E1", category: "Armamento", unit: "m", quantity: 12450, minQuantity: 2000, notes: "" },
+  { id: "mat_demo_2", code: "BAL-A32", description: "Pietrisco ballast 32/50", category: "Sottofondo", unit: "t", quantity: 2980, minQuantity: 1500, notes: "" },
+  { id: "mat_demo_3", code: "CLS-R425", description: "Calcestruzzo R425", category: "Opere civili", unit: "m3", quantity: 850, minQuantity: 500, notes: "" },
+  { id: "mat_demo_4", code: "FER-B450C", description: "Ferro tondo B450C", category: "Opere civili", unit: "t", quantity: 3410, minQuantity: 1000, notes: "" },
+  { id: "mat_demo_5", code: "TRV-B70", description: "Traversa in c.a. B70", category: "Armamento", unit: "cad", quantity: 1250, minQuantity: 800, notes: "" },
+  { id: "mat_demo_6", code: "CAV-FIBRA", description: "Cavo fibra ottica", category: "Impianti", unit: "m", quantity: 4200, minQuantity: 500, notes: "" },
+  { id: "mat_demo_7", code: "TUB-PEHD", description: "Tubo PEHD corrugato", category: "Impianti", unit: "m", quantity: 1780, minQuantity: 600, notes: "" },
+  { id: "mat_demo_8", code: "ACC-PALF", description: "Accessori pali fondazione", category: "Opere civili", unit: "set", quantity: 6150, minQuantity: 500, notes: "" },
 ];
 
-const selectedMaterial = materialRows[0] as MaterialRow;
-
 export function MaterialsScreen() {
+  const [materials, setMaterials] = useState<DesktopMaterial[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const loadMaterials = useCallback(() => {
+    let active = true;
+    listDesktopMaterials(fallbackMaterials).then((result) => {
+      if (!active) return;
+      setMaterials(result.data);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const cleanup = loadMaterials();
+    return cleanup;
+  }, [loadMaterials]);
+
+  useEffect(() => {
+    const handleChange = () => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(loadMaterials, 150);
+    };
+    window.addEventListener("quantara:data-changed", handleChange);
+    return () => {
+      window.removeEventListener("quantara:data-changed", handleChange);
+      clearTimeout(debounceRef.current);
+    };
+  }, [loadMaterials]);
+
+  const selectedMaterial = useMemo(
+    () => materials.find((m) => m.id === selectedMaterialId) ?? null,
+    [materials, selectedMaterialId],
+  );
+
+  const categories = useMemo(() => {
+    const set = new Set(materials.map((m) => m.category));
+    return ["Tutti", ...set];
+  }, [materials]);
+
+  const filteredMaterials = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return materials.filter((m) => {
+      const matchesSearch = !q || m.code.toLowerCase().includes(q) || m.description.toLowerCase().includes(q) || m.category.toLowerCase().includes(q);
+      const matchesCategory = !selectedCategory || selectedCategory === "Tutti" || m.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [materials, searchQuery, selectedCategory]);
+
+  const metrics = useMemo(() => {
+    const totalStock = materials.reduce((s, m) => s + m.quantity, 0);
+    const critical = materials.filter((m) => m.quantity < m.minQuantity).length;
+    const zero = materials.filter((m) => m.quantity === 0).length;
+    const avgCoverage = materials.length > 0
+      ? Math.round(materials.reduce((s, m) => s + (m.minQuantity > 0 ? Math.min(100, (m.quantity / m.minQuantity) * 100) : 100), 0) / materials.length)
+      : 0;
+    return { totalStock, critical, zero, avgCoverage };
+  }, [materials]);
+
+  const handleDelete = useCallback(async (materialId: string) => {
+    await deleteDesktopMaterial(materialId);
+    dispatchDataChanged();
+    setSelectedMaterialId((current) => (current === materialId ? null : current));
+  }, []);
+
   return (
-    <div className="space-y-4 pt-4">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
+    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--success-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--info-base)_15%,transparent),transparent_32%)]" />
+
+      <section
+        className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
+      >
         <div className="min-w-0">
-          <h2 className="text-[26px] font-bold leading-[1.08] tracking-[-0.02em] text-[var(--text-primary)] 2xl:text-[32px]">
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+            Supply control
+          </span>
+          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
             Materiali e coperture
           </h2>
-          <p className="mt-2 max-w-3xl text-[14px] font-medium leading-6 text-[var(--text-secondary)] 2xl:text-[15px]">
-            Controllo operativo di stock, impegni, fabbisogno e rischio di fornitura.
+          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
+            {materials.length} materiali registrati. Gestisci stock, impegni e soglie minime.
           </p>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-7 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
-              caption="Stock disponibile"
-              delta="+ 4,2% vs 20 apr"
-              icon={Box}
-              label="Valore magazzino"
+              caption="Quantità totale in magazzino"
+              delta={`${materials.length} materiali`}
+              icon={Warehouse}
+              label="Valore stock"
               tone="blue"
-              value="€ 18,75M"
+              value={`${Math.round(metrics.totalStock)}`}
             />
             <MetricCard
-              caption="Fuori soglia minima"
-              delta="+ 2 vs 20 apr"
+              caption="Sotto la soglia minima"
+              delta={`${metrics.zero} esauriti`}
               icon={AlertTriangle}
               label="Critici"
               tone="danger"
-              value="8"
+              value={String(metrics.critical)}
             />
             <MetricCard
-              caption="Entro 30 giorni"
-              delta="+ 3 vs 20 apr"
+              caption="Stock a zero"
               icon={Bell}
-              label="In esaurimento"
+              label="Esauriti"
               tone="warning"
-              value="12"
+              value={String(metrics.zero)}
             />
             <MetricCard
-              caption="Fabbisogno 90 giorni"
-              delta="+ 6% vs 20 apr"
+              caption="Copertura media vs soglia minima"
               icon={ShieldCheck}
               label="Copertura media"
               tone="success"
-              value="78%"
+              value={`${metrics.avgCoverage}%`}
             />
           </div>
         </div>
 
-        <Panel className="self-start p-4">
+        <BezelSurface className="self-start md:translate-y-2" innerClassName="p-5">
           <div className="flex items-center justify-between">
-            <PanelTitle>Alert supply</PanelTitle>
-            <span className="rounded-md bg-[var(--danger-soft)] px-2 py-1 text-[11px] font-bold text-[var(--danger-base)]">
-              2 critici
-            </span>
+            <PanelTitle>Categorie</PanelTitle>
           </div>
-          <div className="mt-3 divide-y divide-[var(--border-subtle)]">
-            <AlertRow
-              description="Rischio di fermo cantiere"
-              label="2 materiali critici su opere civili"
-              tone="danger"
-            />
-            <AlertRow
-              description="Verifica in corso con il fornitore"
-              label="1 fornitura in conferma consegna"
-              tone="warning"
-            />
+          <div className="mt-3 space-y-1.5">
+            {categories.map((cat) => {
+              const count = cat === "Tutti" ? materials.length : materials.filter((m) => m.category === cat).length;
+              return (
+                <button
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-[12px] px-3 py-2 text-left text-[13px] font-semibold transition-colors",
+                    (selectedCategory === cat || (!selectedCategory && cat === "Tutti"))
+                      ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+                  )}
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat === "Tutti" ? null : cat)}
+                  type="button"
+                >
+                  <span>{cat}</span>
+                  <span className="text-[11px] font-medium text-[var(--text-secondary)]">{count}</span>
+                </button>
+              );
+            })}
           </div>
-          <button
-            className="mt-3 flex w-full items-center justify-between text-[12px] font-semibold text-[var(--info-base)]"
-            type="button"
-          >
-            Vedi tutti gli alert
-            <ChevronRight className="size-3.5" />
-          </button>
-        </Panel>
+        </BezelSurface>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <Panel className="min-w-0 p-0">
           <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              {["Tutti", "Critici", "In esaurimento", "Strategici"].map((tab, index) => (
-                <button
-                  className={cn(
-                    "h-8 rounded-full px-3 text-[12px] font-semibold transition-colors 2xl:h-9 2xl:px-4 2xl:text-[13px]",
-                    index === 0
-                      ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
-                      : "bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]",
-                  )}
-                  key={tab}
-                  type="button"
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto] xl:flex xl:flex-wrap xl:items-center">
               <label className="relative min-w-0">
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
                 <input
-                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  placeholder="Cerca nella tabella..."
+                  className="h-10 w-[220px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cerca materiale..."
                   type="search"
+                  value={searchQuery}
                 />
               </label>
-              <ToolbarButton icon={Filter}>Filtri</ToolbarButton>
-              <ToolbarButton icon={Download}>Esporta</ToolbarButton>
             </div>
+
+            <ProjectControlButton icon={Plus} onClick={() => setIsCreateModalOpen(true)} variant="primary">
+              Nuovo materiale
+            </ProjectControlButton>
           </div>
 
           <div className="overflow-x-auto">
@@ -269,133 +230,347 @@ export function MaterialsScreen() {
                 <tr className="border-b border-[var(--border-subtle)]">
                   <th className="px-3 py-2 text-[10px]">Materiale</th>
                   <th className="px-3 py-2 text-[10px]">Categoria</th>
-                  <th className="px-3 py-2 text-[10px]">Disp.</th>
-                  <th className="px-3 py-2 text-[10px]">Impegn.</th>
-                  <th className="px-3 py-2 text-[10px]">Fabbis.</th>
+                  <th className="px-3 py-2 text-[10px]">Stock</th>
+                  <th className="px-3 py-2 text-[10px]">Soglia min</th>
                   <th className="px-3 py-2 text-[10px]">Cop.</th>
                   <th className="px-3 py-2 text-[10px]">Stato</th>
                   <th className="w-8 px-2 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {materialRows.map((row, index) => (
-                  <MaterialTableRow isSelected={index === 0} key={row.code} row={row} />
+                {filteredMaterials.map((mat) => (
+                  <MaterialTableRow
+                    isSelected={mat.id === selectedMaterialId}
+                    key={mat.id}
+                    material={mat}
+                    onDelete={handleDelete}
+                    onSelect={() => setSelectedMaterialId(mat.id === selectedMaterialId ? null : mat.id)}
+                  />
                 ))}
+                {filteredMaterials.length === 0 && (
+                  <tr>
+                    <td className="px-3 py-8 text-center text-[13px] text-[var(--text-secondary)]" colSpan={7}>
+                      Nessun materiale trovato
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] px-3 py-2">
             <span className="text-[11px] font-medium text-[var(--text-secondary)]">
-              Vista 1-8 di 24 materiali
+              {filteredMaterials.length} di {materials.length} materiali
             </span>
-            <button
-              className="flex items-center gap-1 text-[11px] font-medium text-[var(--text-secondary)]"
-              type="button"
-            >
-              Mostra <span className="font-semibold text-[var(--text-primary)]">25</span> per pagina
-              <ChevronDown className="size-3.5" />
-            </button>
           </div>
         </Panel>
 
         <aside className="space-y-4">
-          <Panel>
-            <div className="flex items-center justify-between">
-              <PanelTitle>Focus materiale</PanelTitle>
-              <button
-                aria-label="Chiudi focus materiale"
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                type="button"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <div className="mt-4 rounded-[14px] border border-[var(--border-subtle)] p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <MaterialIcon tone="blue" />
-                  <div className="min-w-0">
-                    <div className="truncate text-[16px] font-bold text-[var(--text-primary)]">
-                      {selectedMaterial.code}
-                    </div>
-                    <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
-                      {selectedMaterial.description}
-                    </div>
-                  </div>
-                </div>
-                <StatusPill tone="success">Disponibile</StatusPill>
+          {selectedMaterial ? (
+            <MaterialDetail material={selectedMaterial} />
+          ) : (
+            <Panel>
+              <PanelTitle>Dettaglio materiale</PanelTitle>
+              <div className="mt-6 text-center text-[13px] text-[var(--text-secondary)]">
+                Seleziona un materiale per vedere dettagli e movimenti
               </div>
-
-              <dl className="mt-5 divide-y divide-[var(--border-subtle)]">
-                <DetailLine
-                  label="Categoria"
-                  value={`${selectedMaterial.category} · ${selectedMaterial.unit}`}
-                />
-                <DetailLine label="Disponibile" value={selectedMaterial.available} />
-                <DetailLine label="Impegnato" value={selectedMaterial.committed} />
-                <DetailLine label="Fabbisogno 90g" value={selectedMaterial.demand} />
-              </dl>
-
-              <button
-                className="mt-4 flex w-full items-center justify-end border-t border-[var(--border-subtle)] pt-3 text-[var(--text-secondary)]"
-                type="button"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-[13px]">
-                  <span className="font-medium text-[var(--text-secondary)]">Copertura</span>
-                  <span className="text-[13px] font-bold text-[var(--text-primary)]">
-                    {selectedMaterial.coverage}%
-                  </span>
-                </div>
-                <CoverageBar coverage={selectedMaterial.coverage} tone={selectedMaterial.tone} />
-              </div>
-            </div>
-
-            <button
-              className="mt-3 flex w-full items-center justify-between text-[12px] font-semibold text-[var(--info-base)]"
-              type="button"
-            >
-              Vedi storico e movimenti
-              <ChevronRight className="size-3.5" />
-            </button>
-          </Panel>
+            </Panel>
+          )}
 
           <Panel>
             <PanelTitle>Azioni rapide</PanelTitle>
             <div className="mt-4 grid gap-2">
-              <ActionButton icon={Warehouse}>Movimenta stock</ActionButton>
-              <ActionButton icon={Bell}>Apri alert fornitura</ActionButton>
-              <button
-                className="flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--accent-primary)] px-4 text-[13px] font-semibold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary-hover)]"
-                type="button"
-              >
-                <ShoppingCart className="size-4" />
+              <ProjectControlButton icon={Plus} onClick={() => setIsCreateModalOpen(true)} variant="neutral">
+                Carica nuovo materiale
+              </ProjectControlButton>
+              <ProjectControlButton icon={ShoppingCart} variant="primary">
                 Crea ordine materiale
-              </button>
+              </ProjectControlButton>
             </div>
           </Panel>
         </aside>
       </section>
+
+      <AddMaterialModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreated={loadMaterials}
+      />
+    </main>
+  );
+}
+
+function MaterialTableRow({
+  isSelected,
+  material,
+  onDelete,
+  onSelect,
+}: {
+  isSelected: boolean;
+  material: DesktopMaterial;
+  onDelete: (id: string) => void;
+  onSelect: () => void;
+}) {
+  const tone = toneForQuantity(material.quantity, material.minQuantity);
+  const coverage = material.minQuantity > 0
+    ? Math.min(100, Math.round((material.quantity / material.minQuantity) * 100))
+    : 100;
+
+  return (
+    <tr
+      className={cn(
+        "border-b border-[var(--border-subtle)] text-[13px] transition-colors hover:bg-[var(--bg-muted)] cursor-pointer",
+        isSelected && "bg-[var(--info-soft)]/45",
+      )}
+      onClick={onSelect}
+    >
+      <td className="px-3 py-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <MaterialIcon tone={categoryColorMap[material.category] ?? "blue"} />
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+              {material.code}
+            </div>
+            <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+              {material.description}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-2">
+        <CategoryPill category={material.category} />
+      </td>
+      <td className="px-3 py-2">
+        <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+          {formatQuantity(material.quantity, material.unit)}
+        </div>
+        <div className={cn("mt-1 text-[11px] font-bold", tone === "danger" ? "text-[var(--danger-base)]" : "text-[var(--success-base)]")}>
+          {material.quantity === 0 ? "Esaurito" : material.quantity < material.minQuantity ? "Sotto soglia" : "Disponibile"}
+        </div>
+      </td>
+      <td className="px-3 py-2 text-[12px] font-medium text-[var(--text-primary)]">
+        {formatQuantity(material.minQuantity, material.unit)}
+      </td>
+      <td className="px-3 py-2">
+        <div className="text-[13px] font-semibold text-[var(--text-primary)]">{coverage}%</div>
+        <CoverageBar coverage={coverage} tone={tone} />
+      </td>
+      <td className="px-3 py-2">
+        <StatusPill tone={tone}>{tone === "danger" ? "Critico" : tone === "warning" ? "Attenzione" : "OK"}</StatusPill>
+      </td>
+      <td className="px-2 py-2 text-right text-[var(--text-secondary)]">
+        <button
+          className="rounded-full p-1.5 transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--danger-base)]"
+          onClick={(e) => { e.stopPropagation(); onDelete(material.id); }}
+          type="button"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function MaterialDetail({ material }: { material: DesktopMaterial }) {
+  const tone = toneForQuantity(material.quantity, material.minQuantity);
+  const coverage = material.minQuantity > 0
+    ? Math.min(100, Math.round((material.quantity / material.minQuantity) * 100))
+    : 100;
+
+  return (
+    <Panel>
+      <div className="flex items-center justify-between">
+        <PanelTitle>Focus materiale</PanelTitle>
+      </div>
+
+      <div className="mt-4 rounded-[14px] border border-[var(--border-subtle)] p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <MaterialIcon tone={categoryColorMap[material.category] ?? "blue"} />
+            <div className="min-w-0">
+              <div className="truncate text-[16px] font-bold text-[var(--text-primary)]">
+                {material.code}
+              </div>
+              <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+                {material.description}
+              </div>
+            </div>
+          </div>
+          <StatusPill tone={tone}>{tone === "danger" ? "Critico" : tone === "warning" ? "Attenzione" : "OK"}</StatusPill>
+        </div>
+
+        <dl className="mt-5 divide-y divide-[var(--border-subtle)]">
+          <DetailLine label="Categoria" value={material.category} />
+          <DetailLine label="Unità di misura" value={material.unit} />
+          <DetailLine label="Stock attuale" value={formatQuantity(material.quantity, material.unit)} />
+          <DetailLine label="Soglia minima" value={formatQuantity(material.minQuantity, material.unit)} />
+        </dl>
+
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[13px]">
+            <span className="font-medium text-[var(--text-secondary)]">Copertura</span>
+            <span className="text-[13px] font-bold text-[var(--text-primary)]">{coverage}%</span>
+          </div>
+          <CoverageBar coverage={coverage} tone={tone} />
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function AddMaterialModal({
+  isOpen,
+  onClose,
+  onCreated,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("Armamento");
+  const [unit, setUnit] = useState("m");
+  const [quantity, setQuantity] = useState("0");
+  const [minQuantity, setMinQuantity] = useState("0");
+  const [saving, setSaving] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSave = async () => {
+    const qty = Number.parseFloat(quantity);
+    const minQty = Number.parseFloat(minQuantity);
+    if (!code.trim() || !description.trim() || Number.isNaN(qty)) return;
+
+    setSaving(true);
+    try {
+      const { createDesktopMaterial } = await import("@/lib/desktopData");
+      await createDesktopMaterial({
+        id: `mat_${Date.now()}`,
+        code: code.trim(),
+        description: description.trim(),
+        category,
+        unit,
+        quantity: qty,
+        minQuantity: minQty,
+        notes: "",
+      });
+      dispatchDataChanged();
+      onClose();
+      setCode("");
+      setDescription("");
+      setQuantity("0");
+      setMinQuantity("0");
+      onCreated();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const categories = ["Armamento", "Sottofondo", "Opere civili", "Impianti"];
+  const units = ["m", "m2", "m3", "cad", "t", "kg", "set", "lt"];
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
+        <div className="rounded-[22px] bg-[var(--surface-base)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[16px] font-bold text-[var(--text-primary)]">Nuovo materiale</h3>
+            <button
+              className="flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+              onClick={onClose}
+              type="button"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Codice">
+                <input
+                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Es. BIN-60E1"
+                  type="text"
+                  value={code}
+                />
+              </Field>
+              <Field label="Unità">
+                <select
+                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                  onChange={(e) => setUnit(e.target.value)}
+                  value={unit}
+                >
+                  {units.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            <Field label="Descrizione">
+              <input
+                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descrizione del materiale"
+                type="text"
+                value={description}
+              />
+            </Field>
+
+            <Field label="Categoria">
+              <select
+                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                onChange={(e) => setCategory(e.target.value)}
+                value={category}
+              >
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Quantità iniziale">
+                <input
+                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  min="0"
+                  onChange={(e) => setQuantity(e.target.value)}
+                  step="any"
+                  type="number"
+                  value={quantity}
+                />
+              </Field>
+              <Field label="Soglia minima">
+                <input
+                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  min="0"
+                  onChange={(e) => setMinQuantity(e.target.value)}
+                  step="any"
+                  type="number"
+                  value={minQuantity}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3">
+            <ProjectControlButton onClick={onClose} variant="ghost">
+              Annulla
+            </ProjectControlButton>
+            <ProjectControlButton
+              disabled={saving || !code.trim() || !description.trim()}
+              onClick={handleSave}
+              variant="primary"
+            >
+              {saving ? "Salvataggio..." : "Crea materiale"}
+            </ProjectControlButton>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <section
-      className={cn(
-        "rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm",
-        className,
-      )}
-    >
-      {children}
-    </section>
-  );
+function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <BezelSurface innerClassName={cn("p-4", className)}>{children}</BezelSurface>;
 }
 
 function PanelTitle({ children }: { children: string }) {
@@ -407,7 +582,6 @@ function PanelTitle({ children }: { children: string }) {
 }
 
 function MetricCard({
-  caption,
   delta,
   icon: Icon,
   label,
@@ -415,14 +589,14 @@ function MetricCard({
   value,
 }: {
   caption: string;
-  delta: string;
+  delta?: string;
   icon: LucideIcon;
   label: string;
-  tone: "blue" | MaterialTone;
+  tone: "blue" | StockTone;
   value: string;
 }) {
   return (
-    <section className="flex min-h-[112px] items-center gap-3 rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm 2xl:min-h-[128px] 2xl:gap-4">
+    <BezelSurface innerClassName="group flex min-h-[112px] items-center gap-3 p-4 2xl:min-h-[128px] 2xl:gap-4">
       <div
         className={cn(
           "flex size-11 shrink-0 items-center justify-center rounded-full 2xl:size-12",
@@ -449,154 +623,55 @@ function MetricCard({
         >
           {value}
         </div>
-        <div className="mt-2 text-[12px] font-medium text-[var(--text-secondary)]">{caption}</div>
-        <div
-          className={cn(
-            "mt-3 text-[11px] font-bold",
-            tone === "danger" ? "text-[var(--danger-base)]" : "text-[var(--success-base)]",
-          )}
-        >
-          {delta}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function AlertRow({
-  description,
-  label,
-  tone,
-}: {
-  description: string;
-  label: string;
-  tone: "danger" | "warning";
-}) {
-  return (
-    <div className="flex items-center gap-3 py-4">
-      <span
-        className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-full",
-          tone === "danger"
-            ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-            : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-        )}
-      >
-        <AlertTriangle className="size-5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{label}</div>
-        <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
-          {description}
-        </div>
-      </div>
-      <StatusPill tone={tone}>{tone === "danger" ? "Critico" : "Warning"}</StatusPill>
-    </div>
-  );
-}
-
-function ToolbarButton({ children, icon: Icon }: { children: string; icon: LucideIcon }) {
-  return (
-    <button
-      className="flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-      type="button"
-    >
-      <Icon className="size-4 text-[var(--text-secondary)]" />
-      {children}
-    </button>
-  );
-}
-
-function MaterialTableRow({ isSelected, row }: { isSelected: boolean; row: MaterialRow }) {
-  return (
-    <tr
-      className={cn(
-        "border-b border-[var(--border-subtle)] text-[13px] transition-colors hover:bg-[var(--bg-muted)]",
-        isSelected && "bg-[var(--info-soft)]/45",
-      )}
-    >
-      <td className="px-3 py-2">
-        <div className="flex min-w-0 items-center gap-3">
-          <MaterialIcon tone={row.iconTone} />
-          <div className="min-w-0">
-            <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
-              {row.code}
-            </div>
-            <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
-              {row.description}
-            </div>
-          </div>
-        </div>
-      </td>
-      <td className="px-3 py-2 text-[12px] font-medium text-[var(--text-primary)]">
-        {row.category} · {row.unit}
-      </td>
-      <td className="px-3 py-2">
-        <div className="text-[13px] font-semibold text-[var(--text-primary)]">{row.available}</div>
-        <div
-          className={cn(
-            "mt-1 text-[11px] font-bold",
-            row.availableHint === "Basso" || row.availableHint === "Critico"
-              ? "text-[var(--danger-base)]"
-              : "text-[var(--success-base)]",
-          )}
-        >
-          {row.availableHint}
-        </div>
-      </td>
-      <td className="px-3 py-2 text-[12px] font-medium text-[var(--text-primary)]">
-        {row.committed}
-      </td>
-      <td className="px-3 py-2 text-[12px] font-medium text-[var(--text-primary)]">{row.demand}</td>
-      <td className="px-3 py-2">
-        <div className="text-[13px] font-semibold text-[var(--text-primary)]">{row.coverage}%</div>
-        <CoverageBar coverage={row.coverage} tone={row.tone} />
-      </td>
-      <td className="px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span
+        {delta ? (
+          <div
             className={cn(
-              "size-2 rounded-full",
-              row.tone === "success" && "bg-[var(--success-base)]",
-              row.tone === "warning" && "bg-[var(--warning-base)]",
-              row.tone === "danger" && "bg-[var(--danger-base)]",
-            )}
-          />
-          <span
-            className={cn(
-              "text-[12px] font-semibold",
-              row.tone === "success" && "text-[var(--success-base)]",
-              row.tone === "warning" && "text-[var(--warning-base)]",
-              row.tone === "danger" && "text-[var(--danger-base)]",
+              "mt-3 text-[11px] font-bold",
+              tone === "danger" ? "text-[var(--danger-base)]" : "text-[var(--success-base)]",
             )}
           >
-            {row.status}
-          </span>
-        </div>
-      </td>
-      <td className="px-2 py-2 text-right text-[var(--text-secondary)]">
-        <MoreVertical className="ml-auto size-4" />
-      </td>
-    </tr>
+            {delta}
+          </div>
+        ) : null}
+      </div>
+    </BezelSurface>
   );
 }
 
-function MaterialIcon({ tone }: { tone: MaterialRow["iconTone"] }) {
+function CategoryPill({ category }: { category: string }) {
+  const color = categoryColorMap[category] ?? "blue";
+  return (
+    <span
+      className={cn(
+        "inline-block rounded-full px-2.5 py-1 text-[11px] font-bold",
+        color === "blue" && "bg-[var(--info-soft)] text-[var(--info-base)]",
+        color === "green" && "bg-[var(--success-soft)] text-[var(--success-base)]",
+        color === "orange" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+        color === "purple" && "bg-[var(--bg-muted-strong)] text-[var(--accent-secondary)]",
+      )}
+    >
+      {category}
+    </span>
+  );
+}
+
+function MaterialIcon({ tone }: { tone: CategoryTone }) {
   return (
     <span
       className={cn(
         "flex size-9 shrink-0 items-center justify-center rounded-lg",
         tone === "blue" && "bg-[var(--info-soft)] text-[var(--info-base)]",
         tone === "green" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-        tone === "red" && "bg-[var(--danger-soft)] text-[var(--danger-base)]",
+        tone === "orange" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+        tone === "purple" && "bg-[var(--bg-muted-strong)] text-[var(--accent-secondary)]",
       )}
     >
-      {tone === "red" ? <AlertTriangle className="size-5" /> : <Package className="size-5" />}
+      <Package className="size-5" />
     </span>
   );
 }
 
-function CoverageBar({ coverage, tone }: { coverage: number; tone: MaterialTone }) {
+function CoverageBar({ coverage, tone }: { coverage: number; tone: StockTone }) {
   return (
     <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
       <div
@@ -612,7 +687,7 @@ function CoverageBar({ coverage, tone }: { coverage: number; tone: MaterialTone 
   );
 }
 
-function StatusPill({ children, tone }: { children: string; tone: MaterialTone }) {
+function StatusPill({ children, tone }: { children: string; tone: StockTone }) {
   return (
     <span
       className={cn(
@@ -636,14 +711,11 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActionButton({ children, icon: Icon }: { children: string; icon: LucideIcon }) {
+function Field({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <button
-      className="flex h-11 items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-      type="button"
-    >
-      <Icon className="size-4 text-[var(--text-secondary)]" />
+    <div className="block">
+      <div className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">{label}</div>
       {children}
-    </button>
+    </div>
   );
 }
