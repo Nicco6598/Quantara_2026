@@ -1,7 +1,7 @@
 import { parseEuroAmount } from "@quantara/domain-utils";
-import { X } from "lucide-react";
+import { CheckCircle2, FileText, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Button } from "@/components/shared/Button";
+import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 import { groupEditableTariffVoices } from "../utils/tariff-grouping";
 import { getImportValidation, parseOptionalPercent } from "../utils/tariffs-validation";
@@ -64,41 +64,41 @@ export function TariffImportPreviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/35 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-xl">
-        <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <h3 className="text-[21px] font-bold leading-tight text-[var(--text-primary)]">
-              Preview importazione
-            </h3>
-            <p className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
-              Controlla i dati estratti dal PDF prima di confermarli nel catalogo.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-semibold text-[var(--text-secondary)]">
-              <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 py-1">
-                {metadata.name}
-              </span>
-              <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 py-1">
-                {metadata.sourceName}
-              </span>
-              <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 py-1">
-                {metadata.year}
-              </span>
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/42 p-4">
+      <div className="projects-surface flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none">
+        <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)]/70 px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 gap-4">
+            <div className="hidden size-12 shrink-0 items-center justify-center rounded-[16px] bg-[var(--info-soft)] text-[var(--info-base)] sm:flex">
+              <FileText className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="max-w-4xl text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)] md:text-[30px]">
+                Preview importazione
+              </h3>
+              <p className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
+                Controlla i dati estratti dal PDF prima di confermarli nel catalogo.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-semibold text-[var(--text-secondary)]">
+                <span className="rounded-full bg-[var(--bg-muted)] px-3 py-1">{metadata.name}</span>
+                <span className="rounded-full bg-[var(--bg-muted)] px-3 py-1">
+                  {metadata.sourceName}
+                </span>
+                <span className="rounded-full bg-[var(--bg-muted)] px-3 py-1">{metadata.year}</span>
+              </div>
             </div>
           </div>
-          <Button
+          <ProjectControlButton
             aria-label="Chiudi preview"
+            className="size-10 px-0"
             onClick={onCancel}
-            size="icon"
-            type="button"
-            variant="ghost"
+            variant="icon"
           >
             <X className="size-4" />
-          </Button>
+          </ProjectControlButton>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid grid-flow-dense gap-3 md:grid-cols-4">
             <ImportMetric
               label="Righe rilevate"
               value={metadata.voices.length.toLocaleString("it-IT")}
@@ -128,8 +128,8 @@ export function TariffImportPreviewModal({
               validation={validation}
             />
             <div className="space-y-3 lg:sticky lg:top-0">
-              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+              <div className="rounded-[20px] bg-[var(--bg-muted)]/65 p-4">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
                   Validazioni
                 </div>
                 <div className="mt-3 space-y-2 text-[12px] font-medium text-[var(--text-secondary)]">
@@ -153,7 +153,7 @@ export function TariffImportPreviewModal({
                 </div>
               </div>
               {validation.duplicateExamples.length > 0 || validation.invalidExamples.length > 0 ? (
-                <div className="rounded-lg border border-[var(--warning-soft)] bg-[var(--warning-soft)] p-3 text-[12px] font-medium leading-5 text-[var(--warning-base)]">
+                <div className="rounded-[20px] bg-[var(--warning-soft)] p-4 text-[12px] font-medium leading-5 text-[var(--warning-base)]">
                   {validation.duplicateExamples.length > 0 ? (
                     <div>Duplicati: {validation.duplicateExamples.join(", ")}</div>
                   ) : null}
@@ -164,7 +164,7 @@ export function TariffImportPreviewModal({
                     <div className="mt-3 flex flex-wrap gap-2">
                       {invalidRows.map((row) => (
                         <button
-                          className="rounded-md border border-current/25 bg-[var(--surface-base)] px-2 py-1 text-[11px] font-bold"
+                          className="projects-control-button projects-control-button-neutral rounded-full px-3 py-1 text-[11px] font-bold"
                           key={`${row.index}-${row.field}`}
                           onClick={() => focusImportCell(row.index, row.field)}
                           type="button"
@@ -180,24 +180,25 @@ export function TariffImportPreviewModal({
           </div>
 
           {!hasVoices ? (
-            <div className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
+            <div className="mt-4 rounded-[20px] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
               Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento
               contenga codici, unita di misura e prezzi leggibili.
             </div>
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <Button onClick={onCancel} type="button" variant="outline">
+        <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <ProjectControlButton onClick={onCancel} variant="neutral">
             Annulla
-          </Button>
-          <Button
+          </ProjectControlButton>
+          <ProjectControlButton
             disabled={!canConfirm || isBusy}
+            icon={CheckCircle2}
             onClick={() => onConfirm({ ...metadata, voices: editableVoices })}
-            type="button"
+            variant="primary"
           >
             Conferma importazione
-          </Button>
+          </ProjectControlButton>
         </div>
       </div>
     </div>

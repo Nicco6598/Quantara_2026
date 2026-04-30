@@ -20,7 +20,7 @@ function ImportCell({
 }) {
   return (
     <input
-      className={`h-9 min-w-0 rounded-md border bg-[var(--surface-base)] px-2 text-[12px] font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
+      className={`h-9 min-w-0 rounded-[10px] border bg-[var(--surface-base)] px-2 text-[12px] font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
         align === "right" ? "text-right" : ""
       } ${
         isInvalid
@@ -59,8 +59,8 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   );
 
   return (
-    <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border-subtle)]/80">
-      <div className="grid grid-cols-[minmax(86px,0.9fr)_minmax(140px,1.8fr)_minmax(46px,0.45fr)_minmax(76px,0.65fr)_minmax(76px,0.65fr)] gap-2 border-b border-[var(--border-subtle)]/80 bg-[var(--bg-muted)]/35 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+    <div className="mt-4 rounded-[20px] bg-[var(--bg-muted)]/50">
+      <div className="sticky top-[-20px] z-20 grid grid-cols-[minmax(86px,0.9fr)_minmax(140px,1.8fr)_minmax(46px,0.45fr)_minmax(76px,0.65fr)_minmax(76px,0.65fr)] gap-2 rounded-t-[20px] border-b border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_96%,var(--bg-muted)_4%)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)] shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_6%,transparent)]">
         <span>Codice</span>
         <span>Descrizione</span>
         <span>U.M.</span>
@@ -70,7 +70,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
       <div>
         {groups.map((group) => (
           <div key={group.code}>
-            <div className="grid grid-cols-[minmax(86px,0.9fr)_minmax(140px,1.8fr)_minmax(46px,0.45fr)_minmax(76px,0.65fr)_minmax(76px,0.65fr)] gap-2 border-b border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-3 py-2 text-[12px] font-bold text-[var(--text-primary)]">
+            <div className="grid grid-cols-[minmax(86px,0.9fr)_minmax(140px,1.8fr)_minmax(46px,0.45fr)_minmax(76px,0.65fr)_minmax(76px,0.65fr)] gap-2 border-b border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/70 px-3 py-2 text-[12px] font-semibold text-[var(--text-primary)]">
               <span className="break-words leading-5">{group.code}</span>
               <span className="min-w-0 break-words leading-5">{group.description}</span>
               <span>-</span>

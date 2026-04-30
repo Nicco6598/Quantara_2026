@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 type Tone = "danger" | "info" | "neutral" | "success" | "warning";
 
 export function ScreenShell({ children, className }: { children: ReactNode; className?: string }) {
-  return <main className={cn("space-y-6 p-6 pb-8", className)}>{children}</main>;
+  return <main className={cn("premium-page space-y-6 p-6 pb-8", className)}>{children}</main>;
 }
 
 export function CommandPanel({

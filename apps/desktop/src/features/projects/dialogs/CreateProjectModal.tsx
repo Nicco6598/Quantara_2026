@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/shared/Button";
+import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import type {
   CreateDesktopContractRequest,
   DesktopContract,
@@ -189,54 +189,57 @@ export function CreateProjectModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/42 p-4">
       <button
         aria-label="Chiudi creazione progetto"
         className="absolute inset-0 cursor-default"
         onClick={onClose}
         type="button"
       />
-      <section className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[18px] border border-subtle bg-card shadow-panel">
-        <div className="flex items-start justify-between gap-5 px-8 pb-5 pt-7">
+      <section className="projects-surface relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none">
+        <div className="flex items-start justify-between gap-5 px-6 pb-5 pt-6 md:px-8 md:pt-7">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-danger">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
               Nuovo progetto
             </div>
-            <h3 className="mt-2 text-2xl font-bold leading-tight text-foreground">
+            <h3 className="mt-2 max-w-3xl text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)] md:text-[30px]">
               {step === 1 ? "Dati contratto e perimetro" : "Importo e oneri sicurezza"}
             </h3>
-            <p className="mt-2 max-w-2xl text-sm leading-5 text-secondary">
+            <p className="mt-2 max-w-2xl text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
               {step === 1
                 ? "Definisci identita, codici contrattuali e appaltatore del progetto."
                 : "Definisci importo contrattuale e oneri della sicurezza esclusi dal ribasso."}
             </p>
           </div>
-          <button
-            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-card text-secondary transition-colors hover:bg-muted hover:text-foreground"
+          <ProjectControlButton
+            aria-label="Chiudi creazione progetto"
+            className="size-10 px-0"
             onClick={onClose}
-            type="button"
+            variant="icon"
           >
             <X className="size-4" />
-          </button>
+          </ProjectControlButton>
         </div>
 
-        <div className="px-8 pb-6">
+        <div className="px-6 pb-6 md:px-8">
           <ProjectStepper step={step} />
         </div>
 
-        <div className="grid min-h-0 flex-1 border-t border-subtle/70 lg:grid-cols-[minmax(0,1fr)_350px]">
-          <div className="min-h-0 overflow-y-auto px-8 py-7">
+        <div className="grid min-h-0 flex-1 border-t border-[var(--border-subtle)]/70 lg:grid-cols-[minmax(0,1fr)_350px]">
+          <div className="min-h-0 overflow-y-auto px-6 py-7 md:px-8">
             <div className="mx-auto max-w-[760px]">
               {step === 1 ? (
                 <section>
-                  <div className="flex items-start gap-4 border-b border-subtle pb-5">
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-[12px] bg-danger/10 text-danger">
+                  <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
                       <FileText className="size-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div>
-                        <div className="text-lg font-bold text-foreground">Anagrafica progetto</div>
-                        <p className="mt-1 text-sm leading-5 text-secondary">
+                        <div className="text-[17px] font-semibold text-[var(--text-primary)]">
+                          Anagrafica progetto
+                        </div>
+                        <p className="mt-1 text-[13px] leading-5 text-[var(--text-secondary)]">
                           Inserisci dati identificativi e codici contrattuali.
                         </p>
                       </div>
@@ -280,11 +283,11 @@ export function CreateProjectModal({
                       value={draft.frameworkAgreementCode}
                     />
                     <label className="block">
-                      <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-secondary">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                         Appaltatore
                       </span>
                       <input
-                        className="mt-3 h-[54px] w-full rounded-[12px] border border-subtle bg-card px-4 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring"
+                        className="mt-3 h-[54px] w-full rounded-[16px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                         list="project-contractor-options"
                         onChange={(event) =>
                           setDraft((state) => ({
@@ -305,14 +308,16 @@ export function CreateProjectModal({
                 </section>
               ) : (
                 <section>
-                  <div className="flex items-start gap-4 border-b border-subtle pb-5">
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-[12px] bg-danger/10 text-danger">
+                  <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
                       <WalletCards className="size-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div>
-                        <div className="text-lg font-bold text-foreground">Setup economico</div>
-                        <p className="mt-1 text-sm leading-5 text-secondary">
+                        <div className="text-[17px] font-semibold text-[var(--text-primary)]">
+                          Setup economico
+                        </div>
+                        <p className="mt-1 text-[13px] leading-5 text-[var(--text-secondary)]">
                           Definisci importi principali del progetto.
                         </p>
                       </div>
@@ -339,7 +344,7 @@ export function CreateProjectModal({
                       value={draft.safetyCostsNotSubjectToDiscount}
                     />
                   </div>
-                  <div className="mt-5 border-l-2 border-danger/50 pl-4 text-xs leading-5 text-secondary">
+                  <div className="mt-5 rounded-[18px] bg-[var(--bg-muted)]/70 px-4 py-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
                     Gli oneri della sicurezza vengono salvati sul progetto e saranno usati nei
                     flussi SAL senza applicazione del ribasso.
                   </div>
@@ -348,20 +353,20 @@ export function CreateProjectModal({
             </div>
           </div>
 
-          <aside className="min-h-0 overflow-y-auto border-t border-subtle bg-muted/20 p-5 lg:border-l lg:border-t-0">
+          <aside className="min-h-0 overflow-y-auto border-t border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/35 p-5 lg:border-l lg:border-t-0">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-secondary">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                 Anteprima
               </div>
-              <div className="mt-4 rounded-[14px] border border-subtle bg-card p-4 shadow-soft">
-                <div className="truncate text-lg font-bold text-foreground">
+              <div className="mt-4 rounded-[22px] bg-[var(--surface-base)] p-4 shadow-none">
+                <div className="truncate text-lg font-semibold text-[var(--text-primary)]">
                   {draft.title.trim() || "Nuovo progetto"}
                 </div>
-                <div className="mt-2 text-sm leading-5 text-secondary">
+                <div className="mt-2 text-sm leading-5 text-[var(--text-secondary)]">
                   {draft.applicationContractCode.trim() || "Contratto applicativo"} ·{" "}
                   {draft.frameworkAgreementCode.trim() || "Accordo quadro"}
                 </div>
-                <div className="mt-1 text-sm leading-5 text-secondary">
+                <div className="mt-1 text-sm leading-5 text-[var(--text-secondary)]">
                   {draft.contractorName.trim() || "Appaltatore da selezionare"}
                 </div>
                 <div className="mt-4 grid gap-3">
@@ -387,10 +392,10 @@ export function CreateProjectModal({
               </div>
             </div>
             <div className="mt-5">
-              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-secondary">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                 Controlli rapidi
               </div>
-              <div className="mt-3 grid gap-2 text-xs text-secondary">
+              <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)]">
                 <QuickCheckRow isOk={validation.checks.identity} label="Nome progetto compilato" />
                 <QuickCheckRow
                   isOk={validation.checks.amount}
@@ -409,29 +414,28 @@ export function CreateProjectModal({
           </aside>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-card px-8 py-4">
-          <div className="min-h-5 text-sm text-danger">{error}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)]/70 bg-[var(--surface-base)] px-6 py-4 md:px-8">
+          <div className="min-h-5 text-sm font-medium text-[var(--danger-base)]">{error}</div>
           <div className="flex flex-wrap gap-3">
             {step === 2 ? (
-              <Button onClick={() => setStep(1)} type="button" variant="outline">
-                <ArrowLeft className="size-4" />
+              <ProjectControlButton icon={ArrowLeft} onClick={() => setStep(1)} variant="neutral">
                 Indietro
-              </Button>
+              </ProjectControlButton>
             ) : null}
             {step === 1 ? (
-              <Button onClick={handleNext} type="button">
+              <ProjectControlButton onClick={handleNext} variant="primary">
                 Avanti
                 <ArrowRight className="size-4" />
-              </Button>
+              </ProjectControlButton>
             ) : (
-              <Button
+              <ProjectControlButton
                 disabled={isSaving || !validation.canSubmit}
+                icon={PlusCircle}
                 onClick={handleSubmit}
-                type="button"
+                variant="primary"
               >
-                <PlusCircle className="size-4" />
                 {isSaving ? "Salvataggio" : submitLabel}
-              </Button>
+              </ProjectControlButton>
             )}
           </div>
         </div>
@@ -442,20 +446,20 @@ export function CreateProjectModal({
 
 function QuickCheckRow({ isOk, label }: { isOk: boolean; label: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-[10px] border border-subtle bg-card px-3 py-2">
+    <div className="flex items-center justify-between gap-2 rounded-[14px] bg-[var(--surface-base)] px-3 py-2">
       <span className="flex min-w-0 items-center gap-2">
         {isOk ? (
-          <Check className="size-4 shrink-0 text-success" />
+          <Check className="size-4 shrink-0 text-[var(--success-base)]" />
         ) : (
-          <CircleAlert className="size-4 shrink-0 text-warning" />
+          <CircleAlert className="size-4 shrink-0 text-[var(--warning-base)]" />
         )}
         <span className="truncate">{label}</span>
       </span>
       <span
         className={
           isOk
-            ? "rounded-full bg-success/15 px-3 py-1 text-[11px] font-bold text-success"
-            : "rounded-full bg-warning/15 px-3 py-1 text-[11px] font-bold text-warning"
+            ? "rounded-full bg-[var(--success-soft)] px-3 py-1 text-[11px] font-bold text-[var(--success-base)]"
+            : "rounded-full bg-[var(--warning-soft)] px-3 py-1 text-[11px] font-bold text-[var(--warning-base)]"
         }
       >
         {isOk ? "OK" : "Check"}
@@ -468,7 +472,7 @@ function ProjectStepper({ step }: { step: ProjectModalStep }) {
   return (
     <div className="grid items-center gap-4 md:grid-cols-[minmax(130px,160px)_1fr_minmax(150px,190px)]">
       <StepStatus completed={step > 1} index={1} label="Dati" status="Completato" />
-      <div className="hidden h-px bg-subtle md:block" />
+      <div className="hidden h-px bg-[var(--border-subtle)]/70 md:block" />
       <StepStatus
         active={step === 2}
         completed={false}
@@ -498,10 +502,10 @@ function StepStatus({
       <div
         className={
           completed
-            ? "flex size-10 items-center justify-center rounded-full border border-subtle bg-card text-foreground"
+            ? "flex size-10 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[var(--text-inverse)]"
             : active
-              ? "flex size-10 items-center justify-center rounded-full border border-danger bg-card text-danger"
-              : "flex size-10 items-center justify-center rounded-full border border-subtle bg-card text-secondary"
+              ? "flex size-10 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]"
+              : "flex size-10 items-center justify-center rounded-full bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]"
         }
       >
         {completed ? (
@@ -511,8 +515,14 @@ function StepStatus({
         )}
       </div>
       <div>
-        <div className="text-sm font-bold text-foreground">{label}</div>
-        <div className={active ? "text-xs font-medium text-danger" : "text-xs text-secondary"}>
+        <div className="text-sm font-semibold text-[var(--text-primary)]">{label}</div>
+        <div
+          className={
+            active
+              ? "text-xs font-medium text-[var(--info-base)]"
+              : "text-xs text-[var(--text-secondary)]"
+          }
+        >
           {status}
         </div>
       </div>
@@ -535,11 +545,11 @@ function ProjectTextField({
 }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="mt-3 h-[54px] w-full rounded-[12px] border border-subtle bg-card px-4 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring"
+        className="mt-3 h-[54px] w-full rounded-[16px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
@@ -563,11 +573,11 @@ function ProjectCurrencyField({
 }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="mt-3 h-[54px] w-full rounded-[12px] border border-subtle bg-card px-4 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring"
+        className="mt-3 h-[54px] w-full rounded-[16px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         inputMode="decimal"
         onChange={(event) => onChange(sanitizeMoneyInput(event.target.value))}
         placeholder={placeholder}
@@ -580,14 +590,16 @@ function ProjectCurrencyField({
 
 function PreviewMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[12px] border border-subtle bg-card p-3">
+    <div className="flex items-center justify-between gap-3 rounded-[16px] bg-[var(--bg-muted)]/70 p-3">
       <div className="min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-secondary">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
           {label}
         </div>
-        <div className="mt-1 truncate text-sm font-bold text-foreground">{value}</div>
+        <div className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+          {value}
+        </div>
       </div>
-      <div className="text-secondary">{icon}</div>
+      <div className="text-[var(--text-secondary)]">{icon}</div>
     </div>
   );
 }

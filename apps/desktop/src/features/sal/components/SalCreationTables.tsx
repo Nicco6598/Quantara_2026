@@ -49,7 +49,7 @@ export function SalExcelGrid({
 
   return (
     <div className="space-y-3">
-      <label className="relative flex h-10 items-center rounded-[10px] border border-subtle bg-card">
+      <label className="relative flex h-10 items-center rounded-full border border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/65">
         <Search className="ml-3 size-4 text-secondary" />
         <input
           aria-label="Cerca voce per codice o descrizione"
@@ -59,9 +59,9 @@ export function SalExcelGrid({
           value={query}
         />
       </label>
-      <div className="overflow-x-auto rounded-[12px] border border-subtle">
+      <div className="overflow-x-auto rounded-[20px] bg-[var(--bg-muted)]/50">
         <div className="min-w-[1040px]">
-          <div className="grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
+          <div className="sticky top-0 z-10 grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-2 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
             <span />
             <span>Codice</span>
             <span>Descrizione</span>
@@ -85,8 +85,8 @@ export function SalExcelGrid({
                 selectedIds.has(voice.id),
               ).length;
               return (
-                <div className="border-t border-subtle" key={group.id}>
-                  <div className="grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] items-center bg-muted/25 px-3 py-2 text-[12px] font-semibold">
+                <div className="border-t border-[var(--border-subtle)]/60" key={group.id}>
+                  <div className="grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] items-center bg-[var(--surface-base)]/68 px-3 py-2 text-[12px] font-semibold">
                     <span className="text-primary">
                       {selectedInGroup}/{group.voices.length}
                     </span>
@@ -107,7 +107,7 @@ export function SalExcelGrid({
                     return (
                       <div
                         className={cn(
-                          "grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] items-center border-t border-subtle px-3 py-2 text-[13px]",
+                          "grid grid-cols-[44px_112px_minmax(260px,1fr)_80px_112px_100px_120px_130px] items-center border-t border-[var(--border-subtle)]/55 px-3 py-2 text-[13px] transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--surface-base)]/76",
                           selected && "bg-primary/5",
                         )}
                         key={voice.id}
@@ -117,7 +117,7 @@ export function SalExcelGrid({
                             selected ? `Deseleziona ${voice.code}` : `Seleziona ${voice.code}`
                           }
                           className={cn(
-                            "ml-2 flex size-5 items-center justify-center rounded-[6px] border border-subtle",
+                            "ml-2 flex size-5 items-center justify-center rounded-[7px] border border-[var(--border-subtle)]",
                             selected && "border-primary bg-primary text-white",
                           )}
                           onClick={() => (selected ? onRemove(voice.id) : onToggle(voice))}
@@ -132,7 +132,7 @@ export function SalExcelGrid({
                         <span>{voice.unit}</span>
                         <input
                           aria-label={`Quantita ${voice.code}`}
-                          className="h-8 rounded-[8px] border border-subtle bg-card px-2 text-right text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                          className="h-8 rounded-[10px] border border-[var(--border-subtle)]/60 bg-[var(--surface-base)] px-2 text-right text-[13px] outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                           disabled={!selected}
                           min={0}
                           onChange={(event) =>
@@ -149,7 +149,7 @@ export function SalExcelGrid({
                         />
                         <select
                           aria-label={`Maggiorazione ${voice.code}`}
-                          className="h-8 rounded-[8px] border border-subtle bg-card px-2 text-right text-[12px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                          className="h-8 rounded-[10px] border border-[var(--border-subtle)]/60 bg-[var(--surface-base)] px-2 text-right text-[12px] outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                           disabled={!selected}
                           onChange={(event) => onSurcharge(voice.id, Number(event.target.value))}
                           value={line?.surchargePercent ?? 0}
@@ -225,7 +225,7 @@ export function CatalogPanel({
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-[1fr_40px_40px] gap-2">
-        <label className="relative flex h-10 items-center rounded-[10px] border border-subtle bg-card">
+        <label className="relative flex h-10 items-center rounded-full border border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/65">
           <Search className="ml-3 size-4 text-secondary" />
           <input
             aria-label="Cerca voce o codice tariffario"
@@ -242,8 +242,8 @@ export function CatalogPanel({
           <MoreHorizontal className="size-4" />
         </button>
       </div>
-      <div className="overflow-hidden rounded-[12px] border border-subtle">
-        <div className="grid grid-cols-[38px_96px_minmax(180px,1fr)_64px_78px_106px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
+      <div className="overflow-hidden rounded-[20px] bg-[var(--bg-muted)]/50">
+        <div className="grid grid-cols-[38px_96px_minmax(180px,1fr)_64px_78px_106px] bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-2 text-xs font-semibold text-secondary">
           <span />
           <span>Codice</span>
           <span>Descrizione</span>
@@ -264,10 +264,10 @@ export function CatalogPanel({
             {groupedVoices.map((group) => {
               const isExpanded = normalizedQuery.length > 0 || expandedGroups.has(group.id);
               return (
-                <div className="border-t border-subtle" key={group.id}>
+                <div className="border-t border-[var(--border-subtle)]/55" key={group.id}>
                   <button
                     aria-expanded={isExpanded}
-                    className="grid w-full grid-cols-[38px_96px_minmax(180px,1fr)_64px_78px_106px] items-center bg-muted/25 px-3 py-2 text-left text-[12px] font-bold hover:bg-muted/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    className="grid w-full grid-cols-[38px_96px_minmax(180px,1fr)_64px_78px_106px] items-center bg-[var(--surface-base)]/68 px-3 py-2 text-left text-[12px] font-semibold transition-colors hover:bg-[var(--surface-base)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                     onClick={() =>
                       setExpandedGroups((current) => {
                         const next = new Set(current);
@@ -294,14 +294,14 @@ export function CatalogPanel({
                     ? group.voices.map((voice) => (
                         <button
                           aria-pressed={selectedIds.has(voice.id)}
-                          className="grid w-full grid-cols-[38px_96px_minmax(180px,1fr)_64px_78px_106px] items-center border-t border-subtle px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                          className="grid w-full grid-cols-[38px_96px_minmax(180px,1fr)_64px_78px_106px] items-center border-t border-[var(--border-subtle)]/55 px-3 py-2.5 text-left text-[13px] transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                           key={voice.id}
                           onClick={() => onToggle(voice)}
                           type="button"
                         >
                           <span
                             className={cn(
-                              "ml-4 flex size-5 items-center justify-center rounded-[6px] border border-subtle",
+                              "ml-4 flex size-5 items-center justify-center rounded-[7px] border border-[var(--border-subtle)]",
                               selectedIds.has(voice.id) && "border-primary bg-primary text-white",
                             )}
                           >
@@ -351,10 +351,10 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onSurcharge: (voiceId: string, percent: number) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-[12px] border border-subtle">
+    <div className="overflow-hidden rounded-[20px] bg-[var(--bg-muted)]/50">
       <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
         <div className="min-w-[1060px]">
-          <div className="grid grid-cols-[116px_minmax(220px,1fr)_72px_84px_84px_84px_196px_96px_96px_120px_44px] bg-muted/45 px-3 py-2 text-xs font-semibold text-secondary">
+          <div className="sticky top-0 z-10 grid grid-cols-[116px_minmax(220px,1fr)_72px_84px_84px_84px_196px_96px_96px_120px_44px] bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-2 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
             <span>Codice</span>
             <span>Descrizione</span>
             <span>U.M.</span>
@@ -391,16 +391,16 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
 
   if (lines.length === 0) {
     return (
-      <div className="rounded-[14px] border border-subtle">
+      <div className="rounded-[20px] bg-[var(--bg-muted)]/50">
         <EmptyTableState message="Il registro SAL apparira quando avrai selezionato almeno una voce tariffaria." />
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-[14px] border border-subtle">
+    <div className="overflow-x-auto rounded-[20px] bg-[var(--bg-muted)]/50">
       <div className="min-w-[1100px]">
-        <div className="grid grid-cols-[44px_160px_110px_minmax(260px,1fr)_74px_130px_130px_120px_54px] bg-muted/45 px-3 py-3 text-xs font-semibold text-secondary">
+        <div className="sticky top-0 z-10 grid grid-cols-[44px_160px_110px_minmax(260px,1fr)_74px_130px_130px_120px_54px] bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
           <span />
           <span>Tariffario</span>
           <span>Codice</span>
