@@ -7,8 +7,14 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const parserDir = join(repoRoot, "apps", "desktop", "src-tauri", "resources", "parser");
 const parserScript = join(parserDir, "rfi_tariffa_parser.py");
 const buildDir = join(repoRoot, "apps", "desktop", "src-tauri", "target", "rfi-parser-build");
+const venvDir = join(buildDir, ".venv");
 const isWindows = process.platform === "win32";
 const parserBinary = join(parserDir, isWindows ? "rfi_tariffa_parser.exe" : "rfi_tariffa_parser");
+const pythonExecutable = join(
+  venvDir,
+  isWindows ? "Scripts" : "bin",
+  isWindows ? "python.exe" : "python",
+);
 
 if (!existsSync(parserScript)) {
   throw new Error(`Parser script not found: ${parserScript}`);
@@ -16,9 +22,6 @@ if (!existsSync(parserScript)) {
 
 mkdirSync(parserDir, { recursive: true });
 mkdirSync(buildDir, { recursive: true });
-
-const python = process.env.PYTHON ?? (isWindows ? "py" : "python3");
-const pythonPrefixArgs = process.env.PYTHON ? [] : isWindows ? ["-3"] : [];
 
 function run(command, args) {
   const result = spawnSync(command, args, {
@@ -35,21 +38,18 @@ function run(command, args) {
   }
 }
 
-run(python, [...pythonPrefixArgs, "-m", "pip", "install", "--upgrade", "pip"]);
-run(python, [
-  ...pythonPrefixArgs,
-  "-m",
-  "pip",
-  "install",
-  "--upgrade",
-  "pyinstaller",
-  "pdfplumber",
-]);
+if (!existsSync(pythonExecutable)) {
+  const basePython = process.env.PYTHON ?? (isWindows ? "py" : "python3");
+  const basePythonArgs = process.env.PYTHON ? [] : isWindows ? ["-3"] : [];
+  run(basePython, [...basePythonArgs, "-m", "venv", venvDir]);
+}
+
+run(pythonExecutable, ["-m", "pip", "install", "--upgrade", "pip"]);
+run(pythonExecutable, ["-m", "pip", "install", "--upgrade", "pyinstaller", "pdfplumber"]);
 
 rmSync(parserBinary, { force: true });
 
-run(python, [
-  ...pythonPrefixArgs,
+run(pythonExecutable, [
   "-m",
   "PyInstaller",
   "--onefile",

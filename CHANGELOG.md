@@ -2,6 +2,10 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.1.61 - 2026-04-30
+
+- Fix import python per MacOS.
+
 ## 0.1.60 - 2026-04-30
 
 - Fix import tariffari cross-platform: il bundle Tauri include ora il parser nella posizione corretta e la release desktop non dipende piu da `py -3` sul client.
