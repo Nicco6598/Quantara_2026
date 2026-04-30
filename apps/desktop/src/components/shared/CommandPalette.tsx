@@ -150,7 +150,8 @@ export function CommandPalette({
 
     setQuery("");
     setSelectedIndex(0);
-    window.setTimeout(() => inputRef.current?.focus(), 0);
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => clearTimeout(timer);
   }, [isOpen]);
 
   if (!isOpen) {

@@ -5,6 +5,7 @@ import {
   Copy,
   Database,
   FileText,
+  type LucideIcon,
   MoreVertical,
   Save,
   Search,
@@ -12,10 +13,11 @@ import {
   Star,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
-import { ScreenShell, SectionPanel, SummaryLine } from "@/components/shared/Screen";
+import { SummaryLine } from "@/components/shared/Screen";
 import { useToast } from "@/components/shared/ToastProvider";
+import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import {
   createDesktopTariffBook,
   type DesktopContract,
@@ -30,11 +32,12 @@ import {
   type TariffPdfMetadata,
   updateDesktopTariffBook,
 } from "@/lib/desktopData";
+import { cn } from "@/lib/utils";
 import { QuickAction } from "./components/QuickAction";
 import { TariffBookRow } from "./components/TariffBookRow";
 import { TariffEditField } from "./components/TariffEditField";
+import { TariffImportLoadingModal } from "./components/TariffImportLoadingModal";
 import { TariffImportPreviewModal } from "./components/TariffImportPreviewModal";
-import { TariffMetric } from "./components/TariffMetric";
 import { TariffVoicesExplorerModal } from "./components/TariffVoicesExplorerModal";
 import {
   fallbackContracts,
@@ -62,6 +65,7 @@ export function TariffsScreen() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [importPreview, setImportPreview] = useState<TariffPdfMetadata | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [importingFileName, setImportingFileName] = useState("");
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditTariffBookForm>({
     name: "",
@@ -119,20 +123,29 @@ export function TariffsScreen() {
     Promise.all([
       listDesktopTariffBooks(fallbackTariffBooks),
       listDesktopContracts(fallbackContracts),
-    ]).then(([tariffBooks, contracts]) => {
-      if (!active) {
-        return;
-      }
+    ])
+      .then(([tariffBooks, contracts]) => {
+        if (!active) {
+          return;
+        }
 
-      setTariffBooksState(tariffBooks);
-      setContractsState(contracts);
-      setSelectedTariffBookId(tariffBooks.data[0]?.id ?? fallbackTariffBook.id);
-    });
+        setTariffBooksState(tariffBooks);
+        setContractsState(contracts);
+        setSelectedTariffBookId(tariffBooks.data[0]?.id ?? fallbackTariffBook.id);
+      })
+      .catch(() => {
+        if (!active) return;
+        notify({
+          message: "Impossibile caricare tariffari e contratti.",
+          title: "Caricamento fallito",
+          tone: "danger",
+        });
+      });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [notify]);
 
   const tariffMetrics = useMemo<TariffMetrics>(() => {
     const sourceNames = new Set<string>();
@@ -236,16 +249,25 @@ export function TariffsScreen() {
   useEffect(() => {
     let active = true;
 
-    listDesktopTariffVoices(selectedTariffBook.id, fallbackTariffVoices).then((result) => {
-      if (active) {
-        setVoicesState(result);
-      }
-    });
+    listDesktopTariffVoices(selectedTariffBook.id, fallbackTariffVoices)
+      .then((result) => {
+        if (active) {
+          setVoicesState(result);
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        notify({
+          message: "Impossibile caricare le voci del tariffario selezionato.",
+          title: "Caricamento voci fallito",
+          tone: "danger",
+        });
+      });
 
     return () => {
       active = false;
     };
-  }, [selectedTariffBook.id]);
+  }, [selectedTariffBook.id, notify]);
 
   useEffect(() => {
     let active = true;
@@ -259,13 +281,17 @@ export function TariffsScreen() {
         const result = await listDesktopTariffVoices(book.id, fallbackForBook);
         return [book.id, result.data.length] as const;
       }),
-    ).then((entries) => {
-      if (!active) {
-        return;
-      }
+    )
+      .then((entries) => {
+        if (!active) {
+          return;
+        }
 
-      setVoiceCountByBookId(Object.fromEntries(entries));
-    });
+        setVoiceCountByBookId(Object.fromEntries(entries));
+      })
+      .catch(() => {
+        if (!active) return;
+      });
 
     return () => {
       active = false;
@@ -275,16 +301,27 @@ export function TariffsScreen() {
   const groupedVoices = useMemo(() => groupTariffVoices(voicesState.data), [voicesState.data]);
 
   const handlePdfImport = useCallback(async () => {
-    setIsImporting(true);
+    setIsImporting(false);
+    setImportingFileName("");
     setCreateState("saving");
-    setCreateMessage("Lettura PDF tariffario in corso...");
+    setCreateMessage("Seleziona un PDF o JSON tariffario da importare.");
 
     let metadata: TariffPdfMetadata | null = null;
     try {
-      metadata = await selectTariffPdfMetadata();
+      metadata = await selectTariffPdfMetadata({
+        onFileSelected: (path) => {
+          setImportingFileName(getFileNameFromPath(path));
+          setIsImporting(true);
+          setCreateMessage("File selezionato. Lettura tariffario in corso...");
+        },
+        onPreviewStart: (fallback) => {
+          setImportingFileName(fallback.name);
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setIsImporting(false);
+      setImportingFileName("");
       setCreateState("error");
       setCreateMessage(message);
       notify({
@@ -295,6 +332,7 @@ export function TariffsScreen() {
       return;
     }
     setIsImporting(false);
+    setImportingFileName("");
 
     if (!metadata) {
       setCreateMessage("Selezione PDF non disponibile in browser o annullata.");
@@ -491,47 +529,54 @@ export function TariffsScreen() {
   }
 
   return (
-    <ScreenShell className="space-y-5 p-4 pb-6 lg:p-5 2xl:p-6">
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-[25px] font-bold leading-tight tracking-[-0.01em] text-[var(--text-primary)] sm:text-[30px]">
+    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
+
+      <section
+        className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
+      >
+        <div className="min-w-0">
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+            Catalogo prezzi
+          </span>
+          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
             Catalogo tariffari
           </h2>
-          <p className="mt-2 max-w-3xl text-[14px] font-medium leading-6 text-[var(--text-secondary)]">
-            Gestisci i tariffari per ente, anno e coerenza con i progetti.
+          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
+            Gestisci tariffari per ente, anno e coerenza con i progetti, mantenendo import, filtri
+            e dettaglio nello stesso piano operativo.
           </p>
-        </div>
-        <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]">
-          <div className="grid min-w-[680px] grid-cols-5 divide-x divide-[var(--border-subtle)] sm:min-w-0">
-            <TariffMetric
-              detail="Totali nel catalogo"
+
+          <div className="mt-7 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <MetricCard
+              caption="Totali nel catalogo"
               icon={Database}
               label="Tariffari"
               value={String(tariffMetrics.tariffCount)}
             />
-            <TariffMetric
-              detail="Enti gestiti"
+            <MetricCard
+              caption="Enti gestiti"
               icon={Building2}
               label="Enti"
               tone="success"
               value={String(tariffMetrics.sourceCount)}
             />
-            <TariffMetric
-              detail={availableYears.slice(0, 3).join(", ")}
+            <MetricCard
+              caption={availableYears.slice(0, 3).join(", ")}
               icon={CalendarDays}
               label="Anni attivi"
               tone="warning"
               value={String(availableYears.length)}
             />
-            <TariffMetric
-              detail="Nel catalogo"
+            <MetricCard
+              caption="Nel catalogo"
               icon={Sparkles}
               label="Voci totali"
               tone="info"
               value={voicesState.data.length.toLocaleString("it-IT")}
             />
-            <TariffMetric
-              detail="Attivi o validati"
+            <MetricCard
+              caption="Attivi o validati"
               icon={CheckCircle2}
               label="Aggiornati"
               tone="success"
@@ -539,14 +584,43 @@ export function TariffsScreen() {
             />
           </div>
         </div>
+
+        <BezelSurface className="self-start md:translate-y-2" innerClassName="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                Voci nel catalogo
+              </div>
+              <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+                {voicesState.data.length.toLocaleString("it-IT")}
+              </div>
+            </div>
+            <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <Database className="size-6" />
+            </span>
+          </div>
+          <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+            {tariffMetrics.tariffCount} tariffari su {tariffMetrics.sourceCount} enti.
+          </p>
+          <div className="mt-4 flex items-center gap-3">
+            <span
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success-base)]",
+              )}
+            >
+              <CheckCircle2 className="size-5" />
+            </span>
+            <div className="text-[12px] font-semibold text-[var(--text-primary)]">
+              {tariffMetrics.activeCount} aggiornati
+            </div>
+          </div>
+        </BezelSurface>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)_410px]">
-        <div className="space-y-3 xl:self-start">
-          <SectionPanel className="rounded-xl p-4">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-              Azioni rapide
-            </div>
+      <section className="mt-8 grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)_410px]">
+        <div className="space-y-4 xl:self-start">
+          <Panel>
+            <PanelTitle>Azioni rapide</PanelTitle>
             <div className="mt-4 space-y-3">
               <QuickAction
                 detail="Carica un tariffario da PDF o JSON parser"
@@ -565,18 +639,19 @@ export function TariffsScreen() {
             </div>
             {createMessage ? (
               <p
-                className={`mt-4 rounded-lg border px-3 py-2 text-xs font-medium leading-5 ${
+                className={cn(
+                  "mt-4 rounded-lg border px-3 py-2 text-[12px] font-medium leading-5",
                   createState === "error"
                     ? "border-[var(--danger-soft)] bg-[var(--danger-soft)] text-[var(--danger-base)]"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-muted)] text-[var(--text-secondary)]"
-                }`}
+                    : "border-[var(--border-subtle)] bg-[var(--bg-muted)] text-[var(--text-secondary)]",
+                )}
               >
                 {createMessage}
               </p>
             ) : null}
-          </SectionPanel>
+          </Panel>
 
-          <SectionPanel className="rounded-xl p-4">
+          <Panel>
             <div className="text-[13px] font-bold text-[var(--text-primary)]">
               Come funzionano i tariffari?
             </div>
@@ -587,107 +662,106 @@ export function TariffsScreen() {
             <button className="mt-3 text-[12px] font-bold text-[var(--info-base)]" type="button">
               Scopri di piu
             </button>
-          </SectionPanel>
+          </Panel>
         </div>
 
-        <SectionPanel className="min-w-0 rounded-xl p-0">
-          <div className="border-b border-[var(--border-subtle)]/80 p-4">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  className={`border-b-2 px-2 pb-2 text-[12px] font-bold ${
-                    activeCatalogTab === "all"
-                      ? "border-[var(--info-base)] text-[var(--text-primary)]"
-                      : "border-transparent text-[var(--text-secondary)]"
-                  }`}
-                  onClick={() => setActiveCatalogTab("all")}
-                  type="button"
-                >
-                  Tutti i tariffari
-                  <Badge className="ml-2" variant="info">
-                    {baseFilteredTariffBooks.length}
-                  </Badge>
-                </button>
-                <button
-                  className={`border-b-2 px-2 pb-2 text-[12px] font-bold ${
-                    activeCatalogTab === "favorites"
-                      ? "border-[var(--warning-base)] text-[var(--text-primary)]"
-                      : "border-transparent text-[var(--text-secondary)]"
-                  }`}
-                  onClick={() => setActiveCatalogTab("favorites")}
-                  type="button"
-                >
-                  I miei preferiti
-                  <Badge className="ml-2" variant={favoriteCount > 0 ? "warning" : "neutral"}>
-                    {favoriteCount}
-                  </Badge>
-                </button>
-              </div>
+        <Panel className="min-w-0 p-0">
+          <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className={cn(
+                  "h-9 rounded-full px-4 text-[12px] font-semibold transition-colors 2xl:h-10 2xl:text-[13px]",
+                  activeCatalogTab === "all"
+                    ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                    : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                )}
+                onClick={() => setActiveCatalogTab("all")}
+                type="button"
+              >
+                Tutti i tariffari
+                <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold">
+                  {baseFilteredTariffBooks.length}
+                </span>
+              </button>
+              <button
+                className={cn(
+                  "h-9 rounded-full px-4 text-[12px] font-semibold transition-colors 2xl:h-10 2xl:text-[13px]",
+                  activeCatalogTab === "favorites"
+                    ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                    : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                )}
+                onClick={() => setActiveCatalogTab("favorites")}
+                type="button"
+              >
+                I miei preferiti
+                <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold">
+                  {favoriteCount}
+                </span>
+              </button>
+            </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
-                <select
-                  className="h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)]"
-                  onChange={(event) => setYearFilter(event.target.value)}
-                  value={yearFilter}
-                >
-                  <option value="all">Tutti gli anni</option>
-                  {availableYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="h-10 min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)] lg:w-[180px]"
-                  onChange={(event) => setProjectFilter(event.target.value)}
-                  value={projectFilter}
-                >
-                  <option value="all">
-                    {realContracts.length > 0 ? "Tutti i progetti" : "Nessun progetto locale"}
+            <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
+              <select
+                className="h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                onChange={(event) => setYearFilter(event.target.value)}
+                value={yearFilter}
+              >
+                <option value="all">Tutti gli anni</option>
+                {availableYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
                   </option>
-                  {realContracts.map((contract) => (
-                    <option key={contract.id} value={contract.id}>
-                      {contract.title}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium text-[var(--text-primary)]"
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                  value={statusFilter}
-                >
-                  <option value="all">Tutti gli stati</option>
-                  <option value="active">active</option>
-                  <option value="draft">draft</option>
-                  <option value="validated">validated</option>
-                </select>
-                <label className="relative block sm:col-span-2 lg:col-span-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
-                  <input
-                    className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] lg:w-[220px] 2xl:w-[260px]"
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Cerca per nome, ente o ID..."
-                    type="search"
-                    value={query}
-                  />
-                </label>
-                <Button
-                  onClick={() => {
-                    setYearFilter("all");
-                    setProjectFilter("all");
-                    setStatusFilter("all");
-                    setQuery("");
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  Reset filtri
-                </Button>
-              </div>
+                ))}
+              </select>
+              <select
+                className="h-10 min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] lg:w-[180px]"
+                onChange={(event) => setProjectFilter(event.target.value)}
+                value={projectFilter}
+              >
+                <option value="all">
+                  {realContracts.length > 0 ? "Tutti i progetti" : "Nessun progetto locale"}
+                </option>
+                {realContracts.map((contract) => (
+                  <option key={contract.id} value={contract.id}>
+                    {contract.title}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                onChange={(event) => setStatusFilter(event.target.value)}
+                value={statusFilter}
+              >
+                <option value="all">Tutti gli stati</option>
+                <option value="active">active</option>
+                <option value="draft">draft</option>
+                <option value="validated">validated</option>
+              </select>
+              <label className="relative block sm:col-span-2 lg:col-span-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+                <input
+                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] lg:w-[220px] 2xl:w-[260px]"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Cerca per nome, ente o ID..."
+                  type="search"
+                  value={query}
+                />
+              </label>
+              <ProjectControlButton
+                onClick={() => {
+                  setYearFilter("all");
+                  setProjectFilter("all");
+                  setStatusFilter("all");
+                  setQuery("");
+                }}
+                variant="neutral"
+              >
+                Reset filtri
+              </ProjectControlButton>
             </div>
           </div>
 
-          <div className="hidden grid-cols-[36px_minmax(190px,1.5fr)_minmax(130px,0.8fr)_70px_82px_100px_92px_36px] border-b border-[var(--border-subtle)]/80 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)] 2xl:grid">
+          <div className="hidden grid-cols-[36px_minmax(190px,1.5fr)_minmax(130px,0.8fr)_70px_82px_100px_92px_36px] border-b border-[var(--border-subtle)] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)] 2xl:grid">
             <span />
             <span>Nome tariffario</span>
             <span>Ente</span>
@@ -697,7 +771,7 @@ export function TariffsScreen() {
             <span>Voci</span>
             <span />
           </div>
-          <div className="divide-y divide-[var(--border-subtle)]/80">
+          <div className="divide-y divide-[var(--border-subtle)]">
             {visibleTariffBooks.length > 0 ? (
               visibleTariffBooks.map((book) => (
                 <TariffBookRow
@@ -714,30 +788,28 @@ export function TariffsScreen() {
                 />
               ))
             ) : (
-              <div className="p-8 text-sm text-[var(--text-secondary)]">
+              <div className="p-8 text-[13px] text-[var(--text-secondary)]">
                 {activeCatalogTab === "favorites"
                   ? "Nessun preferito trovato con i filtri correnti."
                   : "Nessun tariffario nel filtro corrente."}
               </div>
             )}
           </div>
-        </SectionPanel>
+        </Panel>
 
         <aside className="space-y-4 xl:col-span-2 2xl:col-span-1">
-          <SectionPanel className="rounded-xl p-4">
+          <Panel>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                 <Star className="size-4 fill-[var(--warning-base)] text-[var(--warning-base)]" />
                 Dettaglio tariffario
               </div>
-              <Button
+              <ProjectControlButton
                 onClick={() => handleStartEdit(selectedTariffBook)}
-                size="icon"
-                type="button"
-                variant="outline"
+                variant="icon"
               >
                 <MoreVertical className="size-4" />
-              </Button>
+              </ProjectControlButton>
             </div>
             {editingBookId === selectedTariffBook.id ? (
               <div className="mt-4 space-y-3">
@@ -760,7 +832,7 @@ export function TariffsScreen() {
                   <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
                     Stato
                     <select
-                      className="mt-1 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3 text-[13px] font-medium normal-case tracking-normal text-[var(--text-primary)]"
+                      className="mt-1 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium normal-case tracking-normal text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                       onChange={(event) =>
                         setEditForm((form) => ({ ...form, status: event.target.value }))
                       }
@@ -773,13 +845,17 @@ export function TariffsScreen() {
                   </label>
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <Button className="flex-1" onClick={handleSaveEdit} type="button">
-                    <Save className="size-4" />
+                  <ProjectControlButton
+                    className="flex-1"
+                    icon={Save}
+                    onClick={handleSaveEdit}
+                    variant="primary"
+                  >
                     Salva
-                  </Button>
-                  <Button onClick={() => setEditingBookId(null)} type="button" variant="outline">
+                  </ProjectControlButton>
+                  <ProjectControlButton onClick={() => setEditingBookId(null)} variant="neutral">
                     Annulla
-                  </Button>
+                  </ProjectControlButton>
                 </div>
               </div>
             ) : (
@@ -812,16 +888,16 @@ export function TariffsScreen() {
                 </dl>
               </div>
             )}
-          </SectionPanel>
+          </Panel>
 
-          <SectionPanel className="rounded-xl p-4">
+          <Panel>
             <div className="flex items-center justify-between gap-3">
               <div className="text-[13px] font-bold text-[var(--text-primary)]">
                 Voci tariffarie
               </div>
-              <Button onClick={() => setIsVoicesExplorerOpen(true)} type="button" variant="outline">
+              <ProjectControlButton onClick={() => setIsVoicesExplorerOpen(true)} variant="neutral">
                 Apri vista completa
-              </Button>
+              </ProjectControlButton>
             </div>
             <p className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
               Consulta voci e sottovoci in una vista dedicata con ricerca e righe apribili.
@@ -830,7 +906,7 @@ export function TariffsScreen() {
               {groupedVoices.length.toLocaleString("it-IT")} voci principali ·{" "}
               {voicesState.data.length.toLocaleString("it-IT")} sottovoci
             </div>
-          </SectionPanel>
+          </Panel>
         </aside>
       </section>
       {importPreview ? (
@@ -841,6 +917,9 @@ export function TariffsScreen() {
           onConfirm={handleConfirmImport}
         />
       ) : null}
+      {isImporting && !importPreview ? (
+        <TariffImportLoadingModal fileName={importingFileName} />
+      ) : null}
       {isVoicesExplorerOpen ? (
         <TariffVoicesExplorerModal
           groups={groupedVoices}
@@ -849,6 +928,74 @@ export function TariffsScreen() {
           total={voicesState.data.length}
         />
       ) : null}
-    </ScreenShell>
+    </main>
   );
+}
+
+function Panel({ children, className }: { children: ReactNode; className?: string }) {
+  return <BezelSurface innerClassName={cn("p-4", className)}>{children}</BezelSurface>;
+}
+
+function PanelTitle({ children }: { children: string }) {
+  return (
+    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+      {children}
+    </div>
+  );
+}
+
+function MetricCard({
+  caption,
+  icon: Icon,
+  label,
+  tone,
+  value,
+}: {
+  caption: string;
+  icon: LucideIcon;
+  label: string;
+  tone?: "blue" | "info" | "success" | "warning";
+  value: string;
+}) {
+  return (
+    <BezelSurface
+      innerClassName={cn(
+        "group flex min-h-[112px] items-center gap-3 p-4 2xl:min-h-[128px] 2xl:gap-4",
+        tone === "blue" ? "bg-[var(--info-soft)]/20" : "",
+      )}
+    >
+      <div
+        className={cn(
+          "flex size-11 shrink-0 items-center justify-center rounded-full 2xl:size-12",
+          (!tone || tone === "blue") && "bg-[var(--info-soft)] text-[var(--info-base)]",
+          tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
+          tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+          tone === "info" && "bg-[var(--info-soft)] text-[var(--info-base)]",
+        )}
+      >
+        <Icon className="size-5 2xl:size-6" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+          {label}
+        </div>
+        <div
+          className={cn(
+            "mt-2 text-[20px] font-bold leading-none 2xl:text-[22px]",
+            (!tone || tone === "blue") && "text-[var(--info-base)]",
+            tone === "success" && "text-[var(--success-base)]",
+            tone === "warning" && "text-[var(--warning-base)]",
+            tone === "info" && "text-[var(--info-base)]",
+          )}
+        >
+          {value}
+        </div>
+        <div className="mt-2 text-[12px] font-medium text-[var(--text-secondary)]">{caption}</div>
+      </div>
+    </BezelSurface>
+  );
+}
+
+function getFileNameFromPath(path: string) {
+  return path.split(/[\\/]/).pop() ?? path;
 }

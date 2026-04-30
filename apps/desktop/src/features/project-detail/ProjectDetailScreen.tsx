@@ -1,29 +1,38 @@
 import {
   Activity,
-  BarChart3,
   CheckCircle2,
   ChevronRight,
   Clock3,
+  FileText,
   Layers3,
+  MoreVertical,
   Plus,
   Radio,
   ReceiptText,
+  ThumbsUp,
+  Trash2,
   TrendingUp,
-  UserRound,
   UsersRound,
   WalletCards,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
 import { formatDueWindow, formatForecastDelta } from "@/features/projects/utils/projects-helpers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { useToast } from "@/components/shared/ToastProvider";
 import { useNavigate } from "@/hooks/useNavigate";
 import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
+const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
+
 export function ProjectDetailScreen() {
+  const { notify } = useToast();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<PortfolioProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,19 +42,29 @@ export function ProjectDetailScreen() {
   useEffect(() => {
     let active = true;
 
-    listDesktopContracts([]).then((contracts) => {
-      if (!active) {
-        return;
-      }
+    listDesktopContracts([])
+      .then((contracts) => {
+        if (!active) {
+          return;
+        }
 
-      setProjects(contracts.data.map(mapContractToProject));
-      setIsLoading(false);
-    });
+        setProjects(contracts.data.map(mapContractToProject));
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        notify({
+          message: "Impossibile caricare i dettagli del progetto.",
+          title: "Caricamento fallito",
+          tone: "danger",
+        });
+        setIsLoading(false);
+      });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [notify]);
 
   const selectedProject = useMemo(() => {
     const storedProject = readSelectedProjectDetail();
@@ -89,6 +108,8 @@ export function ProjectDetailScreen() {
       salViews.map((row) => ({
         amount: row.total,
         date: row.closedAt ?? row.date,
+        id: row.id,
+        isClosed: row.status === "closed",
         period: row.description || row.title,
         sal: row.title,
         status: row.status === "closed" ? "Approvata" : "Bozza",
@@ -121,6 +142,10 @@ export function ProjectDetailScreen() {
     [salRows, selectedProject],
   );
 
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const deleteSal = useSalWorkflowStore((state) => state.deleteSal);
+  const closeSal = useSalWorkflowStore((state) => state.closeSal);
+
   function handleCreateSal() {
     if (!selectedProject) {
       return;
@@ -136,6 +161,33 @@ export function ProjectDetailScreen() {
     navigate("sal-create");
   }
 
+  const handleDeleteSal = useCallback(
+    (salId: string) => {
+      const sal = salDocuments.find((d) => d.id === salId);
+      deleteSal(salId);
+      setDeleteTargetId(null);
+      notify({
+        message: `"${sal?.title ?? salId}" eliminato dal registro locale.`,
+        title: "SAL eliminata",
+        tone: "success",
+      });
+    },
+    [deleteSal, notify, salDocuments],
+  );
+
+  const handleCloseSal = useCallback(
+    (salId: string) => {
+      const sal = salDocuments.find((d) => d.id === salId);
+      closeSal(salId);
+      notify({
+        message: `"${sal?.title ?? salId}" approvata e chiusa.`,
+        title: "SAL approvata",
+        tone: "success",
+      });
+    },
+    [closeSal, notify, salDocuments],
+  );
+
   if (isLoading) {
     return (
       <div className="pt-4 text-sm font-medium text-[var(--text-secondary)]">
@@ -147,9 +199,9 @@ export function ProjectDetailScreen() {
   if (!selectedProject || !detail) {
     return (
       <div className="pt-4">
-        <div className="rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 text-sm text-[var(--text-secondary)]">
+        <BezelSurface innerClassName="p-5 text-sm text-[var(--text-secondary)]">
           Nessun progetto locale disponibile.
-        </div>
+        </BezelSurface>
       </div>
     );
   }
@@ -159,81 +211,116 @@ export function ProjectDetailScreen() {
       caption: "Budget totale del contratto",
       icon: WalletCards,
       label: "Budget contrattuale",
-      tone: "blue",
+      tone: "blue" as const,
       value: formatMoney({ amount: detail.budget.contractual, currency: "EUR" }),
     },
     {
       caption: "Valore impegnato sul contratto",
       icon: Layers3,
       label: "Impegnato",
-      tone: "green",
+      tone: "success" as const,
       value: formatMoney({ amount: financials.committed, currency: "EUR" }),
     },
     {
       caption: "Ultima SAL approvata",
       icon: Clock3,
       label: "SAL corrente",
-      tone: "orange",
+      tone: "warning" as const,
       value: formatMoney({ amount: financials.currentSalAmount, currency: "EUR" }),
     },
     {
       caption: "Avanzamento fisico del lotto",
       icon: TrendingUp,
       label: "Progresso",
-      tone: "violet",
+      tone: "info" as const,
       value: `${detail.progress}%`,
     },
-  ] as const;
+  ];
 
   return (
-    <div className="pt-4 text-[var(--text-primary)]">
-      <div className="flex min-w-0 flex-wrap items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
-        <span>Portfolio</span>
-        <ChevronRight className="size-3.5" />
-        <span>Progetti</span>
-        <ChevronRight className="size-3.5" />
-        <span className="font-bold text-[var(--text-primary)]">{detail.name}</span>
-      </div>
+    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-4">
-          <section className="rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-5 py-5 shadow-sm md:px-6">
-            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-              <div className="flex min-w-0 items-center gap-5">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)] md:size-16 lg:size-[76px]">
-                  <BarChart3 className="size-6 md:size-8" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="truncate text-[24px] font-bold leading-none tracking-[-0.02em] text-[var(--text-primary)] md:text-[28px] lg:text-[34px]">
-                    {detail.name}
-                  </h2>
-                  <p className="mt-1 truncate text-[14px] font-medium text-[var(--text-secondary)] md:mt-2 md:text-[15px]">
-                    {detail.lot} - {detail.location}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <StatusPill tone={detail.healthTone}>{detail.health}</StatusPill>
-                    <StatusPill tone="info">{String(detail.sal.current)}</StatusPill>
+      <section
+        className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
+      >
+        <div className="min-w-0">
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+            Dossier {detail.lot}
+          </span>
+          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
+            {detail.name}
+          </h2>
+          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
+            {detail.lot} &middot; {detail.location}. Presidio economico, SAL e segnali di
+            avanzamento in un solo dossier operativo.
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <StatusPill tone={detail.healthTone}>{detail.health}</StatusPill>
+            <StatusPill tone="info">{String(detail.sal.current)}</StatusPill>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <ProjectControlButton
+              className="h-10 px-4 text-[13px]"
+              icon={Plus}
+              onClick={handleCreateSal}
+              variant="primary"
+            >
+              Nuova SAL
+            </ProjectControlButton>
+            <ProjectControlButton className="h-10 px-4 text-[13px]" variant="neutral">
+              Presidio economico
+            </ProjectControlButton>
+          </div>
+        </div>
+
+        <BezelSurface className="self-start md:translate-y-2" innerClassName="p-0 overflow-hidden">
+          <div className="relative min-h-[220px]">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-cover bg-center opacity-70 grayscale contrast-125"
+              style={{
+                backgroundImage:
+                  "url(https://picsum.photos/seed/rail-construction-dossier/900/700)",
+              }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.08),rgba(2,6,23,0.56))]" />
+            <div className="absolute inset-x-4 bottom-4 rounded-[18px] bg-[rgba(255,255,255,0.86)] p-4 text-slate-950 shadow-[0_18px_38px_rgba(15,23,42,0.16)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Avanzamento dossier
+                  </div>
+                  <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.04em]">
+                    {detail.progress}%
                   </div>
                 </div>
-              </div>
-              <div className="grid shrink-0 gap-3 text-left md:w-[220px] md:text-right">
-                <MetaLine label="Ultimo aggiornamento" value="27 Apr 2025 · 17:40" />
-                <MetaLine label="Responsabile" value={detail.manager} icon={UserRound} />
+                <div className="text-right text-[11px] font-semibold leading-5 text-slate-600">
+                  {detail.manager}
+                  <br />
+                  27 Apr 2025 &middot; 17:40
+                </div>
               </div>
             </div>
-          </section>
+          </div>
+        </BezelSurface>
+      </section>
 
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {kpiCards.map((metric) => (
-              <MetricCard key={metric.label} {...metric} />
-            ))}
-          </section>
+      <section className="mt-8 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {kpiCards.map((metric) => (
+          <MetricCard key={metric.label} {...metric} />
+        ))}
+      </section>
 
-          <section className="rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm md:p-5">
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
-              Milestone operative
-            </h3>
-            <div className="mt-3 grid gap-3 lg:grid-cols-4">
+      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-5">
+          <Panel>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                Milestone
+              </h3>
+            <div className="mt-4 grid gap-3 lg:grid-cols-4">
               {milestoneRows.map((row, index) => (
                 <MilestoneItem
                   isLast={index === milestoneRows.length - 1}
@@ -242,18 +329,18 @@ export function ProjectDetailScreen() {
                 />
               ))}
             </div>
-          </section>
+          </Panel>
 
-          <section className="rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm md:p-5">
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+          <Panel>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
               Economico ed esecuzione
             </h3>
             <div className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <div className="rounded-[14px] border border-[var(--border-subtle)] p-4">
-                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                  Quadro economico
-                </div>
-                <dl className="mt-3 divide-y divide-[var(--border-subtle)]">
+              <div className="rounded-[18px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                    Quadro economico
+                  </div>
+                <dl className="mt-3 divide-y divide-[var(--border-subtle)]/70">
                   <SummaryRow
                     label="Budget contrattuale"
                     value={formatMoney({ amount: detail.budget.contractual, currency: "EUR" })}
@@ -269,96 +356,80 @@ export function ProjectDetailScreen() {
                 </dl>
               </div>
 
-              <div className="grid rounded-[14px] border border-[var(--border-subtle)] p-4 md:grid-cols-2">
-                <div className="border-b border-[var(--border-subtle)] pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-4">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+              <div className="grid rounded-[18px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4 md:grid-cols-2">
+                <div className="border-b border-[var(--border-subtle)]/70 pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                     Forecast
                   </div>
                   <InfoBlock label="Fine prevista" value={detail.endDate} />
-                  <InfoBlock label="CPI" value={detail.cpi} note="Sotto budget rispetto al piano" />
+                  <InfoBlock
+                    label="CPI"
+                    value={detail.cpi}
+                    note="Sotto budget rispetto al piano"
+                  />
                 </div>
                 <div className="pt-4 md:pl-4 md:pt-0">
-                  <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                  <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                     <span>Impatto</span>
                     <span className="text-[14px] tracking-normal text-[var(--danger-base)]">
                       {detail.forecastImpact}
                     </span>
                   </div>
-                  <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
+                  <div className="mt-5 border-t border-[var(--border-subtle)]/70 pt-4">
                     <InfoBlock label="Rischio materiale" value={detail.materialRisk} />
                   </div>
                 </div>
               </div>
             </div>
-          </section>
+          </Panel>
 
-          <section className="rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm md:p-5">
+          <Panel>
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                <FileText className="size-4 text-[var(--info-base)]" />
                 Registro SAL
-              </h3>
-              <button
+              </div>
+              <ProjectControlButton
+                icon={Plus}
                 onClick={handleCreateSal}
-                className="flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-3 text-[13px] font-bold text-[var(--text-inverse)] shadow-sm transition-all hover:bg-[var(--accent-primary-hover)]"
-                type="button"
+                className="h-9 px-3 text-[13px]"
+                variant="primary"
               >
-                <Plus className="size-4" />
                 Nuova SAL
-              </button>
+              </ProjectControlButton>
             </div>
 
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
-                <thead className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                  <tr className="border-y border-[var(--border-subtle)]">
-                    <th className="px-3 py-3">SAL</th>
-                    <th className="px-3 py-3">Periodo</th>
-                    <th className="px-3 py-3">Importo</th>
-                    <th className="px-3 py-3">Stato</th>
-                    <th className="px-3 py-3">Approvata</th>
-                    <th className="px-3 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {salRows.map((row) => (
-                    <tr
-                      className={cn("border-b border-[var(--border-subtle)] last:border-b-0")}
-                      key={row.sal}
-                    >
-                      <td className="px-3 py-3 font-bold text-[var(--text-primary)]">{row.sal}</td>
-                      <td className="px-3 py-3 text-[var(--text-secondary)]">{row.period}</td>
-                      <td className="px-3 py-3 font-bold text-[var(--text-primary)]">
-                        {formatMoney({ amount: row.amount, currency: "EUR" })}
-                      </td>
-                      <td className="px-3 py-3">
-                        <StatusPill tone={row.tone}>{row.status}</StatusPill>
-                      </td>
-                      <td className="px-3 py-3 text-[var(--text-secondary)]">{row.date}</td>
-                      <td className="px-3 py-3 text-right text-[var(--info-base)]">
-                        <ChevronRight className="ml-auto size-4" />
-                      </td>
-                    </tr>
-                  ))}
-                  {salRows.length === 0 ? (
-                    <tr>
-                      <td
-                        className="px-3 py-5 text-[13px] text-[var(--text-secondary)]"
-                        colSpan={6}
-                      >
-                        Nessuna SAL registrata per questo progetto.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
+            <div className="mt-4 space-y-2">
+              {salRows.map((row) => (
+                <SalCard
+                  key={row.id}
+                  date={row.date}
+                  isClosed={row.isClosed}
+                  onClose={() => handleCloseSal(row.id)}
+                  onDelete={() => setDeleteTargetId(row.id)}
+                  period={row.period}
+                  sal={row.sal}
+                  status={row.status}
+                  tone={row.tone}
+                  value={formatMoney({ amount: row.amount, currency: "EUR" })}
+                />
+              ))}
+              {salRows.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-4 py-8 text-center">
+                  <FileText className="size-8 text-[var(--text-secondary)]" />
+                  <p className="text-[13px] font-medium text-[var(--text-secondary)]">
+                    Nessuna SAL registrata per questo progetto.
+                  </p>
+                </div>
+              ) : null}
             </div>
-          </section>
+          </Panel>
         </div>
 
         <aside className="min-w-0 space-y-4">
-          <section className="rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm">
+          <Panel>
             <PanelTitle icon={Radio}>Presidio rapido</PanelTitle>
-            <dl className="mt-3 divide-y divide-[var(--border-subtle)]">
+            <dl className="mt-4 divide-y divide-[var(--border-subtle)]/70">
               <SummaryRow label="Inizio" value={detail.startDate} />
               <SummaryRow label="Fine prevista" value={detail.endDate} />
               <SummaryRow label="Ultimo aggiornamento" value={detail.lastUpdate} />
@@ -371,21 +442,21 @@ export function ProjectDetailScreen() {
                 value={formatMoney({ amount: financials.residual, currency: "EUR" })}
               />
             </dl>
-          </section>
+          </Panel>
 
-          <section className="rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm">
+          <Panel>
             <PanelTitle icon={UsersRound}>Team progetto</PanelTitle>
-            <div className="mt-3 space-y-2.5">
+            <div className="mt-4 space-y-2.5">
               {projectTeam.map((member) => (
                 <div
-                  className="flex items-center gap-3 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2.5 shadow-sm"
+                  className="flex items-center gap-3 rounded-[16px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2.5"
                   key={member.initials}
                 >
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[12px] font-bold text-[var(--text-inverse)]">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-[13px] bg-[var(--accent-primary)] text-[12px] font-bold text-[var(--text-inverse)]">
                     {member.initials}
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+                    <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
                       {member.name}
                     </div>
                     <div className="truncate text-[12px] font-medium text-[var(--text-secondary)]">
@@ -395,21 +466,21 @@ export function ProjectDetailScreen() {
                 </div>
               ))}
             </div>
-          </section>
+          </Panel>
 
-          <section className="rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm">
+          <Panel>
             <PanelTitle icon={Activity}>Attivita recenti</PanelTitle>
-            <div className="mt-3 space-y-3">
+            <div className="mt-4 space-y-3">
               {recentActivities.slice(0, 1).map((activity) => (
                 <div
-                  className="flex items-start gap-3 rounded-[12px] border border-[var(--border-subtle)] px-3 py-3 shadow-sm"
+                  className="flex items-start gap-3 rounded-[16px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-3"
                   key={activity.text}
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-muted)] text-[var(--text-secondary)]">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[12px] bg-[var(--surface-base)] text-[var(--text-secondary)]">
                     <ReceiptText className="size-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+                    <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
                       {activity.text}
                     </div>
                     <div className="mt-0.5 text-[12px] font-medium text-[var(--text-secondary)]">
@@ -423,18 +494,130 @@ export function ProjectDetailScreen() {
                   </div>
                 </div>
               ))}
-              <button
-                className="flex w-full items-center justify-between pt-1 text-[12px] font-bold text-[var(--info-base)]"
-                type="button"
-              >
+              <ProjectControlButton className="mt-1 w-full justify-between px-3" variant="soft">
                 Vedi tutte le attivita
                 <ChevronRight className="size-4" />
-              </button>
+              </ProjectControlButton>
             </div>
-          </section>
+          </Panel>
         </aside>
       </section>
+
+      {deleteTargetId ? (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
+          <button
+            aria-label="Chiudi"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setDeleteTargetId(null)}
+            type="button"
+          />
+          <motion.div
+            className="relative w-full max-w-sm rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            transition={{ duration: 0.5, ease: SPRING_EASE }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+          >
+            <div className="rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
+                  <Trash2 className="size-5" />
+                </span>
+                <div>
+                  <div className="text-[14px] font-semibold text-[var(--text-primary)]">
+                    Eliminare questa SAL?
+                  </div>
+                  <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+                    L'operazione rimuove definitivamente il documento. I dati non possono essere
+                    recuperati.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-[13px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+                  onClick={() => setDeleteTargetId(null)}
+                  type="button"
+                >
+                  Annulla
+                </button>
+                <button
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--danger-base)] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
+                  onClick={() => handleDeleteSal(deleteTargetId)}
+                  type="button"
+                >
+                  <Trash2 className="size-4" />
+                  Elimina
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      ) : null}
+    </main>
+  );
+}
+
+function Panel({ children, className }: { children: ReactNode; className?: string }) {
+  return <BezelSurface innerClassName={cn("p-5", className)}>{children}</BezelSurface>;
+}
+
+function PanelTitle({ children, icon: Icon }: { children: string; icon: typeof Radio }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+      <Icon className="size-4 text-[var(--info-base)]" />
+      {children}
     </div>
+  );
+}
+
+function MetricCard({
+  caption,
+  icon: Icon,
+  label,
+  tone,
+  value,
+}: {
+  caption: string;
+  icon: typeof WalletCards;
+  label: string;
+  tone: "blue" | "info" | "success" | "warning";
+  value: string;
+}) {
+  return (
+    <BezelSurface
+      innerClassName={cn(
+        "group flex min-h-[112px] items-center gap-4 p-4 2xl:min-h-[128px] 2xl:gap-5",
+        tone === "blue" ? "bg-[var(--info-soft)]/20" : "",
+      )}
+    >
+      <div
+        className={cn(
+          "flex size-12 shrink-0 items-center justify-center rounded-[16px] 2xl:size-14",
+          (!tone || tone === "blue" || tone === "info") &&
+            "bg-[var(--info-soft)] text-[var(--info-base)]",
+          tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
+          tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+        )}
+      >
+        <Icon className="size-6" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+          {label}
+        </div>
+        <div
+          className={cn(
+            "mt-2 truncate text-[20px] font-bold leading-none md:text-[22px]",
+            (!tone || tone === "blue" || tone === "info") && "text-[var(--info-base)]",
+            tone === "success" && "text-[var(--success-base)]",
+            tone === "warning" && "text-[var(--warning-base)]",
+          )}
+        >
+          {value}
+        </div>
+        <div className="mt-2 text-[12px] font-medium text-[var(--text-secondary)]">{caption}</div>
+      </div>
+    </BezelSurface>
   );
 }
 
@@ -442,7 +625,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
       <span className="text-[12px] font-medium text-[var(--text-secondary)]">{label}</span>
-      <span className="max-w-[58%] text-right text-[13px] font-bold text-[var(--text-primary)]">
+      <span className="max-w-[58%] text-right text-[13px] font-semibold text-[var(--text-primary)]">
         {value}
       </span>
     </div>
@@ -459,7 +642,7 @@ function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex rounded-full px-3 py-1 text-[11px] font-bold",
+        "inline-flex rounded-full px-3 py-1 text-[11px] font-semibold",
         tone === "danger" && "bg-[var(--danger-soft)] text-[var(--danger-base)]",
         tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
         tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
@@ -468,47 +651,6 @@ function StatusPill({
     >
       {children}
     </span>
-  );
-}
-
-function MetricCard({
-  caption,
-  icon: Icon,
-  label,
-  tone,
-  value,
-}: {
-  caption: string;
-  icon: typeof WalletCards;
-  label: string;
-  tone: "blue" | "green" | "orange" | "violet";
-  value: string;
-}) {
-  return (
-    <section className="flex min-h-[116px] items-center gap-4 rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm">
-      <div
-        className={cn(
-          "flex size-12 shrink-0 items-center justify-center rounded-full",
-          tone === "blue" && "bg-[var(--info-soft)] text-[var(--info-base)]",
-          tone === "green" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-          tone === "orange" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-          tone === "violet" && "bg-[var(--bg-muted-strong)] text-[var(--accent-secondary)]",
-        )}
-      >
-        <Icon className="size-6" />
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-          {label}
-        </div>
-        <div className="mt-2 truncate text-[20px] font-bold leading-none text-[var(--text-primary)] md:text-[22px]">
-          {value}
-        </div>
-        <div className="mt-2 truncate text-[11px] font-medium text-[var(--text-secondary)]">
-          {caption}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -541,7 +683,7 @@ function MilestoneItem({
         )}
       </div>
       <div className="min-w-0">
-        <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">{row.label}</div>
+        <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{row.label}</div>
         <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
           {row.date}
         </div>
@@ -557,39 +699,142 @@ function InfoBlock({ label, note, value }: { label: string; note?: string; value
   return (
     <div className="mt-4">
       <div className="text-[12px] font-medium text-[var(--text-secondary)]">{label}</div>
-      <div className="mt-1 text-[15px] font-bold text-[var(--text-primary)]">{value}</div>
+      <div className="mt-1 text-[15px] font-semibold text-[var(--text-primary)]">{value}</div>
       {note ? (
-        <div className="mt-1 text-[11px] font-bold text-[var(--danger-base)]">{note}</div>
+        <div className="mt-1 text-[11px] font-semibold text-[var(--danger-base)]">{note}</div>
       ) : null}
     </div>
   );
 }
 
-function MetaLine({
-  icon: Icon,
-  label,
+function SalCard({
+  date,
+  isClosed,
+  onClose,
+  onDelete,
+  period,
+  sal,
+  status,
+  tone,
   value,
 }: {
-  icon?: typeof UserRound;
-  label: string;
+  date: string;
+  isClosed: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+  period: string;
+  sal: string;
+  status: string;
+  tone: "danger" | "info" | "success" | "warning";
   value: string;
 }) {
-  return (
-    <div>
-      <div className="text-[12px] font-medium text-[var(--text-secondary)]">{label}</div>
-      <div className="mt-1 flex items-center gap-2 text-[13px] font-bold text-[var(--text-primary)] md:justify-end">
-        {value}
-        {Icon ? <Icon className="size-4 text-[var(--text-secondary)]" /> : null}
-      </div>
-    </div>
-  );
-}
+  const [menuOpen, setMenuOpen] = useState(false);
 
-function PanelTitle({ children, icon: Icon }: { children: string; icon: typeof Radio }) {
   return (
-    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-primary)]">
-      <Icon className="size-4 text-[var(--info-base)]" />
-      {children}
+    <div className="group relative flex items-center justify-between gap-4 rounded-[16px] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/60 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--bg-muted)_84%,var(--surface-base)_16%)] hover:ring-[var(--border-subtle)]">
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-[12px]",
+            isClosed
+              ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+              : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+          )}
+        >
+          {isClosed ? (
+            <CheckCircle2 className="size-5" />
+          ) : (
+            <Clock3 className="size-5" />
+          )}
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+              {sal}
+            </span>
+            <StatusPill tone={tone}>{status}</StatusPill>
+          </div>
+          <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+            {period} &middot; {value}
+          </div>
+          <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">{date}</div>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        {isClosed ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-3 py-1 text-[11px] font-semibold text-[var(--success-base)]">
+            <ThumbsUp className="size-3.5" />
+            Approvata
+          </span>
+        ) : (
+          <ProjectControlButton
+            aria-label="Approva SAL"
+            className="size-9"
+            icon={ThumbsUp}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            variant="icon"
+          >
+            <span className="sr-only">Approva</span>
+          </ProjectControlButton>
+        )}
+
+        <div className="relative">
+          <ProjectControlButton
+            aria-label="Azioni SAL"
+            className="size-9"
+            icon={MoreVertical}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              setMenuOpen((v) => !v);
+            }}
+            variant="icon"
+          >
+            <span className="sr-only">Azioni</span>
+          </ProjectControlButton>
+          {menuOpen ? (
+            <>
+              <button
+                aria-label="Chiudi menu"
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={() => setMenuOpen(false)}
+                type="button"
+              />
+              <div className="absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]/70">
+                {!isClosed ? (
+                  <button
+                    className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                      onClose();
+                    }}
+                    type="button"
+                  >
+                    <ThumbsUp className="size-4 text-[var(--info-base)]" />
+                    Approva
+                  </button>
+                ) : null}
+                <button
+                  className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                  type="button"
+                >
+                  <Trash2 className="size-4" />
+                  Elimina
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

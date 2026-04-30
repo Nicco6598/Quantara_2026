@@ -1,5 +1,20 @@
-import type { LucideIcon } from "lucide-react";
-import { CheckCircle2, Clock3, Moon, RefreshCcw, Sparkles, Sun, WandSparkles } from "lucide-react";
+import {
+  ArrowsClockwise,
+  ArrowUpRight,
+  BellRinging,
+  CheckCircle,
+  Clock,
+  DesktopTower,
+  GitBranch,
+  MagicWand,
+  Moon,
+  Palette,
+  Sparkle,
+  Sun,
+  WaveSine,
+} from "@phosphor-icons/react";
+import { motion } from "framer-motion";
+import type { ComponentType, ReactNode } from "react";
 import { useState } from "react";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
@@ -13,8 +28,14 @@ import {
 } from "@/store/app-store";
 
 type UpdateViewState = { kind: "idle" } | UpdateCheckResult;
+type Tone = "danger" | "info" | "neutral" | "success" | "warning";
+type PhosphorIcon = ComponentType<{
+  className?: string;
+  weight?: "thin" | "light" | "regular" | "bold" | "fill" | "duotone";
+}>;
 
 const updaterReady = import.meta.env.PROD;
+const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
 
 export function SettingsScreen() {
   const {
@@ -43,134 +64,89 @@ export function SettingsScreen() {
   const releaseStatus = getReleaseStatus(updateState);
 
   return (
-    <div className="pt-2">
-      {/* Hero - outside cards, like dashboard */}
-      <section>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="rounded-[9px] bg-[var(--bg-muted-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_16%_8%,color-mix(in_srgb,var(--accent-primary)_16%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--info-base)_14%,transparent),transparent_32%)]" />
+
+      <section
+        className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
+      >
+        <div>
+          <div className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             Impostazioni
-          </span>
-          <span className="text-[12px] font-medium text-[var(--text-secondary)]">
-            Build v{APP_VERSION} · {updaterReady ? "Desktop release" : "Sviluppo"}
-          </span>
-        </div>
-        <div className="mt-3">
-          <h2 className="text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-[var(--text-primary)]">
+          </div>
+          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
             Configurazione applicazione
           </h2>
-          <p className="mt-2 max-w-3xl text-[16px] font-normal leading-6 text-[var(--text-secondary)]">
+          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
             Preferenze operative, stato updater e identita della build. Le modifiche vengono
             applicate immediatamente.
           </p>
         </div>
+
+        <BezelSurface className="md:translate-y-2" innerClassName="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                Build attiva
+              </div>
+              <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+                v{APP_VERSION}
+              </div>
+            </div>
+            <IconOrb icon={DesktopTower} tone={updaterReady ? "success" : "neutral"} />
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <MiniStat label="Canale" value="Stable" />
+            <MiniStat label="Updater" value={updaterReady ? "Pronto" : "Solo release"} />
+          </div>
+        </BezelSurface>
       </section>
 
-      {/* Version info - outside cards */}
-      <div className="mt-6 grid grid-cols-3 gap-4">
-        {[
-          {
-            detail: "Sync versione e rilascio desktop",
-            label: "Versione installata",
-            tone: "success" as const,
-            value: `v${APP_VERSION}`,
-          },
-          {
-            detail: "Canale operativo collegato alla pipeline release",
-            label: "Canale",
-            tone: "info" as const,
-            value: "Stable",
-          },
-          {
-            detail: updaterReady
-              ? "Check live disponibile in questa build"
-              : "Check live non eseguito in sviluppo",
-            label: "Updater",
-            tone: updaterReady ? ("success" as const) : ("neutral" as const),
-            value: updaterReady ? "Pronto" : "Solo release",
-          },
-        ].map((metric) => (
-          <section
-            className="group min-h-[130px] rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none transition hover:-translate-y-0.5 hover:bg-[var(--surface-inset)]"
-            key={metric.label}
-          >
-            <div className="min-w-0">
-              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                {metric.label}
-              </div>
-              <div className="mt-2 text-[22px] font-semibold leading-none tracking-[-0.03em] text-[var(--text-primary)]">
-                {metric.value}
-              </div>
-              <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-                {metric.detail}
-              </div>
-            </div>
-          </section>
-        ))}
-      </div>
-
-      {/* Main content */}
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        {/* Left column - Release check */}
-        <div className="space-y-6">
-          {/* Release updater */}
-          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                  Aggiornamenti
+      <section className="mt-8 grid grid-flow-dense gap-5 xl:grid-cols-12">
+        <BezelSurface className="xl:col-span-8 xl:row-span-2" innerClassName="p-5 md:p-6">
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-3">
+                <IconOrb icon={ArrowsClockwise} tone={releaseStatus.tone} />
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                    Aggiornamenti
+                  </div>
+                  <h3 className="mt-1 text-[20px] font-semibold text-[var(--text-primary)]">
+                    Controllo release
+                  </h3>
                 </div>
-                <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
-                  Controllo release
-                </h3>
               </div>
-              <span
-                className={cn(
-                  "rounded-[9px] px-2.5 py-1 text-[11px] font-semibold",
-                  releaseStatus.tone === "success"
-                    ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-                    : releaseStatus.tone === "warning"
-                      ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-                      : releaseStatus.tone === "danger"
-                        ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-                        : releaseStatus.tone === "info"
-                          ? "bg-[var(--info-soft)] text-[var(--info-base)]"
-                          : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-                )}
-              >
-                {releaseStatus.label}
-              </span>
+
+              <p className="mt-5 text-[14px] leading-6 text-[var(--text-secondary)]">
+                {releaseStatus.description}
+              </p>
+
+              {releaseStatus.checkedAt ? (
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+                  <Clock className="size-3.5" weight="light" />
+                  Ultimo controllo {formatTimestamp(releaseStatus.checkedAt)}
+                </div>
+              ) : null}
             </div>
 
-            <p className="mt-3 text-[13px] leading-5 text-[var(--text-secondary)]">
-              {releaseStatus.description}
-            </p>
+            <StatusPill label={releaseStatus.label} tone={releaseStatus.tone} />
+          </div>
 
-            {releaseStatus.checkedAt ? (
-              <div className="mt-3 flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
-                <Clock3 className="size-3.5" />
-                Ultimo controllo {formatTimestamp(releaseStatus.checkedAt)}
-              </div>
-            ) : null}
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                className={cn(
-                  "flex h-9 items-center gap-2 rounded-xl px-4 text-[13px] font-semibold transition-all",
-                  isCheckingUpdates
-                    ? "bg-[var(--bg-muted)] text-[var(--text-secondary)]"
-                    : "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/30 hover:bg-[var(--bg-muted)]",
-                )}
-                disabled={isCheckingUpdates}
-                onClick={handleCheckForUpdates}
-                type="button"
-              >
-                <RefreshCcw className={cn("size-4", isCheckingUpdates && "animate-spin")} />
-                {isCheckingUpdates ? "Verifica in corso..." : "Verifica disponibilita"}
-              </button>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <ActionButton disabled={isCheckingUpdates} onClick={handleCheckForUpdates}>
+              {isCheckingUpdates ? "Verifica in corso" : "Verifica disponibilita"}
+            </ActionButton>
+            <div className="text-[12px] leading-5 text-[var(--text-secondary)]">
+              {updaterReady
+                ? "Il controllo usa il canale release desktop."
+                : "Il check live e disponibile solo sulle build firmate."}
             </div>
+          </div>
 
-            {releaseStatus.notes ? (
-              <div className="mt-4 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
+          {releaseStatus.notes ? (
+            <div className="mt-6 rounded-[22px] bg-[var(--bg-muted)] p-1 ring-1 ring-[var(--border-subtle)]">
+              <div className="rounded-[18px] bg-[var(--surface-base)] p-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_60%,transparent)]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                   Note rilevate
                 </div>
@@ -178,154 +154,261 @@ export function SettingsScreen() {
                   {releaseStatus.notes}
                 </p>
               </div>
-            ) : null}
-          </section>
-
-          {/* Build info */}
-          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                  Build
-                </div>
-                <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
-                  Catena versione
-                </h3>
-              </div>
-              {pendingReleaseNotes ? (
-                <span className="rounded-[9px] bg-[var(--warning-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-base)]">
-                  Note release in sospeso
-                </span>
-              ) : null}
             </div>
+          ) : null}
+        </BezelSurface>
 
-            <div className="mt-4 flex items-start gap-3 rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] p-4">
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success-base)]" />
-              <div>
-                <div className="text-[13px] font-semibold text-[var(--text-primary)]">
-                  Catena di versione attiva
-                </div>
-                <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
-                  La UI legge APP_VERSION, rigenerata dal flusso pnpm version:sync che riallinea
-                  root package.json, workspace desktop e metadati Tauri prima di check e build.
-                </p>
-              </div>
+        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
+          <SectionTitle eyebrow="Interfaccia" icon={Palette} title="Tema" />
+          <p className="mt-2 text-[12px] leading-5 text-[var(--text-secondary)]">
+            Trattamento cromatico della shell.
+          </p>
+          <ModeSelector<ThemeMode>
+            onChange={setThemeMode}
+            options={[
+              { description: "Superfici chiare", icon: Sun, label: "Chiaro", value: "light" },
+              { description: "Superfici scure", icon: Moon, label: "Scuro", value: "dark" },
+            ]}
+            value={themeMode}
+          />
+        </BezelSurface>
+
+        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
+          <SectionTitle eyebrow="Esperienza" icon={WaveSine} title="Movimento" />
+          <p className="mt-2 text-[12px] leading-5 text-[var(--text-secondary)]">
+            Transizioni e micro-animazioni della shell.
+          </p>
+          <ModeSelector<MotionMode>
+            onChange={setMotionMode}
+            options={[
+              {
+                description: "Tutte le transizioni",
+                icon: Sparkle,
+                label: "Completo",
+                value: "full",
+              },
+              {
+                description: "Effetti ridotti",
+                icon: MagicWand,
+                label: "Ridotto",
+                value: "reduced",
+              },
+            ]}
+            value={motionMode}
+          />
+        </BezelSurface>
+
+        <BezelSurface className="xl:col-span-5" innerClassName="p-5">
+          <SectionTitle eyebrow="Build" icon={GitBranch} title="Catena versione" />
+          {pendingReleaseNotes ? (
+            <div className="mt-4 inline-flex rounded-full bg-[var(--warning-soft)] px-3 py-1 text-[11px] font-semibold text-[var(--warning-base)]">
+              Note release in sospeso
             </div>
+          ) : null}
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <InfoTile
-                label="Runtime update"
-                value={updaterReady ? "Desktop release" : "Sviluppo"}
-              />
-              <InfoTile
-                label="Note aggiornamento"
-                value={
-                  pendingReleaseNotes ? `v${pendingReleaseNotes.version}` : "Nessuna in sospeso"
-                }
-              />
-              <InfoTile
-                label="Check automatico"
-                value={autoCheckUpdatesOnLaunch ? "Attivo" : "Manuale"}
-              />
-              <InfoTile
-                label="Release feedback"
-                value={showReleaseNotesAfterUpdate ? "Abilitato" : "Disabilitato"}
-              />
-            </div>
-          </section>
-        </div>
-
-        {/* Right column - Preferences */}
-        <div className="space-y-6">
-          {/* Theme */}
-          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
+          <div className="mt-5 flex items-start gap-3 rounded-[20px] bg-[var(--bg-muted)] p-4 ring-1 ring-[var(--border-subtle)]">
+            <CheckCircle
+              className="mt-0.5 size-5 shrink-0 text-[var(--success-base)]"
+              weight="light"
+            />
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                Interfaccia
+              <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+                Catena di versione attiva
               </div>
-              <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">Tema</h3>
-              <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
-                Trattamento cromatico della shell.
+              <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
+                La UI legge APP_VERSION, rigenerata dal flusso pnpm version:sync che riallinea root
+                package.json, workspace desktop e metadati Tauri prima di check e build.
               </p>
             </div>
-            <ModeSelector<ThemeMode>
-              onChange={setThemeMode}
-              options={[
-                { description: "Superfici chiare", icon: Sun, label: "Chiaro", value: "light" },
-                { description: "Superfici scure", icon: Moon, label: "Scuro", value: "dark" },
-              ]}
-              value={themeMode}
+          </div>
+        </BezelSurface>
+
+        <BezelSurface className="xl:col-span-3" innerClassName="p-5">
+          <SectionTitle eyebrow="Release" icon={BellRinging} title="Regole" />
+          <div className="mt-5 space-y-3">
+            <ToggleRow
+              checked={autoCheckUpdatesOnLaunch}
+              description="Check automatico all'avvio della build desktop."
+              label="Auto-check all'avvio"
+              onChange={setAutoCheckUpdatesOnLaunch}
             />
-          </section>
-
-          {/* Motion */}
-          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                Esperienza
-              </div>
-              <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
-                Movimento
-              </h3>
-              <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
-                Transizioni e micro-animazioni della shell.
-              </p>
-            </div>
-            <ModeSelector<MotionMode>
-              onChange={setMotionMode}
-              options={[
-                {
-                  description: "Tutte le transizioni",
-                  icon: Sparkles,
-                  label: "Completo",
-                  value: "full",
-                },
-                {
-                  description: "Effetti ridotti",
-                  icon: WandSparkles,
-                  label: "Ridotto",
-                  value: "reduced",
-                },
-              ]}
-              value={motionMode}
+            <ToggleRow
+              checked={showReleaseNotesAfterUpdate}
+              description="Mostra conferma di installazione dopo il riavvio."
+              label="Feedback post-update"
+              onChange={setShowReleaseNotesAfterUpdate}
             />
-          </section>
+          </div>
+        </BezelSurface>
 
-          {/* Release rules */}
-          <section className="rounded-[16px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-5 shadow-none">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                Release
-              </div>
-              <h3 className="mt-1 text-[16px] font-semibold text-[var(--text-primary)]">
-                Regole di aggiornamento
-              </h3>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <ToggleRow
-                checked={autoCheckUpdatesOnLaunch}
-                description="Check automatico all'avvio della build desktop."
-                label="Auto-check all'avvio"
-                onChange={setAutoCheckUpdatesOnLaunch}
-              />
-              <ToggleRow
-                checked={showReleaseNotesAfterUpdate}
-                description="Mostra conferma di installazione dopo il riavvio."
-                label="Feedback post-update"
-                onChange={setShowReleaseNotesAfterUpdate}
-              />
-            </div>
-          </section>
-        </div>
+        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
+          <div className="grid grid-cols-2 gap-3">
+            <InfoTile
+              label="Runtime update"
+              value={updaterReady ? "Desktop release" : "Sviluppo"}
+            />
+            <InfoTile
+              label="Note update"
+              value={pendingReleaseNotes ? `v${pendingReleaseNotes.version}` : "Nessuna"}
+            />
+            <InfoTile
+              label="Check automatico"
+              value={autoCheckUpdatesOnLaunch ? "Attivo" : "Manuale"}
+            />
+            <InfoTile
+              label="Feedback release"
+              value={showReleaseNotesAfterUpdate ? "Abilitato" : "Disabilitato"}
+            />
+          </div>
+        </BezelSurface>
       </section>
+    </main>
+  );
+}
+
+function BezelSurface({
+  children,
+  className,
+  innerClassName,
+}: {
+  children: ReactNode;
+  className?: string;
+  innerClassName?: string;
+}) {
+  return (
+    <motion.section
+      className={cn(
+        "rounded-[30px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]",
+        className,
+      )}
+      initial={{ opacity: 0, y: 18, scale: 0.992 }}
+      transition={{ duration: 0.72, ease: SPRING_EASE }}
+      viewport={{ amount: 0.18, once: true }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+    >
+      <div
+        className={cn(
+          "h-full rounded-[24px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]",
+          innerClassName,
+        )}
+      >
+        {children}
+      </div>
+    </motion.section>
+  );
+}
+
+function SectionTitle({
+  eyebrow,
+  icon: Icon,
+  title,
+}: {
+  eyebrow: string;
+  icon: PhosphorIcon;
+  title: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <IconOrb icon={Icon} tone="info" />
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+          {eyebrow}
+        </div>
+        <h3 className="mt-1 text-[17px] font-semibold text-[var(--text-primary)]">{title}</h3>
+      </div>
+    </div>
+  );
+}
+
+function IconOrb({ icon: Icon, tone }: { icon: PhosphorIcon; tone: Tone }) {
+  return (
+    <span
+      className={cn(
+        "flex size-11 shrink-0 items-center justify-center rounded-full ring-1",
+        tone === "success" &&
+          "bg-[var(--success-soft)] text-[var(--success-base)] ring-[color-mix(in_srgb,var(--success-base)_22%,transparent)]",
+        tone === "warning" &&
+          "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[color-mix(in_srgb,var(--warning-base)_24%,transparent)]",
+        tone === "danger" &&
+          "bg-[var(--danger-soft)] text-[var(--danger-base)] ring-[color-mix(in_srgb,var(--danger-base)_24%,transparent)]",
+        tone === "info" &&
+          "bg-[var(--info-soft)] text-[var(--info-base)] ring-[color-mix(in_srgb,var(--info-base)_22%,transparent)]",
+        tone === "neutral" &&
+          "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] ring-[var(--border-subtle)]",
+      )}
+    >
+      <Icon className="size-5" weight="light" />
+    </span>
+  );
+}
+
+function StatusPill({ label, tone }: { label: string; tone: Tone }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex w-max rounded-full px-3 py-1.5 text-[11px] font-semibold ring-1",
+        tone === "success" &&
+          "bg-[var(--success-soft)] text-[var(--success-base)] ring-[color-mix(in_srgb,var(--success-base)_20%,transparent)]",
+        tone === "warning" &&
+          "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[color-mix(in_srgb,var(--warning-base)_22%,transparent)]",
+        tone === "danger" &&
+          "bg-[var(--danger-soft)] text-[var(--danger-base)] ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)]",
+        tone === "info" &&
+          "bg-[var(--info-soft)] text-[var(--info-base)] ring-[color-mix(in_srgb,var(--info-base)_20%,transparent)]",
+        tone === "neutral" &&
+          "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] ring-[var(--border-subtle)]",
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ActionButton({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      className="group inline-flex h-12 shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+      {...(!disabled ? { whileHover: { y: -1 }, whileTap: { scale: 0.97 } } : {})}
+    >
+      <span>{children}</span>
+      <span className="flex size-10 items-center justify-center rounded-full bg-white/16 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-105">
+        {disabled ? (
+          <ArrowsClockwise className="size-4 animate-spin" weight="light" />
+        ) : (
+          <ArrowUpRight className="size-4" weight="light" />
+        )}
+      </span>
+    </motion.button>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[16px] bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">
+        {value}
+      </div>
     </div>
   );
 }
 
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[12px] border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-3 py-2.5">
+    <div className="rounded-[18px] bg-[var(--bg-muted)] px-3 py-3 ring-1 ring-[var(--border-subtle)]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
         {label}
       </div>
@@ -344,53 +427,57 @@ function ModeSelector<TValue extends string>({
   onChange: (value: TValue) => void;
   options: {
     description: string;
-    icon: LucideIcon;
+    icon: PhosphorIcon;
     label: string;
     value: TValue;
   }[];
   value: TValue;
 }) {
   return (
-    <div className="mt-4 grid gap-2">
+    <div className="mt-5 grid gap-2">
       {options.map((option) => {
         const active = value === option.value;
         const Icon = option.icon;
 
         return (
-          <button
+          <motion.button
             aria-pressed={active}
             className={cn(
-              "flex items-center gap-3 rounded-xl border p-3 text-left transition-all",
+              "group flex min-h-16 items-center gap-3 rounded-[20px] p-2.5 text-left outline-none ring-1 transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
               active
-                ? "border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/5"
-                : "border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] hover:border-[var(--accent-primary)]/20 hover:bg-[var(--bg-muted-strong)]",
+                ? "bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base))] ring-[color-mix(in_srgb,var(--accent-primary)_34%,transparent)]"
+                : "bg-[var(--bg-muted)] ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]",
             )}
             key={option.value}
             onClick={() => onChange(option.value)}
             type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.98 }}
           >
             <span
               className={cn(
-                "flex size-9 items-center justify-center rounded-lg transition-all",
+                "flex size-10 items-center justify-center rounded-full transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
                 active
                   ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                  : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+                  : "bg-[var(--surface-base)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]",
               )}
             >
-              <Icon className="size-4" />
+              <Icon className="size-4.5" weight="light" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-semibold text-[var(--text-primary)]">
                 {option.label}
               </div>
-              <div className="text-[11px] text-[var(--text-secondary)]">{option.description}</div>
+              <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                {option.description}
+              </div>
             </div>
             {active ? (
-              <span className="rounded-[9px] bg-[var(--accent-primary)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)]">
+              <span className="rounded-full bg-[var(--accent-primary)]/10 px-2.5 py-1 text-[10px] font-semibold text-[var(--accent-primary)]">
                 Attivo
               </span>
             ) : null}
-          </button>
+          </motion.button>
         );
       })}
     </div>
@@ -409,30 +496,30 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-[var(--border-subtle)]/80 bg-[var(--bg-muted)] px-4 py-3">
+    <div className="flex items-start justify-between gap-4 rounded-[20px] bg-[var(--bg-muted)] px-4 py-3 ring-1 ring-[var(--border-subtle)]">
       <div className="min-w-0">
         <div className="text-[13px] font-semibold text-[var(--text-primary)]">{label}</div>
-        <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">{description}</p>
+        <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p>
       </div>
-      <button
+      <motion.button
         aria-checked={checked}
         className={cn(
-          "relative mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border transition-all",
+          "relative mt-0.5 flex h-7 w-12 shrink-0 items-center rounded-full p-1 outline-none ring-1 transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
           checked
-            ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]"
-            : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
+            ? "bg-[var(--accent-primary)] ring-[var(--accent-primary)]"
+            : "bg-[var(--surface-base)] ring-[var(--border-subtle)]",
         )}
         onClick={() => onChange(!checked)}
         role="switch"
         type="button"
+        whileTap={{ scale: 0.96 }}
       >
-        <span
-          className={cn(
-            "mx-0.5 block size-5 rounded-full bg-[var(--surface-base)] shadow-sm transition-transform",
-            checked ? "translate-x-5" : "translate-x-0",
-          )}
+        <motion.span
+          className="block size-5 rounded-full bg-[var(--surface-base)] shadow-[0_1px_4px_rgba(0,0,0,0.12)]"
+          transition={{ duration: 0.45, ease: SPRING_EASE }}
+          animate={{ x: checked ? 20 : 0 }}
         />
-      </button>
+      </motion.button>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
+import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import { cn } from "@/lib/utils";
 
 type MemberStatus = "active" | "inactive" | "invited";
@@ -200,14 +201,44 @@ const statusMeta: Record<MemberStatus, { className: string; label: string }> = {
 
 export function TeamScreen() {
   return (
-    <div className="space-y-5 pb-6">
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_15%_10%,color-mix(in_srgb,var(--accent-primary)_13%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--success-base)_12%,transparent),transparent_32%)]" />
+
+      <section
+        className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
+      >
+        <div>
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+            Workspace
+          </span>
+          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
+            Team e permessi
+          </h2>
+          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
+            Membri, inviti e ruoli operativi del workspace con visibilita immediata su accessi e
+            assegnazioni.
+          </p>
+        </div>
+        <BezelSurface className="md:translate-y-2" innerClassName="p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+            Membri attivi
+          </div>
+          <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+            16 / 18
+          </div>
+          <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+            Due inviti sono ancora in attesa di conferma.
+          </p>
+        </BezelSurface>
+      </section>
+
+      <section className="mt-8 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((metric) => (
           <TeamMetricCard {...metric} key={metric.label} />
         ))}
       </section>
 
-      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="mt-8 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <TeamMembersPanel />
 
         <aside className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
@@ -223,7 +254,7 @@ export function TeamScreen() {
         I permessi sono applicati a livello di progetto. Un membro puo avere ruoli diversi su
         progetti diversi.
       </p>
-    </div>
+    </main>
   );
 }
 
@@ -248,7 +279,7 @@ function TeamMetricCard({
   }[tone];
 
   return (
-    <article className="min-h-[116px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-sm shadow-slate-950/[0.03]">
+    <BezelSurface innerClassName="group min-h-[116px] p-5">
       <div className="flex items-center gap-4">
         <div
           className={cn(
@@ -270,13 +301,13 @@ function TeamMetricCard({
           </div>
         </div>
       </div>
-    </article>
+    </BezelSurface>
   );
 }
 
 function TeamMembersPanel() {
   return (
-    <section className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm shadow-slate-950/[0.03]">
+    <BezelSurface innerClassName="overflow-hidden p-0">
       <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] p-5 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
           Membri del team
@@ -291,13 +322,10 @@ function TeamMembersPanel() {
               type="search"
             />
           </label>
-          <button
-            className="flex h-10 min-w-[168px] items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3.5 text-[13px] font-semibold text-[var(--text-primary)]"
-            type="button"
-          >
+          <ProjectControlButton className="min-w-[168px] justify-between" variant="neutral">
             Tutti i ruoli
             <ChevronDown className="size-4 text-[var(--text-secondary)]" />
-          </button>
+          </ProjectControlButton>
         </div>
       </div>
 
@@ -324,33 +352,24 @@ function TeamMembersPanel() {
       <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-[12px] font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           Mostra
-          <button
-            className="flex h-8 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2.5 font-semibold text-[var(--text-primary)]"
-            type="button"
-          >
+          <ProjectControlButton className="h-8 px-2.5" variant="neutral">
             10
             <ChevronDown className="size-3.5" />
-          </button>
+          </ProjectControlButton>
           di 18 risultati
         </div>
         <div className="flex items-center gap-2">
           <PaginationButton icon={ChevronLeft} label="Pagina precedente" />
-          <button
-            className="size-8 rounded-lg border border-[var(--info-base)] bg-[var(--info-soft)] text-[12px] font-bold text-[var(--info-base)]"
-            type="button"
-          >
+          <ProjectControlButton className="size-8 px-0 text-[12px]" variant="soft">
             1
-          </button>
-          <button
-            className="size-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[12px] font-bold text-[var(--text-primary)]"
-            type="button"
-          >
+          </ProjectControlButton>
+          <ProjectControlButton className="size-8 px-0 text-[12px]" variant="neutral">
             2
-          </button>
+          </ProjectControlButton>
           <PaginationButton icon={ChevronRight} label="Pagina successiva" />
         </div>
       </div>
-    </section>
+    </BezelSurface>
   );
 }
 
@@ -381,13 +400,13 @@ function TeamMemberRow({ member }: { member: TeamMember }) {
         {member.lastAccess}
       </td>
       <td className="px-5 py-3 text-right">
-        <button
+        <ProjectControlButton
           aria-label={`Azioni per ${member.name}`}
-          className="inline-flex size-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] transition hover:border-[var(--accent-primary)]/30 hover:text-[var(--text-primary)]"
-          type="button"
+          className="size-8 px-0"
+          variant="icon"
         >
           <Ellipsis className="size-4" />
-        </button>
+        </ProjectControlButton>
       </td>
     </tr>
   );
@@ -395,7 +414,7 @@ function TeamMemberRow({ member }: { member: TeamMember }) {
 
 function InviteMemberCard() {
   return (
-    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-sm shadow-slate-950/[0.03]">
+    <BezelSurface innerClassName="p-5">
       <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
         Aggiungi membro
       </h2>
@@ -412,22 +431,15 @@ function InviteMemberCard() {
             type="email"
           />
         </label>
-        <button
-          className="flex h-10 w-full items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3.5 text-[13px] font-semibold text-[var(--text-primary)]"
-          type="button"
-        >
+        <ProjectControlButton className="w-full justify-between" variant="neutral">
           Seleziona ruolo
           <ChevronDown className="size-4 text-[var(--text-secondary)]" />
-        </button>
-        <button
-          className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--info-base)]/25 bg-[var(--info-soft)] text-[13px] font-bold text-[var(--info-base)] transition hover:border-[var(--info-base)]/45"
-          type="button"
-        >
-          <Send className="size-4" />
+        </ProjectControlButton>
+        <ProjectControlButton className="w-full" icon={Send} variant="soft">
           Invia invito
-        </button>
+        </ProjectControlButton>
       </div>
-    </section>
+    </BezelSurface>
   );
 }
 
@@ -435,7 +447,7 @@ function RolesCard() {
   const roles = Object.entries(roleMeta) as [TeamRole, (typeof roleMeta)[TeamRole]][];
 
   return (
-    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-sm shadow-slate-950/[0.03]">
+    <BezelSurface innerClassName="p-5">
       <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
         Ruoli e permessi
       </h2>
@@ -448,7 +460,7 @@ function RolesCard() {
 
           return (
             <div
-              className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3"
+              className="flex items-center gap-3 rounded-[18px] bg-[var(--bg-muted)]/70 p-3"
               key={role}
             >
               <div
@@ -474,14 +486,10 @@ function RolesCard() {
           );
         })}
       </div>
-      <button
-        className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--info-base)]/25 bg-[var(--info-soft)] text-[13px] font-bold text-[var(--info-base)] transition hover:border-[var(--info-base)]/45"
-        type="button"
-      >
-        <UserCog className="size-4" />
+      <ProjectControlButton className="mt-5 w-full" icon={UserCog} variant="soft">
         Gestisci ruoli
-      </button>
-    </section>
+      </ProjectControlButton>
+    </BezelSurface>
   );
 }
 
@@ -541,13 +549,9 @@ function StatusPill({ status }: { status: MemberStatus }) {
 
 function PaginationButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return (
-    <button
-      aria-label={label}
-      className="flex size-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)]"
-      type="button"
-    >
+    <ProjectControlButton aria-label={label} className="size-8 px-0" variant="icon">
       <Icon className="size-4" />
-    </button>
+    </ProjectControlButton>
   );
 }
 

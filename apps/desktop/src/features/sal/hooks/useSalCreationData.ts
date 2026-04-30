@@ -173,8 +173,9 @@ async function loadVoicesForBooks(
   tariffBookIds: string[],
   tariffBooks: readonly DesktopTariffBook[],
 ): Promise<SalVoiceDraft[]> {
+  const bookMap = new Map(tariffBooks.map((book) => [book.id, book]));
   const selectedBooks = tariffBookIds
-    .map((id) => tariffBooks.find((book) => book.id === id))
+    .map((id) => bookMap.get(id))
     .filter((book): book is DesktopTariffBook => book != null);
   const results = await Promise.all(
     selectedBooks.map(async (book) => {
