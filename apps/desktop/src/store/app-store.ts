@@ -18,16 +18,22 @@ export type ThemeMode = "light" | "dark";
 type WorkflowAction = "new-project" | "new-sal" | "import-tariff" | null;
 export type PendingWorkflowAction = WorkflowAction;
 
+type NavEntry = {
+  route: QuantaraRoute;
+  context?: string;
+};
+
 type NavigationSlice = {
+  activeContext: string | undefined;
   activeRoute: QuantaraRoute;
   canGoBack: boolean;
   canGoForward: boolean;
   navigateBack: () => void;
   navigateForward: () => void;
   pendingWorkflowAction: WorkflowAction;
-  routeHistory: QuantaraRoute[];
+  routeHistory: NavEntry[];
   routeHistoryIndex: number;
-  setActiveRoute: (route: QuantaraRoute) => void;
+  setActiveRoute: (route: QuantaraRoute, context?: string) => void;
   setPendingWorkflowAction: (action: WorkflowAction) => void;
 };
 
@@ -52,11 +58,13 @@ type PreferenceSlice = {
 
 export type AppStore = NavigationSlice & PreferenceSlice & ThemeSlice;
 
-const initialRouteHistory: QuantaraRoute[] = ["dashboard"];
+const initialRouteHistory: NavEntry[] = [{ route: "dashboard" }];
 
-function createNavigationState(routeHistory: QuantaraRoute[], routeHistoryIndex: number) {
+function createNavigationState(routeHistory: NavEntry[], routeHistoryIndex: number) {
+  const entry = routeHistory[routeHistoryIndex];
   return {
-    activeRoute: routeHistory[routeHistoryIndex] ?? "dashboard",
+    activeContext: entry?.context,
+    activeRoute: entry?.route ?? "dashboard",
     canGoBack: routeHistoryIndex > 0,
     canGoForward: routeHistoryIndex < routeHistory.length - 1,
     routeHistory,
@@ -93,16 +101,16 @@ export const useAppStore = create<AppStore>()(
           };
         }),
       pendingWorkflowAction: null,
-      setActiveRoute: (route) =>
+      setActiveRoute: (route, context) =>
         set((state) => {
-          const currentRoute = state.routeHistory[state.routeHistoryIndex];
+          const currentEntry = state.routeHistory[state.routeHistoryIndex];
 
-          if (route === currentRoute) {
+          if (route === currentEntry?.route && context === currentEntry?.context) {
             return state;
           }
 
           const nextHistory = state.routeHistory.slice(0, state.routeHistoryIndex + 1);
-          nextHistory.push(route);
+          nextHistory.push(context !== undefined ? { route, context } : { route });
 
           return {
             ...createNavigationState(nextHistory, nextHistory.length - 1),
@@ -163,6 +171,7 @@ export const useAppStore = create<AppStore>()(
 export function useNavigationState() {
   return useAppStore(
     useShallow((state) => ({
+      activeContext: state.activeContext,
       activeRoute: state.activeRoute,
       canGoBack: state.canGoBack,
       canGoForward: state.canGoForward,
