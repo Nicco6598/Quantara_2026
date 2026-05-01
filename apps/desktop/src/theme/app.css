@@ -59,11 +59,11 @@ body,
   font-size: 13px;
   font-weight: 700;
   transition:
-    background 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    color 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+    background 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sal-outline-button:hover,
@@ -116,10 +116,10 @@ body,
   background: color-mix(in srgb, var(--surface-base) 74%, transparent);
   color: var(--text-secondary);
   transition:
-    background 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    color 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+    background 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sal-icon-button:hover {
@@ -252,11 +252,11 @@ body {
 
 .projects-control-button {
   transition:
-    background-color 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    color 440ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+    background-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .projects-control-button-neutral,
@@ -652,8 +652,8 @@ body {
 
 .dashboard-metric-card {
   transition:
-    box-shadow 560ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow 400ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dashboard-metric-card::after {
@@ -758,8 +758,8 @@ body {
 .dashboard-project-row {
   background: color-mix(in srgb, var(--surface-base) 94%, transparent);
   transition:
-    background-color 360ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
+    background-color 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dashboard-project-row:hover {
@@ -1305,34 +1305,63 @@ textarea {
 }
 
 @keyframes entry-fade {
-  from { opacity: 0; transform: translateY(18px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
-.animate-entry { animation: entry-fade 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
+.animate-entry {
+  animation: entry-fade 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 @keyframes entry-fade-sm {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
-.animate-entry-sm { animation: entry-fade-sm 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.animate-entry-sm {
+  animation: entry-fade-sm 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 @keyframes dash-in {
-  from { stroke-dasharray: 0 2000; }
+  from {
+    stroke-dasharray: 0 2000;
+  }
 }
 
 @keyframes width-in {
-  from { width: 0; }
+  from {
+    width: 0;
+  }
 }
 
 @keyframes bar-rise {
-  from { height: 0; }
+  from {
+    height: 0;
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+  }
 }
 
 @keyframes num-in {
-  from { opacity: 0; transform: scale(0.85); }
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
 }
-.animate-num { animation: num-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both; }
+.animate-num {
+  animation: num-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
