@@ -1,5 +1,5 @@
-import { ArrowUpRight, Clock3, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { ArrowUpRight, Clock3, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
 import { cn } from "@/lib/utils";
@@ -71,7 +71,8 @@ export function UpdateExperienceDialog({
                 Cosa cambia in v{update.version}
               </h2>
               <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
-                Quantara scaricherà la patch, applicherà l'update e riaprirà l'app sulla nuova versione.
+                Quantara scaricherà la patch, applicherà l'update e riaprirà l'app sulla nuova
+                versione.
               </p>
 
               <div className="mt-5 max-h-[38vh] space-y-2 overflow-y-auto pr-1">
@@ -91,7 +92,9 @@ export function UpdateExperienceDialog({
                               : "bg-[var(--accent-primary)]",
                         )}
                       />
-                      <span className="text-[13px] leading-5 text-[var(--text-primary)]">{note.text}</span>
+                      <span className="text-[13px] leading-5 text-[var(--text-primary)]">
+                        {note.text}
+                      </span>
                     </div>
                   ))
                 ) : (
@@ -105,7 +108,11 @@ export function UpdateExperienceDialog({
             <aside className="border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_30%,transparent)] p-5 lg:border-l lg:border-t-0">
               <div className="space-y-3">
                 <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
-                <MetricPill icon={Clock3} label="Controllo" value={formatTimestamp(update.checkedAt)} />
+                <MetricPill
+                  icon={Clock3}
+                  label="Controllo"
+                  value={formatTimestamp(update.checkedAt)}
+                />
                 <MetricPill icon={ShieldCheck} label="Canale" value="Stable" />
               </div>
 
@@ -123,9 +130,7 @@ export function UpdateExperienceDialog({
                       Installazione in corso...
                     </>
                   ) : (
-                    <>
-                      Aggiorna e riavvia
-                    </>
+                    <>Aggiorna e riavvia</>
                   )}
                 </ActionButton>
                 <button

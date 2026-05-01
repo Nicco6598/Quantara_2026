@@ -1,5 +1,5 @@
-import { CheckCircle2, Info, TriangleAlert, X, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { CheckCircle2, Info, TriangleAlert, X, XCircle } from "lucide-react";
 import {
   createContext,
   type ReactNode,

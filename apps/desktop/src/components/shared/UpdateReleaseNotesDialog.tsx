@@ -1,5 +1,5 @@
-import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { PendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { cn } from "@/lib/utils";
@@ -50,9 +50,8 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
                     Quantara v{notes.version} è attiva
                   </h2>
                   <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
-                    Riavvio completato il{" "}
-                    {new Date(notes.installedAt).toLocaleString("it-IT")}. Puoi continuare a
-                    lavorare dalla versione aggiornata.
+                    Riavvio completato il {new Date(notes.installedAt).toLocaleString("it-IT")}.
+                    Puoi continuare a lavorare dalla versione aggiornata.
                   </p>
                 </div>
               </div>
@@ -79,7 +78,9 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
                               : "bg-[var(--accent-primary)]",
                         )}
                       />
-                      <span className="text-[13px] leading-5 text-[var(--text-primary)]">{note}</span>
+                      <span className="text-[13px] leading-5 text-[var(--text-primary)]">
+                        {note}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -87,9 +88,7 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
             ) : null}
 
             <div className="mt-5 flex justify-end">
-              <ActionButton onClick={onClose}>
-                Continua
-              </ActionButton>
+              <ActionButton onClick={onClose}>Continua</ActionButton>
             </div>
           </div>
         </div>
@@ -99,13 +98,7 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
   );
 }
 
-function ActionButton({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
+function ActionButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <motion.button
       className="group inline-flex h-11 shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"

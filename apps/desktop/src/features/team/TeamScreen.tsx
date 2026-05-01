@@ -13,6 +13,8 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
+import { ScreenHero } from "@/components/shared/ScreenHero";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import { cn } from "@/lib/utils";
 
@@ -204,33 +206,24 @@ export function TeamScreen() {
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_15%_10%,color-mix(in_srgb,var(--accent-primary)_13%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--success-base)_12%,transparent),transparent_32%)]" />
 
-      <section
-        className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
-      >
-        <div>
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-            Workspace
-          </span>
-          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
-            Team e permessi
-          </h2>
-          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
-            Membri, inviti e ruoli operativi del workspace con visibilita immediata su accessi e
-            assegnazioni.
-          </p>
-        </div>
-        <BezelSurface className="md:translate-y-2" innerClassName="p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-            Membri attivi
+      <ScreenHero
+        badge="Workspace"
+        title="Team e permessi"
+        description="Membri, inviti e ruoli operativi del workspace con visibilita immediata su accessi e assegnazioni."
+        sidePanel={
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+              Membri attivi
+            </div>
+            <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+              16 / 18
+            </div>
+            <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+              Due inviti sono ancora in attesa di conferma.
+            </p>
           </div>
-          <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
-            16 / 18
-          </div>
-          <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-            Due inviti sono ancora in attesa di conferma.
-          </p>
-        </BezelSurface>
-      </section>
+        }
+      />
 
       <section className="mt-8 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((metric) => (
@@ -329,8 +322,9 @@ function TeamMembersPanel() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] border-collapse text-left">
+      {/* --- Desktop table view --- */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-[var(--bg-muted)] text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
               <th className="px-5 py-3.5">Membro</th>
@@ -347,6 +341,13 @@ function TeamMembersPanel() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* --- Mobile card view --- */}
+      <div className="divide-y divide-[var(--border-subtle)] md:hidden">
+        {teamMembers.map((member) => (
+          <MobileMemberCard key={member.id} member={member} />
+        ))}
       </div>
 
       <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-[12px] font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
@@ -370,6 +371,39 @@ function TeamMembersPanel() {
         </div>
       </div>
     </BezelSurface>
+  );
+}
+
+function MobileMemberCard({ member }: { member: TeamMember }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar member={member} />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+              {member.name}
+            </span>
+            <StatusPill status={member.status} />
+          </div>
+          <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+            {member.email}
+          </div>
+          <div className="mt-1 flex items-center gap-3 text-[12px] text-[var(--text-secondary)]">
+            <RolePill role={member.role} />
+            <span>{member.projects} progetti</span>
+            <span>{member.lastAccess}</span>
+          </div>
+        </div>
+      </div>
+      <ProjectControlButton
+        aria-label={`Azioni per ${member.name}`}
+        className="size-8 shrink-0 px-0"
+        variant="icon"
+      >
+        <Ellipsis className="size-4" />
+      </ProjectControlButton>
+    </div>
   );
 }
 
@@ -413,6 +447,7 @@ function TeamMemberRow({ member }: { member: TeamMember }) {
 }
 
 function InviteMemberCard() {
+  const { notify } = useToast();
   return (
     <BezelSurface innerClassName="p-5">
       <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
@@ -435,7 +470,19 @@ function InviteMemberCard() {
           Seleziona ruolo
           <ChevronDown className="size-4 text-[var(--text-secondary)]" />
         </ProjectControlButton>
-        <ProjectControlButton className="w-full" icon={Send} variant="soft">
+        <ProjectControlButton
+          className="w-full"
+          icon={Send}
+          onClick={() =>
+            notify({
+              message:
+                "L'invito dei membri del team sara disponibile in un prossimo aggiornamento.",
+              title: "In arrivo",
+              tone: "info",
+            })
+          }
+          variant="soft"
+        >
           Invia invito
         </ProjectControlButton>
       </div>
@@ -444,6 +491,7 @@ function InviteMemberCard() {
 }
 
 function RolesCard() {
+  const { notify } = useToast();
   const roles = Object.entries(roleMeta) as [TeamRole, (typeof roleMeta)[TeamRole]][];
 
   return (
@@ -486,7 +534,19 @@ function RolesCard() {
           );
         })}
       </div>
-      <ProjectControlButton className="mt-5 w-full" icon={UserCog} variant="soft">
+      <ProjectControlButton
+        className="mt-5 w-full"
+        icon={UserCog}
+        onClick={() =>
+          notify({
+            message:
+              "La gestione dei ruoli e permessi sara disponibile in un prossimo aggiornamento.",
+            title: "In arrivo",
+            tone: "info",
+          })
+        }
+        variant="soft"
+      >
         Gestisci ruoli
       </ProjectControlButton>
     </BezelSurface>
