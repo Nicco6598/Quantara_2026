@@ -1,6 +1,6 @@
 {
   "name": "@quantara/desktop",
-  "version": "0.1.61",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,11 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@quantara/domain-utils": "workspace:*",
     "@quantara/excel-import": "workspace:*",
     "@quantara/shared-types": "workspace:*",
-    "@quantara/validation": "workspace:*",
     "@quantara/ui-tokens": "workspace:*",
+    "@quantara/validation": "workspace:*",
     "@radix-ui/react-slot": "1.2.4",
     "@tailwindcss/vite": "4.2.4",
     "@tanstack/react-table": "8.21.3",
@@ -27,6 +28,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "date-fns": "4.1.0",
+    "framer-motion": "^12.38.0",
     "lucide-react": "0.555.0",
     "react": "19.2.5",
     "react-dom": "19.2.5",

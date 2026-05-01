@@ -1,6 +1,6 @@
 {
   "name": "quantara",
-  "version": "0.1.61",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -15,6 +15,8 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "parser:bundle": "node scripts/prepare-rfi-parser-runtime.mjs",
+    "release:prep": "pnpm version:sync && pnpm parser:bundle && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "release:tag": "node scripts/release-tag.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "pnpm -r typecheck",
