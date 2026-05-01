@@ -32,9 +32,8 @@ import {
   listDesktopContracts,
   listDesktopTariffBooks,
 } from "@/lib/desktopData";
-import { cn } from "@/lib/utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { useAppStore } from "@/store/app-store";
+import { useAppStore, useNavigationState } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { fallbackProjectTariffBook, focusOptions } from "./projects-data";
 import { mapContractToProject } from "./utils/project-mappers";
@@ -55,10 +54,9 @@ const projectContractorStorageKey = "quantara.projectContractors.v1";
 
 export function ProjectsScreen() {
   const navigate = useNavigate();
+  const { activeContext, activeRoute, navigateBack } = useNavigationState();
   const { notify } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [createState, setCreateState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [createMessage, setCreateMessage] = useState("");
   const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
     data: [],
     message: "Caricamento contratti locali.",
@@ -88,8 +86,6 @@ export function ProjectsScreen() {
   const { exportMigrationWorkbook, importMigrationFile } = useProjectMigration({
     contracts: contractsState.data,
     notify,
-    setCreateMessage,
-    setCreateState,
     setMigrationAction,
   });
   const { createProject, deleteProject, selectProject, updateProject } = useProjectMutations({
@@ -100,8 +96,6 @@ export function ProjectsScreen() {
     selectedContractId,
     setContractorRegistry,
     setContractsState,
-    setCreateMessage,
-    setCreateState,
     setEditingProject,
     setIsCreateProjectModalOpen,
     setProjectContractors,
@@ -196,6 +190,12 @@ export function ProjectsScreen() {
     return () => window.removeEventListener("keydown", handleKeyboardShortcut);
   }, []);
 
+  useEffect(() => {
+    if (activeRoute === "projects") {
+      setSelectedContractorId(activeContext ?? null);
+    }
+  }, [activeRoute, activeContext]);
+
   function handleOpenProject(project: PortfolioProject) {
     try {
       window.sessionStorage.setItem("quantara.selectedProjectDetail.v1", JSON.stringify(project));
@@ -214,17 +214,19 @@ export function ProjectsScreen() {
     const contractorName = normalizeContractorName(contractorDraft);
 
     if (contractorName.length < 2) {
-      setCreateState("error");
-      setCreateMessage("Inserisci un nome appaltatore valido.");
+      notify({ message: "Inserisci un nome appaltatore valido.", tone: "warning" });
       return;
     }
 
     setContractorRegistry((current) => mergeContractorRegistry(current, contractorName));
     setContractorDraft("");
     setIsContractorModalOpen(false);
-    setCreateState("saved");
-    setCreateMessage(`${contractorName} creato tra gli appaltatori.`);
     dispatchDataChanged();
+    notify({
+      message: `${contractorName} creato tra gli appaltatori.`,
+      title: "Appaltatore aggiunto",
+      tone: "success",
+    });
   }
 
   function handleEditFromActions(project: PortfolioProject) {
@@ -242,21 +244,24 @@ export function ProjectsScreen() {
   }
 
   const handleBackFromContractor = useCallback(() => {
-    setSelectedContractorId(null);
     setQuery("");
     setFocus("all");
-  }, []);
+    navigateBack();
+  }, [navigateBack]);
 
   const handleOpenCreateProject = useCallback(() => {
     setEditingProject(null);
     setIsCreateProjectModalOpen(true);
   }, []);
 
-  const handleOpenFolder = useCallback((folderId: string) => {
-    setSelectedContractorId(folderId);
-    setQuery("");
-    setFocus("all");
-  }, []);
+  const handleOpenFolder = useCallback(
+    (folderId: string) => {
+      setQuery("");
+      setFocus("all");
+      navigate("projects", folderId);
+    },
+    [navigate],
+  );
 
   const handleImportFileChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -321,20 +326,6 @@ export function ProjectsScreen() {
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
 
-      {createMessage ? (
-        <div
-          className={cn(
-            "mb-4 rounded-[14px] border px-4 py-3 text-[13px] font-medium",
-            createState === "error"
-              ? "border-[var(--danger-soft)] bg-[var(--danger-soft)] text-[var(--danger-base)]"
-              : "border-[var(--success-soft)] bg-[var(--success-soft)] text-[var(--success-base)]",
-          )}
-          role="status"
-        >
-          {createMessage}
-        </div>
-      ) : null}
-
       {selectedContractor ? (
         <ContractorDetailView
           averageProgress={averageProgress}
@@ -389,7 +380,6 @@ export function ProjectsScreen() {
           contractorOptions={contractorRegistry}
           defaultTariffBookId={tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id}
           {...(createProjectInitialValues ? { initialValues: createProjectInitialValues } : {})}
-          isSaving={createState === "saving"}
           onClose={handleCloseCreateProjectModal}
           onCreate={editingProject ? updateProject : createProject}
           submitLabel={editingProject ? "Salva modifiche" : "Crea progetto"}

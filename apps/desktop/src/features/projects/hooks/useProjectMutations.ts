@@ -16,8 +16,6 @@ import {
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 
-type CreateState = "idle" | "saving" | "saved" | "error";
-
 type Notify = (toast: {
   message: string;
   title?: string;
@@ -31,8 +29,6 @@ type UseProjectMutationsOptions = {
   projectContractors: Record<string, string>;
   setContractorRegistry: Dispatch<SetStateAction<string[]>>;
   setContractsState: Dispatch<SetStateAction<DesktopDataResult<DesktopContract[]>>>;
-  setCreateMessage: (message: string) => void;
-  setCreateState: (state: CreateState) => void;
   setEditingProject: Dispatch<SetStateAction<ProjectEditState | null>>;
   setIsCreateProjectModalOpen: (isOpen: boolean) => void;
   setProjectContractors: Dispatch<SetStateAction<Record<string, string>>>;
@@ -48,8 +44,6 @@ export function useProjectMutations({
   projectContractors,
   setContractorRegistry,
   setContractsState,
-  setCreateMessage,
-  setCreateState,
   setEditingProject,
   setIsCreateProjectModalOpen,
   setProjectContractors,
@@ -61,9 +55,6 @@ export function useProjectMutations({
     request: CreateDesktopContractRequest,
     meta: { contractorName: string },
   ) {
-    setCreateState("saving");
-    setCreateMessage("");
-
     try {
       const created = await createDesktopContract(request);
 
@@ -81,8 +72,6 @@ export function useProjectMutations({
         mergeContractorRegistry(current, normalizeContractorName(meta.contractorName)),
       );
       setSelectedContractId(created.id);
-      setCreateState("saved");
-      setCreateMessage(`${created.title} creato.`);
       dispatchDataChanged();
       notify({
         message: `${created.title} e pronto nel registro progetti.`,
@@ -91,8 +80,6 @@ export function useProjectMutations({
       });
       return created;
     } catch (error) {
-      setCreateState("error");
-      setCreateMessage(error instanceof Error ? error.message : String(error));
       notify({
         message: error instanceof Error ? error.message : String(error),
         title: "Creazione non riuscita",
@@ -109,9 +96,6 @@ export function useProjectMutations({
     if (!editingProject) {
       return createProject(request, meta);
     }
-
-    setCreateState("saving");
-    setCreateMessage("");
 
     try {
       const updated = await updateDesktopContract(editingProject.contractId, {
@@ -133,8 +117,6 @@ export function useProjectMutations({
         mergeContractorRegistry(current, normalizeContractorName(meta.contractorName)),
       );
       setSelectedContractId(updated.id);
-      setCreateState("saved");
-      setCreateMessage(`${updated.title} aggiornato.`);
       setEditingProject(null);
       dispatchDataChanged();
       notify({
@@ -144,8 +126,6 @@ export function useProjectMutations({
       });
       return updated;
     } catch (error) {
-      setCreateState("error");
-      setCreateMessage(error instanceof Error ? error.message : String(error));
       notify({
         message: error instanceof Error ? error.message : String(error),
         title: "Modifica non riuscita",
@@ -159,8 +139,6 @@ export function useProjectMutations({
     const contract = contracts.find((item) => item.id === projectId);
 
     if (!contract) {
-      setCreateState("error");
-      setCreateMessage("Modifica disponibile sui progetti locali creati nel database.");
       notify({
         message: "Puoi modificare solo i progetti locali creati nel database.",
         title: "Modifica non disponibile",
@@ -185,14 +163,9 @@ export function useProjectMutations({
       },
     });
     setIsCreateProjectModalOpen(true);
-    setCreateState("idle");
-    setCreateMessage("");
   }
 
   async function deleteProject(projectId: string) {
-    setCreateState("saving");
-    setCreateMessage("");
-
     try {
       const deletedContract = contracts.find((contract) => contract.id === projectId);
 
@@ -206,8 +179,6 @@ export function useProjectMutations({
       if (selectedContractId === projectId) {
         setSelectedContractId("");
       }
-      setCreateState("saved");
-      setCreateMessage(`${deletedContract?.title ?? "Progetto"} eliminato.`);
       dispatchDataChanged();
       notify({
         message: `${deletedContract?.title ?? "Progetto"} eliminato dal registro.`,
@@ -215,8 +186,6 @@ export function useProjectMutations({
         tone: "success",
       });
     } catch (error) {
-      setCreateState("error");
-      setCreateMessage(error instanceof Error ? error.message : String(error));
       notify({
         message: error instanceof Error ? error.message : String(error),
         title: "Eliminazione non riuscita",

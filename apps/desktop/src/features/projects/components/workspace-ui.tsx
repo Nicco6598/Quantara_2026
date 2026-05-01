@@ -17,7 +17,7 @@ export function ProjectSurface({
   return (
     <motion.section
       className={cn(
-        "projects-surface rounded-[24px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none",
+        "projects-surface rounded-[24px] border-[0.5px] border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none",
         className,
       )}
       initial={{ opacity: 0, y: 14, scale: 0.994 }}
@@ -77,7 +77,7 @@ export function BezelSurface({
   return (
     <motion.section
       className={cn(
-        "min-w-0 rounded-[30px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]",
+        "min-w-0 rounded-[30px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_40%,transparent)]",
         className,
       )}
       initial={{ opacity: 0, y: 18, scale: 0.992 }}
@@ -87,7 +87,7 @@ export function BezelSurface({
     >
       <div
         className={cn(
-          "h-full rounded-[24px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]",
+          "h-full rounded-[24px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]",
           innerClassName,
         )}
       >
@@ -144,9 +144,7 @@ export function MetricCard({
         >
           {value}
         </div>
-        <div className="mt-2 text-[12px] font-medium text-[var(--text-secondary)]">
-          {caption}
-        </div>
+        <div className="mt-2 text-[12px] font-medium text-[var(--text-secondary)]">{caption}</div>
       </div>
     </BezelSurface>
   );

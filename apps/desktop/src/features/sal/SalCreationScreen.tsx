@@ -24,10 +24,10 @@ import {
   useState,
 } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
-import { useNavigate } from "@/hooks/useNavigate";
-import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { BezelSurface } from "@/features/projects/components/workspace-ui";
+import { useNavigate } from "@/hooks/useNavigate";
 import { cn } from "@/lib/utils";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { SalCard, SalHero, SalStepper, SalWorkflowTopbar } from "./components/SalCreationChrome";
 import {
   AccountingRows,
@@ -281,39 +281,39 @@ export function SalCreationScreen() {
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
 
-        {showBreadcrumbNav ? (
-          <div className="mb-4 flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
-            <span>Nuova SAL</span>
-            <ChevronRight className="size-3.5" />
-            <span className="font-semibold text-[var(--text-primary)]">{primaryLabel}</span>
-          </div>
+      {showBreadcrumbNav ? (
+        <div className="mb-4 flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+          <span>Nuova SAL</span>
+          <ChevronRight className="size-3.5" />
+          <span className="font-semibold text-[var(--text-primary)]">{primaryLabel}</span>
+        </div>
+      ) : null}
+
+      <SalWorkflowTopbar
+        canGoBack={phase !== "context"}
+        onBack={() =>
+          phase === "completed" ? goToPhase("confirm") : goToPhase(getPreviousPhase(phase))
+        }
+        onDraft={saveDraft}
+        onPrimary={goPrimary}
+        primaryLabel={primaryLabel}
+        showPrimary={phase !== "completed"}
+      />
+
+      <div className="mt-5 space-y-5">
+        {data.error ? (
+          <FeedbackBanner tone="danger" title="Caricamento SAL non riuscito" message={data.error} />
+        ) : null}
+        {data.isLoading ? (
+          <FeedbackBanner
+            tone="info"
+            title="Caricamento dati reali"
+            message="Sto leggendo contratti, tariffari e voci disponibili nel database locale."
+          />
         ) : null}
 
-        <SalWorkflowTopbar
-          canGoBack={phase !== "context"}
-          onBack={() =>
-            phase === "completed" ? goToPhase("confirm") : goToPhase(getPreviousPhase(phase))
-          }
-          onDraft={saveDraft}
-          onPrimary={goPrimary}
-          primaryLabel={primaryLabel}
-          showPrimary={phase !== "completed"}
-        />
-
-        <div className="mt-5 space-y-5">
-          {data.error ? (
-            <FeedbackBanner tone="danger" title="Caricamento SAL non riuscito" message={data.error} />
-          ) : null}
-          {data.isLoading ? (
-            <FeedbackBanner
-              tone="info"
-              title="Caricamento dati reali"
-              message="Sto leggendo contratti, tariffari e voci disponibili nel database locale."
-            />
-          ) : null}
-
-          {phase === "completed" ? (
-            <DetailView
+        {phase === "completed" ? (
+          <DetailView
             createdSalTitle={createdSalTitle}
             lineViews={lineViews}
             onClose={() => {
@@ -426,7 +426,7 @@ export function SalCreationScreen() {
             ) : null}
           </>
         )}
-        </div>
+      </div>
     </main>
   );
 }
@@ -482,10 +482,7 @@ function SetupStep({
     <div className="space-y-5">
       <BezelSurface innerClassName="p-0">
         <div className="grid divide-y divide-[var(--border-subtle)]/60 md:grid-cols-4 md:divide-x md:divide-y-0">
-          <ContextTile
-            label="Contratto"
-            value={project.applicationContractCode}
-          />
+          <ContextTile label="Contratto" value={project.applicationContractCode} />
           <ContextTile label="Documento" value={project.salTitle} />
           <ContextTile
             label="Tariffario"
@@ -574,9 +571,7 @@ function SetupStep({
                               : "border border-[var(--border-subtle)] bg-[var(--bg-muted)]",
                           )}
                         >
-                          {isSelected ? (
-                            <Check className="size-3.5" strokeWidth={3} />
-                          ) : null}
+                          {isSelected ? <Check className="size-3.5" strokeWidth={3} /> : null}
                         </span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -626,10 +621,7 @@ function SetupStep({
               Regole economiche
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <DiscountControl
-                economicRules={economicRules}
-                setEconomicRules={setEconomicRules}
-              />
+              <DiscountControl economicRules={economicRules} setEconomicRules={setEconomicRules} />
               <RuleChip label="Arrotonda al centesimo" />
               <RuleChip label="Voci OS: escluse dal ribasso" />
             </div>
@@ -676,10 +668,7 @@ function SetupStep({
                 label="Impegnato precedente"
                 value={<Currency value={summary.previousProgressiveAmount} />}
               />
-              <SummaryLine
-                label="Documento corrente"
-                value={<Currency value={summary.total} />}
-              />
+              <SummaryLine label="Documento corrente" value={<Currency value={summary.total} />} />
               <SummaryLine
                 label="Residuo stimato"
                 value={<Currency value={summary.budgetResidual} />}
@@ -734,7 +723,11 @@ function VoicesStep({
   lineViews: SalLineView[];
   lines: SalLineDraft[];
   onBack: () => void;
-  onFactorChange: (voiceId: string, field: "factor1" | "factor2" | "factor3", value: number) => void;
+  onFactorChange: (
+    voiceId: string,
+    field: "factor1" | "factor2" | "factor3",
+    value: number,
+  ) => void;
   onPrimary: () => void;
   primaryLabel: string;
   onRemove: (voiceId: string) => void;
@@ -786,18 +779,24 @@ function VoicesStep({
           />
         </div>
         <div className="mt-2 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <SummaryLine label="Valore ribasso" tone="danger" value={<Currency value={summary.discountAmount} />} />
+          <SummaryLine
+            label="Valore ribasso"
+            tone="danger"
+            value={<Currency value={summary.discountAmount} />}
+          />
           <SummaryLine label="Budget residuo" value={<Currency value={summary.budgetResidual} />} />
-          <SummaryLine label="Totale progressivo SAL" tone="info" value={<Currency value={summary.total} />} />
+          <SummaryLine
+            label="Totale progressivo SAL"
+            tone="info"
+            value={<Currency value={summary.total} />}
+          />
         </div>
       </BezelSurface>
 
       <AccountingRows lines={lineViews} />
 
       <BezelSurface innerClassName="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-        <span className="text-[16px] font-semibold text-[var(--text-secondary)]">
-          Totale SAL
-        </span>
+        <span className="text-[16px] font-semibold text-[var(--text-secondary)]">Totale SAL</span>
         <span className="text-[20px] font-bold text-[var(--info-base)]">
           <Currency value={summary.total} />
         </span>
@@ -858,11 +857,28 @@ function VerifyStep({
             Riepilogo economico
           </div>
           <dl className="mt-4 space-y-1">
-            <SummaryLine label="Imponibile soggetto a ribasso" value={<Currency value={summary.discountableAmount} />} />
-            <SummaryLine label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`} value={<Currency value={-summary.discountAmount} />} tone="danger" />
-            <SummaryLine label="Importo maggiorazioni" value={<Currency value={summary.linkedChargeAmount} />} />
-            <SummaryLine label="Importo voci OS" value={<Currency value={summary.safetyAmount} />} />
-            <SummaryLine label="TOTALE SAL" value={<Currency value={summary.total} />} tone="info" />
+            <SummaryLine
+              label="Imponibile soggetto a ribasso"
+              value={<Currency value={summary.discountableAmount} />}
+            />
+            <SummaryLine
+              label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`}
+              value={<Currency value={-summary.discountAmount} />}
+              tone="danger"
+            />
+            <SummaryLine
+              label="Importo maggiorazioni"
+              value={<Currency value={summary.linkedChargeAmount} />}
+            />
+            <SummaryLine
+              label="Importo voci OS"
+              value={<Currency value={summary.safetyAmount} />}
+            />
+            <SummaryLine
+              label="TOTALE SAL"
+              value={<Currency value={summary.total} />}
+              tone="info"
+            />
           </dl>
         </BezelSurface>
         <BezelSurface innerClassName="p-4 md:p-5">
@@ -954,12 +970,29 @@ function ConfirmStep({
             Chiusura economica
           </div>
           <dl className="mt-4 space-y-1">
-            <SummaryLine label="Importo lordo tariffa" value={<Currency value={summary.grossAmount} />} />
-            <SummaryLine label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`} value={<Currency value={-summary.discountAmount} />} tone="danger" />
-            <SummaryLine label="Totale netto" value={<Currency value={summary.netDiscountableAmount} />} />
+            <SummaryLine
+              label="Importo lordo tariffa"
+              value={<Currency value={summary.grossAmount} />}
+            />
+            <SummaryLine
+              label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`}
+              value={<Currency value={-summary.discountAmount} />}
+              tone="danger"
+            />
+            <SummaryLine
+              label="Totale netto"
+              value={<Currency value={summary.netDiscountableAmount} />}
+            />
             <SummaryLine label="Voci OS" value={<Currency value={summary.safetyAmount} />} />
-            <SummaryLine label="Maggiorazioni" value={<Currency value={summary.linkedChargeAmount} />} />
-            <SummaryLine label="Totale complessivo" value={<Currency value={summary.total} />} tone="info" />
+            <SummaryLine
+              label="Maggiorazioni"
+              value={<Currency value={summary.linkedChargeAmount} />}
+            />
+            <SummaryLine
+              label="Totale complessivo"
+              value={<Currency value={summary.total} />}
+              tone="info"
+            />
           </dl>
         </BezelSurface>
         <div className="grid gap-5 md:grid-cols-2">
@@ -969,9 +1002,21 @@ function ConfirmStep({
               Output documentali
             </div>
             <div className="mt-4 space-y-3">
-              <OutputRow disabled icon={<FileText className="size-5 text-[var(--danger-base)]" />} label="PDF libretto" />
-              <OutputRow disabled icon={<FileSpreadsheet className="size-5 text-[var(--success-base)]" />} label="Excel dettaglio" />
-              <OutputRow disabled icon={<Printer className="size-5 text-[var(--info-base)]" />} label="Stampa contabilita" />
+              <OutputRow
+                disabled
+                icon={<FileText className="size-5 text-[var(--danger-base)]" />}
+                label="PDF libretto"
+              />
+              <OutputRow
+                disabled
+                icon={<FileSpreadsheet className="size-5 text-[var(--success-base)]" />}
+                label="Excel dettaglio"
+              />
+              <OutputRow
+                disabled
+                icon={<Printer className="size-5 text-[var(--info-base)]" />}
+                label="Stampa contabilita"
+              />
             </div>
           </BezelSurface>
           <BezelSurface innerClassName="p-4 md:p-5">
@@ -1038,7 +1083,10 @@ function DetailView({
         <StepMetric label="Totale SAL" value={<Currency value={summary.total} />} />
         <StepMetric label="Voci contabilizzate" value={String(lineViews.length)} />
         <StepMetric label="Ultimo aggiornamento" value="27 Apr 2026 - 17:40" />
-        <StepMetric label="Impatto sul budget" value={`${summary.budgetResidual < 0 ? "-" : ""}0,0%`} />
+        <StepMetric
+          label="Impatto sul budget"
+          value={`${summary.budgetResidual < 0 ? "-" : ""}0,0%`}
+        />
       </div>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <SalCard title="Registro contabile SAL">

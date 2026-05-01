@@ -1,12 +1,6 @@
 import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  FileText,
-  Save,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileText, Save } from "lucide-react";
 import type { ReactNode } from "react";
 import { BezelSurface } from "@/features/projects/components/workspace-ui";
 import { cn } from "@/lib/utils";
@@ -86,9 +80,7 @@ export function SalHero({
   title: string;
 }) {
   return (
-    <section
-      className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
-    >
+    <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
       <div className="min-w-0">
         <div className="flex items-center gap-3">
           <span className="flex size-10 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
@@ -198,15 +190,14 @@ export function SalStepper({
                       "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base))] text-[var(--accent-primary)]",
                     isBlocked &&
                       "border-[var(--warning-base)]/40 bg-[var(--warning-soft)] text-[var(--warning-base)]",
-                    !isCompleted && !isCurrent && !isBlocked &&
+                    !isCompleted &&
+                      !isCurrent &&
+                      !isBlocked &&
                       "border-[var(--border-subtle)] bg-[var(--bg-muted)] text-[var(--text-secondary)]",
                   )}
                   initial={false}
                   animate={{
-                    scale:
-                      isCurrent ? [1, 1.15, 1]
-                      : isCompleted ? [1, 1.1, 1]
-                      : 1,
+                    scale: isCurrent ? [1, 1.15, 1] : isCompleted ? [1, 1.1, 1] : 1,
                   }}
                   transition={{
                     duration: 0.7,
@@ -266,9 +257,7 @@ export function SalCard({
   title: string;
 }) {
   return (
-    <BezelSurface
-      innerClassName={cn("p-4 md:p-5", className)}
-    >
+    <BezelSurface innerClassName={cn("p-4 md:p-5", className)}>
       <div className="mb-4 flex items-center gap-2.5">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-[var(--info-soft)] text-[var(--info-base)]">
           <Icon className="size-4" />

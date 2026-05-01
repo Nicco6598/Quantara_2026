@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
-import { MetricCard } from "@/features/projects/components/workspace-ui";
 import {
   buildActionSummary,
   buildActivityRows,
@@ -13,6 +12,7 @@ import {
   PriorityActions,
   RightRail,
 } from "@/features/dashboard/components/DashboardSections";
+import { MetricCard } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
@@ -109,36 +109,33 @@ export function DashboardScreen() {
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
 
-      
-        <div className="grid min-w-0 gap-6 md:gap-7 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:gap-8">
-          <main className="min-w-0 space-y-6">
-            <Hero />
+      <div className="grid min-w-0 gap-6 md:gap-7 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:gap-8">
+        <main className="min-w-0 space-y-6">
+          <Hero />
 
-            <div
-              className="animate-entry grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5"
-            >
-              {metrics.map((metric) => (
-                <MetricCard {...metric} key={metric.label} />
-              ))}
-            </div>
+          <div className="animate-entry grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">
+            {metrics.map((metric) => (
+              <MetricCard {...metric} key={metric.label} />
+            ))}
+          </div>
 
-            <PriorityActions summary={priorityActions} />
+          <PriorityActions summary={priorityActions} />
 
-            <OperationalSites
-              onDeleteProject={handleDeleteProject}
-              operationalByProjectId={operationalByProjectId}
-              projects={projects}
-            />
-
-            <Milestones items={milestones} />
-          </main>
-
-          <RightRail
-            activities={activities}
-            distribution={distribution}
-            projectCount={projects.length}
+          <OperationalSites
+            onDeleteProject={handleDeleteProject}
+            operationalByProjectId={operationalByProjectId}
+            projects={projects}
           />
-        </div>
+
+          <Milestones items={milestones} />
+        </main>
+
+        <RightRail
+          activities={activities}
+          distribution={distribution}
+          projectCount={projects.length}
+        />
+      </div>
     </main>
   );
 }

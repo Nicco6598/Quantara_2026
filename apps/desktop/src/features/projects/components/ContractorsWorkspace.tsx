@@ -5,10 +5,8 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
-  FolderOpen,
   HardHat,
   Layers3,
-  MoreVertical,
   Plus,
   Search,
   ShieldCheck,
@@ -20,11 +18,7 @@ import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import {
-  BezelSurface,
-  MetricCard,
-  ProjectControlButton,
-} from "./workspace-ui";
+import { BezelSurface, MetricCard, ProjectControlButton } from "./workspace-ui";
 
 type ContractorsWorkspaceProps = {
   activeProjectsCount: number;
@@ -55,9 +49,7 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
 
   return (
     <div>
-      <section
-        className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
-      >
+      <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
         <div className="min-w-0">
           <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             Appaltatori
@@ -102,7 +94,7 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
 
         <BezelSurface className="self-start md:translate-y-2" innerClassName="p-5">
           <div className="flex items-start justify-between gap-4">
-    <div className="w-full">
+            <div className="w-full">
               <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                 Portfolio complessivo
               </div>
@@ -308,135 +300,39 @@ function ContractorFoldersPanel({
         </div>
       </div>
 
-      <div className="divide-y divide-[var(--border-subtle)]">
-        {folders.length > 0 ? (
-          folders.map((folder) => {
+      {folders.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {folders.map((folder) => {
             const hasCriticalItems = folder.criticalCount > 0 || folder.salWindowCount > 0;
-
             return (
-              <div className="p-4 xl:p-5" key={folder.id}>
-                {/* biome-ignore lint/a11y/useSemanticElements: card wrapper needs div for layout flexibility */}
-                <div
-                  className="group cursor-pointer"
-                  onClick={() => onOpenFolder(folder.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onOpenFolder(folder.id);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="flex items-start justify-between gap-5">
-                    <div className="flex min-w-0 items-start gap-4">
-                      <span className="flex size-14 shrink-0 items-center justify-center rounded-[18px] bg-[var(--info-soft)] text-[var(--accent-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]">
-                        <FolderOpen className="size-6" />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="truncate text-[22px] font-bold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
-                            {folder.contractor}
-                          </span>
-                          <span
-                            className={cn(
-                              "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[11px] font-semibold",
-                              hasCriticalItems
-                                ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20"
-                                : "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20",
-                            )}
-                          >
-                            <span className="size-1.5 rounded-full bg-current" />
-                            {hasCriticalItems ? "Presidio" : "Stabile"}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
-                          Gestione completa di contratti, progetti, SAL e controlli.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="hidden shrink-0 items-center gap-3 text-[12px] font-medium text-[var(--text-secondary)] xl:flex">
-                      <span>Ultima attivita: 27 apr 2025</span>
-                      <ProjectControlButton
-                        aria-label="Azioni appaltatore"
-                        className="size-8"
-                        icon={MoreVertical}
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                        }}
-                        variant="icon"
-                      >
-                        <span className="sr-only">Azioni appaltatore</span>
-                      </ProjectControlButton>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-5 divide-x divide-[var(--border-subtle)]/60 overflow-hidden rounded-[16px] border border-[var(--border-subtle)]/50">
-                    <FolderMetric
-                      label="Valore contratti"
-                      value={formatMoney({ amount: folder.budget, currency: "EUR" })}
-                    />
-                    <FolderMetric label="Contratti" value={`${folder.projectCount}`} />
-                    <FolderMetric label="Progetti" value={`${folder.projectCount}`} />
-                    <FolderMetric label="SAL" value={`${folder.salCount}`} />
-                    <FolderMetric
-                      label="Alert"
-                      value={folder.criticalCount > 0 ? `${folder.criticalCount} ⚠` : `${folder.criticalCount}`}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between text-[12px] font-medium text-[var(--text-secondary)] xl:hidden">
-                    <span>Ultima attivita: 27 apr 2025</span>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-[var(--border-subtle)]/50 pt-4">
-                    <span className="text-[12px] font-medium text-[var(--text-secondary)]">
-                      {folder.projectCount} progetti in portfolio
-                    </span>
-                    <ProjectControlButton
-                      className="h-10 px-5 text-[13px]"
-                      icon={ChevronRight}
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        onOpenFolder(folder.id);
-                      }}
-                      variant="primary"
-                    >
-                      Apri workspace
-                    </ProjectControlButton>
-                  </div>
-                </div>
-              </div>
+              <ContractorCard
+                key={folder.id}
+                folder={folder}
+                hasCriticalItems={hasCriticalItems}
+                onOpenFolder={onOpenFolder}
+              />
             );
-          })
-        ) : (
-          <div className="px-4 py-8 xl:px-5">
-            {/* biome-ignore lint/a11y/useSemanticElements: div needed for layout inside grid */}
-            <div
-              className="rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-12 text-center transition-colors hover:bg-[var(--bg-muted)]"
-              onClick={onOpenCreateContractor}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onOpenCreateContractor();
-                }
-              }}
-            >
-              <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                <Building2 className="size-5" />
-              </span>
-              <span className="mt-5 block text-[15px] font-semibold text-[var(--text-primary)]">
-                Vuoi aggiungere un nuovo appaltatore?
-              </span>
-              <span className="mt-2 block text-[13px] text-[var(--text-secondary)]">
-                Crea manualmente o importa da Excel per iniziare subito.
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
+          })}
+        </div>
+      ) : (
+        <div className="px-4 py-8 xl:px-5">
+          <button
+            type="button"
+            className="w-full rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-12 text-center transition-colors hover:bg-[var(--bg-muted)]"
+            onClick={onOpenCreateContractor}
+          >
+            <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <Building2 className="size-5" />
+            </span>
+            <span className="mt-5 block text-[15px] font-semibold text-[var(--text-primary)]">
+              Vuoi aggiungere un nuovo appaltatore?
+            </span>
+            <span className="mt-2 block text-[13px] text-[var(--text-secondary)]">
+              Crea manualmente o importa da Excel per iniziare subito.
+            </span>
+          </button>
+        </div>
+      )}
 
       {folders.length > 0 ? (
         <div className="border-t border-[var(--border-subtle)] px-4 py-4 text-center xl:px-5 xl:py-5">
@@ -456,13 +352,85 @@ function ContractorFoldersPanel({
   );
 }
 
-function FolderMetric({ label, value }: { label: string; value: string }) {
+function ContractorCard({
+  folder,
+  hasCriticalItems,
+  onOpenFolder,
+}: {
+  folder: ContractorFolder;
+  hasCriticalItems: boolean;
+  onOpenFolder: (id: string) => void;
+}) {
   return (
-    <div className="min-w-0 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-3 py-3 text-center">
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+    <button
+      type="button"
+      className="group w-full cursor-pointer rounded-2xl border-[0.5px] border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent-primary)]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
+      onClick={() => onOpenFolder(folder.id)}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--accent-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]">
+            <HardHat className="size-5" />
+          </span>
+          <span className="truncate text-[15px] font-bold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+            {folder.contractor}
+          </span>
+        </div>
+        <span
+          className={cn(
+            "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-[10px] font-semibold",
+            hasCriticalItems
+              ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20"
+              : "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20",
+          )}
+        >
+          <span className="size-1.5 rounded-full bg-current" />
+          {hasCriticalItems ? "Presidio" : "Stabile"}
+        </span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 divide-x divide-[var(--border-subtle)]/60 overflow-hidden rounded-xl border-[0.5px] border-[var(--border-subtle)]/50">
+        <CardMetric
+          label="Valore"
+          value={formatMoney({ amount: folder.budget, currency: "EUR" })}
+        />
+        <CardMetric label="Progetti" value={`${folder.projectCount}`} />
+        <CardMetric
+          label="Alert"
+          value={`${folder.criticalCount}`}
+          highlight={folder.criticalCount > 0}
+        />
+      </div>
+
+      <div className="mt-4 flex items-center justify-end">
+        <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent-primary)] opacity-0 transition-all duration-200 -translate-x-1 group-hover:translate-x-0 group-hover:opacity-100">
+          Apri workspace <ChevronRight className="size-3.5" />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function CardMetric({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="min-w-0 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-2 py-2.5 text-center">
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
         {label}
       </dt>
-      <dd className="mt-1 truncate text-[15px] font-bold text-[var(--text-primary)]">
+      <dd
+        className={cn(
+          "mt-0.5 truncate text-[14px] font-bold",
+          highlight ? "text-[var(--warning-base)]" : "text-[var(--text-primary)]",
+        )}
+      >
         {value}
       </dd>
     </div>

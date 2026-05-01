@@ -1,18 +1,24 @@
 import { motion } from "framer-motion";
-import { ArrowUpRight, Building2, ChevronRight, FolderKanban, HardHat, Trash2, TrendingUp } from "lucide-react";
-import { ModernDonut, ProgressRing, SegmentBars } from "@/components/shared/Charts";
+import {
+  ArrowUpRight,
+  Building2,
+  ChevronRight,
+  FolderKanban,
+  HardHat,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ModernDonut, ProgressRing, SegmentBars } from "@/components/shared/Charts";
 import type { StatusTone } from "@/components/shared/StatusBadge";
-import type { PortfolioProject } from "@/features/projects/ProjectsScreen";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
+import type { PortfolioProject } from "@/features/projects/ProjectsScreen";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 export function Hero() {
   return (
-    <section
-      className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
-    >
+    <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
@@ -36,7 +42,13 @@ export function Hero() {
           <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
             Indice operativo
           </div>
-          <ProgressRing className="mx-auto mt-4" color="var(--accent-primary)" percentage={82} size={140} strokeWidth={10}>
+          <ProgressRing
+            className="mx-auto mt-4"
+            color="var(--accent-primary)"
+            percentage={82}
+            size={140}
+            strokeWidth={10}
+          >
             <div className="text-center">
               <div className="text-[32px] font-bold leading-none tracking-[-0.03em] text-[var(--text-primary)]">
                 82<span className="text-[20px]">,4</span>
@@ -429,7 +441,10 @@ export function RightRail({
         </div>
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-5">
           <ModernDonut segments={buildSegments(distribution)} size={120} strokeWidth={8} />
-          <SegmentBars className="w-full flex-1 self-center sm:self-start" segments={buildSegments(distribution)} />
+          <SegmentBars
+            className="w-full flex-1 self-center sm:self-start"
+            segments={buildSegments(distribution)}
+          />
         </div>
         <RailLink label="Vedi distribuzione" />
       </BezelSurface>
@@ -562,8 +577,18 @@ export function buildActionSummary(projects: PortfolioProject[]) {
 export function buildMilestones(projects: PortfolioProject[]) {
   const today = new Date();
   const months = [
-    "Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
-    "Lug", "Ago", "Set", "Ott", "Nov", "Dic",
+    "Gen",
+    "Feb",
+    "Mar",
+    "Apr",
+    "Mag",
+    "Giu",
+    "Lug",
+    "Ago",
+    "Set",
+    "Ott",
+    "Nov",
+    "Dic",
   ];
   const fallback = [
     {

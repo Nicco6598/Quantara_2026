@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import {
   Activity,
   CheckCircle2,
@@ -15,14 +16,13 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
-import { motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
 import { formatDueWindow, formatForecastDelta } from "@/features/projects/utils/projects-helpers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
-import { useToast } from "@/components/shared/ToastProvider";
 import { useNavigate } from "@/hooks/useNavigate";
 import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
@@ -241,9 +241,7 @@ export function ProjectDetailScreen() {
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
 
-      <section
-        className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end"
-      >
+      <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
         <div className="min-w-0">
           <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             Dossier {detail.lot}
@@ -317,9 +315,9 @@ export function ProjectDetailScreen() {
       <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">
           <Panel>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                Milestone
-              </h3>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+              Milestone
+            </h3>
             <div className="mt-4 grid gap-3 lg:grid-cols-4">
               {milestoneRows.map((row, index) => (
                 <MilestoneItem
@@ -337,9 +335,9 @@ export function ProjectDetailScreen() {
             </h3>
             <div className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
               <div className="rounded-[18px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                    Quadro economico
-                  </div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                  Quadro economico
+                </div>
                 <dl className="mt-3 divide-y divide-[var(--border-subtle)]/70">
                   <SummaryRow
                     label="Budget contrattuale"
@@ -362,11 +360,7 @@ export function ProjectDetailScreen() {
                     Forecast
                   </div>
                   <InfoBlock label="Fine prevista" value={detail.endDate} />
-                  <InfoBlock
-                    label="CPI"
-                    value={detail.cpi}
-                    note="Sotto budget rispetto al piano"
-                  />
+                  <InfoBlock label="CPI" value={detail.cpi} note="Sotto budget rispetto al piano" />
                 </div>
                 <div className="pt-4 md:pl-4 md:pt-0">
                   <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
@@ -415,7 +409,7 @@ export function ProjectDetailScreen() {
                 />
               ))}
               {salRows.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-4 py-8 text-center">
+                <div className="flex flex-col items-center gap-3 rounded-[16px] border-[0.5px] border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-4 py-8 text-center">
                   <FileText className="size-8 text-[var(--text-secondary)]" />
                   <p className="text-[13px] font-medium text-[var(--text-secondary)]">
                     Nessuna SAL registrata per questo progetto.
@@ -683,7 +677,9 @@ function MilestoneItem({
         )}
       </div>
       <div className="min-w-0">
-        <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{row.label}</div>
+        <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+          {row.label}
+        </div>
         <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
           {row.date}
         </div>
@@ -741,11 +737,7 @@ function SalCard({
               : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
           )}
         >
-          {isClosed ? (
-            <CheckCircle2 className="size-5" />
-          ) : (
-            <Clock3 className="size-5" />
-          )}
+          {isClosed ? <CheckCircle2 className="size-5" /> : <Clock3 className="size-5" />}
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2">

@@ -11,21 +11,26 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ScreenHero } from "@/components/shared/ScreenHero";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
-import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { cn } from "@/lib/utils";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 const STATUS_OPTIONS = ["Tutti", "Bozza", "Chiuso"] as const;
 
 export function AccountingScreen() {
+  const { notify } = useToast();
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const [contracts, setContracts] = useState<{ id: string; budget: { amount: number }; title: string; contractor: string }[]>([]);
+  const [contracts, setContracts] = useState<
+    { id: string; budget: { amount: number }; title: string; contractor: string }[]
+  >([]);
   const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
   const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
   const projects = useSalWorkflowStore((state) => state.projects);
@@ -42,12 +47,21 @@ export function AccountingScreen() {
     let active = true;
     listDesktopContracts([]).then((result) => {
       if (!active) return;
-      setContracts(result.data.map((c) => {
-        const p = mapContractToProject(c);
-        return { id: c.id, budget: c.contractualAmount, title: c.title, contractor: p.contractor };
-      }));
+      setContracts(
+        result.data.map((c) => {
+          const p = mapContractToProject(c);
+          return {
+            id: c.id,
+            budget: c.contractualAmount,
+            title: c.title,
+            contractor: p.contractor,
+          };
+        }),
+      );
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -100,20 +114,42 @@ export function AccountingScreen() {
           const c = contracts.find((cc) => cc.id === doc.projectId);
           if (c?.contractor !== filterContractor) return false;
         }
-        if (filterStatus !== "Tutti" && doc.status !== (filterStatus === "Bozza" ? "draft" : "closed")) return false;
+        if (
+          filterStatus !== "Tutti" &&
+          doc.status !== (filterStatus === "Bozza" ? "draft" : "closed")
+        )
+          return false;
         if (dateFrom && doc.date < dateFrom) return false;
         if (dateTo && doc.date > dateTo) return false;
-        if (q && !doc.title.toLowerCase().includes(q) && !(projectMap.get(doc.projectId) ?? "").toLowerCase().includes(q)) return false;
+        if (
+          q &&
+          !doc.title.toLowerCase().includes(q) &&
+          !(projectMap.get(doc.projectId) ?? "").toLowerCase().includes(q)
+        )
+          return false;
         return true;
       })
       .map(({ doc }) => doc.id);
-  }, [salDocuments, salViews, filterProject, filterContractor, filterStatus, dateFrom, dateTo, filterQuery, contracts, projectMap]);
+  }, [
+    salDocuments,
+    salViews,
+    filterProject,
+    filterContractor,
+    filterStatus,
+    dateFrom,
+    dateTo,
+    filterQuery,
+    contracts,
+    projectMap,
+  ]);
 
   const filteredData = useMemo(() => {
     return salDocuments
       .map((doc, idx) => ({ doc, view: salViews[idx] }))
       .filter(({ doc }) => filteredSalIds.includes(doc.id))
-      .sort((a, b) => (b.view?.closedAt ?? b.doc.date).localeCompare(a.view?.closedAt ?? a.doc.date));
+      .sort((a, b) =>
+        (b.view?.closedAt ?? b.doc.date).localeCompare(a.view?.closedAt ?? a.doc.date),
+      );
   }, [salDocuments, salViews, filteredSalIds]);
 
   const selection = useMemo(() => {
@@ -132,7 +168,8 @@ export function AccountingScreen() {
   const toggleSal = useCallback((id: string) => {
     setSelectedSalIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }, []);
@@ -154,49 +191,77 @@ export function AccountingScreen() {
     setDateTo("");
   }, []);
 
-  const hasActiveFilters = filterProject !== "all" || filterContractor !== "Tutti" || filterStatus !== "Tutti" || filterQuery || dateFrom || dateTo;
+  const hasActiveFilters =
+    filterProject !== "all" ||
+    filterContractor !== "Tutti" ||
+    filterStatus !== "Tutti" ||
+    filterQuery ||
+    dateFrom ||
+    dateTo;
 
   return (
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_16%_8%,color-mix(in_srgb,var(--accent-primary)_14%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_32%)]" />
 
       <section className="animate-entry">
-        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
-          <div className="min-w-0">
-            <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-              Contabilità
-            </span>
-            <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
-              Report contabile
-            </h2>
-            <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
-              Seleziona i SAL da includere nel report, applica i filtri per periodo / appaltatore / progetto e genera il documento contabile.
-            </p>
-          </div>
-          <BezelSurface className="md:translate-y-2" innerClassName="p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-                  {selectedSalIds.size > 0 ? `${selectedSalIds.size} selezionati` : `${selection.length} nel filtro`}
+        <ScreenHero
+          badge="Contabilità"
+          title="Report contabile"
+          description="Seleziona i SAL da includere nel report, applica i filtri per periodo / appaltatore / progetto e genera il documento contabile."
+          sidePanel={
+            <div>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                    {selectedSalIds.size > 0
+                      ? `${selectedSalIds.size} selezionati`
+                      : `${selection.length} nel filtro`}
+                  </div>
+                  <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+                    {formatMoney({ amount: metrics.total, currency: "EUR" })}
+                  </div>
                 </div>
-                <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
-                  {formatMoney({ amount: metrics.total, currency: "EUR" })}
-                </div>
+                <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+                  <Calculator className="size-6" />
+                </span>
               </div>
-              <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                <Calculator className="size-6" />
-              </span>
+              <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+                {metrics.closedCount} chiusi · {metrics.draftCount} bozze · su {contracts.length}{" "}
+                contratti
+              </p>
             </div>
-            <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-              {metrics.closedCount} chiusi · {metrics.draftCount} bozze · su {contracts.length} contratti
-            </p>
-          </BezelSurface>
-        </div>
+          }
+        />
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          <FilterSelect label="Appaltatore" onChange={(v) => { setFilterContractor(v); setFilterProject("all"); }} options={[...contractorOptions]} value={filterContractor} />
-          <FilterSelect label="Progetto" onChange={(v) => { setFilterProject(v); if (v !== "all") { const c = contracts.find((cc) => cc.id === v); if (c) setFilterContractor(c.contractor); } }} options={projectOptions.map((o) => o.id)} displayMap={new Map(projectOptions.map((o) => [o.id, o.title]))} value={filterProject} />
-          <FilterSelect label="Stato" onChange={setFilterStatus} options={[...STATUS_OPTIONS]} value={filterStatus} />
+          <FilterSelect
+            label="Appaltatore"
+            onChange={(v) => {
+              setFilterContractor(v);
+              setFilterProject("all");
+            }}
+            options={[...contractorOptions]}
+            value={filterContractor}
+          />
+          <FilterSelect
+            label="Progetto"
+            onChange={(v) => {
+              setFilterProject(v);
+              if (v !== "all") {
+                const c = contracts.find((cc) => cc.id === v);
+                if (c) setFilterContractor(c.contractor);
+              }
+            }}
+            options={projectOptions.map((o) => o.id)}
+            displayMap={new Map(projectOptions.map((o) => [o.id, o.title]))}
+            value={filterProject}
+          />
+          <FilterSelect
+            label="Stato"
+            onChange={setFilterStatus}
+            options={[...STATUS_OPTIONS]}
+            value={filterStatus}
+          />
           <label className="flex items-center gap-1.5 rounded-full bg-[var(--bg-muted-strong)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             <span>Da</span>
             <input
@@ -255,12 +320,14 @@ export function AccountingScreen() {
                     onClick={toggleAll}
                     type="button"
                   >
-                    {selectedSalIds.size === filteredData.length ? "Deseleziona tutti" : "Seleziona tutti"}
+                    {selectedSalIds.size === filteredData.length
+                      ? "Deseleziona tutti"
+                      : "Seleziona tutti"}
                   </button>
                 </div>
 
                 {filteredData.length > 0 ? (
-                  <div className="mt-4 overflow-hidden rounded-[14px] border border-[var(--border-subtle)]">
+                  <div className="mt-4 overflow-hidden rounded-[14px] border-[0.5px] border-[var(--border-subtle)]">
                     {filteredData.map(({ doc, view }) => {
                       if (!view) return null;
                       const selected = selectedSalIds.has(doc.id);
@@ -269,7 +336,9 @@ export function AccountingScreen() {
                         <button
                           className={cn(
                             "flex w-full items-center justify-between gap-4 border-b border-[var(--border-subtle)] px-4 py-4 text-left last:border-b-0 2xl:px-5 2xl:py-5",
-                            selected ? "bg-[var(--info-soft)]/35" : "transition-colors hover:bg-[var(--bg-muted)]",
+                            selected
+                              ? "bg-[var(--info-soft)]/35"
+                              : "transition-colors hover:bg-[var(--bg-muted)]",
                           )}
                           key={doc.id}
                           onClick={() => toggleSal(doc.id)}
@@ -332,7 +401,19 @@ export function AccountingScreen() {
                     <p className="mt-7 max-w-[260px] text-[14px] font-medium leading-6 text-[var(--text-secondary)]">
                       {selectedSalIds.size} SAL pronti per il report contabile.
                     </p>
-                    <ProjectControlButton className="mt-5 h-12 w-full justify-between" icon={Download} variant="primary">
+                    <ProjectControlButton
+                      className="mt-5 h-12 w-full justify-between"
+                      icon={Download}
+                      onClick={() =>
+                        notify({
+                          message:
+                            "Il generatore report contabile sara disponibile in un prossimo aggiornamento.",
+                          title: "In arrivo",
+                          tone: "info",
+                        })
+                      }
+                      variant="primary"
+                    >
                       Genera report contabile
                       <ChevronRight className="ml-auto size-4" />
                     </ProjectControlButton>
@@ -362,15 +443,34 @@ export function AccountingScreen() {
               <SummaryRow label="SAL selezionati" value={String(selection.length)} />
               <SummaryRow label="di cui chiusi" value={String(metrics.closedCount)} />
               <SummaryRow label="di cui bozze" value={String(metrics.draftCount)} />
-              <SummaryRow label="Importo totale" value={formatMoney({ amount: metrics.total, currency: "EUR" })} />
+              <SummaryRow
+                label="Importo totale"
+                value={formatMoney({ amount: metrics.total, currency: "EUR" })}
+              />
               <SummaryRow
                 label="% budget totale"
-                value={metrics.budget > 0 ? `${Math.round((metrics.total / metrics.budget) * 100)}%` : "—"}
+                value={
+                  metrics.budget > 0
+                    ? `${Math.round((metrics.total / metrics.budget) * 100)}%`
+                    : "—"
+                }
               />
             </div>
 
             <div className="mt-5 grid gap-2">
-              <ProjectControlButton className="w-full" icon={Download} variant="neutral">
+              <ProjectControlButton
+                className="w-full"
+                icon={Download}
+                onClick={() =>
+                  notify({
+                    message:
+                      "Il download del report in formato CSV sara disponibile in un prossimo aggiornamento.",
+                    title: "In arrivo",
+                    tone: "info",
+                  })
+                }
+                variant="neutral"
+              >
                 Scarica report (.csv)
               </ProjectControlButton>
               <ProjectControlButton
@@ -394,47 +494,65 @@ export function AccountingScreen() {
               </div>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-[14px] border border-[var(--border-subtle)]">
-              {contracts.filter((c) => selection.some(({ doc }) => doc.projectId === c.id)).length > 0
-                ? contracts
-                    .filter((c) => selection.some(({ doc }) => doc.projectId === c.id))
-                    .map((c) => {
-                      const selForProject = selection.filter(({ doc }) => doc.projectId === c.id);
-                      const totalForProject = selForProject.reduce((s, { view }) => s + (view?.total ?? 0), 0);
-                      const pct = c.budget.amount > 0 ? Math.round((totalForProject / c.budget.amount) * 100) : 0;
-                      return (
-                        <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3 last:border-b-0" key={c.id}>
-                          <div className="min-w-0">
-                            <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
-                              {c.title}
-                            </div>
-                            <div className="mt-1 flex items-center gap-2">
-                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-                                <div
-                                  className={cn(
-                                    "h-full rounded-full",
-                                    pct > 90 ? "bg-[var(--danger-base)]" : pct > 70 ? "bg-[var(--warning-base)]" : "bg-[var(--success-base)]",
-                                  )}
-                                  style={{ width: `${Math.min(pct, 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-[11px] font-medium text-[var(--text-secondary)]">{pct}%</span>
-                            </div>
+            <div className="mt-4 overflow-hidden rounded-[14px] border-[0.5px] border-[var(--border-subtle)]">
+              {contracts.filter((c) => selection.some(({ doc }) => doc.projectId === c.id)).length >
+              0 ? (
+                contracts
+                  .filter((c) => selection.some(({ doc }) => doc.projectId === c.id))
+                  .map((c) => {
+                    const selForProject = selection.filter(({ doc }) => doc.projectId === c.id);
+                    const totalForProject = selForProject.reduce(
+                      (s, { view }) => s + (view?.total ?? 0),
+                      0,
+                    );
+                    const pct =
+                      c.budget.amount > 0
+                        ? Math.round((totalForProject / c.budget.amount) * 100)
+                        : 0;
+                    return (
+                      <div
+                        className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3 last:border-b-0"
+                        key={c.id}
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                            {c.title}
                           </div>
-                          <div className="text-right">
-                            <div className="text-[12px] font-semibold text-[var(--text-primary)]">
-                              {formatMoney({ amount: totalForProject, currency: "EUR" })}
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
+                              <div
+                                className={cn(
+                                  "h-full rounded-full",
+                                  pct > 90
+                                    ? "bg-[var(--danger-base)]"
+                                    : pct > 70
+                                      ? "bg-[var(--warning-base)]"
+                                      : "bg-[var(--success-base)]",
+                                )}
+                                style={{ width: `${Math.min(pct, 100)}%` }}
+                              />
                             </div>
-                            <div className="text-[11px] text-[var(--text-secondary)]">{selForProject.length} SAL</div>
+                            <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+                              {pct}%
+                            </span>
                           </div>
                         </div>
-                      );
-                    })
-                : (
-                  <div className="px-4 py-6 text-center text-[13px] text-[var(--text-secondary)]">
-                    Seleziona dei SAL per vedere i progetti coinvolti
-                  </div>
-                )}
+                        <div className="text-right">
+                          <div className="text-[12px] font-semibold text-[var(--text-primary)]">
+                            {formatMoney({ amount: totalForProject, currency: "EUR" })}
+                          </div>
+                          <div className="text-[11px] text-[var(--text-secondary)]">
+                            {selForProject.length} SAL
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="px-4 py-6 text-center text-[13px] text-[var(--text-secondary)]">
+                  Seleziona dei SAL per vedere i progetti coinvolti
+                </div>
+              )}
             </div>
           </Panel>
         </aside>

@@ -1,4 +1,5 @@
 import { contractSchema } from "@quantara/validation";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import type {
   CreateDesktopContractRequest,
@@ -19,6 +20,8 @@ import type {
   DesktopTariffBook,
 } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
+
+const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
 
 type ProjectModalStep = 1 | 2;
 
@@ -36,7 +39,6 @@ type CreateProjectModalProps = {
   contractorOptions: string[];
   defaultTariffBookId: string;
   initialValues?: ProjectFormState;
-  isSaving: boolean;
   onClose: () => void;
   onCreate: (
     request: CreateDesktopContractRequest,
@@ -65,7 +67,6 @@ export function CreateProjectModal({
   contractorOptions,
   defaultTariffBookId,
   initialValues,
-  isSaving,
   onClose,
   onCreate,
   submitLabel = "Crea progetto",
@@ -100,6 +101,7 @@ export function CreateProjectModal({
     }
   });
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<ProjectModalStep>(1);
   const amount = parseLocalizedMoney(draft.contractualAmount);
   const safetyCostsAmount = parseLocalizedMoney(draft.safetyCostsNotSubjectToDiscount);
@@ -174,6 +176,8 @@ export function CreateProjectModal({
       return;
     }
 
+    setSaving(true);
+
     const created = await onCreate(request, {
       contractorName: sanitizeTextValue(draft.contractorName),
     });
@@ -186,260 +190,260 @@ export function CreateProjectModal({
       }
       onClose();
     }
+
+    setSaving(false);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/42 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
       <button
         aria-label="Chiudi creazione progetto"
         className="absolute inset-0 cursor-default"
         onClick={onClose}
         type="button"
       />
-      <section className="projects-surface relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none">
-        <div className="flex items-start justify-between gap-5 px-6 pb-5 pt-6 md:px-8 md:pt-7">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-              Nuovo progetto
+      <motion.section
+        className="relative flex w-full max-w-5xl max-h-[92vh] flex-col overflow-hidden rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        initial={{ opacity: 0, y: 24, scale: 0.96 }}
+        transition={{ duration: 0.5, ease: SPRING_EASE }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+      >
+        <div className="flex flex-col rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          <div className="flex items-start justify-between gap-5 border-b border-[var(--border-subtle)] px-6 pb-5 pt-6 md:px-8 md:pt-7">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                Nuovo progetto
+              </div>
+              <h3 className="mt-2 max-w-3xl text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)] md:text-[30px]">
+                {step === 1 ? "Dati contratto e perimetro" : "Importo e oneri sicurezza"}
+              </h3>
+              <p className="mt-2 max-w-2xl text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+                {step === 1
+                  ? "Definisci identita, codici contrattuali e appaltatore del progetto."
+                  : "Definisci importo contrattuale e oneri della sicurezza esclusi dal ribasso."}
+              </p>
             </div>
-            <h3 className="mt-2 max-w-3xl text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)] md:text-[30px]">
-              {step === 1 ? "Dati contratto e perimetro" : "Importo e oneri sicurezza"}
-            </h3>
-            <p className="mt-2 max-w-2xl text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
-              {step === 1
-                ? "Definisci identita, codici contrattuali e appaltatore del progetto."
-                : "Definisci importo contrattuale e oneri della sicurezza esclusi dal ribasso."}
-            </p>
+            <button
+              aria-label="Chiudi"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+              onClick={onClose}
+              type="button"
+            >
+              <X className="size-4" />
+            </button>
           </div>
-          <ProjectControlButton
-            aria-label="Chiudi creazione progetto"
-            className="size-10 px-0"
-            onClick={onClose}
-            variant="icon"
-          >
-            <X className="size-4" />
-          </ProjectControlButton>
-        </div>
 
-        <div className="px-6 pb-6 md:px-8">
-          <ProjectStepper step={step} />
-        </div>
+          <div className="px-6 py-5 md:px-8">
+            <ProjectStepper step={step} />
+          </div>
 
-        <div className="grid min-h-0 flex-1 border-t border-[var(--border-subtle)]/70 lg:grid-cols-[minmax(0,1fr)_350px]">
-          <div className="min-h-0 overflow-y-auto px-6 py-7 md:px-8">
-            <div className="mx-auto max-w-[760px]">
-              {step === 1 ? (
-                <section>
-                  <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
-                      <FileText className="size-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div>
-                        <div className="text-[17px] font-semibold text-[var(--text-primary)]">
-                          Anagrafica progetto
+          <div className="grid min-h-0 flex-1 border-t border-[var(--border-subtle)]/70 lg:grid-cols-[minmax(0,1fr)_350px]">
+            <div className="min-h-0 overflow-y-auto px-6 py-7 md:px-8">
+              <div className="mx-auto max-w-[760px]">
+                {step === 1 ? (
+                  <section>
+                    <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
+                        <FileText className="size-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div>
+                          <div className="text-[17px] font-semibold text-[var(--text-primary)]">
+                            Anagrafica progetto
+                          </div>
+                          <p className="mt-1 text-[13px] leading-5 text-[var(--text-secondary)]">
+                            Inserisci dati identificativi e codici contrattuali.
+                          </p>
                         </div>
-                        <p className="mt-1 text-[13px] leading-5 text-[var(--text-secondary)]">
-                          Inserisci dati identificativi e codici contrattuali.
-                        </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
-                    <ProjectTextField
-                      label="Nome progetto"
-                      onChange={(value) =>
-                        setDraft((state) => ({ ...state, title: sanitizeTextInput(value) }))
-                      }
-                      placeholder="Linea AV/AC Milano-Verona"
-                      value={draft.title}
-                    />
-                    <ProjectTextField
-                      label="Contratto applicativo"
-                      onChange={(value) =>
-                        setDraft((state) => ({
-                          ...state,
-                          applicationContractCode: sanitizeTextInput(value),
-                        }))
-                      }
-                      placeholder="CA-MV-001"
-                      value={draft.applicationContractCode}
-                    />
-                    <ProjectTextField
-                      label="Accordo quadro"
-                      onKeyDown={(event) => {
-                        if (event.key === "Tab" && !event.shiftKey) {
-                          event.preventDefault();
-                          handleNext();
+                    <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
+                      <ProjectTextField
+                        label="Nome progetto"
+                        onChange={(value) =>
+                          setDraft((state) => ({ ...state, title: sanitizeTextInput(value) }))
                         }
-                      }}
-                      onChange={(value) =>
-                        setDraft((state) => ({
-                          ...state,
-                          frameworkAgreementCode: sanitizeTextInput(value),
-                        }))
-                      }
-                      placeholder="AQ-RFI-2026"
-                      value={draft.frameworkAgreementCode}
-                    />
-                    <label className="block">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                        Appaltatore
-                      </span>
-                      <input
-                        className="mt-3 h-[54px] w-full rounded-[16px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                        list="project-contractor-options"
-                        onChange={(event) =>
+                        placeholder="Linea AV/AC Milano-Verona"
+                        value={draft.title}
+                      />
+                      <ProjectTextField
+                        label="Contratto applicativo"
+                        onChange={(value) =>
                           setDraft((state) => ({
                             ...state,
-                            contractorName: sanitizeTextInput(event.target.value),
+                            applicationContractCode: sanitizeTextInput(value),
                           }))
                         }
-                        placeholder="RFI"
-                        value={draft.contractorName}
+                        placeholder="CA-MV-001"
+                        value={draft.applicationContractCode}
                       />
-                      <datalist id="project-contractor-options">
-                        {contractorOptions.map((contractor) => (
-                          <option key={contractor} value={contractor} />
-                        ))}
-                      </datalist>
-                    </label>
-                  </div>
-                </section>
-              ) : (
-                <section>
-                  <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
-                      <WalletCards className="size-5" />
+                      <ProjectTextField
+                        label="Accordo quadro"
+                        onKeyDown={(event) => {
+                          if (event.key === "Tab" && !event.shiftKey) {
+                            event.preventDefault();
+                            handleNext();
+                          }
+                        }}
+                        onChange={(value) =>
+                          setDraft((state) => ({
+                            ...state,
+                            frameworkAgreementCode: sanitizeTextInput(value),
+                          }))
+                        }
+                        placeholder="AQ-RFI-2026"
+                        value={draft.frameworkAgreementCode}
+                      />
+                      <ContractorSelect
+                        options={contractorOptions}
+                        value={draft.contractorName}
+                        onChange={(value) =>
+                          setDraft((state) => ({
+                            ...state,
+                            contractorName: sanitizeTextInput(value),
+                          }))
+                        }
+                      />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div>
-                        <div className="text-[17px] font-semibold text-[var(--text-primary)]">
-                          Setup economico
+                  </section>
+                ) : (
+                  <section>
+                    <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
+                        <WalletCards className="size-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div>
+                          <div className="text-[17px] font-semibold text-[var(--text-primary)]">
+                            Setup economico
+                          </div>
+                          <p className="mt-1 text-[13px] leading-5 text-[var(--text-secondary)]">
+                            Definisci importi principali del progetto.
+                          </p>
                         </div>
-                        <p className="mt-1 text-[13px] leading-5 text-[var(--text-secondary)]">
-                          Definisci importi principali del progetto.
-                        </p>
                       </div>
                     </div>
+                    <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
+                      <ProjectCurrencyField
+                        label="Importo contrattuale"
+                        onChange={(value) =>
+                          setDraft((state) => ({ ...state, contractualAmount: value }))
+                        }
+                        placeholder="26.150.000,00"
+                        value={draft.contractualAmount}
+                      />
+                      <ProjectCurrencyField
+                        label="Oneri della sicurezza non soggetti a ribassi"
+                        onChange={(value) =>
+                          setDraft((state) => ({
+                            ...state,
+                            safetyCostsNotSubjectToDiscount: value,
+                          }))
+                        }
+                        placeholder="0,00"
+                        value={draft.safetyCostsNotSubjectToDiscount}
+                      />
+                    </div>
+                    <div className="mt-5 rounded-[18px] bg-[var(--bg-muted)]/70 px-4 py-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
+                      Gli oneri della sicurezza vengono salvati sul progetto e saranno usati nei
+                      flussi SAL senza applicazione del ribasso.
+                    </div>
+                  </section>
+                )}
+              </div>
+            </div>
+
+            <aside className="min-h-0 overflow-y-auto border-t border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/35 p-5 lg:border-l lg:border-t-0">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                  Anteprima
+                </div>
+                <div className="mt-4 rounded-[22px] bg-[var(--surface-base)] p-4 shadow-none">
+                  <div className="truncate text-lg font-semibold text-[var(--text-primary)]">
+                    {draft.title.trim() || "Nuovo progetto"}
                   </div>
-                  <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
-                    <ProjectCurrencyField
+                  <div className="mt-2 text-sm leading-5 text-[var(--text-secondary)]">
+                    {draft.applicationContractCode.trim() || "Contratto applicativo"} ·{" "}
+                    {draft.frameworkAgreementCode.trim() || "Accordo quadro"}
+                  </div>
+                  <div className="mt-1 text-sm leading-5 text-[var(--text-secondary)]">
+                    {draft.contractorName.trim() || "Appaltatore da selezionare"}
+                  </div>
+                  <div className="mt-4 grid gap-3">
+                    <PreviewMetric
+                      icon={<WalletCards className="size-5" />}
                       label="Importo contrattuale"
-                      onChange={(value) =>
-                        setDraft((state) => ({ ...state, contractualAmount: value }))
+                      value={
+                        Number.isFinite(amount)
+                          ? formatMoney({ amount, currency: "EUR" })
+                          : "Da inserire"
                       }
-                      placeholder="26.150.000,00"
-                      value={draft.contractualAmount}
                     />
-                    <ProjectCurrencyField
-                      label="Oneri della sicurezza non soggetti a ribassi"
-                      onChange={(value) =>
-                        setDraft((state) => ({
-                          ...state,
-                          safetyCostsNotSubjectToDiscount: value,
-                        }))
+                    <PreviewMetric
+                      icon={<ShieldCheck className="size-5" />}
+                      label="Oneri sicurezza"
+                      value={
+                        Number.isFinite(safetyCostsAmount)
+                          ? formatMoney({ amount: safetyCostsAmount, currency: "EUR" })
+                          : "Da inserire"
                       }
-                      placeholder="0,00"
-                      value={draft.safetyCostsNotSubjectToDiscount}
                     />
                   </div>
-                  <div className="mt-5 rounded-[18px] bg-[var(--bg-muted)]/70 px-4 py-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
-                    Gli oneri della sicurezza vengono salvati sul progetto e saranno usati nei
-                    flussi SAL senza applicazione del ribasso.
-                  </div>
-                </section>
+                </div>
+              </div>
+              <div className="mt-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                  Controlli rapidi
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)]">
+                  <QuickCheckRow
+                    isOk={validation.checks.identity}
+                    label="Nome progetto compilato"
+                  />
+                  <QuickCheckRow
+                    isOk={validation.checks.amount}
+                    label="Importo contrattuale valido"
+                  />
+                  <QuickCheckRow
+                    isOk={validation.checks.safetyCosts}
+                    label="Oneri sicurezza validi"
+                  />
+                  <QuickCheckRow
+                    isOk={validation.checks.safetyCostsWithinBudget}
+                    label="Oneri entro budget"
+                  />
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)]/70 bg-[var(--surface-base)] px-6 py-4 md:px-8">
+            <div className="min-h-5 text-sm font-medium text-[var(--danger-base)]">{error}</div>
+            <div className="flex flex-wrap gap-3">
+              {step === 2 ? (
+                <ProjectControlButton icon={ArrowLeft} onClick={() => setStep(1)} variant="neutral">
+                  Indietro
+                </ProjectControlButton>
+              ) : null}
+              {step === 1 ? (
+                <ProjectControlButton onClick={handleNext} variant="primary">
+                  Avanti
+                  <ArrowRight className="size-4" />
+                </ProjectControlButton>
+              ) : (
+                <ProjectControlButton
+                  disabled={saving || !validation.canSubmit}
+                  icon={PlusCircle}
+                  onClick={handleSubmit}
+                  variant="primary"
+                >
+                  {saving ? "Salvataggio" : submitLabel}
+                </ProjectControlButton>
               )}
             </div>
           </div>
-
-          <aside className="min-h-0 overflow-y-auto border-t border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/35 p-5 lg:border-l lg:border-t-0">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                Anteprima
-              </div>
-              <div className="mt-4 rounded-[22px] bg-[var(--surface-base)] p-4 shadow-none">
-                <div className="truncate text-lg font-semibold text-[var(--text-primary)]">
-                  {draft.title.trim() || "Nuovo progetto"}
-                </div>
-                <div className="mt-2 text-sm leading-5 text-[var(--text-secondary)]">
-                  {draft.applicationContractCode.trim() || "Contratto applicativo"} ·{" "}
-                  {draft.frameworkAgreementCode.trim() || "Accordo quadro"}
-                </div>
-                <div className="mt-1 text-sm leading-5 text-[var(--text-secondary)]">
-                  {draft.contractorName.trim() || "Appaltatore da selezionare"}
-                </div>
-                <div className="mt-4 grid gap-3">
-                  <PreviewMetric
-                    icon={<WalletCards className="size-5" />}
-                    label="Importo contrattuale"
-                    value={
-                      Number.isFinite(amount)
-                        ? formatMoney({ amount, currency: "EUR" })
-                        : "Da inserire"
-                    }
-                  />
-                  <PreviewMetric
-                    icon={<ShieldCheck className="size-5" />}
-                    label="Oneri sicurezza"
-                    value={
-                      Number.isFinite(safetyCostsAmount)
-                        ? formatMoney({ amount: safetyCostsAmount, currency: "EUR" })
-                        : "Da inserire"
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="mt-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                Controlli rapidi
-              </div>
-              <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)]">
-                <QuickCheckRow isOk={validation.checks.identity} label="Nome progetto compilato" />
-                <QuickCheckRow
-                  isOk={validation.checks.amount}
-                  label="Importo contrattuale valido"
-                />
-                <QuickCheckRow
-                  isOk={validation.checks.safetyCosts}
-                  label="Oneri sicurezza validi"
-                />
-                <QuickCheckRow
-                  isOk={validation.checks.safetyCostsWithinBudget}
-                  label="Oneri entro budget"
-                />
-              </div>
-            </div>
-          </aside>
         </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)]/70 bg-[var(--surface-base)] px-6 py-4 md:px-8">
-          <div className="min-h-5 text-sm font-medium text-[var(--danger-base)]">{error}</div>
-          <div className="flex flex-wrap gap-3">
-            {step === 2 ? (
-              <ProjectControlButton icon={ArrowLeft} onClick={() => setStep(1)} variant="neutral">
-                Indietro
-              </ProjectControlButton>
-            ) : null}
-            {step === 1 ? (
-              <ProjectControlButton onClick={handleNext} variant="primary">
-                Avanti
-                <ArrowRight className="size-4" />
-              </ProjectControlButton>
-            ) : (
-              <ProjectControlButton
-                disabled={isSaving || !validation.canSubmit}
-                icon={PlusCircle}
-                onClick={handleSubmit}
-                variant="primary"
-              >
-                {isSaving ? "Salvataggio" : submitLabel}
-              </ProjectControlButton>
-            )}
-          </div>
-        </div>
-      </section>
+      </motion.section>
     </div>
   );
 }
@@ -470,60 +474,72 @@ function QuickCheckRow({ isOk, label }: { isOk: boolean; label: string }) {
 
 function ProjectStepper({ step }: { step: ProjectModalStep }) {
   return (
-    <div className="grid items-center gap-4 md:grid-cols-[minmax(130px,160px)_1fr_minmax(150px,190px)]">
-      <StepStatus completed={step > 1} index={1} label="Dati" status="Completato" />
-      <div className="hidden h-px bg-[var(--border-subtle)]/70 md:block" />
-      <StepStatus
-        active={step === 2}
-        completed={false}
-        index={2}
-        label="Economico"
-        status={step === 2 ? "In configurazione" : "Da configurare"}
-      />
+    <div className="flex items-center gap-5">
+      <StepperDot active={step === 1} completed={step > 1} index={1} label="Dati" />
+      <div className="relative flex-1 h-px overflow-hidden rounded-full">
+        <div className="absolute inset-0 bg-[var(--border-subtle)]/70" />
+        <motion.div
+          className="absolute inset-y-0 left-0 bg-[var(--accent-primary)]"
+          initial={false}
+          animate={{ width: step === 1 ? "0%" : "100%" }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+      <StepperDot active={step === 2} completed={false} index={2} label="Economico" />
     </div>
   );
 }
 
-function StepStatus({
+function StepperDot({
   active,
   completed,
   index,
   label,
-  status,
 }: {
-  active?: boolean;
+  active: boolean;
   completed: boolean;
   index: number;
   label: string;
-  status: string;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex shrink-0 items-center gap-3">
       <div
         className={
           completed
-            ? "flex size-10 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+            ? "flex size-10 items-center justify-center rounded-full bg-[var(--accent-primary)]"
             : active
-              ? "flex size-10 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]"
-              : "flex size-10 items-center justify-center rounded-full bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]"
+              ? "flex size-10 items-center justify-center rounded-full bg-[var(--info-base)]"
+              : "flex size-10 items-center justify-center rounded-full bg-[var(--bg-muted-strong)]"
         }
       >
         {completed ? (
-          <Check className="size-5" />
+          <motion.span
+            animate={{ rotate: 0, scale: 1 }}
+            initial={{ rotate: -90, scale: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Check className="size-5 text-[var(--text-inverse)]" />
+          </motion.span>
         ) : (
-          <span className="text-sm font-bold">{index}</span>
+          <span
+            className={`text-sm font-bold ${active ? "text-[var(--text-inverse)]" : "text-[var(--text-secondary)]"}`}
+          >
+            {index}
+          </span>
         )}
       </div>
       <div>
         <div className="text-sm font-semibold text-[var(--text-primary)]">{label}</div>
         <div
           className={
-            active
-              ? "text-xs font-medium text-[var(--info-base)]"
-              : "text-xs text-[var(--text-secondary)]"
+            completed
+              ? "text-xs font-medium text-[var(--success-base)]"
+              : active
+                ? "text-xs font-medium text-[var(--info-base)]"
+                : "text-xs text-[var(--text-secondary)]"
           }
         >
-          {status}
+          {completed ? "Completato" : active ? "In corso" : "Da fare"}
         </div>
       </div>
     </div>
@@ -549,7 +565,7 @@ function ProjectTextField({
         {label}
       </span>
       <input
-        className="mt-3 h-[54px] w-full rounded-[16px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+        className="mt-3 h-11 w-full rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
@@ -577,7 +593,7 @@ function ProjectCurrencyField({
         {label}
       </span>
       <input
-        className="mt-3 h-[54px] w-full rounded-[16px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+        className="mt-3 h-11 w-full rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         inputMode="decimal"
         onChange={(event) => onChange(sanitizeMoneyInput(event.target.value))}
         placeholder={placeholder}
@@ -601,6 +617,85 @@ function PreviewMetric({ icon, label, value }: { icon: ReactNode; label: string;
       </div>
       <div className="text-[var(--text-secondary)]">{icon}</div>
     </div>
+  );
+}
+
+function ContractorSelect({
+  options,
+  value,
+  onChange,
+}: {
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setFilter("");
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const filtered = options.filter((o) => o.toLowerCase().includes(filter.toLowerCase()));
+
+  return (
+    <label className="block">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+        Appaltatore
+      </span>
+      <div className="relative mt-3" ref={ref}>
+        {/* biome-ignore lint/a11y/useSemanticElements: wrapper needs a div because it contains an input */}
+        <div
+          className="flex h-11 w-full cursor-pointer items-center rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus-within:border-[var(--accent-primary)] focus-within:ring-2 focus-within:ring-[var(--ring-focus)]"
+          onClick={() => setIsOpen(!isOpen)}
+          onKeyDown={() => {}}
+          role="button"
+          tabIndex={0}
+        >
+          <input
+            className="flex-1 bg-transparent outline-none text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setIsOpen(true);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            placeholder="RFI"
+            type="text"
+            value={isOpen ? filter : value}
+          />
+        </div>
+        {isOpen ? (
+          <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-48 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-[var(--text-secondary)]">Nessun risultato</div>
+            ) : (
+              filtered.map((option) => (
+                <button
+                  className="flex w-full items-center px-3 py-2.5 text-left text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+                  key={option}
+                  onClick={() => {
+                    onChange(option);
+                    setIsOpen(false);
+                    setFilter("");
+                  }}
+                  type="button"
+                >
+                  {option}
+                </button>
+              ))
+            )}
+          </div>
+        ) : null}
+      </div>
+    </label>
   );
 }
 

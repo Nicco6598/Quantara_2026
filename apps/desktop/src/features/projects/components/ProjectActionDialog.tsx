@@ -1,6 +1,6 @@
+import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import { ChevronRight, Pencil, Trash2, X } from "lucide-react";
-import { motion } from "framer-motion";
 import { useEffect } from "react";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";

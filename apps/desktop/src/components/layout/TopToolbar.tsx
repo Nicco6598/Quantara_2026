@@ -87,9 +87,7 @@ const commonPageActions: PageAction[] = [
 ];
 
 const routeActionOverrides: Partial<Record<QuantaraRoute, PageAction[]>> = {
-  tariffs: [
-    { actionId: "import-tariff", label: "Importa", mark: "UP", variant: "primary" },
-  ],
+  tariffs: [{ actionId: "import-tariff", label: "Importa", mark: "UP", variant: "primary" }],
 };
 
 const markIconMap: Record<string, React.ElementType> = {
@@ -123,7 +121,7 @@ export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarPro
     <header className="relative z-30 shrink-0 px-4 py-3 md:px-6">
       <BezelSurface innerClassName="flex min-h-[64px] items-center justify-between gap-5 px-4 py-2.5 md:px-5">
         <div className="animate-entry-sm flex min-w-0 items-center gap-4">
-          {activeRoute !== "dashboard" ? <HistoryNavigator /> : null}
+          <HistoryNavigator />
 
           <div className="min-w-0">
             <div className="text-[9px] font-extrabold uppercase tracking-[0.24em] text-[var(--accent-primary)]">

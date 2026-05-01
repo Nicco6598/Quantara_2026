@@ -19,8 +19,22 @@ export function ModernDonut({
 
   return (
     <div className={cn("relative shrink-0", className)} style={{ height: size, width: size }}>
-      <svg aria-label="Donut chart" className="absolute inset-0" height={size} role="img" viewBox={`0 0 ${size} ${size}`} width={size}>
-        <circle cx={center} cy={center} fill="none" r={radius} stroke="var(--bg-muted-strong)" strokeWidth={strokeWidth} />
+      <svg
+        aria-label="Donut chart"
+        className="absolute inset-0"
+        height={size}
+        role="img"
+        viewBox={`0 0 ${size} ${size}`}
+        width={size}
+      >
+        <circle
+          cx={center}
+          cy={center}
+          fill="none"
+          r={radius}
+          stroke="var(--bg-muted-strong)"
+          strokeWidth={strokeWidth}
+        />
         {segments.map((seg) => {
           const fraction = seg.value / total;
           const dashLength = fraction * circumference;
@@ -85,7 +99,10 @@ export function SegmentBars({ segments, className }: { segments: Segment[]; clas
             <div className="h-[3px] overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
               <div
                 className="h-full rounded-full"
-                style={{ backgroundColor: seg.color, animation: `width-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) ${0.5 + i * 0.12}s both` }}
+                style={{
+                  backgroundColor: seg.color,
+                  animation: `width-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) ${0.5 + i * 0.12}s both`,
+                }}
               />
             </div>
           </div>
@@ -110,8 +127,22 @@ export function ProgressRing({
 
   return (
     <div className={cn("relative shrink-0", className)} style={{ height: size, width: size }}>
-      <svg aria-label="Progress ring" className="absolute inset-0" height={size} role="img" viewBox={`0 0 ${size} ${size}`} width={size}>
-        <circle cx={center} cy={center} fill="none" r={radius} stroke="var(--bg-muted-strong)" strokeWidth={strokeWidth} />
+      <svg
+        aria-label="Progress ring"
+        className="absolute inset-0"
+        height={size}
+        role="img"
+        viewBox={`0 0 ${size} ${size}`}
+        width={size}
+      >
+        <circle
+          cx={center}
+          cy={center}
+          fill="none"
+          r={radius}
+          stroke="var(--bg-muted-strong)"
+          strokeWidth={strokeWidth}
+        />
         <circle
           className="origin-center -rotate-90"
           cx={center}
@@ -125,7 +156,9 @@ export function ProgressRing({
           style={{ animation: `dash-in 1.2s cubic-bezier(0.22, 1, 0.36, 1) both` }}
         />
       </svg>
-      {children ? <div className="absolute inset-0 flex items-center justify-center">{children}</div> : null}
+      {children ? (
+        <div className="absolute inset-0 flex items-center justify-center">{children}</div>
+      ) : null}
     </div>
   );
 }
@@ -136,13 +169,25 @@ export function AnimatedBarChart({
   barWidth = 24,
   gap = 8,
   className,
-}: ChartProps & { bars: Array<{ label: string; value: number; color: string }>; height?: number; barWidth?: number; gap?: number }) {
+}: ChartProps & {
+  bars: Array<{ label: string; value: number; color: string }>;
+  height?: number;
+  barWidth?: number;
+  gap?: number;
+}) {
   const maxValue = Math.max(...bars.map((b) => b.value), 1);
   const chartWidth = bars.length * (barWidth + gap) - gap;
 
   return (
     <div className={cn("w-full", className)}>
-      <svg aria-label="Bar chart" className="w-full" height={height + 24} preserveAspectRatio="xMidYMid meet" role="img" viewBox={`0 0 ${chartWidth} ${height + 24}`}>
+      <svg
+        aria-label="Bar chart"
+        className="w-full"
+        height={height + 24}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        viewBox={`0 0 ${chartWidth} ${height + 24}`}
+      >
         {bars.map((bar, i) => {
           const barHeight = (bar.value / maxValue) * (height - 4);
           const x = i * (barWidth + gap) + gap / 2;
@@ -157,7 +202,9 @@ export function AnimatedBarChart({
                 width={barWidth}
                 x={x}
                 y={y}
-                style={{ animation: `bar-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) ${0.1 * i}s both` }}
+                style={{
+                  animation: `bar-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) ${0.1 * i}s both`,
+                }}
               />
               <text
                 className="fill-[var(--text-secondary)] text-[9px] font-medium"
@@ -194,12 +241,18 @@ export function AnimatedHorizontalBars({
           <div key={item.label}>
             <div className="mb-1.5 flex items-center justify-between text-[12px]">
               <span className="font-medium text-[var(--text-secondary)]">{item.label}</span>
-              <span className="font-semibold text-[var(--text-primary)]">{item.value.toLocaleString("it-IT")}</span>
+              <span className="font-semibold text-[var(--text-primary)]">
+                {item.value.toLocaleString("it-IT")}
+              </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
               <div
                 className="h-full rounded-full"
-                style={{ backgroundColor: item.color, width: `${Math.round(pct)}%`, animation: `width-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) ${0.1 * i}s both` }}
+                style={{
+                  backgroundColor: item.color,
+                  width: `${Math.round(pct)}%`,
+                  animation: `width-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) ${0.1 * i}s both`,
+                }}
               />
             </div>
           </div>
@@ -222,7 +275,9 @@ export function AnimatedNumber({
 }) {
   return (
     <span className={cn("tabular-nums animate-[fade-in_0.5s_ease-out]", className)}>
-      {prefix}{value.toLocaleString("it-IT")}{suffix}
+      {prefix}
+      {value.toLocaleString("it-IT")}
+      {suffix}
     </span>
   );
 }

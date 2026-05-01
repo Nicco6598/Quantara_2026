@@ -311,7 +311,10 @@ function SidebarNavItem({
           <span className="absolute -right-0.5 -top-0.5 flex gap-0.5">
             {item.badges.map((badge) => (
               <span
-                className={cn("size-2 rounded-full ring-1 ring-[var(--surface-base)]", badgeDotClass(badge.tone))}
+                className={cn(
+                  "size-2 rounded-full ring-1 ring-[var(--surface-base)]",
+                  badgeDotClass(badge.tone),
+                )}
                 key={badge.label}
               />
             ))}
