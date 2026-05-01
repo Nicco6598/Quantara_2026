@@ -1,6 +1,6 @@
 {
   "name": "quantara",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "pnpm version:sync && pnpm --filter @quantara/desktop build",
+    "build:analyze": "pnpm --filter @quantara/desktop build && node scripts/report-desktop-bundle.mjs",
     "check": "pnpm version:sync && pnpm typecheck && pnpm lint && pnpm test",
     "format": "biome format --write .",
     "format:check": "biome format .",
@@ -28,7 +29,6 @@
     "@biomejs/biome": "2.4.12",
     "@playwright/test": "1.59.1",
     "typescript": "6.0.3",
-    "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.5"
   }
 }

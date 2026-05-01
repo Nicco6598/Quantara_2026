@@ -6,7 +6,6 @@ import {
   Calculator,
   Check,
   CheckCircle2,
-  ChevronRight,
   ClipboardList,
   FileSpreadsheet,
   FileText,
@@ -20,6 +19,7 @@ import {
   type ReactNode,
   type SetStateAction,
   useCallback,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -83,7 +83,13 @@ export function SalCreationScreen() {
   const [lines, setLines] = useState<SalLineDraft[]>([]);
   const [economicRules, setEconomicRules] = useState<SalEconomicRules>(defaultSalEconomicRules);
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
+  const [salTitle, setSalTitle] = useState("");
   const [navDirection, setNavDirection] = useState<"forward" | "backward">("forward");
+  useEffect(() => {
+    if (data.project && !salTitle) {
+      setSalTitle(data.project.salTitle);
+    }
+  }, [data.project, salTitle]);
   const previousProgressiveAmount = useMemo(() => {
     const projectId = data.project?.id;
     if (!projectId) {
@@ -261,7 +267,17 @@ export function SalCreationScreen() {
       })),
       notes: "",
       projectId: data.project.id,
-      title: data.project.salTitle,
+      title: salTitle.trim() || data.project.salTitle,
+      total: summary.total,
+      voices: lineViews.map((line) => ({
+        category: line.voice.category,
+        code: line.voice.code,
+        description: line.voice.description,
+        id: line.voice.id,
+        projectYear: line.voice.tariffYear,
+        unit: line.voice.unit,
+        unitPrice: line.voice.unitPrice,
+      })),
     });
 
     setCreatedSalTitle(created.title);
@@ -275,19 +291,9 @@ export function SalCreationScreen() {
 
   const primaryLabel = phase === "confirm" ? "Conferma" : "Continua";
 
-  const showBreadcrumbNav = phase !== "completed";
-
   return (
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
-
-      {showBreadcrumbNav ? (
-        <div className="mb-4 flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
-          <span>Nuova SAL</span>
-          <ChevronRight className="size-3.5" />
-          <span className="font-semibold text-[var(--text-primary)]">{primaryLabel}</span>
-        </div>
-      ) : null}
 
       <SalWorkflowTopbar
         canGoBack={phase !== "context"}
@@ -374,10 +380,12 @@ export function SalCreationScreen() {
                 onPrimary={goPrimary}
                 primaryLabel={primaryLabel}
                 project={data.project}
+                salTitle={salTitle}
                 selectedTariffBooks={data.selectedTariffBooks}
                 selectedTariffBook={data.selectedTariffBook}
                 selectTariffBook={data.selectTariffBook}
                 setEconomicRules={setEconomicRules}
+                setSalTitle={setSalTitle}
                 summary={summary}
                 tariffBooks={data.tariffBookOptions}
                 voicesCount={data.voices.length}
@@ -438,10 +446,12 @@ function SetupStep({
   onPrimary,
   primaryLabel,
   project,
+  salTitle,
   selectedTariffBooks,
   selectedTariffBook,
   selectTariffBook,
   setEconomicRules,
+  setSalTitle,
   summary,
   tariffBooks,
   voicesCount,
@@ -452,10 +462,12 @@ function SetupStep({
   onPrimary: () => void;
   primaryLabel: string;
   project: SalProjectContext | null;
+  salTitle: string;
   selectedTariffBooks: SalTariffBookOption[];
   selectedTariffBook: SalTariffBookOption | null;
   selectTariffBook: (tariffBookId: string) => Promise<void>;
   setEconomicRules: Dispatch<SetStateAction<SalEconomicRules>>;
+  setSalTitle: Dispatch<SetStateAction<string>>;
   summary: SalEconomicSummary;
   tariffBooks: SalTariffBookOption[];
   voicesCount: number;
@@ -483,7 +495,7 @@ function SetupStep({
       <BezelSurface innerClassName="p-0">
         <div className="grid divide-y divide-[var(--border-subtle)]/60 md:grid-cols-4 md:divide-x md:divide-y-0">
           <ContextTile label="Contratto" value={project.applicationContractCode} />
-          <ContextTile label="Documento" value={project.salTitle} />
+          <ContextTile label="Documento" value={salTitle || project.salTitle} />
           <ContextTile
             label="Tariffario"
             value={
@@ -512,7 +524,21 @@ function SetupStep({
               <InfoField label="Progetto / Contratto" value={project.title} />
               <InfoField label="Atto contrattuale" value={project.applicationContractCode} />
               <InfoField label="Linea / Lotto" value={project.location} />
-              <InfoField label="Nome SAL" value={project.salTitle} />
+              <div>
+                <label
+                  className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]"
+                  htmlFor="sal-title-input"
+                >
+                  Nome SAL
+                </label>
+                <input
+                  className="mt-1 h-10 w-full rounded-[10px] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[14px] font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  id="sal-title-input"
+                  onChange={(event) => setSalTitle(event.target.value)}
+                  placeholder={project.salTitle}
+                  value={salTitle}
+                />
+              </div>
               <InfoField label="Tipo documento" value="SAL" />
             </div>
           </BezelSurface>

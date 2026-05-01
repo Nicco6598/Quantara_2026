@@ -1,4 +1,9 @@
-import { eur, resolveTariffVoice, summarizeSal } from "@quantara/domain-utils";
+import {
+  calculateAccountingRowFinalPrice,
+  eur,
+  resolveTariffVoice,
+  summarizeSal,
+} from "@quantara/domain-utils";
 import type { ContractRecord, SalRecord, TariffVoice } from "@quantara/shared-types";
 import { describe, expect, it } from "vitest";
 
@@ -27,6 +32,7 @@ const voices: readonly TariffVoice[] = [
     unitPrice: eur(10),
   },
 ];
+const fallbackVoice = voices[0] as TariffVoice;
 
 describe("accounting domain", () => {
   it("resolves tariff voices by contract priority and fallback", () => {
@@ -35,6 +41,38 @@ describe("accounting domain", () => {
     expect(resolution?.source).toBe("fallback");
     expect(resolution?.voice.id).toBe("voice_fallback");
     expect(resolution?.trace).toHaveLength(2);
+  });
+
+  it("resolves the priority tariff before fallback when both books contain a voice", () => {
+    const resolution = resolveTariffVoice(
+      contract,
+      [
+        ...voices,
+        {
+          ...fallbackVoice,
+          id: "voice_primary",
+          tariffBookId: "tariff_primary",
+          unitPrice: eur(12),
+        },
+      ],
+      "op-001",
+    );
+
+    expect(resolution?.source).toBe("priority");
+    expect(resolution?.voice.id).toBe("voice_primary");
+    expect(resolution?.trace).toEqual(["Checked tariff_primary for op-001: hit"]);
+  });
+
+  it("returns null when no tariff priority contains the requested official code", () => {
+    const resolution = resolveTariffVoice(contract, voices, "MISSING");
+
+    expect(resolution).toBeNull();
+  });
+
+  it("guards accounting row totals against invalid or negative factors", () => {
+    expect(calculateAccountingRowFinalPrice(10, 2, 3, 4, 5)).toBe(1200);
+    expect(calculateAccountingRowFinalPrice(10, -1, 3, 4, 5)).toBe(0);
+    expect(calculateAccountingRowFinalPrice(10, 1, Number.NaN, 4, 5)).toBe(0);
   });
 
   it("keeps OS safety costs outside tender and subcontract discounts", () => {

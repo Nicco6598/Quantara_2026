@@ -6,6 +6,7 @@ import {
   buildManagerLoad,
   compareProjects,
   createContractorId,
+  isPlaceholderContractorName,
   isSalWindow,
   matchesFocus,
   matchesProjectSearch,
@@ -51,7 +52,11 @@ export function useProjectPortfolioView({
       selectedContractorId
         ? allSals.filter((sal) => {
             const project = projectSalIndex.get(sal.projectId);
-            return createContractorId(project?.client ?? "") === selectedContractorId;
+            if (!project || isPlaceholderContractorName(project.client)) {
+              return false;
+            }
+
+            return createContractorId(project.client) === selectedContractorId;
           })
         : allSals,
     [allSals, projectSalIndex, selectedContractorId],

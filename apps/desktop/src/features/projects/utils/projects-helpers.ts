@@ -156,6 +156,15 @@ export function normalizeContractorName(value: string): string {
   return normalized || "Appaltatore da assegnare";
 }
 
+export function isPlaceholderContractorName(value: string): boolean {
+  const normalized = normalizeContractorName(value).toLowerCase();
+  return (
+    normalized === "appaltatore da assegnare" ||
+    normalized === "impresa da contratto" ||
+    normalized === "senza appaltatore"
+  );
+}
+
 const contractorIdCache = new Map<string, string>();
 
 export function createContractorId(contractor: string): string {

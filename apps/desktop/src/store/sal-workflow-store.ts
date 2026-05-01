@@ -18,6 +18,8 @@ type CreateDraftSalWithLinesInput = CreateSalInput & {
 };
 type CloseNewSalInput = CreateSalInput & {
   lines: SalLine[];
+  total?: number;
+  voices?: SalTariffVoice[];
 };
 
 type SalWorkflowStore = {
@@ -116,6 +118,8 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
         const currentCount = get().salDocuments.filter(
           (sal) => sal.projectId === input.projectId,
         ).length;
+        const existingVoiceIds = new Set(get().tariffVoices.map((voice) => voice.id));
+        const voicesToAdd = (input.voices ?? []).filter((voice) => !existingVoiceIds.has(voice.id));
         const sal: SalDocument = {
           date: input.date,
           description: input.description,
@@ -126,12 +130,16 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           status: "closed",
           title: generateSalTitle(input.title, currentCount),
           closedAt: new Date().toISOString().slice(0, 10),
+          ...(typeof input.total === "number" && Number.isFinite(input.total)
+            ? { total: input.total }
+            : {}),
         };
 
         set((state) => ({
           activeProjectId: sal.projectId,
           activeSalId: sal.id,
           salDocuments: [sal, ...state.salDocuments],
+          tariffVoices: [...voicesToAdd, ...state.tariffVoices],
         }));
 
         return sal;

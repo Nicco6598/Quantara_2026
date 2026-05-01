@@ -14,6 +14,7 @@ import {
 } from "@/features/dashboard/components/DashboardSections";
 import { MetricCard } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
+import { readStringRecord } from "@/features/projects/utils/projects-helpers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
@@ -31,7 +32,12 @@ export function DashboardScreen() {
     listDesktopContracts([])
       .then((contracts) => {
         if (abort.signal.aborted) return;
-        setProjects(contracts.data.map(mapContractToProject));
+        const projectContractors = readStringRecord("quantara.projectContractors.v1");
+        setProjects(
+          contracts.data.map((contract) =>
+            mapContractToProject(contract, projectContractors[contract.id]),
+          ),
+        );
       })
       .catch(() => {
         if (abort.signal.aborted) return;

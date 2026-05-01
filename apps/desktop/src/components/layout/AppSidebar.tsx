@@ -13,8 +13,9 @@ import {
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
-import { fallbackMaterials as materialRows } from "@/features/materials/MaterialsScreen";
+import { fallbackMaterials as materialRows } from "@/features/materials/materials-data";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
+import { isPlaceholderContractorName } from "@/features/projects/utils/projects-helpers";
 import { APP_VERSION } from "@/generated/appVersion";
 import { listDesktopContracts } from "@/lib/desktopData";
 import { DATA_CHANGED_EVENT } from "@/lib/sync-events";
@@ -46,6 +47,7 @@ const SIDEBAR_WIDTH_COLLAPSED = 72;
 export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [projects, setProjects] = useState<{ id: string; contractor: string }[]>([]);
+  const [contractorCount, setContractorCount] = useState(0);
   const debounceRef = useRef<number | undefined>(undefined);
   const toggleCollapsed = useCallback(() => setCollapsed((prev) => !prev), []);
 
@@ -64,15 +66,37 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
               return {};
             }
           })();
+    const contractorRegistry: string[] =
+      typeof window === "undefined"
+        ? []
+        : (() => {
+            try {
+              const parsed = JSON.parse(
+                window.localStorage.getItem("quantara.contractorRegistry.v1") ?? "[]",
+              );
+              return Array.isArray(parsed)
+                ? parsed.filter((item): item is string => typeof item === "string")
+                : [];
+            } catch {
+              return [];
+            }
+          })();
 
     listDesktopContracts([]).then((contracts) => {
       if (!active) return;
-      setProjects(
-        contracts.data.map((c) => {
-          const p = mapContractToProject(c);
-          const contractor = registry[c.id];
-          return contractor ? { ...p, contractor } : p;
-        }),
+      const projectRows = contracts.data.map((c) => {
+        const p = mapContractToProject(c);
+        const contractor = registry[c.id];
+        return contractor ? { ...p, contractor } : p;
+      });
+
+      setProjects(projectRows);
+      setContractorCount(
+        new Set(
+          [...projectRows.map((project) => project.contractor), ...contractorRegistry].filter(
+            (contractor) => !isPlaceholderContractorName(contractor),
+          ),
+        ).size,
       );
     });
 
@@ -99,10 +123,6 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
     };
   }, [loadProjects]);
 
-  const contractorCount = useMemo(
-    () => new Set(projects.map((p) => p.contractor)).size,
-    [projects],
-  );
   const projectCount = projects.length;
   const criticalMaterialsCount = useMemo(
     () => materialRows.filter((m) => m.quantity === 0 || m.quantity < m.minQuantity).length,

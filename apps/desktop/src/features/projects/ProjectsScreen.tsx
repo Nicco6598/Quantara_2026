@@ -1,5 +1,8 @@
+import { Trash2, X } from "lucide-react";
 import {
   type ChangeEvent,
+  lazy,
+  Suspense,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -10,21 +13,19 @@ import {
 } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
-import { ContractorModal } from "@/features/projects/components/ContractorModal";
 import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
-import { ProjectActionDialog } from "@/features/projects/components/ProjectActionDialog";
-import { SalModal } from "@/features/projects/components/SalModal";
-import { CreateProjectModal } from "@/features/projects/dialogs/CreateProjectModal";
 import { useProjectMigration } from "@/features/projects/hooks/useProjectMigration";
 import { useProjectMutations } from "@/features/projects/hooks/useProjectMutations";
 import { useProjectPortfolioView } from "@/features/projects/hooks/useProjectPortfolioView";
 import type {
+  ContractorFolder,
   MigrationAction,
   PortfolioFocus,
   PortfolioProject,
   ProjectActionDialogState,
   ProjectEditState,
 } from "@/features/projects/types";
+import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   type DesktopContract,
@@ -38,6 +39,7 @@ import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { fallbackProjectTariffBook, focusOptions } from "./projects-data";
 import { mapContractToProject } from "./utils/project-mappers";
 import {
+  createContractorId,
   mergeContractorRegistry,
   normalizeContractorName,
   readStringList,
@@ -51,6 +53,25 @@ export { mapContractToProject } from "./utils/project-mappers";
 
 const contractorRegistryStorageKey = "quantara.contractorRegistry.v1";
 const projectContractorStorageKey = "quantara.projectContractors.v1";
+
+const ContractorModal = lazy(() =>
+  import("@/features/projects/components/ContractorModal").then((m) => ({
+    default: m.ContractorModal,
+  })),
+);
+const ProjectActionDialog = lazy(() =>
+  import("@/features/projects/components/ProjectActionDialog").then((m) => ({
+    default: m.ProjectActionDialog,
+  })),
+);
+const SalModal = lazy(() =>
+  import("@/features/projects/components/SalModal").then((m) => ({ default: m.SalModal })),
+);
+const CreateProjectModal = lazy(() =>
+  import("@/features/projects/dialogs/CreateProjectModal").then((m) => ({
+    default: m.CreateProjectModal,
+  })),
+);
 
 export function ProjectsScreen() {
   const navigate = useNavigate();
@@ -69,6 +90,9 @@ export function ProjectsScreen() {
   );
   const [contractorDraft, setContractorDraft] = useState("");
   const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
+  const [contractorDeleteTarget, setContractorDeleteTarget] = useState<ContractorFolder | null>(
+    null,
+  );
   const [contractorRegistry, setContractorRegistry] = useState<string[]>(() =>
     readStringList(contractorRegistryStorageKey),
   );
@@ -103,19 +127,21 @@ export function ProjectsScreen() {
     tariffBookId: tariffBooksState[0]?.id ?? "",
   });
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
+  const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
+  const salProjects = useSalWorkflowStore((state) => state.projects);
+  const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
+  const updateSalLineQuantity = useSalWorkflowStore((state) => state.updateLineQuantity);
+  const updateSalLineSurcharge = useSalWorkflowStore((state) => state.updateLineSurcharge);
   const activeProjects = useMemo(
     () =>
       contractsState.source === "desktop" || contractsState.data.length > 0
-        ? contractsState.data.map((contract) =>
-            mapContractToProject(contract, projectContractors[contract.id]),
-          )
+        ? contractsState.data.map((contract) => {
+            const baseProject = mapContractToProject(contract, projectContractors[contract.id]);
+            return enrichProjectWithRealSalData(baseProject, salDocuments, tariffVoices);
+          })
         : [],
-    [contractsState.data, contractsState.source, projectContractors],
+    [contractsState.data, contractsState.source, projectContractors, salDocuments, tariffVoices],
   );
-  const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
-  const salProjects = useSalWorkflowStore((state) => state.projects);
-  const updateSalLineQuantity = useSalWorkflowStore((state) => state.updateLineQuantity);
-  const updateSalLineSurcharge = useSalWorkflowStore((state) => state.updateLineSurcharge);
   const projectSalIndex = useMemo(
     () => new Map(salProjects.map((project) => [project.id, project])),
     [salProjects],
@@ -225,6 +251,39 @@ export function ProjectsScreen() {
     notify({
       message: `${contractorName} creato tra gli appaltatori.`,
       title: "Appaltatore aggiunto",
+      tone: "success",
+    });
+  }
+
+  function handleConfirmDeleteContractor() {
+    if (!contractorDeleteTarget) {
+      return;
+    }
+
+    const deletedId = contractorDeleteTarget.id;
+    const deletedName = contractorDeleteTarget.contractor;
+
+    setContractorRegistry((current) =>
+      current.filter((contractor) => createContractorId(contractor) !== deletedId),
+    );
+    setProjectContractors((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(
+          ([, contractor]) => createContractorId(contractor) !== deletedId,
+        ),
+      ),
+    );
+    if (selectedContractorId === deletedId) {
+      navigateBack();
+    }
+    setContractorDeleteTarget(null);
+    dispatchDataChanged();
+    notify({
+      message:
+        contractorDeleteTarget.projectCount > 0
+          ? `${deletedName} eliminato. I progetti collegati restano nel registro senza appaltatore assegnato.`
+          : `${deletedName} eliminato dal registro appaltatori.`,
+      title: "Appaltatore eliminato",
       tone: "success",
     });
   }
@@ -359,6 +418,7 @@ export function ProjectsScreen() {
           activeProjectsCount={activeProjects.length}
           folders={contractorFolders}
           onImport={() => fileInputRef.current?.click()}
+          onDeleteContractor={setContractorDeleteTarget}
           onOpenCreateContractor={() => setIsContractorModalOpen(true)}
           onOpenFolder={handleOpenFolder}
           onOpenNotifications={() => setIsSalModalOpen(true)}
@@ -375,50 +435,240 @@ export function ProjectsScreen() {
         type="file"
       />
 
-      {isCreateProjectModalOpen ? (
-        <CreateProjectModal
-          contractorOptions={contractorRegistry}
-          defaultTariffBookId={tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id}
-          {...(createProjectInitialValues ? { initialValues: createProjectInitialValues } : {})}
-          onClose={handleCloseCreateProjectModal}
-          onCreate={editingProject ? updateProject : createProject}
-          submitLabel={editingProject ? "Salva modifiche" : "Crea progetto"}
-          tariffBooks={tariffBooksState}
-        />
-      ) : null}
-      {projectActionDialog ? (
-        <ProjectActionDialog
-          mode={projectActionDialog.mode}
-          onClose={() => setProjectActionDialog(null)}
-          onDelete={() => handleAskDeleteFromActions(projectActionDialog.project)}
-          onEdit={() => handleEditFromActions(projectActionDialog.project)}
-          onOpen={() => {
-            setProjectActionDialog(null);
-            handleOpenProject(projectActionDialog.project);
-          }}
-          onConfirmDelete={() => void handleConfirmDeleteFromActions(projectActionDialog.project)}
-          project={projectActionDialog.project}
-        />
-      ) : null}
-      {isContractorModalOpen ? (
-        <ContractorModal
-          contractorDraft={contractorDraft}
-          onChange={setContractorDraft}
-          onClose={() => {
-            setContractorDraft("");
-            setIsContractorModalOpen(false);
-          }}
-          onCreate={handleCreateContractor}
-        />
-      ) : null}
-      <SalModal
-        isOpen={isSalModalOpen}
-        onClose={() => setIsSalModalOpen(false)}
-        projectIndex={projectSalIndex}
-        sals={modalSals}
-        onUpdateQuantity={updateSalLineQuantity}
-        onUpdateSurcharge={updateSalLineSurcharge}
-      />
+      <Suspense fallback={null}>
+        {isCreateProjectModalOpen ? (
+          <CreateProjectModal
+            contractorOptions={contractorRegistry}
+            defaultTariffBookId={tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id}
+            {...(createProjectInitialValues ? { initialValues: createProjectInitialValues } : {})}
+            onClose={handleCloseCreateProjectModal}
+            onCreate={editingProject ? updateProject : createProject}
+            submitLabel={editingProject ? "Salva modifiche" : "Crea progetto"}
+            tariffBooks={tariffBooksState}
+          />
+        ) : null}
+        {projectActionDialog ? (
+          <ProjectActionDialog
+            mode={projectActionDialog.mode}
+            onClose={() => setProjectActionDialog(null)}
+            onDelete={() => handleAskDeleteFromActions(projectActionDialog.project)}
+            onEdit={() => handleEditFromActions(projectActionDialog.project)}
+            onOpen={() => {
+              setProjectActionDialog(null);
+              handleOpenProject(projectActionDialog.project);
+            }}
+            onConfirmDelete={() => void handleConfirmDeleteFromActions(projectActionDialog.project)}
+            project={projectActionDialog.project}
+          />
+        ) : null}
+        {isContractorModalOpen ? (
+          <ContractorModal
+            contractorDraft={contractorDraft}
+            onChange={setContractorDraft}
+            onClose={() => {
+              setContractorDraft("");
+              setIsContractorModalOpen(false);
+            }}
+            onCreate={handleCreateContractor}
+          />
+        ) : null}
+        {isSalModalOpen ? (
+          <SalModal
+            isOpen={isSalModalOpen}
+            onClose={() => setIsSalModalOpen(false)}
+            projectIndex={projectSalIndex}
+            sals={modalSals}
+            onUpdateQuantity={updateSalLineQuantity}
+            onUpdateSurcharge={updateSalLineSurcharge}
+          />
+        ) : null}
+        {contractorDeleteTarget ? (
+          <ContractorDeleteDialog
+            contractor={contractorDeleteTarget}
+            onClose={() => setContractorDeleteTarget(null)}
+            onConfirm={handleConfirmDeleteContractor}
+          />
+        ) : null}
+      </Suspense>
     </main>
+  );
+}
+
+function enrichProjectWithRealSalData(
+  project: PortfolioProject,
+  salDocuments: ReturnType<typeof useSalWorkflowStore.getState>["salDocuments"],
+  tariffVoices: ReturnType<typeof useSalWorkflowStore.getState>["tariffVoices"],
+): PortfolioProject {
+  const projectSals = salDocuments
+    .filter((sal) => sal.projectId === project.id)
+    .map((sal) => buildSalDocumentView(sal, tariffVoices))
+    .sort((left, right) => {
+      const leftDate = left.closedAt ?? left.date;
+      const rightDate = right.closedAt ?? right.date;
+      return rightDate.localeCompare(leftDate);
+    });
+
+  if (projectSals.length === 0) {
+    return {
+      ...project,
+      forecastDeltaDays: 0,
+      healthLabel: "SAL da avviare",
+      manager: "PM non assegnato",
+      materialRisk: "Nessuna SAL registrata",
+      nextMilestone: "Creare prima SAL",
+      progress: 0,
+      salDays: 0,
+      salState: "Nessuna SAL",
+      salValue: { amount: 0, currency: project.budget.currency },
+      tone: "warning",
+      variance: "0,0%",
+    };
+  }
+
+  const closedSals = projectSals.filter((sal) => sal.status === "closed");
+  const draftSals = projectSals.filter((sal) => sal.status !== "closed");
+  const latestSal = projectSals[0];
+  const latestClosedSal = closedSals[0];
+  const committedAmount = projectSals.reduce((sum, sal) => sum + sal.total, 0);
+  const closedAmount = closedSals.reduce((sum, sal) => sum + sal.total, 0);
+  const referenceAmount = latestSal?.total ?? 0;
+  const progress =
+    project.budget.amount > 0
+      ? Math.min(100, Math.round((closedAmount / project.budget.amount) * 1000) / 10)
+      : 0;
+  const variance =
+    project.budget.amount > 0
+      ? `${((committedAmount / project.budget.amount) * 100).toLocaleString("it-IT", {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 1,
+        })}%`
+      : "0,0%";
+
+  if (draftSals.length > 0) {
+    return {
+      ...project,
+      healthLabel: draftSals.length === 1 ? "SAL in bozza" : `${draftSals.length} SAL in bozza`,
+      manager: "PM non assegnato",
+      materialRisk:
+        closedSals.length > 0
+          ? `${closedSals.length} SAL approvate, ${draftSals.length} in lavorazione`
+          : "SAL in lavorazione senza approvazioni",
+      nextMilestone: latestSal?.title ?? "Completare SAL",
+      progress,
+      salDays: daysFromToday(latestSal?.date),
+      salState: latestSal?.title ?? "SAL in bozza",
+      salValue: { amount: referenceAmount, currency: project.budget.currency },
+      tone: "warning",
+      variance,
+    };
+  }
+
+  return {
+    ...project,
+    healthLabel: "SAL approvata",
+    manager: "PM non assegnato",
+    materialRisk: `${closedSals.length} SAL approvate`,
+    nextMilestone: latestClosedSal?.title ?? "SAL approvata",
+    progress,
+    salDays: daysFromToday(latestClosedSal?.closedAt ?? latestClosedSal?.date),
+    salState: latestClosedSal?.title ?? "SAL chiusa",
+    salValue: { amount: latestClosedSal?.total ?? 0, currency: project.budget.currency },
+    tone: "success",
+    variance,
+  };
+}
+
+function daysFromToday(dateValue: string | undefined): number {
+  if (!dateValue) {
+    return 0;
+  }
+
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return 0;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((date.getTime() - today.getTime()) / 86_400_000);
+}
+
+function ContractorDeleteDialog({
+  contractor,
+  onClose,
+  onConfirm,
+}: {
+  contractor: ContractorFolder;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
+      <button
+        aria-label="Chiudi conferma eliminazione appaltatore"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <section className="relative w-full max-w-md rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
+        <div className="rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] md:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                Elimina appaltatore
+              </span>
+              <h3 className="mt-3 text-[20px] font-bold leading-tight text-[var(--text-primary)]">
+                {contractor.contractor}
+              </h3>
+              <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+                {contractor.projectCount > 0
+                  ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato.`
+                  : "La cartella verra rimossa dal registro appaltatori."}
+              </p>
+            </div>
+            <button
+              aria-label="Chiudi"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+              onClick={onClose}
+              type="button"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <div className="mt-6 rounded-[18px] border border-[var(--danger-base)]/20 bg-[var(--danger-soft)]/50 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
+                <Trash2 className="size-5" />
+              </span>
+              <div>
+                <div className="text-[14px] font-semibold text-[var(--danger-base)]">
+                  Confermare eliminazione?
+                </div>
+                <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+                  L'operazione aggiorna il registro locale e il menu laterale.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-[13px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+              onClick={onClose}
+              type="button"
+            >
+              Annulla
+            </button>
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--danger-base)] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
+              onClick={onConfirm}
+              type="button"
+            >
+              <Trash2 className="size-4" />
+              Elimina
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }

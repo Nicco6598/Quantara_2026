@@ -278,7 +278,122 @@ function WorkbenchRow({
         )}
       />
 
-      <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between 2xl:gap-3">
+      <div className="hidden grid-cols-[1.35fr_0.8fr_0.7fr_0.72fr_0.85fr_0.8fr_80px] items-center gap-2 xl:grid">
+        <div className="flex min-w-0 items-center gap-3">
+          <motion.div
+            className={cn(
+              "relative flex size-10 shrink-0 items-center justify-center rounded-xl shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]",
+              toneClass,
+            )}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ scale: 1.05 }}
+          >
+            <FolderKanban className="size-5" />
+          </motion.div>
+          <div className="min-w-0">
+            <div className="truncate text-[14px] font-bold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+              {project.title}
+            </div>
+            <div className="mt-1 flex min-w-0 items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+              <MapPin className="size-3.5 shrink-0" />
+              <span className="truncate">
+                {project.lot} · {project.location}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <span
+            className={cn(
+              "inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold",
+              toneClass,
+            )}
+            title={project.healthLabel}
+          >
+            <span className="size-1.5 shrink-0 rounded-full bg-current" />
+            <span className="truncate">{project.healthLabel}</span>
+          </span>
+          <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
+            {project.phase}
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+            {project.manager}
+          </div>
+          <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
+            {project.nextMilestone}
+          </div>
+        </div>
+
+        <WorkbenchMiniMetric
+          detail={project.variance}
+          label="EAC"
+          value={formatMoney(project.budget)}
+        />
+        <WorkbenchMiniMetric
+          detail={formatDueWindow(project.salDays)}
+          label={project.salState}
+          value={formatMoney(project.salValue)}
+        />
+
+        <div className="flex w-[72px] flex-col items-center justify-center">
+          <div className="relative flex size-10 items-center justify-center">
+            <svg
+              aria-label={`${project.progress}% completato`}
+              className="absolute inset-0 size-10 -rotate-90"
+              viewBox="0 0 40 40"
+              role="img"
+            >
+              <circle
+                className="text-[var(--bg-muted-strong)]"
+                cx="20"
+                cy="20"
+                fill="none"
+                r="16"
+                strokeWidth="4"
+                stroke="currentColor"
+              />
+              <circle
+                className={progressBarClass.replace("bg-", "text-")}
+                cx="20"
+                cy="20"
+                fill="none"
+                r="16"
+                strokeWidth="4"
+                stroke="currentColor"
+                strokeDasharray={`${(project.progress / 100) * 100.5} 100.5`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="text-[10px] font-bold text-[var(--text-primary)]">
+              {formatPercent(project.progress)}
+            </span>
+          </div>
+          <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[--tracking-caption] text-[var(--text-secondary)]">
+            Progresso
+          </span>
+        </div>
+
+        <div className="flex justify-end">
+          <ProjectControlButton
+            aria-label={`Azioni per ${project.title}`}
+            className="size-8"
+            icon={MoreVertical}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onOpenProjectActions(project);
+            }}
+            variant="icon"
+          >
+            <span className="sr-only">Azioni per {project.title}</span>
+          </ProjectControlButton>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 xl:hidden">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <motion.div
             className={cn(
@@ -343,75 +458,21 @@ function WorkbenchRow({
           </div>
         </div>
 
-        <div className="hidden shrink-0 items-stretch xl:flex">
-          <div className="flex items-stretch gap-0 rounded-xl border-[0.5px] border-[var(--border-subtle)]/50 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-3 py-2">
-            <WorkbenchMiniMetric
-              detail={project.variance}
-              label="EAC"
-              value={formatMoney(project.budget)}
-            />
-            <div className="mx-3 w-px self-stretch bg-[var(--border-subtle)]/60" />
-            <WorkbenchMiniMetric
-              detail={formatDueWindow(project.salDays)}
-              label="SAL"
-              value={formatMoney(project.salValue)}
-            />
-            <div className="mx-3 w-px self-stretch bg-[var(--border-subtle)]/60" />
-            <div className="flex w-[72px] flex-col items-center justify-center">
-              <div className="relative flex size-10 items-center justify-center">
-                <svg
-                  aria-label={`${project.progress}% completato`}
-                  className="absolute inset-0 size-10 -rotate-90"
-                  viewBox="0 0 40 40"
-                  role="img"
-                >
-                  <circle
-                    className="text-[var(--bg-muted-strong)]"
-                    cx="20"
-                    cy="20"
-                    fill="none"
-                    r="16"
-                    strokeWidth="4"
-                    stroke="currentColor"
-                  />
-                  <circle
-                    className={progressBarClass.replace("bg-", "text-")}
-                    cx="20"
-                    cy="20"
-                    fill="none"
-                    r="16"
-                    strokeWidth="4"
-                    stroke="currentColor"
-                    strokeDasharray={`${(project.progress / 100) * 100.5} 100.5`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <span className="text-[10px] font-bold text-[var(--text-primary)]">
-                  {formatPercent(project.progress)}
-                </span>
-              </div>
-              <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[--tracking-caption] text-[var(--text-secondary)]">
-                Progresso
-              </span>
-            </div>
-          </div>
-
-          <ProjectControlButton
-            aria-label={`Azioni per ${project.title}`}
-            className="ml-2 size-8 self-center"
-            icon={MoreVertical}
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onOpenProjectActions(project);
-            }}
-            variant="icon"
-          >
-            <span className="sr-only">Azioni per {project.title}</span>
-          </ProjectControlButton>
-        </div>
+        <ProjectControlButton
+          aria-label={`Azioni per ${project.title}`}
+          className="self-end"
+          icon={MoreVertical}
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            onOpenProjectActions(project);
+          }}
+          variant="icon"
+        >
+          <span className="sr-only">Azioni per {project.title}</span>
+        </ProjectControlButton>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)]/60 pt-2 text-[12px] font-medium text-[var(--text-secondary)] xl:mt-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)]/60 pt-2 text-[12px] font-medium text-[var(--text-secondary)] xl:hidden">
         <span>{project.phase}</span>
         <span className="text-[var(--border-subtle)]">·</span>
         <span>{project.materialRisk}</span>

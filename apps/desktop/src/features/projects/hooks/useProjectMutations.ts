@@ -179,6 +179,10 @@ export function useProjectMutations({
       if (selectedContractId === projectId) {
         setSelectedContractId("");
       }
+      setProjectContractors((current) => {
+        const { [projectId]: _deleted, ...remaining } = current;
+        return remaining;
+      });
       dispatchDataChanged();
       notify({
         message: `${deletedContract?.title ?? "Progetto"} eliminato dal registro.`,

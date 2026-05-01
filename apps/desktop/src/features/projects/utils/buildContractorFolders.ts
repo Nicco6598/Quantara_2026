@@ -1,5 +1,10 @@
 import type { ContractorFolder, PortfolioProject } from "../types";
-import { createContractorId, isSalWindow, normalizeContractorName } from "./projects-helpers";
+import {
+  createContractorId,
+  isPlaceholderContractorName,
+  isSalWindow,
+  normalizeContractorName,
+} from "./projects-helpers";
 
 export function buildContractorFolders(
   contractors: string[],
@@ -13,7 +18,7 @@ export function buildContractorFolders(
     const contractor = normalizeContractorName(contractorName);
     const id = createContractorId(contractor);
 
-    if (!id) {
+    if (!id || isPlaceholderContractorName(contractor)) {
       continue;
     }
 
@@ -31,12 +36,23 @@ export function buildContractorFolders(
 
   for (const project of projects) {
     const contractor = normalizeContractorName(project.contractor);
-    const id = createContractorId(contractor);
-    const current = folders.get(id);
-
-    if (!current) {
+    if (isPlaceholderContractorName(contractor)) {
       continue;
     }
+
+    const id = createContractorId(contractor);
+    const current =
+      folders.get(id) ??
+      ({
+        budget: 0,
+        contractor,
+        criticalCount: 0,
+        id,
+        projectCount: 0,
+        salCount: 0,
+        salExposure: 0,
+        salWindowCount: 0,
+      } satisfies ContractorFolder);
 
     current.budget += project.budget.amount;
     current.projectCount += 1;
@@ -48,13 +64,24 @@ export function buildContractorFolders(
 
   for (const sal of sals) {
     const project = salProjectIndex.get(sal.projectId);
-    const contractor = normalizeContractorName(project?.client ?? "Appaltatore da assegnare");
-    const id = createContractorId(contractor);
-    const current = folders.get(id);
-
-    if (!current) {
+    if (!project || isPlaceholderContractorName(project.client)) {
       continue;
     }
+
+    const contractor = normalizeContractorName(project.client);
+    const id = createContractorId(contractor);
+    const current =
+      folders.get(id) ??
+      ({
+        budget: 0,
+        contractor,
+        criticalCount: 0,
+        id,
+        projectCount: 0,
+        salCount: 0,
+        salExposure: 0,
+        salWindowCount: 0,
+      } satisfies ContractorFolder);
 
     current.salCount += 1;
     folders.set(id, current);

@@ -1,9 +1,4 @@
-import {
-  parseQuantaraMigrationWorkbook,
-  type QuantaraMigrationWorkbook,
-  serializeQuantaraMigrationWorkbook,
-  validateQuantaraMigrationWorkbook,
-} from "@quantara/excel-import";
+import type { QuantaraMigrationWorkbook } from "@quantara/excel-import";
 import type { MigrationAction } from "@/features/projects/types";
 import {
   countValidationIssues,
@@ -48,6 +43,8 @@ export function useProjectMigration({
     };
 
     try {
+      const { serializeQuantaraMigrationWorkbook } = await import("@quantara/excel-import");
+
       await waitForUiPaint();
       downloadWorkbook(serializeQuantaraMigrationWorkbook(data), "quantara-projects-export.xlsx");
       notify({
@@ -73,6 +70,9 @@ export function useProjectMigration({
     setMigrationAction("import");
 
     try {
+      const { parseQuantaraMigrationWorkbook, validateQuantaraMigrationWorkbook } = await import(
+        "@quantara/excel-import"
+      );
       const data = parseQuantaraMigrationWorkbook(await file.arrayBuffer());
       const validation = validateQuantaraMigrationWorkbook(data);
 

@@ -37,6 +37,7 @@ export type SalDocument = {
   projectId: string;
   status: SalDocumentStatus;
   title: string;
+  total?: number;
 };
 
 export type SalLineView = SalLine & {
@@ -95,7 +96,10 @@ export function buildSalDocumentView(
   return {
     ...document,
     lines,
-    total: lines.reduce((sum, line) => sum + line.lineTotal, 0),
+    total:
+      typeof document.total === "number" && Number.isFinite(document.total)
+        ? document.total
+        : lines.reduce((sum, line) => sum + line.lineTotal, 0),
   };
 }
 

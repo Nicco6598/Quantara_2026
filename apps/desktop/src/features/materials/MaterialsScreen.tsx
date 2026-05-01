@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
+import { fallbackMaterials } from "@/features/materials/materials-data";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import {
   type DesktopMaterial,
@@ -43,89 +44,6 @@ function formatQuantity(value: number, unit: string): string {
   const n = Number.isInteger(value) ? value : Math.round(value * 100) / 100;
   return `${n} ${unit}`;
 }
-
-export const fallbackMaterials: DesktopMaterial[] = [
-  {
-    id: "mat_demo_1",
-    code: "BIN-60E1",
-    description: "Binario tipo 60E1",
-    category: "Armamento",
-    unit: "m",
-    quantity: 12450,
-    minQuantity: 2000,
-    notes: "",
-  },
-  {
-    id: "mat_demo_2",
-    code: "BAL-A32",
-    description: "Pietrisco ballast 32/50",
-    category: "Sottofondo",
-    unit: "t",
-    quantity: 2980,
-    minQuantity: 1500,
-    notes: "",
-  },
-  {
-    id: "mat_demo_3",
-    code: "CLS-R425",
-    description: "Calcestruzzo R425",
-    category: "Opere civili",
-    unit: "m3",
-    quantity: 850,
-    minQuantity: 500,
-    notes: "",
-  },
-  {
-    id: "mat_demo_4",
-    code: "FER-B450C",
-    description: "Ferro tondo B450C",
-    category: "Opere civili",
-    unit: "t",
-    quantity: 3410,
-    minQuantity: 1000,
-    notes: "",
-  },
-  {
-    id: "mat_demo_5",
-    code: "TRV-B70",
-    description: "Traversa in c.a. B70",
-    category: "Armamento",
-    unit: "cad",
-    quantity: 1250,
-    minQuantity: 800,
-    notes: "",
-  },
-  {
-    id: "mat_demo_6",
-    code: "CAV-FIBRA",
-    description: "Cavo fibra ottica",
-    category: "Impianti",
-    unit: "m",
-    quantity: 4200,
-    minQuantity: 500,
-    notes: "",
-  },
-  {
-    id: "mat_demo_7",
-    code: "TUB-PEHD",
-    description: "Tubo PEHD corrugato",
-    category: "Impianti",
-    unit: "m",
-    quantity: 1780,
-    minQuantity: 600,
-    notes: "",
-  },
-  {
-    id: "mat_demo_8",
-    code: "ACC-PALF",
-    description: "Accessori pali fondazione",
-    category: "Opere civili",
-    unit: "set",
-    quantity: 6150,
-    minQuantity: 500,
-    notes: "",
-  },
-];
 
 export function MaterialsScreen() {
   const { notify } = useToast();
@@ -171,8 +89,16 @@ export function MaterialsScreen() {
   );
 
   const categories = useMemo(() => {
-    const set = new Set(materials.map((m) => m.category));
-    return ["Tutti", ...set];
+    const categoryCounts = new Map<string, number>();
+
+    for (const material of materials) {
+      categoryCounts.set(material.category, (categoryCounts.get(material.category) ?? 0) + 1);
+    }
+
+    return {
+      counts: categoryCounts,
+      names: ["Tutti", ...categoryCounts.keys()],
+    };
   }, [materials]);
 
   const filteredMaterials = useMemo(() => {
@@ -238,11 +164,9 @@ export function MaterialsScreen() {
               <PanelTitle>Categorie</PanelTitle>
             </div>
             <div className="mt-3 space-y-1.5">
-              {categories.map((cat) => {
+              {categories.names.map((cat) => {
                 const count =
-                  cat === "Tutti"
-                    ? materials.length
-                    : materials.filter((m) => m.category === cat).length;
+                  cat === "Tutti" ? materials.length : (categories.counts.get(cat) ?? 0);
                 return (
                   <button
                     className={cn(

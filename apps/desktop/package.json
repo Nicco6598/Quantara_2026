@@ -1,6 +1,6 @@
 {
   "name": "@quantara/desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -43,7 +43,6 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
     "typescript": "5.9.3",
-    "vite": "8.0.10",
-    "vite-tsconfig-paths": "6.1.1"
+    "vite": "8.0.10"
   }
 }

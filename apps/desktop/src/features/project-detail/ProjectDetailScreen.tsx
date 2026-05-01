@@ -21,7 +21,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
-import { formatDueWindow, formatForecastDelta } from "@/features/projects/utils/projects-helpers";
+import {
+  formatDueWindow,
+  formatForecastDelta,
+  readStringRecord,
+} from "@/features/projects/utils/projects-helpers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useNavigate } from "@/hooks/useNavigate";
 import { listDesktopContracts } from "@/lib/desktopData";
@@ -48,7 +52,12 @@ export function ProjectDetailScreen() {
           return;
         }
 
-        setProjects(contracts.data.map(mapContractToProject));
+        const projectContractors = readStringRecord("quantara.projectContractors.v1");
+        setProjects(
+          contracts.data.map((contract) =>
+            mapContractToProject(contract, projectContractors[contract.id]),
+          ),
+        );
         setIsLoading(false);
       })
       .catch(() => {
@@ -67,10 +76,10 @@ export function ProjectDetailScreen() {
   }, [notify]);
 
   const selectedProject = useMemo(() => {
-    const storedProject = readSelectedProjectDetail();
+    const selectedProjectId = readSelectedProjectId();
 
-    if (storedProject) {
-      return projects.find((project) => project.id === storedProject.id) ?? storedProject;
+    if (selectedProjectId) {
+      return projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? null;
     }
 
     return projects[0] ?? null;
@@ -831,7 +840,7 @@ function SalCard({
   );
 }
 
-function readSelectedProjectDetail(): PortfolioProject | null {
+function readSelectedProjectId(): string | null {
   try {
     const rawValue = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
 
@@ -839,7 +848,8 @@ function readSelectedProjectDetail(): PortfolioProject | null {
       return null;
     }
 
-    return JSON.parse(rawValue) as PortfolioProject;
+    const parsed = JSON.parse(rawValue) as { id?: unknown };
+    return typeof parsed.id === "string" ? parsed.id : null;
   } catch {
     return null;
   }

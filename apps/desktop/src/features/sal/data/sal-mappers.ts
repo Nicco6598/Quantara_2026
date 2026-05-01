@@ -1,14 +1,22 @@
-import { createDesktopVoiceKey } from "@/features/projects/utils/projects-helpers";
+import {
+  createDesktopVoiceKey,
+  normalizeContractorName,
+} from "@/features/projects/utils/projects-helpers";
 import type { DesktopContract, DesktopTariffBook, DesktopTariffVoice } from "@/lib/desktopData";
 import type { SalProjectContext, SalTariffBookOption, SalVoiceDraft } from "../types";
 
-export function mapContractToSalProject(contract: DesktopContract): SalProjectContext {
+export function mapContractToSalProject(
+  contract: DesktopContract,
+  contractorName?: string,
+): SalProjectContext {
   const title = contract.title || "Progetto senza titolo";
+  const contractor = contractorName ? normalizeContractorName(contractorName) : "Senza appaltatore";
+
   return {
     applicationContractCode: contract.applicationContractCode || "Contratto non impostato",
     contract,
     contractAmount: contract.contractualAmount.amount,
-    contractor: inferContractor(contract),
+    contractor,
     frameworkAgreementCode: contract.frameworkAgreementCode || "AQ non impostato",
     id: contract.id,
     location: "Lotto corrente",
@@ -63,14 +71,6 @@ export function mapVoiceToDraft(
     unit: voice.unitOfMeasure,
     unitPrice: voice.unitPrice,
   };
-}
-
-function inferContractor(contract: DesktopContract) {
-  const combined = `${contract.title} ${contract.applicationContractCode} ${contract.frameworkAgreementCode}`;
-  if (combined.toLowerCase().includes("rfi")) {
-    return "RFI - Direzione Milano";
-  }
-  return "Impresa da contratto";
 }
 
 function isSafetyVoice(voice: DesktopTariffVoice) {

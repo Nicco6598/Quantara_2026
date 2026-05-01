@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { readStringRecord } from "@/features/projects/utils/projects-helpers";
 import {
   type DesktopContract,
   type DesktopTariffBook,
@@ -30,6 +31,8 @@ const initialLoadState: LoadState = {
   tariffBooks: [],
   voices: [],
 };
+
+const projectContractorStorageKey = "quantara.projectContractors.v1";
 
 export function useSalCreationData() {
   const [state, setState] = useState<LoadState>(initialLoadState);
@@ -99,9 +102,13 @@ export function useSalCreationData() {
   }, []);
 
   const selectedContract = useMemo(() => selectContract(state.contracts), [state.contracts]);
+  const projectContractors = useMemo(() => readStringRecord(projectContractorStorageKey), []);
   const project = useMemo<SalProjectContext | null>(
-    () => (selectedContract ? mapContractToSalProject(selectedContract) : null),
-    [selectedContract],
+    () =>
+      selectedContract
+        ? mapContractToSalProject(selectedContract, projectContractors[selectedContract.id])
+        : null,
+    [projectContractors, selectedContract],
   );
   const tariffBookOptions = useMemo<SalTariffBookOption[]>(
     () => mapTariffBooksForContract(state.tariffBooks, selectedContract),

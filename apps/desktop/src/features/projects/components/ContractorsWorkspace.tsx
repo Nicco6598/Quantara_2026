@@ -7,13 +7,15 @@ import {
   ClipboardList,
   HardHat,
   Layers3,
+  MoreVertical,
   Plus,
   Search,
   ShieldCheck,
+  Trash2,
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { memo, type ReactNode, useMemo } from "react";
+import { memo, type ReactNode, useMemo, useState } from "react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
@@ -24,6 +26,7 @@ type ContractorsWorkspaceProps = {
   activeProjectsCount: number;
   folders: ContractorFolder[];
   onImport: () => void;
+  onDeleteContractor: (folder: ContractorFolder) => void;
   onOpenCreateContractor: () => void;
   onOpenFolder: (folderId: string) => void;
   onOpenNotifications: () => void;
@@ -35,6 +38,7 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
   activeProjectsCount,
   folders,
   onImport,
+  onDeleteContractor,
   onOpenCreateContractor,
   onOpenFolder,
   onOpenNotifications,
@@ -125,6 +129,7 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
           <ContractorFoldersPanel
             folders={folders}
             onImport={onImport}
+            onDeleteContractor={onDeleteContractor}
             onOpenCreateContractor={onOpenCreateContractor}
             onOpenFolder={onOpenFolder}
           />
@@ -253,11 +258,13 @@ function InsightRow({
 function ContractorFoldersPanel({
   folders,
   onImport,
+  onDeleteContractor,
   onOpenCreateContractor,
   onOpenFolder,
 }: {
   folders: ContractorFolder[];
   onImport: () => void;
+  onDeleteContractor: (folder: ContractorFolder) => void;
   onOpenCreateContractor: () => void;
   onOpenFolder: (folderId: string) => void;
 }) {
@@ -309,6 +316,7 @@ function ContractorFoldersPanel({
                 key={folder.id}
                 folder={folder}
                 hasCriticalItems={hasCriticalItems}
+                onDeleteContractor={onDeleteContractor}
                 onOpenFolder={onOpenFolder}
               />
             );
@@ -355,18 +363,24 @@ function ContractorFoldersPanel({
 function ContractorCard({
   folder,
   hasCriticalItems,
+  onDeleteContractor,
   onOpenFolder,
 }: {
   folder: ContractorFolder;
   hasCriticalItems: boolean;
+  onDeleteContractor: (folder: ContractorFolder) => void;
   onOpenFolder: (id: string) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
-    <button
-      type="button"
-      className="group w-full cursor-pointer rounded-2xl border-[0.5px] border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent-primary)]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
-      onClick={() => onOpenFolder(folder.id)}
-    >
+    <div className="group relative rounded-2xl border-[0.5px] border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent-primary)]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
+      <button
+        aria-label={`Apri ${folder.contractor}`}
+        className="absolute inset-0 rounded-2xl text-left"
+        onClick={() => onOpenFolder(folder.id)}
+        type="button"
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--accent-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]">
@@ -376,17 +390,54 @@ function ContractorCard({
             {folder.contractor}
           </span>
         </div>
-        <span
-          className={cn(
-            "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-[10px] font-semibold",
-            hasCriticalItems
-              ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20"
-              : "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20",
-          )}
-        >
-          <span className="size-1.5 rounded-full bg-current" />
-          {hasCriticalItems ? "Presidio" : "Stabile"}
-        </span>
+        <div className="relative z-10 flex shrink-0 items-center gap-1.5">
+          <span
+            className={cn(
+              "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-[10px] font-semibold",
+              hasCriticalItems
+                ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20"
+                : "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20",
+            )}
+          >
+            <span className="size-1.5 rounded-full bg-current" />
+            {hasCriticalItems ? "Presidio" : "Stabile"}
+          </span>
+          <button
+            aria-label={`Azioni ${folder.contractor}`}
+            className="flex size-8 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+            onClick={(event) => {
+              event.stopPropagation();
+              setMenuOpen((open) => !open);
+            }}
+            type="button"
+          >
+            <MoreVertical className="size-4" />
+          </button>
+          {menuOpen ? (
+            <>
+              <button
+                aria-label="Chiudi menu appaltatore"
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={() => setMenuOpen(false)}
+                type="button"
+              />
+              <div className="absolute right-0 top-full z-50 mt-1.5 w-48 overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]/70">
+                <button
+                  className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen(false);
+                    onDeleteContractor(folder);
+                  }}
+                  type="button"
+                >
+                  <Trash2 className="size-4" />
+                  Elimina appaltatore
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-3 divide-x divide-[var(--border-subtle)]/60 overflow-hidden rounded-xl border-[0.5px] border-[var(--border-subtle)]/50">
@@ -407,7 +458,7 @@ function ContractorCard({
           Apri workspace <ChevronRight className="size-3.5" />
         </span>
       </div>
-    </button>
+    </div>
   );
 }
 
