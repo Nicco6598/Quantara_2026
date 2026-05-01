@@ -1,61 +1,90 @@
-import { FileText, ScanLine } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle2, FileText, Loader, ScanLine, XCircle } from "lucide-react";
+import type { ImportFileProgress } from "@/lib/desktopData";
 
-export function TariffImportLoadingModal({ fileName }: { fileName: string }) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    const startedAt = performance.now();
-    const interval = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((performance.now() - startedAt) / 1000));
-    }, 250);
-
-    return () => window.clearInterval(interval);
-  }, []);
+export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[] }) {
+  const doneCount = files.filter((f) => f.status === "done" || f.status === "error").length;
+  const errorCount = files.filter((f) => f.status === "error").length;
+  const total = files[0]?.total ?? 0;
+  const processingCount = files.filter((f) => f.status === "processing").length;
+  const currentIndex = files.findIndex((f) => f.status === "processing");
 
   return (
-    <div className="fixed inset-0 z-[82] grid place-items-center bg-slate-950/42 p-4">
-      <section
-        aria-busy="true"
-        aria-live="polite"
-        className="projects-surface relative w-full max-w-[520px] overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-6 shadow-none"
-        role="status"
-      >
-        <div className="flex items-start gap-4">
-          <div className="relative flex size-14 shrink-0 items-center justify-center rounded-[18px] bg-[var(--info-soft)] text-[var(--info-base)]">
-            <FileText className="size-6" />
-            <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-[var(--surface-base)] text-[var(--accent-primary)]">
-              <ScanLine className="size-3 animate-pulse" />
-            </span>
+    <div className="fixed inset-0 z-[82] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
+      <div className="relative w-full max-w-lg rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
+        <div className="rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-6 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          <div className="flex items-start gap-4">
+            <div className="relative flex size-14 shrink-0 items-center justify-center rounded-[18px] bg-[var(--info-soft)] text-[var(--info-base)]">
+              <FileText className="size-6" />
+              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-[var(--surface-base)] text-[var(--accent-primary)]">
+                <ScanLine className="size-3 animate-pulse" />
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-3">
+                <h3 className="text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)]">
+                  Importazione tariffari
+                </h3>
+                <span className="inline-flex h-7 items-center rounded-full bg-[var(--accent-primary)]/10 px-3 text-[12px] font-bold text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]/20">
+                  {currentIndex >= 0 ? currentIndex + 1 : doneCount}/{total}
+                </span>
+              </div>
+              <p className="mt-2 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+                {total === 0
+                  ? "Seleziona i file PDF da importare..."
+                  : processingCount > 0
+                    ? `Elaborazione in corso...`
+                    : errorCount > 0
+                      ? `${total} file elaborati con ${errorCount} errori`
+                      : `${total} file pronti per la preview`}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)]">
-              Lettura tariffario in corso
-            </h3>
-            <p className="mt-2 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
-              Il file e stato scelto. Il parser desktop sta preparando la preview modificabile.
-            </p>
-          </div>
-        </div>
 
-        <div className="mt-6 rounded-[18px] bg-[var(--bg-muted)]/70 p-4">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-            File selezionato
+          <div className="mt-6 space-y-2">
+            {files.map((file) => (
+              <div
+                className="flex items-center gap-3 rounded-[14px] bg-[var(--bg-muted)]/60 px-4 py-3"
+                key={file.index}
+              >
+                {file.status === "processing" ? (
+                  <Loader className="size-5 shrink-0 animate-spin text-[var(--info-base)]" />
+                ) : file.status === "done" ? (
+                  <CheckCircle2 className="size-5 shrink-0 text-[var(--success-base)]" />
+                ) : file.status === "error" ? (
+                  <XCircle className="size-5 shrink-0 text-[var(--danger-base)]" />
+                ) : (
+                  <div className="size-5 shrink-0 rounded-full border-2 border-[var(--border-subtle)]" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                    {file.fileName}
+                  </div>
+                  {file.status === "error" && file.error ? (
+                    <div className="mt-0.5 truncate text-[11px] font-medium text-[var(--danger-base)]">
+                      {file.error}
+                    </div>
+                  ) : (
+                    <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                      {file.status === "pending"
+                        ? "In attesa"
+                        : file.status === "processing"
+                          ? "Lettura in corso..."
+                          : file.status === "done"
+                            ? "Completato"
+                            : "Errore"}
+                    </div>
+                  )}
+                </div>
+                {file.status === "processing" ? (
+                  <div className="h-1.5 w-20 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
+                    <div className="h-full w-1/3 animate-[tariff-import-scan_1.15s_cubic-bezier(0.22,1,0.36,1)_infinite] rounded-full bg-[var(--accent-primary)]" />
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
-          <div className="mt-2 truncate text-[14px] font-semibold text-[var(--text-primary)]">
-            {fileName || "Tariffario selezionato"}
-          </div>
         </div>
-
-        <div className="mt-5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-          <div className="h-2 w-1/3 animate-[tariff-import-scan_1.15s_cubic-bezier(0.22,1,0.36,1)_infinite] rounded-full bg-[var(--accent-primary)]" />
-        </div>
-
-        <div className="mt-5 flex items-center justify-between gap-3 text-[12px] font-medium text-[var(--text-secondary)]">
-          <span>Parser attivo da {elapsedSeconds}s</span>
-          <span>In attesa della risposta Tauri</span>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

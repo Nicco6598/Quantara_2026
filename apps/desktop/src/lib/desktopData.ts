@@ -33,7 +33,11 @@ export type DesktopDataResult<T> =
       source: "fallback";
     };
 
-type InflightKey = "contracts" | "materials" | `tariff-books:${number}` | `tariff-voices:${string}:${number}`;
+type InflightKey =
+  | "contracts"
+  | "materials"
+  | `tariff-books:${number}`
+  | `tariff-voices:${string}:${number}`;
 
 const inflightRequests = new Map<InflightKey, Promise<DesktopDataResult<unknown>>>();
 
@@ -189,6 +193,56 @@ export async function selectTariffPdfMetadata({
   }
 }
 
+export async function selectMultipleTariffPdfMetadatas(
+  onProgress: (status: ImportFileProgress) => void,
+): Promise<TariffPdfMetadata[]> {
+  if (!isTauriRuntime()) {
+    return [];
+  }
+
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const selectedPaths = await open({
+    filters: [{ extensions: ["pdf", "json"], name: "Tariffario PDF o JSON parser" }],
+    multiple: true,
+  });
+
+  if (!selectedPaths || selectedPaths.length === 0) {
+    return [];
+  }
+
+  const results: TariffPdfMetadata[] = [];
+  const paths = selectedPaths as string[];
+
+  for (const [index, path] of paths.entries()) {
+    const fallback = inferTariffMetadataFromPath(path);
+    onProgress({ fileName: fallback.name, index, total: paths.length, status: "processing" });
+
+    try {
+      const metadata = await invoke<TariffPdfMetadata>("import_tariff_pdf_preview", { path });
+      results.push(metadata);
+      onProgress({ fileName: fallback.name, index, total: paths.length, status: "done" });
+    } catch (error) {
+      onProgress({
+        fileName: fallback.name,
+        index,
+        total: paths.length,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return results;
+}
+
+export type ImportFileProgress = {
+  fileName: string;
+  index: number;
+  total: number;
+  status: "pending" | "processing" | "done" | "error";
+  error?: string;
+};
+
 function inferTariffMetadataFromPath(path: string): TariffPdfMetadata {
   const fileName =
     path
@@ -325,7 +379,16 @@ export async function adjustDesktopMaterialStock(
   description: string,
 ): Promise<DesktopMaterial> {
   if (!isTauriRuntime()) {
-    return { id: materialId, code: "", description: "", category: "", unit: "", notes: "", minQuantity: 0, quantity: newQuantity };
+    return {
+      id: materialId,
+      code: "",
+      description: "",
+      category: "",
+      unit: "",
+      notes: "",
+      minQuantity: 0,
+      quantity: newQuantity,
+    };
   }
 
   return invoke<DesktopMaterial>("adjust_material_stock", { materialId, newQuantity, description });
@@ -350,5 +413,3 @@ export async function listDesktopMaterialTransactions(
 
   return invoke<DesktopMaterialTransaction[]>("list_material_transactions", { materialId });
 }
-
-
