@@ -4,7 +4,6 @@ import {
   type LucideIcon,
   Package,
   Plus,
-  Search,
   ShieldCheck,
   ShoppingCart,
   Trash2,
@@ -12,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ClearFiltersButton, FilterSearch } from "@/components/filters";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
 import { fallbackMaterials } from "@/features/materials/materials-data";
@@ -109,8 +109,7 @@ export function MaterialsScreen() {
         m.code.toLowerCase().includes(q) ||
         m.description.toLowerCase().includes(q) ||
         m.category.toLowerCase().includes(q);
-      const matchesCategory =
-        !selectedCategory || selectedCategory === "Tutti" || m.category === selectedCategory;
+      const matchesCategory = !selectedCategory || m.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
   }, [materials, searchQuery, selectedCategory]);
@@ -228,16 +227,19 @@ export function MaterialsScreen() {
         <Panel className="min-w-0 p-0">
           <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              <label className="relative min-w-0">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
-                <input
-                  className="h-10 w-[220px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cerca materiale..."
-                  type="search"
-                  value={searchQuery}
+              <FilterSearch
+                onChange={setSearchQuery}
+                placeholder="Cerca materiale..."
+                value={searchQuery}
+              />
+              {searchQuery || selectedCategory ? (
+                <ClearFiltersButton
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSelectedCategory(null);
+                  }}
                 />
-              </label>
+              ) : null}
             </div>
 
             <ProjectControlButton

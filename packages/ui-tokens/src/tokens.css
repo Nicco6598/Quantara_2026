@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
 
-  --color-neutral-0: #ffffff;
-  --color-neutral-25: #fbfcfd;
-  --color-neutral-50: #f6f7f8;
-  --color-neutral-100: #ebeef1;
-  --color-neutral-200: #d9dee5;
-  --color-neutral-300: #b8c0cc;
-  --color-neutral-500: #657184;
-  --color-neutral-700: #283244;
-  --color-neutral-800: #1c2432;
-  --color-neutral-900: #101722;
+  --color-neutral-0: #f7f8fa;
+  --color-neutral-25: #f2f3f6;
+  --color-neutral-50: #ebedf0;
+  --color-neutral-100: #e0e3e8;
+  --color-neutral-200: #cdd1d8;
+  --color-neutral-300: #b2b8c4;
+  --color-neutral-500: #5d6677;
+  --color-neutral-700: #232b3a;
+  --color-neutral-800: #181f2b;
+  --color-neutral-900: #0e131d;
   --color-brand-500: #ef3f22;
   --color-brand-600: #d93218;
   --color-brand-700: #b72b18;
@@ -27,11 +27,11 @@
   --bg-muted: var(--color-neutral-50);
   --bg-muted-strong: var(--color-neutral-100);
   --surface-base: var(--color-neutral-0);
-  --surface-raised: var(--color-neutral-0);
+  --surface-raised: #fafbfc;
   --surface-inset: var(--color-neutral-25);
   --text-primary: var(--color-neutral-900);
   --text-secondary: var(--color-neutral-500);
-  --text-inverse: var(--color-neutral-0);
+  --text-inverse: #fafbfc;
   --border-subtle: var(--color-neutral-100);
   --border-strong: var(--color-neutral-200);
   --ring-focus: color-mix(in srgb, var(--color-brand-500) 45%, transparent);
@@ -53,16 +53,16 @@
   --chart-5: var(--color-neutral-300);
 
   --sidebar-bg: var(--surface-base);
-  --sidebar-active-bg: #fff0ec;
+  --sidebar-active-bg: #f0eae6;
   --sidebar-active-text: var(--accent-primary);
   --topbar-bg: color-mix(in srgb, var(--bg-app) 82%, var(--surface-base));
   --kpi-card-bg: var(--surface-raised);
-  --table-row-hover: #fff7f4;
+  --table-row-hover: #f0eae6;
   --detail-panel-bg: var(--surface-base);
   --bg-app-accent: color-mix(in srgb, var(--sidebar-bg) 92%, #5c4a3d 8%);
 
-  --shadow-soft: 0 12px 30px rgb(16 23 34 / 7%);
-  --shadow-panel: 0 18px 48px rgb(16 23 34 / 10%);
+  --shadow-soft: 0 12px 30px rgb(16 23 34 / 8%);
+  --shadow-panel: 0 18px 48px rgb(16 23 34 / 12%);
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -85,33 +85,37 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --bg-app: #11161f;
-  --bg-panel: #171d27;
-  --bg-muted: #1d2430;
-  --bg-muted-strong: #263040;
-  --surface-base: #1a212d;
-  --surface-raised: #1f2838;
-  --surface-inset: #121923;
-  --text-primary: #f5f7fa;
-  --text-secondary: #9aa6b7;
-  --text-inverse: #f5f7fa;
-  --border-subtle: #35435a;
-  --border-strong: #4a5a70;
-  --ring-focus: color-mix(in srgb, var(--color-brand-500) 65%, transparent);
-  --accent-primary: #ff5a3d;
-  --accent-primary-hover: #ff6e55;
-  --success-soft: #1a3a28;
-  --warning-soft: #3d2e15;
-  --danger-soft: #4a2020;
-  --info-soft: #1a2f48;
-  --sidebar-bg: #141a23;
+  --bg-app: #121214;
+  --bg-panel: #18181b;
+  --bg-muted: #1e1e22;
+  --bg-muted-strong: #26262c;
+  --surface-base: #1a1a1e;
+  --surface-raised: #202026;
+  --surface-inset: #0f0f12;
+  --text-primary: #e8e8ed;
+  --text-secondary: #94949e;
+  --text-inverse: #e8e8ed;
+  --border-subtle: #2c2c34;
+  --border-strong: #3a3a44;
+  --ring-focus: color-mix(in srgb, var(--color-brand-500) 55%, transparent);
+  --accent-primary: #ff6b4a;
+  --accent-primary-hover: #ff8060;
+  --success-base: #22d06a;
+  --success-soft: #142e1e;
+  --warning-base: #f0a030;
+  --warning-soft: #2e2212;
+  --danger-base: #f05048;
+  --danger-soft: #3a1818;
+  --info-base: #4090f0;
+  --info-soft: #142438;
+  --sidebar-bg: #141416;
   --sidebar-active-bg: #3d221e;
   --topbar-bg: color-mix(in srgb, var(--bg-app) 84%, var(--surface-base));
-  --table-row-hover: #252a35;
-  --detail-panel-bg: #19212e;
-  --bg-app-accent: color-mix(in srgb, var(--sidebar-bg) 92%, #3d3f5a 8%);
-  --shadow-soft: 0 12px 30px rgb(0 0 0 / 24%);
-  --shadow-panel: 0 18px 48px rgb(0 0 0 / 34%);
+  --table-row-hover: #23232a;
+  --detail-panel-bg: #16161a;
+  --bg-app-accent: color-mix(in srgb, var(--sidebar-bg) 92%, #3d3d4a 8%);
+  --shadow-soft: 0 12px 30px rgb(0 0 0 / 32%);
+  --shadow-panel: 0 18px 48px rgb(0 0 0 / 42%);
 }
 
 @theme inline {

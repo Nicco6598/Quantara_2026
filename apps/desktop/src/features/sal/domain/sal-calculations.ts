@@ -91,60 +91,157 @@ export function summarizeSalLines(
 export function buildVerificationChecks(
   lineViews: readonly SalLineView[],
   summary: SalEconomicSummary,
+  economicRules: SalEconomicRules,
 ): SalVerificationCheck[] {
   const completeLines = lineViews.filter((line) => line.status === "complete").length;
   const safetyLines = lineViews.filter((line) => line.voice.isSafetyCost).length;
   const linkedLines = lineViews.filter((line) => line.linkedCharges.length > 0).length;
   const hasBudgetOverflow = summary.budgetResidual < 0;
+  const zeroQtyLines = lineViews.filter((line) => line.quantity <= 0);
+  const zeroPriceLines = lineViews.filter((line) => line.voice.unitPrice <= 0);
+  const highSurchargeLines = lineViews.filter((line) => line.surchargePercent > 25);
+  const highDiscount = economicRules.discountEnabled && economicRules.discountPercent > 30;
 
-  return [
-    {
-      detail:
-        completeLines === lineViews.length
-          ? "Tutte le voci selezionate hanno una quantita misurata."
-          : "Inserisci le quantita mancanti prima della conferma.",
-      id: "measurements",
-      label: "Voci con dettaglio misure completo",
-      result: `${completeLines}/${lineViews.length} ok`,
-      tone: completeLines === lineViews.length ? "success" : "warning",
-    },
-    {
-      detail: "Il sommario e calcolato dalle righe SAL correnti.",
-      id: "summary",
-      label: "Voci con sommario generato",
-      result: `${lineViews.length}/${lineViews.length} ok`,
+  const checks: SalVerificationCheck[] = [];
+
+  // Total SAL check
+  checks.push({
+    detail:
+      summary.total > 0
+        ? `Il totale della SAL è di ${summary.total.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}.`
+        : "Nessun importo calcolato. Aggiungi voci con quantità per generare un totale.",
+    id: "total",
+    label: "Totale SAL calcolato",
+    result: summary.total > 0 ? "OK" : "Zero",
+    tone: summary.total > 0 ? "success" : "warning",
+  });
+
+  // Voice count
+  if (lineViews.length > 0) {
+    checks.push({
+      detail: `${lineViews.length} voci inserite nella bozza.`,
+      id: "count",
+      label: "Voci inserite",
+      result: `${lineViews.length} voci`,
       tone: "success",
-    },
-    {
+    });
+  }
+
+  // Complete measurements
+  checks.push({
+    detail:
+      completeLines === lineViews.length
+        ? "Tutte le voci hanno una quantità valida maggiore di zero."
+        : `${lineViews.length - completeLines} voci hanno quantità zero. Assegna una misura per completarle.`,
+    id: "measurements",
+    label: "Voci con quantità valida",
+    result: `${completeLines}/${lineViews.length} ok`,
+    tone: completeLines === lineViews.length ? "success" : "warning",
+  });
+
+  // Zero quantity lines
+  if (zeroQtyLines.length > 0) {
+    checks.push({
+      detail: `Le voci ${zeroQtyLines.map((l) => l.voice.code).join(", ")} hanno quantità pari a zero.`,
+      id: "zero-qty",
+      label: "Voci con quantità zero",
+      result: `${zeroQtyLines.length} voci`,
+      tone: "warning",
+    });
+  }
+
+  // Zero price lines
+  if (zeroPriceLines.length > 0) {
+    checks.push({
+      detail: `Le voci ${zeroPriceLines.map((l) => l.voice.code).join(", ")} hanno prezzo unitario zero. Verifica il tariffario.`,
+      id: "zero-price",
+      label: "Voci con prezzo zero",
+      result: `${zeroPriceLines.length} voci`,
+      tone: "warning",
+    });
+  }
+
+  // High surcharge
+  if (highSurchargeLines.length > 0) {
+    checks.push({
+      detail: `Le voci ${highSurchargeLines.map((l) => l.voice.code).join(", ")} hanno maggiorazione superiore al 25%. Verifica la congruità.`,
+      id: "high-surcharge",
+      label: "Maggiorazioni elevate",
+      result: `${highSurchargeLines.length} voci`,
+      tone: "warning",
+    });
+  }
+
+  // Linked charges
+  if (lineViews.length > 0) {
+    checks.push({
       detail:
         linkedLines > 0
-          ? "Le maggiorazioni attive sono collegate alla voce padre."
-          : "Nessuna maggiorazione attiva sulle righe selezionate.",
+          ? `${linkedLines} voci hanno maggiorazioni collegate.`
+          : "Nessuna maggiorazione attiva sulle righe.",
       id: "linked",
       label: "Maggiorazioni collegate",
       result: `${linkedLines} collegate`,
       tone: "success",
-    },
-    {
-      detail:
-        safetyLines > 0
-          ? "Le voci OS sono escluse dal ribasso secondo le regole correnti."
-          : "Nessuna voce OS presente nel documento.",
+    });
+  }
+
+  // OS safety costs
+  if (safetyLines > 0) {
+    checks.push({
+      detail: `${safetyLines} voci OS (oneri sicurezza) presenti. Sono escluse dal calcolo del ribasso.`,
       id: "safety",
       label: "Voci OS escluse dal ribasso",
-      result: `${safetyLines} OS escluse`,
+      result: `${safetyLines} OS`,
       tone: "success",
-    },
-    {
-      detail: hasBudgetOverflow
-        ? "Il documento supera il residuo contrattuale disponibile."
-        : "Il totale SAL resta dentro il residuo contrattuale disponibile.",
+    });
+  }
+
+  // Budget check
+  if (hasBudgetOverflow) {
+    checks.push({
+      detail: `Il documento supera il residuo disponibile di ${Math.abs(summary.budgetResidual).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}. Il budget contrattuale non è sufficiente.`,
+      id: "budget-overflow",
+      label: "Sforamento budget",
+      result: `Fuori di ${Math.abs(summary.budgetResidual).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`,
+      tone: "danger",
+    });
+  } else {
+    checks.push({
+      detail: `Residuo contrattuale di ${summary.budgetResidual.toLocaleString("it-IT", { style: "currency", currency: "EUR" })} dopo questa SAL.`,
       id: "budget",
-      label: "Budget residuo dopo SAL",
-      result: hasBudgetOverflow ? "Fuori budget" : "OK",
-      tone: hasBudgetOverflow ? "danger" : "success",
-    },
-  ];
+      label: "Budget residuo",
+      result: summary.budgetResidual >= 0 ? "OK" : "Fuori budget",
+      tone: summary.budgetResidual >= 0 ? "success" : "danger",
+    });
+  }
+
+  // High discount warning
+  if (highDiscount) {
+    checks.push({
+      detail: `Il ribasso del ${economicRules.discountPercent.toLocaleString("it-IT")}% è superiore al 30%. Verifica che sia corretto.`,
+      id: "high-discount",
+      label: "Ribasso elevato",
+      result: `${economicRules.discountPercent.toLocaleString("it-IT")}%`,
+      tone: "warning",
+    });
+  }
+
+  // Format discount amount
+  if (summary.discountAmount > 0) {
+    checks.push({
+      detail: `Ribasso applicato: ${summary.discountAmount.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}.`,
+      id: "discount",
+      label: "Sconto applicato",
+      result: summary.discountAmount.toLocaleString("it-IT", {
+        style: "currency",
+        currency: "EUR",
+      }),
+      tone: "success",
+    });
+  }
+
+  return checks;
 }
 
 function buildMeasurementRows(line: SalLineDraft, index: number): SalMeasurementRow[] {

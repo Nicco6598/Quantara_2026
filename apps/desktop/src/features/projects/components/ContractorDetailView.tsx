@@ -4,9 +4,9 @@ import {
   ClipboardList,
   FolderOpen,
   Layers3,
-  Search,
   TrendingUp,
 } from "lucide-react";
+import { FilterSearch } from "@/components/filters";
 import type {
   ActivityItem,
   ApprovalItem,
@@ -206,16 +206,12 @@ export function ContractorDetailView({
                 />
               ))}
             </div>
-            <label className="relative min-w-0 xl:w-[260px]">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Cerca lotto, PM, milestone..."
-                type="search"
-                value={query}
-              />
-            </label>
+            <FilterSearch
+              className="xl:w-[260px]"
+              onChange={setQuery}
+              placeholder="Cerca lotto, PM, milestone..."
+              value={query}
+            />
           </ProjectsWorkbench>
         </section>
 

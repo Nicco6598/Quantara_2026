@@ -1,5 +1,6 @@
-import { Pencil, Search, Trash2, X } from "lucide-react";
+import { Pencil, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { FilterSearch } from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
@@ -95,16 +96,16 @@ export function SalModal({
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 border-b border-subtle px-5 py-3">
-            <div className="flex rounded-full border border-subtle bg-muted/45 p-1">
+          <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] px-5 py-3">
+            <div className="flex rounded-full border border-[var(--border-subtle)] bg-[var(--bg-muted)]/45 p-1">
               {(["all", "draft", "closed"] as const).map((f) => (
                 <button
                   key={f}
                   className={cn(
                     "rounded-full px-3 py-1 text-xs font-medium transition-colors",
                     filter === f
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-secondary hover:text-foreground",
+                      ? "bg-[var(--surface-base)] text-[var(--text-primary)] shadow-sm"
+                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
                   )}
                   onClick={() => setFilter(f)}
                   type="button"
@@ -113,16 +114,9 @@ export function SalModal({
                 </button>
               ))}
             </div>
-            <label className="relative flex-1 min-w-[200px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary" />
-              <input
-                className="h-9 w-full rounded-full border border-subtle bg-card pl-9 pr-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Cerca SAL..."
-                type="search"
-                value={query}
-              />
-            </label>
+            <div className="min-w-0 flex-1">
+              <FilterSearch onChange={setQuery} placeholder="Cerca SAL..." value={query} />
+            </div>
           </div>
 
           <div className="max-h-[60vh] overflow-y-auto p-5">

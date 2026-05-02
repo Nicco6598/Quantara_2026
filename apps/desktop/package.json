@@ -1,6 +1,6 @@
 {
   "name": "@quantara/desktop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@phosphor-icons/react": "^2.1.10",
     "@quantara/domain-utils": "workspace:*",
     "@quantara/excel-import": "workspace:*",

@@ -6,6 +6,7 @@ import { ShortcutHelpDialog } from "@/components/shared/ShortcutHelpDialog";
 import { ToastProvider, useToast } from "@/components/shared/ToastProvider";
 import { UpdateExperienceDialog } from "@/components/shared/UpdateExperienceDialog";
 import { UpdateReleaseNotesDialog } from "@/components/shared/UpdateReleaseNotesDialog";
+import { useGlobalEscapeListener } from "@/hooks/useEscapeStack";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   APP_UPDATE_AVAILABLE_EVENT,
@@ -62,6 +63,8 @@ function AppShell() {
     document.documentElement.dataset.motion = motionMode;
   }, [motionMode]);
 
+  useGlobalEscapeListener();
+
   const handleTopbarAction = useCallback(
     (actionId: string) => {
       if (actionId === "new-project") {
@@ -111,6 +114,14 @@ function AppShell() {
           title: "Notifiche",
           tone: "info",
         });
+        return;
+      }
+
+      if (actionId.startsWith("sal-goto-step-")) {
+        const step = Number.parseInt(actionId.replace("sal-goto-step-", ""), 10);
+        if (step >= 1 && step <= 4) {
+          useAppStore.getState().setSalPendingStep(step);
+        }
         return;
       }
 
@@ -206,6 +217,18 @@ function AppShell() {
         event.preventDefault();
         navigateForward();
       }
+
+      if (event.key === "Escape") {
+        const isAnyModalOpen =
+          isCommandPaletteOpen ||
+          isShortcutHelpOpen ||
+          availableUpdate !== null ||
+          pendingReleaseNotes !== null;
+        if (!isAnyModalOpen && canGoBack && !isTyping) {
+          event.preventDefault();
+          navigateBack();
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -217,6 +240,9 @@ function AppShell() {
     isCommandPaletteOpen,
     navigateBack,
     navigateForward,
+    pendingReleaseNotes,
+    isShortcutHelpOpen,
+    availableUpdate,
   ]);
 
   useEffect(() => {

@@ -1,18 +1,24 @@
 import {
   Calculator,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Coins,
   Download,
   FileBadge,
   ReceiptText,
-  Search,
   ShieldCheck,
-  X,
+  Trash2,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ClearFiltersButton,
+  FilterDateInput,
+  FilterSearch,
+  FilterSelect,
+} from "@/components/filters";
+import { ContextToolbar } from "@/components/shared/ContextToolbar";
+import { SavedViewSelector } from "@/components/shared/SavedViewSelector";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
@@ -22,6 +28,7 @@ import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+import { useSelectionStore } from "@/store/selection-store";
 
 const STATUS_OPTIONS = ["Tutti", "Bozza", "Chiuso"] as const;
 
@@ -36,12 +43,12 @@ export function AccountingScreen() {
   const projects = useSalWorkflowStore((state) => state.projects);
 
   const [filterProject, setFilterProject] = useState("all");
-  const [filterContractor, setFilterContractor] = useState("all");
+  const [filterContractor, setFilterContractor] = useState("Tutti");
   const [filterStatus, setFilterStatus] = useState<string>("Tutti");
   const [filterQuery, setFilterQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [selectedSalIds, setSelectedSalIds] = useState<Set<string>>(new Set());
+  const selectedSalIds = useSelectionStore((state) => state.ids);
 
   const loadContracts = useCallback(() => {
     let active = true;
@@ -94,10 +101,25 @@ export function AccountingScreen() {
     return m;
   }, [projects, contracts]);
 
+  const projectContractorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of projects) {
+      if (p.client) m.set(p.id, p.client);
+    }
+    for (const c of contracts) {
+      if (!m.has(c.id) && c.contractor && c.contractor !== "Senza appaltatore") {
+        m.set(c.id, c.contractor);
+      }
+    }
+    return m;
+  }, [projects, contracts]);
+
   const contractorOptions = useMemo(() => {
-    const set = new Set(contracts.map((c) => c.contractor));
-    return ["Tutti", ...set];
-  }, [contracts]);
+    const set = new Set(projectContractorMap.values());
+    return ["Tutti", ...set].sort((a, b) =>
+      a === "Tutti" ? -1 : b === "Tutti" ? 1 : a.localeCompare(b),
+    );
+  }, [projectContractorMap]);
 
   const projectOptions = useMemo(() => {
     const list = contracts.map((c) => ({ id: c.id, title: c.title, contractor: c.contractor }));
@@ -111,8 +133,8 @@ export function AccountingScreen() {
       .filter(({ doc }) => {
         if (filterProject !== "all" && doc.projectId !== filterProject) return false;
         if (filterContractor !== "Tutti") {
-          const c = contracts.find((cc) => cc.id === doc.projectId);
-          if (c?.contractor !== filterContractor) return false;
+          const contractor = projectContractorMap.get(doc.projectId);
+          if (contractor !== filterContractor) return false;
         }
         if (
           filterStatus !== "Tutti" &&
@@ -139,7 +161,7 @@ export function AccountingScreen() {
     dateFrom,
     dateTo,
     filterQuery,
-    contracts,
+    projectContractorMap,
     projectMap,
   ]);
 
@@ -153,8 +175,9 @@ export function AccountingScreen() {
   }, [salDocuments, salViews, filteredSalIds]);
 
   const selection = useMemo(() => {
-    if (selectedSalIds.size === 0) return filteredData;
-    return filteredData.filter(({ doc }) => selectedSalIds.has(doc.id));
+    const ids = selectedSalIds;
+    if (ids.size === 0) return filteredData;
+    return filteredData.filter(({ doc }) => ids.has(doc.id));
   }, [filteredData, selectedSalIds]);
 
   const metrics = useMemo(() => {
@@ -166,25 +189,21 @@ export function AccountingScreen() {
   }, [selection, contracts]);
 
   const toggleSal = useCallback((id: string) => {
-    setSelectedSalIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    useSelectionStore.getState().toggle(id);
   }, []);
 
   const toggleAll = useCallback(() => {
-    if (selectedSalIds.size === filteredData.length) {
-      setSelectedSalIds(new Set());
+    const store = useSelectionStore.getState();
+    if (store.ids.size === filteredData.length) {
+      store.clear();
     } else {
-      setSelectedSalIds(new Set(filteredData.map(({ doc }) => doc.id)));
+      store.selectAll(filteredData.map(({ doc }) => doc.id));
     }
-  }, [filteredData, selectedSalIds]);
+  }, [filteredData]);
 
   const clearFilters = useCallback(() => {
     setFilterProject("all");
-    setFilterContractor("all");
+    setFilterContractor("Tutti");
     setFilterStatus("Tutti");
     setFilterQuery("");
     setDateFrom("");
@@ -233,73 +252,66 @@ export function AccountingScreen() {
           }
         />
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <FilterSelect
-            label="Appaltatore"
-            onChange={(v) => {
-              setFilterContractor(v);
-              setFilterProject("all");
-            }}
-            options={[...contractorOptions]}
-            value={filterContractor}
-          />
-          <FilterSelect
-            label="Progetto"
-            onChange={(v) => {
-              setFilterProject(v);
-              if (v !== "all") {
-                const c = contracts.find((cc) => cc.id === v);
-                if (c) setFilterContractor(c.contractor);
-              }
-            }}
-            options={projectOptions.map((o) => o.id)}
-            displayMap={new Map(projectOptions.map((o) => [o.id, o.title]))}
-            value={filterProject}
-          />
-          <FilterSelect
-            label="Stato"
-            onChange={setFilterStatus}
-            options={[...STATUS_OPTIONS]}
-            value={filterStatus}
-          />
-          <label className="flex items-center gap-1.5 rounded-full bg-[var(--bg-muted-strong)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-            <span>Da</span>
-            <input
-              className="w-28 bg-transparent text-[12px] text-[var(--text-primary)] outline-none"
-              onChange={(e) => setDateFrom(e.target.value)}
-              type="date"
-              value={dateFrom}
+        <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterSelect
+              label="Appaltatore"
+              onChange={(v) => {
+                setFilterContractor(v);
+                setFilterProject("all");
+              }}
+              options={[...contractorOptions]}
+              value={filterContractor}
             />
-          </label>
-          <label className="flex items-center gap-1.5 rounded-full bg-[var(--bg-muted-strong)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-            <span>A</span>
-            <input
-              className="w-28 bg-transparent text-[12px] text-[var(--text-primary)] outline-none"
-              onChange={(e) => setDateTo(e.target.value)}
-              type="date"
-              value={dateTo}
+            <FilterSelect
+              label="Progetto"
+              onChange={(v) => {
+                setFilterProject(v);
+                if (v !== "all") {
+                  const c = contracts.find((cc) => cc.id === v);
+                  if (c) setFilterContractor(c.contractor);
+                }
+              }}
+              options={projectOptions.map((o) => o.id)}
+              displayMap={new Map(projectOptions.map((o) => [o.id, o.title]))}
+              value={filterProject}
             />
-          </label>
-          <label className="flex items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-            <Search className="size-3.5" />
-            <input
-              className="w-32 bg-transparent text-[12px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
-              onChange={(e) => setFilterQuery(e.target.value)}
+            <FilterSelect
+              label="Stato"
+              onChange={setFilterStatus}
+              options={[...STATUS_OPTIONS]}
+              value={filterStatus}
+            />
+            <FilterDateInput label="Da" onChange={setDateFrom} value={dateFrom} />
+            <FilterDateInput label="A" onChange={setDateTo} value={dateTo} />
+            <FilterSearch
+              onChange={setFilterQuery}
               placeholder="Cerca SAL..."
-              type="text"
               value={filterQuery}
             />
-          </label>
-          {hasActiveFilters ? (
-            <button
-              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-semibold text-[var(--accent-primary)] transition-colors hover:bg-[var(--info-soft)]"
-              onClick={clearFilters}
-              type="button"
-            >
-              <X className="size-3.5" />
-              Cancella filtri
-            </button>
-          ) : null}
+            {hasActiveFilters ? <ClearFiltersButton onClick={clearFilters} /> : null}
+          </div>
+          <div className="flex items-center gap-3 pl-2 before:block before:h-6 before:w-px before:bg-[var(--border-subtle)]">
+            <SavedViewSelector
+              currentFilters={{
+                contractor: filterContractor,
+                project: filterProject,
+                status: filterStatus,
+                dateFrom,
+                dateTo,
+                query: filterQuery,
+              }}
+              onApplyFilters={(filters) => {
+                if (filters.contractor) setFilterContractor(filters.contractor);
+                if (filters.project) setFilterProject(filters.project);
+                if (filters.status) setFilterStatus(filters.status);
+                if (filters.dateFrom) setDateFrom(filters.dateFrom);
+                if (filters.dateTo) setDateTo(filters.dateTo);
+                if (filters.query) setFilterQuery(filters.query);
+              }}
+              route="accounting"
+            />
+          </div>
         </div>
       </section>
 
@@ -325,6 +337,38 @@ export function AccountingScreen() {
                       : "Seleziona tutti"}
                   </button>
                 </div>
+
+                <ContextToolbar
+                  actions={[
+                    {
+                      icon: <Download className="size-4" />,
+                      label: "Esporta",
+                      run: () =>
+                        notify({
+                          message: "Esportazione in arrivo con un prossimo aggiornamento.",
+                          title: "Esporta",
+                          tone: "info",
+                        }),
+                    },
+                    {
+                      icon: <Trash2 className="size-4" />,
+                      label: "Elimina",
+                      tone: "danger",
+                      run: () => {
+                        const ids = [...useSelectionStore.getState().ids];
+                        const count = ids.length;
+                        for (const id of ids) useSalWorkflowStore.getState().deleteSal(id);
+                        useSelectionStore.getState().clear();
+                        notify({
+                          message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
+                          title: "Eliminate",
+                          tone: "success",
+                        });
+                      },
+                    },
+                  ]}
+                  entityLabel="SAL"
+                />
 
                 {filteredData.length > 0 ? (
                   <div className="mt-4 overflow-hidden rounded-[14px] border-[0.5px] border-[var(--border-subtle)]">
@@ -558,38 +602,6 @@ export function AccountingScreen() {
         </aside>
       </section>
     </main>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-  displayMap,
-}: {
-  label: string;
-  value: string;
-  options: readonly string[];
-  onChange: (v: string) => void;
-  displayMap?: Map<string, string>;
-}) {
-  return (
-    <label className="flex items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-      <span>{label}:</span>
-      <select
-        className="max-w-[140px] bg-transparent text-[12px] font-semibold text-[var(--text-primary)] outline-none"
-        onChange={(e) => onChange(e.target.value)}
-        value={value}
-      >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {displayMap?.get(opt) ?? opt}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="size-3 opacity-60" />
-    </label>
   );
 }
 

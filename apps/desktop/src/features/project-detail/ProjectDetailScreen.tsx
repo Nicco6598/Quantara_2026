@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
@@ -32,6 +33,8 @@ import { listDesktopContracts } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+import { useSelectionStore } from "@/store/selection-store";
+import { ProjectTimeline } from "./components/ProjectTimeline";
 
 const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -403,10 +406,42 @@ export function ProjectDetailScreen() {
             </div>
 
             <div className="mt-4 space-y-2">
+              <ContextToolbar
+                actions={[
+                  {
+                    ...ContextToolbar.actions.export,
+                    run: () =>
+                      notify({
+                        message: "Esportazione in arrivo con un prossimo aggiornamento.",
+                        title: "Esporta",
+                        tone: "info",
+                      }),
+                  },
+                  {
+                    ...ContextToolbar.actions.delete,
+                    run: () => {
+                      const ids = [...useSelectionStore.getState().ids];
+                      const count = ids.length;
+                      ids.forEach((id) => {
+                        const sal = salDocuments.find((d) => d.id === id);
+                        if (sal) deleteSal(sal.id);
+                      });
+                      useSelectionStore.getState().clear();
+                      notify({
+                        message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
+                        title: "Eliminate",
+                        tone: "success",
+                      });
+                    },
+                  },
+                ]}
+                entityLabel="SAL"
+              />
               {salRows.map((row) => (
                 <SalCard
                   key={row.id}
                   date={row.date}
+                  id={row.id}
                   isClosed={row.isClosed}
                   onClose={() => handleCloseSal(row.id)}
                   onDelete={() => setDeleteTargetId(row.id)}
@@ -430,6 +465,7 @@ export function ProjectDetailScreen() {
         </div>
 
         <aside className="min-w-0 space-y-4">
+          <ProjectTimeline project={selectedProject} salDocuments={salDocuments} />
           <Panel>
             <PanelTitle icon={Radio}>Presidio rapido</PanelTitle>
             <dl className="mt-4 divide-y divide-[var(--border-subtle)]/70">
@@ -714,6 +750,7 @@ function InfoBlock({ label, note, value }: { label: string; note?: string; value
 
 function SalCard({
   date,
+  id,
   isClosed,
   onClose,
   onDelete,
@@ -724,6 +761,7 @@ function SalCard({
   value,
 }: {
   date: string;
+  id: string;
   isClosed: boolean;
   onClose: () => void;
   onDelete: () => void;
@@ -733,11 +771,68 @@ function SalCard({
   tone: "danger" | "info" | "success" | "warning";
   value: string;
 }) {
+  const isSelected = useSelectionStore((state) => state.ids.has(id));
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="group relative flex items-center justify-between gap-4 rounded-[16px] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/60 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--bg-muted)_84%,var(--surface-base)_16%)] hover:ring-[var(--border-subtle)]">
-      <div className="flex min-w-0 items-center gap-3">
+    <div
+      className={cn(
+        "group relative flex items-center justify-between gap-3 rounded-[16px] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-3 py-3 ring-1 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--bg-muted)_84%,var(--surface-base)_16%)]",
+        isSelected
+          ? "ring-[var(--accent-primary)]/50 bg-[color-mix(in_srgb,var(--info-soft)_30%,var(--surface-base)_70%)]"
+          : "ring-[var(--border-subtle)]/60 hover:ring-[var(--border-subtle)]",
+      )}
+    >
+      <button
+        className="absolute inset-0 cursor-pointer rounded-[16px]"
+        onClick={() => useSelectionStore.getState().toggle(id)}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            useSelectionStore.getState().toggle(id);
+          }
+        }}
+        aria-label={`Seleziona ${sal}`}
+        type="button"
+      />
+
+      <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-3">
+        <motion.button
+          aria-checked={isSelected}
+          className={cn(
+            "flex size-[20px] shrink-0 items-center justify-center rounded-[5px] border transition-colors",
+            isSelected
+              ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]"
+              : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            useSelectionStore.getState().toggle(id);
+          }}
+          role="checkbox"
+          type="button"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          {isSelected && (
+            <svg
+              aria-label="Selezionato"
+              className="size-2.5 text-white"
+              fill="none"
+              viewBox="0 0 12 12"
+            >
+              <path
+                d="M2.5 6L5 8.5L9.5 3.5"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+              />
+            </svg>
+          )}
+        </motion.button>
+
         <span
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-[12px]",
@@ -762,7 +857,7 @@ function SalCard({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="pointer-events-auto relative z-10 flex shrink-0 items-center gap-1">
         {isClosed ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-3 py-1 text-[11px] font-semibold text-[var(--success-base)]">
             <ThumbsUp className="size-3.5" />

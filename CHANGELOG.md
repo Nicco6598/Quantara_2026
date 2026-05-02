@@ -2,6 +2,59 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.2 - 2026-05-02
+
+### Navigazione e interfaccia generale
+
+- **Breadcrumb di navigazione** — sotto le frecce avanti/indietro compare il percorso delle pagine visitate (es. "Progetti > Edificio Scala A > SAL 03"). Clicca su un passaggio intermedio per tornare direttamente a quella pagina. Se il percorso è lungo, viene mostrato compatto.
+- **Escape universale** — il tasto ESC chiude qualsiasi finestra, menu o pannello aperto.
+- **Selezione multipla e azioni bulk** — in Contabilità e Dettaglio progetto puoi selezionare più elementi con le caselle di spunta e fare azioni in blocco (eliminare, esportare). La barra azioni mostra il conteggio e scompare quando deselezioni tutto.
+- **Indicatore di salvataggio** — nella barra in alto appare un indicatore dello stato di salvataggio (salvato, in salvataggio, modifiche da salvare).
+- **Componenti filtro condivisi** — creati FilterSelect, FilterSearch, FilterDateInput e ClearFiltersButton con stile pill uniforme (rounded-full, bg-muted, ring-1). Utilizzati in Contabilità, Tariffari, Materiali, modale SAL e Dettaglio appaltatore: ricerca, dropdown e date picker hanno lo stesso aspetto su tutte le schermate. I filtri in Tariffari ora mostrano solo opzioni realmente presenti nei dati (es. stato "Attivo" / "Bozza" / "Validato" in italiano, derivati dal database).
+- **Tema chiaro rivisto** — palette neutra riprogettata: sfondo e pannelli non sono più bianco puro (#ffffff) ma hanno tonalità calde e profonde (#f7f8fa, #ebedf0). Superfici e bordi hanno contrasti più morbidi, texture più ricca e meno affaticamento visivo.
+- **Tema scuro rivisto** — sfondo carbon black caldo (#121214) al posto del blu notte, tonalità pastello calde per pannelli e superfici. Testi più morbidi (bianco caldo #e8e8ed, grigio #94949e), bordi meno aggressivi. I colori di stato sono più saturi e "neon" per maggiore contrasto su fondo scuro (verde #22d06a, ambra #f0a030, rosso #f05048, azzurro #4090f0).
+
+### Creazione SAL — completamente rinnovata
+
+- **Navigazione a step nella barra superiore** — i passaggi (Impostazioni, Voci, Verifica, Conferma) sono integrati nella barra in alto al posto del pulsante "+ Nuovo". Ogni step è cliccabile per navigare avanti e indietro.
+- **Layout più snello e compatto** — ogni fase mostra solo le informazioni essenziali. Titoli più piccoli, pannelli più stretti, niente doppie barre o spazi sprecati. Le azioni principali (Continua, Conferma) sono sempre visibili in fondo.
+- **Ricerca voci con autocomplete** — basta iniziare a digitare un codice o descrizione per trovare e aggiungere voci al volo, senza più il vecchio pannello catalogo. Supporta anche Enter rapido: scrivi il codice e premi Invio per aggiungere direttamente.
+- **Modifica diretta dei fattori** — click sul valore nella tabella → modifica → Invio conferma / Escape annulla. Nessun modale.
+- **Riordino voci con drag & drop** — trascina le voci per riordinarle. Utile per raggruppare voci simili prima della stampa. Durante il trascinamento la riga si solleva con un'ombra per feedback visivo.
+- **Copia e incolla voci tra SAL** — Ctrl+C copia le voci selezionate, Ctrl+V le incolla in un'altra bozza. Funziona anche tra sessioni diverse (passa dagli appunti di sistema).
+- **Tabella voci ridisegnata** — righe alternate, campi editabili visivamente distinti da quelli di sola lettura, pulsante "Dettaglio" per espandere misure e maggiorazioni.
+- **Template SAL** — in fase Voci, dopo aver inserito voci e ribasso, clicca "Salva come template". La prossima volta che crei una SAL con lo stesso tariffario, clicca "Template (1)" e scegli il template: voci e regole vengono applicati automaticamente.
+- **Confronto SAL** — in fase Verifica, se esiste una SAL precedente, puoi confrontarle riga per riga: voci aggiunte in verde, rimosse in rosso, modificate in giallo, con differenze di quantità e importo.
+- **Ribasso gara modificabile ovunque** — la percentuale di sconto si può cambiare sia in fase Impostazioni che in fase Voci. Lo sconto applicato è sempre visibile.
+- **Budget, residuo e SAL corrente sempre sotto controllo** — in fase Voci compaiono tre card: l'importo della SAL, il budget residuo (verde/rosso) e il controllo del ribasso con calcolo dello sconto in tempo reale.
+- **Fase Verifica** — controlli contabili come pillole colorate, riepilogo economico e anteprima documento affiancati, dettaglio voci collassabile.
+- **Fase Conferma** — totale SAL, riepilogo sintetico, pulsanti di output e conferma finale.
+- **Fase Completata** — metriche finali, pulsanti "Chiudi" e "Nuova revisione".
+- **Messaggi di errore chiari** — se manca un contratto o un tariffario, il messaggio spiega esattamente cosa fare per proseguire.
+
+### Dettaglio progetto
+
+- **Timeline progetto** — nella sidebar compare una timeline visiva con l'elenco cronologico delle SAL, milestone di avvio/chiusura, stato (completata, in corso, in ritardo) e importi.
+- **Selezione multipla SAL** — ogni card SAL ha una casella di spunta, puoi selezionarne più di una e cancellarle tutte insieme.
+
+### Contabilità
+
+- **Selezione multipla e azioni bulk** — seleziona più SAL, eliminale o esportale in blocco.
+- **Viste filtro salvate** — in Contabilità, imposta i filtri che vuoi (appaltatore, progetto, stato, date), clicca "Viste" → "Salva vista corrente" e dagli un nome. Per riapplicarli, clicca "Viste" → clicca sulla vista salvata.
+- **Filtro appaltatore** — ora mostra i nomi reali degli appaltatori invece di "Senza appaltatore". I dati vengono letti dal registro progetti dello store SAL (campo client), unificati con i contratti caricati da filesystem. Risolto il bug di inizializzazione che lasciava il filtro su un valore "all" non presente tra le opzioni.
+- **Pulsante Viste salvate più visibile** — separato dai filtri con un divisore verticale, evidenziato con colore info-soft e ring accentato.
+
+### Impostazioni
+
+- **Backup e ripristino database** — crea un backup completo del database in formato `.qbk` con un click. Ripristina caricando un file precedentemente salvato. Il backup include SAL, appaltatori, progetti, materiali e preferenze.
+- **Registro attività** — sezione che mostra le ultime operazioni eseguite con data e ora.
+
+### Varie
+
+- **Indicatore di salvataggio globale** — nella barra in alto.
+- **Performance backend** — migrazioni database eseguite una volta sola all'avvio, non più a ogni comando.
+- **Affidabilità** — gestione errori più robusta nel backend Rust.
+
 ## 0.2.1 - 2026-05-01
 
 - **Creazione SAL** — rimossa la navigazione duplicata sopra la procedura guidata: la pagina ora mostra solo la toolbar operativa corretta, con un flusso piu pulito.

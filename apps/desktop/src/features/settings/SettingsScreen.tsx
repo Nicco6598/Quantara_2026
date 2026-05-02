@@ -5,19 +5,22 @@ import {
   CheckCircle,
   Clock,
   DesktopTower,
+  FloppyDisk,
   GitBranch,
   MagicWand,
   Moon,
   Palette,
   Sparkle,
   Sun,
+  Trash,
   WaveSine,
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import type { ComponentType, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
+import { backupDatabase, type DatabaseInfo, getDatabaseInfo, restoreDatabase } from "@/lib/backup";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { cn } from "@/lib/utils";
 import {
@@ -26,6 +29,7 @@ import {
   usePreferenceState,
   useThemeState,
 } from "@/store/app-store";
+import { useAuditLogStore } from "@/store/audit-log-store";
 
 type UpdateViewState = { kind: "idle" } | UpdateCheckResult;
 type Tone = "danger" | "info" | "neutral" | "success" | "warning";
@@ -50,6 +54,16 @@ export function SettingsScreen() {
   const { pendingReleaseNotes } = usePendingReleaseNotes();
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateViewState>({ kind: "idle" });
+  const [dbInfo, setDbInfo] = useState<DatabaseInfo | null>(null);
+  const [isBackupRunning, setIsBackupRunning] = useState(false);
+  const [backupResult, setBackupResult] = useState<string | null>(null);
+  const auditEntries = useAuditLogStore((state) => state.entries);
+
+  useEffect(() => {
+    getDatabaseInfo()
+      .then(setDbInfo)
+      .catch(() => {});
+  }, []);
 
   const handleCheckForUpdates = async () => {
     setIsCheckingUpdates(true);
@@ -258,6 +272,116 @@ export function SettingsScreen() {
               value={showReleaseNotesAfterUpdate ? "Abilitato" : "Disabilitato"}
             />
           </div>
+        </BezelSurface>
+
+        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
+          <SectionTitle eyebrow="Backup" icon={FloppyDisk} title="Backup e ripristino" />
+          <div className="mt-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <MiniStat
+                label="Dimensione DB"
+                value={dbInfo ? formatFileSize(dbInfo.sizeBytes) : "—"}
+              />
+              <MiniStat label="Directory dati" value={dbInfo ? "Locale" : "—"} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90 disabled:opacity-50"
+                disabled={isBackupRunning}
+                onClick={async () => {
+                  setIsBackupRunning(true);
+                  const result = await backupDatabase();
+                  setBackupResult(result);
+                  setIsBackupRunning(false);
+                  if (result !== "annullato") {
+                    getDatabaseInfo()
+                      .then(setDbInfo)
+                      .catch(() => {});
+                  }
+                }}
+                type="button"
+              >
+                <FloppyDisk className="size-4" weight="bold" />
+                Crea backup
+              </button>
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+                onClick={async () => {
+                  const result = await restoreDatabase();
+                  if (result !== "annullato") {
+                    setBackupResult(result);
+                    getDatabaseInfo()
+                      .then(setDbInfo)
+                      .catch(() => {});
+                  }
+                }}
+                type="button"
+              >
+                Ripristina
+              </button>
+            </div>
+            {backupResult && (
+              <div className="rounded-[10px] bg-[var(--success-soft)] px-3 py-2 text-[12px] font-medium text-[var(--success-base)]">
+                {backupResult}
+              </div>
+            )}
+            {isBackupRunning && (
+              <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+                <ArrowsClockwise className="size-4 animate-spin" weight="bold" />
+                Backup in corso...
+              </div>
+            )}
+          </div>
+        </BezelSurface>
+
+        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
+          <SectionTitle eyebrow="Audit" icon={Clock} title="Registro attività" />
+          <div className="mt-4 max-h-[320px] overflow-y-auto">
+            {auditEntries.length === 0 ? (
+              <div className="py-4 text-center text-[13px] text-[var(--text-secondary)]">
+                Nessuna attività registrata.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {auditEntries.map((entry) => (
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-[12px] bg-[var(--bg-muted)]/50 px-3 py-2 text-[12px]"
+                    key={entry.id}
+                  >
+                    <div className="min-w-0">
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        {entry.action}
+                      </span>
+                      <span className="ml-1.5 text-[var(--text-secondary)]">
+                        {entry.entityType}: {entry.entityId.slice(0, 12)}…
+                      </span>
+                      <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                        {entry.details}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right text-[11px] text-[var(--text-secondary)]">
+                      {new Date(entry.timestamp).toLocaleDateString("it-IT")}
+                      <br />
+                      {new Date(entry.timestamp).toLocaleTimeString("it-IT", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {auditEntries.length > 0 && (
+            <button
+              className="mt-3 flex items-center gap-2 rounded-[12px] px-3 py-2 text-[12px] font-semibold text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
+              onClick={() => useAuditLogStore.getState().clearAll()}
+              type="button"
+            >
+              <Trash className="size-4" />
+              Cancella registro
+            </button>
+          )}
         </BezelSurface>
       </section>
     </main>
@@ -570,6 +694,13 @@ function getReleaseStatus(state: UpdateViewState) {
     notes: "",
     tone: "danger" as const,
   };
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 function formatTimestamp(value: string) {

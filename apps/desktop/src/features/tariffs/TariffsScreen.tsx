@@ -8,12 +8,12 @@ import {
   type LucideIcon,
   MoreVertical,
   Save,
-  Search,
   Sparkles,
   Star,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
 import { SummaryLine } from "@/components/shared/Screen";
 import { ScreenHero } from "@/components/shared/ScreenHero";
@@ -215,6 +215,27 @@ export function TariffsScreen() {
   }, [projectFilter, realContracts]);
 
   const availableYears = tariffMetrics.years;
+
+  const statusOptions = useMemo(() => {
+    const set = new Set(tariffBooksState.data.map((b) => b.status));
+    return ["all", ...set];
+  }, [tariffBooksState.data]);
+
+  const statusDisplayMap = useMemo(
+    () =>
+      new Map<string, string>([
+        ["all", "Tutti gli stati"],
+        ["active", "Attivo"],
+        ["draft", "Bozza"],
+        ["validated", "Validato"],
+      ]),
+    [],
+  );
+
+  const projectDisplayMap = useMemo(
+    () => new Map(realContracts.map((c) => [c.id, c.title])),
+    [realContracts],
+  );
 
   const baseFilteredTariffBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -690,63 +711,55 @@ export function TariffsScreen() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                className="h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                onChange={(event) => setYearFilter(event.target.value)}
+              <FilterSelect
+                label="Anno"
+                onChange={setYearFilter}
+                options={["all", ...availableYears.map(String)]}
                 value={yearFilter}
-              >
-                <option value="all">Tutti gli anni</option>
-                {availableYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-10 min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                onChange={(event) => setProjectFilter(event.target.value)}
+                displayMap={
+                  new Map<string, string>([
+                    ["all", "Tutti gli anni"],
+                    ...availableYears.map((y) => [String(y), String(y)] as const),
+                  ])
+                }
+              />
+              <FilterSelect
+                label="Progetto"
+                onChange={setProjectFilter}
+                options={["all", ...realContracts.map((c) => c.id)]}
                 value={projectFilter}
-              >
-                <option value="all">
-                  {realContracts.length > 0 ? "Tutti i progetti" : "Nessun progetto locale"}
-                </option>
-                {realContracts.map((contract) => (
-                  <option key={contract.id} value={contract.id}>
-                    {contract.title}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                onChange={(event) => setStatusFilter(event.target.value)}
+                displayMap={
+                  new Map([
+                    ["all", realContracts.length > 0 ? "Tutti i progetti" : "Nessun progetto"],
+                    ...projectDisplayMap,
+                  ])
+                }
+              />
+              <FilterSelect
+                label="Stato"
+                onChange={setStatusFilter}
+                options={statusOptions}
                 value={statusFilter}
-              >
-                <option value="all">Tutti gli stati</option>
-                <option value="active">active</option>
-                <option value="draft">draft</option>
-                <option value="validated">validated</option>
-              </select>
-              <label className="relative min-w-0">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
-                <input
-                  className="h-10 w-full min-w-[160px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Cerca per nome, ente o ID..."
-                  type="search"
-                  value={query}
+                displayMap={statusDisplayMap}
+              />
+              <FilterSearch
+                onChange={setQuery}
+                placeholder="Cerca per nome, ente o ID..."
+                value={query}
+              />
+              {yearFilter !== "all" ||
+              projectFilter !== "all" ||
+              statusFilter !== "all" ||
+              query ? (
+                <ClearFiltersButton
+                  onClick={() => {
+                    setYearFilter("all");
+                    setProjectFilter("all");
+                    setStatusFilter("all");
+                    setQuery("");
+                  }}
                 />
-              </label>
-              <ProjectControlButton
-                onClick={() => {
-                  setYearFilter("all");
-                  setProjectFilter("all");
-                  setStatusFilter("all");
-                  setQuery("");
-                }}
-                variant="neutral"
-              >
-                Reset
-              </ProjectControlButton>
+              ) : null}
             </div>
           </div>
 

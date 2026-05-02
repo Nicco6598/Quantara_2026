@@ -14,9 +14,16 @@ import {
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRef, useState } from "react";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { SaveIndicator } from "@/components/shared/SaveIndicator";
 import { BezelSurface } from "@/features/projects/components/workspace-ui";
 import { cn } from "@/lib/utils";
-import { type QuantaraRoute, useNavigationState, useThemeState } from "@/store/app-store";
+import {
+  type QuantaraRoute,
+  useNavigationState,
+  usePreferenceState,
+  useThemeState,
+} from "@/store/app-store";
 
 type RouteMeta = {
   dateLabel: string;
@@ -120,8 +127,11 @@ export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarPro
   return (
     <header className="relative z-30 shrink-0 px-4 py-3 md:px-6">
       <BezelSurface innerClassName="flex min-h-[64px] items-center justify-between gap-5 px-4 py-2.5 md:px-5">
-        <div className="animate-entry-sm flex min-w-0 items-center gap-4">
-          <HistoryNavigator />
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="animate-entry-sm flex min-w-0 items-center gap-4">
+            <HistoryNavigator />
+            <Breadcrumbs />
+          </div>
 
           <div className="min-w-0">
             <div className="text-[9px] font-extrabold uppercase tracking-[0.24em] text-[var(--accent-primary)]">
@@ -134,23 +144,80 @@ export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarPro
               <span className="truncate text-[11px] font-semibold tracking-[0.02em] text-[var(--text-secondary)]">
                 {meta.dateLabel}
               </span>
-              <span className="size-[7px] animate-pulse rounded-full bg-[var(--success-base)] shadow-[0_0_0_4px_color-mix(in_srgb,var(--success-base)_13%,transparent)]" />
-              <span className="text-[11px] font-bold text-[var(--success-base)]">
-                Sincronizzato
-              </span>
+              <SaveIndicator status="saved" lastSavedAt={null} />
             </div>
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           <GlobalSearch onOpen={onOpenCommandPalette} />
-          <div className="mx-1.5 h-[34px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
-          <PageActions actions={pageActions} onAction={onPageAction} />
+          {activeRoute === "sal-create" ? (
+            <SalStepNav onAction={onPageAction} />
+          ) : (
+            <>
+              <div className="mx-1.5 h-[34px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
+              <PageActions actions={pageActions} onAction={onPageAction} />
+            </>
+          )}
           <div className="mx-1.5 h-[34px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
           <UtilityButtons onAction={onPageAction} />
         </div>
       </BezelSurface>
     </header>
+  );
+}
+
+function SalStepNav({ onAction }: { onAction?: (actionId: string) => void }) {
+  const { salCurrentStep } = usePreferenceState();
+
+  const steps = [
+    { label: "Impostazioni", icon: "01", actionId: "sal-goto-step-1" },
+    { label: "Voci", icon: "02", actionId: "sal-goto-step-2" },
+    { label: "Verifica", icon: "03", actionId: "sal-goto-step-3" },
+    { label: "Conferma", icon: "04", actionId: "sal-goto-step-4" },
+  ];
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {steps.map((step, index) => {
+        const stepNumber = index + 1;
+        const isCurrent = salCurrentStep === stepNumber;
+        const isCompleted = salCurrentStep > stepNumber;
+        const isClickable = isCompleted || stepNumber === salCurrentStep + 1;
+
+        return (
+          <div className="flex items-center" key={step.label}>
+            {index > 0 && (
+              <div
+                className={cn(
+                  "mx-1 h-px w-4",
+                  isCompleted ? "bg-[var(--accent-primary)]" : "bg-[var(--border-subtle)]",
+                )}
+              />
+            )}
+            <button
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold whitespace-nowrap transition-all duration-200",
+                isCurrent && "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm",
+                isCompleted && "bg-[var(--success-soft)] text-[var(--success-base)]",
+                !isCurrent &&
+                  !isCompleted &&
+                  (isClickable
+                    ? "bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
+                    : "bg-[var(--bg-muted)]/50 text-[var(--text-secondary)]/50 ring-1 ring-[var(--border-subtle)]/50 cursor-not-allowed"),
+              )}
+              onClick={() => {
+                if (isClickable && onAction) onAction(step.actionId);
+              }}
+              type="button"
+            >
+              <span className="text-[10px]">{step.icon}</span>
+              <span>{step.label}</span>
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

@@ -69,7 +69,7 @@ describe("SAL calculations", () => {
   it("summarizes progressive totals and flags budget overflow", () => {
     const views = buildLineViews([ordinaryLine, safetyLine], defaultSalEconomicRules);
     const summary = summarizeSalLines(views, 2500, 100);
-    const checks = buildVerificationChecks(views, summary);
+    const checks = buildVerificationChecks(views, summary, defaultSalEconomicRules);
 
     expect(summary).toMatchObject({
       budgetResidual: -302,
@@ -79,7 +79,7 @@ describe("SAL calculations", () => {
       safetyAmount: 500,
       total: 2702,
     });
-    expect(checks.find((check) => check.id === "budget")?.tone).toBe("danger");
+    expect(checks.find((check) => check.id === "budget-overflow")?.tone).toBe("danger");
   });
 
   it("marks zero or invalid quantities as incomplete without negative totals", () => {

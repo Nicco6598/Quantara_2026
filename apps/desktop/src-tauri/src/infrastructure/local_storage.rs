@@ -9,15 +9,21 @@ pub fn default_database_name() -> PathBuf {
     PathBuf::from("quantara.sqlite3")
 }
 
-pub fn open_app_database(app: &AppHandle) -> Result<Connection, AppError> {
-    let app_data_dir = app
+pub fn get_app_data_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let path = app
         .path()
         .app_data_dir()
-        .map_err(|error| AppError::Database(error.to_string()))?;
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    std::fs::create_dir_all(&path)?;
+    Ok(path)
+}
 
-    std::fs::create_dir_all(&app_data_dir)
-        .map_err(|error| AppError::Database(error.to_string()))?;
+pub fn get_database_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let dir = get_app_data_dir(app)?;
+    Ok(dir.join(default_database_name()))
+}
 
-    let database_path = app_data_dir.join(default_database_name());
-    Connection::open(database_path).map_err(|error| AppError::Database(error.to_string()))
+pub fn open_app_database(app: &AppHandle) -> Result<Connection, AppError> {
+    let database_path = get_database_path(app)?;
+    Connection::open(database_path).map_err(|e| AppError::Database(e.to_string()))
 }

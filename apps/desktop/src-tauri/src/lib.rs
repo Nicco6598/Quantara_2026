@@ -36,6 +36,9 @@ pub fn run() {
             commands::materials::adjust_material_stock,
             commands::materials::deduct_materials,
             commands::materials::list_material_transactions,
+            commands::backup::backup_database,
+            commands::backup::restore_database,
+            commands::backup::get_database_info,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Quantara desktop");

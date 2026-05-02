@@ -80,46 +80,46 @@ export function SalHero({
   title: string;
 }) {
   return (
-    <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
+    <section className="animate-entry grid gap-3 md:grid-cols-[minmax(0,1fr)_280px] md:items-end">
       <div className="min-w-0">
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-            <Icon className="size-5" />
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-8 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+            <Icon className="size-4" />
           </span>
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             Passo {step} di 5
           </span>
         </div>
-        <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
+        <h2 className="mt-3 text-[24px] font-semibold leading-[1.05] text-[var(--text-primary)] md:text-[32px]">
           {title}
         </h2>
-        <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
+        <p className="mt-2 max-w-xl text-[13px] leading-5 text-[var(--text-secondary)]">
           {subtitle}
         </p>
       </div>
-      <BezelSurface className="self-start md:translate-y-2" innerClassName="p-0">
+      <BezelSurface className="self-start md:translate-y-1" innerClassName="p-0">
         <div className="grid min-w-0 grid-cols-3 divide-x divide-[var(--border-subtle)]/60">
-          <div className="flex flex-col items-center gap-1 px-4 py-4">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+          <div className="flex flex-col items-center gap-0.5 px-3 py-3">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
               Progetto
             </span>
-            <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+            <span className="truncate text-[12px] font-semibold text-[var(--text-primary)]">
               {projectTitle ?? "-"}
             </span>
           </div>
-          <div className="flex flex-col items-center gap-1 px-4 py-4">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+          <div className="flex flex-col items-center gap-0.5 px-3 py-3">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
               Anno
             </span>
-            <span className="text-[13px] font-semibold text-[var(--text-primary)]">
+            <span className="text-[12px] font-semibold text-[var(--text-primary)]">
               {tariffYear ?? "-"}
             </span>
           </div>
-          <div className="flex flex-col items-center gap-1 px-4 py-4">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+          <div className="flex flex-col items-center gap-0.5 px-3 py-3">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
               Stato
             </span>
-            <span className="inline-flex rounded-full bg-[var(--info-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--info-base)]">
+            <span className="inline-flex rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--info-base)]">
               {statusLabel}
             </span>
           </div>
@@ -139,8 +139,8 @@ export function SalStepper({
   direction: "forward" | "backward";
 }) {
   return (
-    <BezelSurface innerClassName="p-4 md:p-5">
-      <div className="flex items-start justify-between gap-2 md:gap-4">
+    <BezelSurface innerClassName="p-3 md:p-4">
+      <div className="flex items-start justify-between gap-2 md:gap-3">
         {stages.map((stage, index) => {
           const isCompleted = stage.status === "completed";
           const isCurrent = stage.status === "current";
@@ -183,7 +183,7 @@ export function SalStepper({
                 ) : null}
                 <motion.div
                   className={cn(
-                    "relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full border-2",
+                    "relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border-2",
                     isCompleted &&
                       "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]",
                     isCurrent &&
@@ -257,12 +257,12 @@ export function SalCard({
   title: string;
 }) {
   return (
-    <BezelSurface innerClassName={cn("p-4 md:p-5", className)}>
-      <div className="mb-4 flex items-center gap-2.5">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-[var(--info-soft)] text-[var(--info-base)]">
+    <BezelSurface innerClassName={cn("p-3 md:p-4", className)}>
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[var(--info-soft)] text-[var(--info-base)]">
           <Icon className="size-4" />
         </div>
-        <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">{title}</h2>
+        <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h2>
       </div>
       {children}
     </BezelSurface>

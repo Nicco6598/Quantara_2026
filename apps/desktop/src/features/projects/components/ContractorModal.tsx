@@ -13,7 +13,7 @@ export function ContractorModal({
   contractorDraft: string;
   onChange: (value: string) => void;
   onClose: () => void;
-  onCreate: () => void;
+  onCreate: (name: string) => void;
 }) {
   const [name, setName] = useState(contractorDraft);
   const [contact, setContact] = useState("");
@@ -22,7 +22,7 @@ export function ContractorModal({
   function handleCreate() {
     if (!isValid) return;
     onChange(name);
-    onCreate();
+    onCreate(name);
   }
 
   return (

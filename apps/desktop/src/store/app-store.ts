@@ -33,8 +33,10 @@ type NavigationSlice = {
   pendingWorkflowAction: WorkflowAction;
   routeHistory: NavEntry[];
   routeHistoryIndex: number;
+  salPendingStep: number | null;
   setActiveRoute: (route: QuantaraRoute, context?: string) => void;
   setPendingWorkflowAction: (action: WorkflowAction) => void;
+  setSalPendingStep: (step: number | null) => void;
 };
 
 type ThemeSlice = {
@@ -47,10 +49,12 @@ type PreferenceSlice = {
   autoCheckUpdatesOnLaunch: boolean;
   hasHydratedPreferences: boolean;
   motionMode: MotionMode;
+  salCurrentStep: number;
   selectedProjectId: string;
   setAutoCheckUpdatesOnLaunch: (enabled: boolean) => void;
   setHasHydratedPreferences: (value: boolean) => void;
   setMotionMode: (motionMode: MotionMode) => void;
+  setSalCurrentStep: (step: number) => void;
   setSelectedProjectId: (projectId: string) => void;
   setShowReleaseNotesAfterUpdate: (enabled: boolean) => void;
   showReleaseNotesAfterUpdate: boolean;
@@ -79,6 +83,7 @@ export const useAppStore = create<AppStore>()(
       autoCheckUpdatesOnLaunch: true,
       hasHydratedPreferences: false,
       motionMode: "full",
+      salCurrentStep: 1,
       selectedProjectId: "",
       navigateBack: () =>
         set((state) => {
@@ -101,6 +106,7 @@ export const useAppStore = create<AppStore>()(
           };
         }),
       pendingWorkflowAction: null,
+      salPendingStep: null,
       setActiveRoute: (route, context) =>
         set((state) => {
           const currentEntry = state.routeHistory[state.routeHistoryIndex];
@@ -120,6 +126,10 @@ export const useAppStore = create<AppStore>()(
         set({
           pendingWorkflowAction,
         }),
+      setSalPendingStep: (salPendingStep) =>
+        set({
+          salPendingStep,
+        }),
       setAutoCheckUpdatesOnLaunch: (autoCheckUpdatesOnLaunch) =>
         set({
           autoCheckUpdatesOnLaunch,
@@ -131,6 +141,10 @@ export const useAppStore = create<AppStore>()(
       setMotionMode: (motionMode) =>
         set({
           motionMode,
+        }),
+      setSalCurrentStep: (salCurrentStep) =>
+        set({
+          salCurrentStep,
         }),
       setSelectedProjectId: (selectedProjectId) =>
         set({
@@ -159,6 +173,7 @@ export const useAppStore = create<AppStore>()(
       partialize: (state) => ({
         autoCheckUpdatesOnLaunch: state.autoCheckUpdatesOnLaunch,
         motionMode: state.motionMode,
+        salCurrentStep: state.salCurrentStep,
         selectedProjectId: state.selectedProjectId,
         showReleaseNotesAfterUpdate: state.showReleaseNotesAfterUpdate,
         themeMode: state.themeMode,
@@ -190,10 +205,12 @@ export function usePreferenceState() {
       autoCheckUpdatesOnLaunch: state.autoCheckUpdatesOnLaunch,
       hasHydratedPreferences: state.hasHydratedPreferences,
       motionMode: state.motionMode,
+      salCurrentStep: state.salCurrentStep,
       selectedProjectId: state.selectedProjectId,
       setAutoCheckUpdatesOnLaunch: state.setAutoCheckUpdatesOnLaunch,
       setHasHydratedPreferences: state.setHasHydratedPreferences,
       setMotionMode: state.setMotionMode,
+      setSalCurrentStep: state.setSalCurrentStep,
       setSelectedProjectId: state.setSelectedProjectId,
       setShowReleaseNotesAfterUpdate: state.setShowReleaseNotesAfterUpdate,
       showReleaseNotesAfterUpdate: state.showReleaseNotesAfterUpdate,

@@ -236,8 +236,8 @@ export function ProjectsScreen() {
     setProjectActionDialog({ mode: "actions", project });
   }
 
-  function handleCreateContractor() {
-    const contractorName = normalizeContractorName(contractorDraft);
+  function handleCreateContractor(name?: string) {
+    const contractorName = normalizeContractorName(name ?? contractorDraft);
 
     if (contractorName.length < 2) {
       notify({ message: "Inserisci un nome appaltatore valido.", tone: "warning" });
