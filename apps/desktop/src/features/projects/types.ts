@@ -47,7 +47,7 @@ export type ProjectEditState = {
     contractorName: string;
     contractualAmount: string;
     frameworkAgreementCode: string;
-    safetyCostsNotSubjectToDiscount: string;
+    tenderDiscountPercent: string;
     tariffBookId: string;
     title: string;
   };

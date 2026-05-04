@@ -1,4 +1,4 @@
-use std::{path::Path, process::Command};
+use std::{fs::File, io::Read, path::Path, process::Command};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -32,6 +32,14 @@ pub struct UpdateTariffBookRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TariffWarning {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TariffVoiceRecord {
     pub category: String,
     pub description: String,
@@ -41,6 +49,16 @@ pub struct TariffVoiceRecord {
     pub tariff_book_id: String,
     pub unit_of_measure: String,
     pub unit_price: f64,
+    #[serde(default)]
+    pub categoria_desc: String,
+    #[serde(default)]
+    pub gruppo_desc: String,
+    #[serde(default)]
+    pub voce: String,
+    #[serde(default)]
+    pub voce_desc: String,
+    #[serde(default)]
+    pub warnings: Vec<TariffWarning>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -60,6 +78,8 @@ pub struct TariffPdfImportPreview {
     pub source_name: String,
     pub voices: Vec<TariffVoiceRecord>,
     pub year: i32,
+    pub pages_total: i32,
+    pub pages_parsed: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -77,6 +97,19 @@ struct RfiTariffRecord {
     tipo_valore: String,
     valore_euro: Option<f64>,
     perc_manodopera: Option<f64>,
+    #[serde(default)]
+    categoria_desc: String,
+    #[serde(default)]
+    gruppo_desc: String,
+    #[serde(default)]
+    warnings: Vec<TariffWarning>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ParserOutput {
+    records: Vec<RfiTariffRecord>,
+    #[serde(default)]
+    pages_total: i32,
 }
 
 pub fn list_tariff_books(connection: &Connection) -> Result<Vec<TariffBookRecord>, AppError> {
@@ -257,14 +290,15 @@ pub fn import_tariff_pdf_preview(
         .unwrap_or("Tariffario importato")
         .replace(['_', '-'], " ");
 
-    let records = if extension == "json" {
-        parse_rfi_json_file(path)?
+    let (records, pages_total) = if extension == "json" {
+        (parse_rfi_json_file(path)?, 0)
     } else {
         parse_rfi_pdf_with_python(path, app)?
     };
 
     let source_text = records
         .iter()
+        .take(200)
         .map(|record| {
             format!(
                 "{} {} {} {}",
@@ -285,7 +319,180 @@ pub fn import_tariff_pdf_preview(
         source_name,
         voices,
         year,
+        pages_total,
+        pages_parsed: pages_total,
     })
+}
+
+fn import_single_tariff_pdf(
+    path: &std::path::Path,
+    resource_dir: Option<&std::path::Path>,
+) -> Result<TariffPdfImportPreview, String> {
+    let extension = path
+        .extension()
+        .and_then(|v| v.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if extension != "pdf" && extension != "json" {
+        return Err("only PDF or parser JSON tariff files can be imported".into());
+    }
+
+    let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
+    if metadata.len() > 80 * 1024 * 1024 {
+        return Err("tariff file is too large to import locally".into());
+    }
+
+    let fallback_name = path
+        .file_stem()
+        .and_then(|v| v.to_str())
+        .unwrap_or("Tariffario importato")
+        .replace(['_', '-'], " ");
+
+    let (records, pages_total) = if extension == "json" {
+        (parse_rfi_json_file(path).map_err(|e| e.to_string())?, 0)
+    } else {
+        parse_rfi_pdf_with_python_direct(path, resource_dir)?
+    };
+
+    let source_text = records
+        .iter()
+        .take(200)
+        .map(|r| format!("{} {} {} {}", r.codice, r.voce_desc, r.descrizione, r.tariffa))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let year = infer_year(&fallback_name).unwrap_or(2025);
+    let source_name = infer_source_name(&source_text);
+    let voices = records
+        .iter()
+        .filter_map(|r| rfi_record_to_tariff_voice(r, "tariff_import_preview"))
+        .collect();
+
+    Ok(TariffPdfImportPreview {
+        name: fallback_name,
+        source_name,
+        voices,
+        year,
+        pages_total,
+        pages_parsed: pages_total,
+    })
+}
+
+fn parse_rfi_pdf_with_python_direct(
+    path: &std::path::Path,
+    resource_dir: Option<&std::path::Path>,
+) -> Result<(Vec<RfiTariffRecord>, i32), String> {
+    let mut header = [0_u8; 5];
+    std::fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut header))
+        .map_err(|e| e.to_string())?;
+    if header != *b"%PDF-" {
+        return Err("selected file is not a valid PDF".into());
+    }
+
+    let output = run_bundled_rfi_parser_direct(path, resource_dir)?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "RFI PDF parser failed. Install pdfplumber in the active Python environment. {stderr}"
+        ));
+    }
+
+    let json_str = parser_output_to_utf8(output.stdout).map_err(|e| e.to_string())?;
+    let json_str = remove_json_surrogate_escapes(&json_str);
+
+    if let Ok(result) = serde_json::from_str::<ParserOutput>(&json_str) {
+        return Ok((result.records, result.pages_total));
+    }
+    let records = serde_json::from_str::<Vec<RfiTariffRecord>>(&json_str)
+        .map_err(|e| format!("RFI parser returned invalid JSON: {e}"))?;
+    Ok((records, 0))
+}
+
+fn run_bundled_rfi_parser_direct(
+    path: &std::path::Path,
+    resource_dir: Option<&std::path::Path>,
+) -> Result<std::process::Output, String> {
+    let Some(resource_dir) = resource_dir else {
+        return Err("resource directory unavailable".into());
+    };
+
+    for parser_exe in parser_executable_candidates(resource_dir) {
+        if parser_exe.is_file() {
+            return run_parser_command(Command::new(parser_exe).arg(path));
+        }
+    }
+
+    let parser_script = resource_dir.join("parser").join("rfi_tariffa_parser.py");
+    let python_exe = resource_dir.join("python").join(if cfg!(windows) {
+        "python.exe"
+    } else {
+        "bin/python3"
+    });
+    if python_exe.is_file() && parser_script.is_file() {
+        return run_parser_command(Command::new(python_exe).arg(&parser_script).arg(path));
+    }
+
+    Err(format!(
+        "Bundled parser not found under {}",
+        resource_dir.display()
+    ))
+}
+
+pub fn import_tariff_pdf_preview_batch(
+    paths: &[String],
+    app: &AppHandle,
+    max_concurrent: Option<usize>,
+) -> Result<Vec<TariffPdfImportPreview>, Vec<(String, String)>> {
+    let max = max_concurrent.unwrap_or_else(|| {
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+    })
+    .max(1);
+
+    let resource_dir = app.path().resource_dir().ok();
+    let mut results: Vec<Option<Result<TariffPdfImportPreview, (String, String)>>> =
+        vec![None; paths.len()];
+
+    for chunk_start in (0..paths.len()).step_by(max) {
+        let chunk_end = (chunk_start + max).min(paths.len());
+        let mut handles = Vec::with_capacity(chunk_end - chunk_start);
+
+        for i in chunk_start..chunk_end {
+            let path_buf = std::path::PathBuf::from(&paths[i]);
+            let rd = resource_dir.clone();
+
+            handles.push(std::thread::spawn(move || {
+                let result = import_single_tariff_pdf(&path_buf, rd.as_deref());
+                (i, result)
+            }));
+        }
+
+        for handle in handles {
+            match handle.join() {
+                Ok((idx, Ok(preview))) => results[idx] = Some(Ok(preview)),
+                Ok((idx, Err(msg))) => results[idx] = Some(Err((paths[idx].clone(), msg))),
+                Err(_) => {}
+            }
+        }
+    }
+
+    let mut successes = Vec::with_capacity(paths.len());
+    let mut errors: Vec<(String, String)> = Vec::new();
+    for result in results.into_iter().flatten() {
+        match result {
+            Ok(preview) => successes.push(preview),
+            Err((path, msg)) => errors.push((path, msg)),
+        }
+    }
+
+    if successes.is_empty() && !errors.is_empty() {
+        return Err(errors);
+    }
+
+    Ok(successes)
 }
 
 fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
@@ -293,6 +500,9 @@ fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
     let parser_json = String::from_utf8_lossy(&bytes);
     let parser_json = remove_json_surrogate_escapes(&parser_json);
 
+    if let Ok(output) = serde_json::from_str::<ParserOutput>(&parser_json) {
+        return Ok(output.records);
+    }
     serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json).map_err(|error| {
         AppError::Validation(format!(
             "parser JSON is not a valid RFI tariff export: {error}"
@@ -303,20 +513,19 @@ fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
 fn parse_rfi_pdf_with_python(
     path: &Path,
     app: Option<&AppHandle>,
-) -> Result<Vec<RfiTariffRecord>, AppError> {
-    if !std::fs::read(path)
-        .map_err(|error| AppError::Database(error.to_string()))?
-        .starts_with(b"%PDF-")
-    {
+) -> Result<(Vec<RfiTariffRecord>, i32), AppError> {
+    let mut header = [0_u8; 5];
+    File::open(path)
+        .and_then(|mut file| file.read_exact(&mut header))
+        .map_err(|error| AppError::Database(error.to_string()))?;
+    if header != *b"%PDF-" {
         return Err(AppError::Validation(
             "selected file is not a valid PDF".into(),
         ));
     }
 
     let output = run_bundled_rfi_parser(path, app).map_err(|error| {
-        AppError::Validation(format!(
-            "Parser PDF non incluso in questa build. {error}"
-        ))
+        AppError::Validation(format!("Parser PDF non incluso in questa build. {error}"))
     })?;
 
     if !output.status.success() {
@@ -329,14 +538,19 @@ fn parse_rfi_pdf_with_python(
     let parser_json = parser_output_to_utf8(output.stdout)?;
     let parser_json = remove_json_surrogate_escapes(&parser_json);
 
-    serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json)
-        .map_err(|error| AppError::Validation(format!("RFI parser returned invalid JSON: {error}")))
+    if let Ok(result) = serde_json::from_str::<ParserOutput>(&parser_json) {
+        return Ok((result.records, result.pages_total));
+    }
+    let records = serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json).map_err(|error| {
+        AppError::Validation(format!("RFI parser returned invalid JSON: {error}"))
+    })?;
+    Ok((records, 0))
 }
 
 fn parser_output_to_utf8(output: Vec<u8>) -> Result<String, AppError> {
-    String::from_utf8(output).or_else(|error| decode_windows_1252(error.into_bytes())).map_err(
-        |error| AppError::Validation(format!("Output parser non UTF-8 valido: {error}")),
-    )
+    String::from_utf8(output)
+        .or_else(|error| decode_windows_1252(error.into_bytes()))
+        .map_err(|error| AppError::Validation(format!("Output parser non UTF-8 valido: {error}")))
 }
 
 fn decode_windows_1252(bytes: Vec<u8>) -> Result<String, std::str::Utf8Error> {
@@ -527,6 +741,11 @@ fn rfi_record_to_tariff_voice(
         tariff_book_id: tariff_book_id.to_string(),
         unit_of_measure: unit.to_string(),
         unit_price,
+        categoria_desc: record.categoria_desc.clone(),
+        gruppo_desc: record.gruppo_desc.clone(),
+        voce: record.voce.clone(),
+        voce_desc: record.voce_desc.clone(),
+        warnings: record.warnings.clone(),
     })
 }
 
@@ -601,6 +820,11 @@ fn map_tariff_voice_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TariffVoice
         unit_of_measure: row.get(5)?,
         unit_price: cents_to_money(amount_cents),
         labor_percentage: row.get(7)?,
+        categoria_desc: String::new(),
+        gruppo_desc: String::new(),
+        voce: String::new(),
+        voce_desc: String::new(),
+        warnings: Vec::new(),
     })
 }
 
@@ -708,7 +932,8 @@ mod tests {
 
     use super::{
         CreateTariffBookRequest, TariffVoiceRecord, create_tariff_book, import_tariff_pdf_preview,
-        list_tariff_books, list_tariff_voices, parser_output_to_utf8, remove_json_surrogate_escapes,
+        list_tariff_books, list_tariff_voices, parser_output_to_utf8,
+        remove_json_surrogate_escapes,
     };
 
     #[test]
@@ -731,6 +956,11 @@ mod tests {
                     tariff_book_id: "tariff_lombardia_2025".into(),
                     unit_of_measure: "m".into(),
                     unit_price: 1250.0,
+                    categoria_desc: String::new(),
+                    gruppo_desc: String::new(),
+                    voce: String::new(),
+                    voce_desc: String::new(),
+                    warnings: Vec::new(),
                 }],
                 year: 2025,
             },
@@ -785,6 +1015,11 @@ mod tests {
                 tariff_book_id: "tariff_rfi_2025".into(),
                 unit_of_measure: "CAD".into(),
                 unit_price: 100.0,
+                categoria_desc: String::new(),
+                gruppo_desc: String::new(),
+                voce: String::new(),
+                voce_desc: String::new(),
+                warnings: Vec::new(),
             }],
             year: 2025,
         };
@@ -799,6 +1034,11 @@ mod tests {
             tariff_book_id: "tariff_rfi_2025".into(),
             unit_of_measure: "CAD".into(),
             unit_price: 120.0,
+            categoria_desc: String::new(),
+            gruppo_desc: String::new(),
+            voce: String::new(),
+            voce_desc: String::new(),
+            warnings: Vec::new(),
         }];
 
         create_tariff_book(&mut connection, request).expect("reimport replaces voices");
@@ -845,6 +1085,37 @@ mod tests {
         assert_eq!(preview.voices[0].labor_percentage, Some(100.0));
         assert!(preview.voices[0].category.contains("VOCE 2001"));
         assert!(!preview.voices[0].category.contains("Manodopera"));
+    }
+
+    #[test]
+    fn imports_rfi_parser_object_json_export() {
+        let path = std::env::temp_dir().join("quantara_rfi_tariff_test_obj.json");
+        std::fs::write(
+            &path,
+            r#"{"records":[{
+                "codice":"AC.IR.A.2001.A",
+                "tariffa":"AC",
+                "categoria":"IR",
+                "gruppo":"A",
+                "voce":"2001",
+                "voce_desc":"Fornitura ISA Report",
+                "sottovoce":"A",
+                "descrizione":"Fornitura ISA REPORT per SIZE 1",
+                "unita_codice":"CAD",
+                "unita_label":"Cadauna",
+                "tipo_valore":"EURO",
+                "valore_euro":20337.48,
+                "perc_manodopera":100.0
+            }],"pages_total":48}"#,
+        )
+        .expect("write test json");
+
+        let preview = import_tariff_pdf_preview(&path, None).expect("rfi parser object json");
+
+        assert_eq!(preview.voices.len(), 1);
+        assert_eq!(preview.voices[0].official_code, "AC.IR.A.2001.A");
+        assert_eq!(preview.voices[0].unit_price, 20337.48);
+        assert_eq!(preview.pages_total, 0);
     }
 
     #[test]

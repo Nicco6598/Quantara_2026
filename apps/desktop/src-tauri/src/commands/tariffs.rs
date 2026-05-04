@@ -1,82 +1,109 @@
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 
-use crate::{
-    infrastructure::{
-        local_storage::open_app_database,
-        tariff_repository::{
-            CreateTariffBookRequest, TariffBookRecord, TariffPdfImportPreview, TariffVoiceRecord,
-            UpdateTariffBookRequest,
-        },
+use crate::infrastructure::{
+    local_storage::{with_db, with_db_mut, DbConnection},
+    tariff_repository::{
+        CreateTariffBookRequest, TariffBookRecord, TariffPdfImportPreview, TariffVoiceRecord,
+        UpdateTariffBookRequest,
     },
-    models::app_error::AppError,
 };
 
 #[tauri::command]
-pub fn list_tariff_books(app: AppHandle) -> Result<Vec<TariffBookRecord>, String> {
-    let connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::tariff_repository::list_tariff_books(&connection)
-        .map_err(to_command_error)
+pub fn list_tariff_books(state: State<'_, DbConnection>) -> Result<Vec<TariffBookRecord>, String> {
+    with_db(&state, |conn| {
+        crate::infrastructure::tariff_repository::list_tariff_books(conn)
+    })
 }
 
 #[tauri::command]
 pub fn create_tariff_book(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     request: CreateTariffBookRequest,
 ) -> Result<TariffBookRecord, String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::tariff_repository::create_tariff_book(&mut connection, request)
-        .map_err(to_command_error)
+    with_db_mut(&state, |conn| {
+        crate::infrastructure::tariff_repository::create_tariff_book(conn, request)
+    })
 }
 
 #[tauri::command]
 pub fn update_tariff_book(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     tariff_book_id: String,
     request: UpdateTariffBookRequest,
 ) -> Result<TariffBookRecord, String> {
-    let connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::tariff_repository::update_tariff_book(
-        &connection,
-        &tariff_book_id,
-        request,
-    )
-    .map_err(to_command_error)
+    with_db(&state, |conn| {
+        crate::infrastructure::tariff_repository::update_tariff_book(
+            conn,
+            &tariff_book_id,
+            request,
+        )
+    })
 }
 
 #[tauri::command]
-pub fn delete_tariff_book(app: AppHandle, tariff_book_id: String) -> Result<(), String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::tariff_repository::delete_tariff_book(&mut connection, &tariff_book_id)
-        .map_err(to_command_error)
+pub fn delete_tariff_book(
+    state: State<'_, DbConnection>,
+    tariff_book_id: String,
+) -> Result<(), String> {
+    with_db_mut(&state, |conn| {
+        crate::infrastructure::tariff_repository::delete_tariff_book(conn, &tariff_book_id)
+    })
 }
 
 #[tauri::command]
 pub fn list_tariff_voices(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     tariff_book_id: String,
 ) -> Result<Vec<TariffVoiceRecord>, String> {
-    let connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::tariff_repository::list_tariff_voices(&connection, &tariff_book_id)
-        .map_err(to_command_error)
+    with_db(&state, |conn| {
+        crate::infrastructure::tariff_repository::list_tariff_voices(conn, &tariff_book_id)
+    })
 }
 
 #[tauri::command]
-pub fn import_tariff_pdf_preview(
+pub async fn import_tariff_pdf_preview(
     app: AppHandle,
     path: String,
 ) -> Result<TariffPdfImportPreview, String> {
-    crate::infrastructure::tariff_repository::import_tariff_pdf_preview(
-        std::path::Path::new(&path),
-        Some(&app),
-    )
-    .map_err(to_command_error)
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::infrastructure::tariff_repository::import_tariff_pdf_preview(
+            std::path::Path::new(&path),
+            Some(&app),
+        )
+        .map_err(to_command_error)
+    })
+    .await
+    .map_err(|error| format!("Import tariffario interrotto: {error}"))?
 }
 
-fn to_command_error(error: AppError) -> String {
+#[tauri::command]
+pub async fn import_tariff_pdf_preview_batch(
+    app: AppHandle,
+    paths: Vec<String>,
+) -> Result<Vec<TariffPdfImportPreview>, String> {
+    let max_concurrent = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .max(1);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::infrastructure::tariff_repository::import_tariff_pdf_preview_batch(
+            &paths,
+            &app,
+            Some(max_concurrent),
+        )
+        .map_err(|errors| {
+            errors
+                .iter()
+                .map(|(path, msg)| format!("{path}: {msg}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+    })
+    .await
+    .map_err(|error| format!("Import batch interrotto: {error}"))?
+}
+
+fn to_command_error(error: crate::models::app_error::AppError) -> String {
     error.to_string()
 }

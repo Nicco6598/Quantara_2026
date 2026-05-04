@@ -35,6 +35,7 @@ export function buildLineViews(
     return {
       ...line,
       discountAmount,
+      discountableAmount: discountable,
       grossAmount,
       linkedCharges,
       measurementRows: buildMeasurementRows(line, index),
@@ -56,8 +57,7 @@ export function summarizeSalLines(
       const linkedChargeAmount = line.linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
       return {
         discountAmount: current.discountAmount + line.discountAmount,
-        discountableAmount:
-          current.discountableAmount + (line.voice.isSafetyCost ? 0 : line.grossAmount),
+        discountableAmount: current.discountableAmount + line.discountableAmount,
         grossAmount: current.grossAmount + line.grossAmount,
         linkedChargeAmount: current.linkedChargeAmount + linkedChargeAmount,
         safetyAmount: current.safetyAmount + (line.voice.isSafetyCost ? line.grossAmount : 0),
@@ -85,6 +85,7 @@ export function summarizeSalLines(
     previousProgressiveAmount,
     safetyAmount: roundCurrency(summary.safetyAmount),
     total,
+    voiceCount: lineViews.length,
   };
 }
 

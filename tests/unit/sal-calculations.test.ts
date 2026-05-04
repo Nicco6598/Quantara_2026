@@ -51,6 +51,7 @@ describe("SAL calculations", () => {
 
     expect(views[0]).toMatchObject({
       discountAmount: 438,
+      discountableAmount: 2400,
       grossAmount: 2400,
       netAmount: 1962,
       quantity: 24,
@@ -59,6 +60,7 @@ describe("SAL calculations", () => {
     expect(views[0]?.linkedCharges[0]?.total).toBe(240);
     expect(views[1]).toMatchObject({
       discountAmount: 0,
+      discountableAmount: 0,
       grossAmount: 500,
       netAmount: 500,
       quantity: 10,
@@ -74,6 +76,7 @@ describe("SAL calculations", () => {
     expect(summary).toMatchObject({
       budgetResidual: -302,
       discountAmount: 438,
+      discountableAmount: 2400,
       grossAmount: 2900,
       linkedChargeAmount: 240,
       safetyAmount: 500,
@@ -95,5 +98,52 @@ describe("SAL calculations", () => {
       totalAmount: 0,
     });
     expect(views[0]?.measurementRows).toHaveLength(0);
+  });
+
+  it("reapplies the tender discount to every added line and quantity update", () => {
+    const tenPercentRules = {
+      ...defaultSalEconomicRules,
+      discountPercent: 10,
+    };
+    const firstLine = {
+      ...ordinaryLine,
+      factor1: 2,
+      factor2: 1,
+      factor3: 1,
+      surchargePercent: 0,
+      voice: { ...ordinaryLine.voice, id: "voice-a", unitPrice: 100 },
+    };
+    const secondLine = {
+      ...ordinaryLine,
+      factor1: 3,
+      factor2: 1,
+      factor3: 1,
+      id: "line-second",
+      surchargePercent: 0,
+      voice: { ...ordinaryLine.voice, id: "voice-b", unitPrice: 50 },
+    };
+
+    const initialViews = buildLineViews([firstLine, secondLine], tenPercentRules);
+    const initialSummary = summarizeSalLines(initialViews, 1_000, 0);
+
+    expect(initialViews.map((view) => view.discountAmount)).toEqual([20, 15]);
+    expect(initialSummary).toMatchObject({
+      discountAmount: 35,
+      grossAmount: 350,
+      total: 315,
+    });
+
+    const updatedViews = buildLineViews(
+      [firstLine, { ...secondLine, factor1: 4 }],
+      tenPercentRules,
+    );
+    const updatedSummary = summarizeSalLines(updatedViews, 1_000, 0);
+
+    expect(updatedViews.map((view) => view.discountAmount)).toEqual([20, 20]);
+    expect(updatedSummary).toMatchObject({
+      discountAmount: 40,
+      grossAmount: 400,
+      total: 360,
+    });
   });
 });

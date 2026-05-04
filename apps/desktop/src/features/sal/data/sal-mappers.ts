@@ -24,6 +24,7 @@ export function mapContractToSalProject(
     periodEnd: "2026-05-31",
     periodStart: "2026-05-01",
     salTitle: "SAL 01 - Periodo corrente",
+    tenderDiscountPercent: contract.tenderDiscountPercent ?? 0,
     title,
   };
 }

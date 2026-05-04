@@ -16,6 +16,7 @@ export type SalProjectContext = {
   periodEnd: string;
   periodStart: string;
   salTitle: string;
+  tenderDiscountPercent: number;
   title: string;
 };
 
@@ -72,6 +73,7 @@ export type SalLinkedCharge = {
 
 export type SalLineView = SalLineDraft & {
   discountAmount: number;
+  discountableAmount: number;
   grossAmount: number;
   linkedCharges: SalLinkedCharge[];
   measurementRows: SalMeasurementRow[];
@@ -97,6 +99,7 @@ export type SalEconomicSummary = {
   previousProgressiveAmount: number;
   safetyAmount: number;
   total: number;
+  voiceCount: number;
 };
 
 export type SalVerificationCheck = {

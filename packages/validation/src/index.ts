@@ -10,7 +10,7 @@ export const contractSchema = z.object({
   contractualAmount: moneySchema,
   frameworkAgreementCode: z.string().min(1),
   id: z.string().startsWith("contract_"),
-  safetyCostsNotSubjectToDiscount: moneySchema,
+  tenderDiscountPercent: z.number().min(0).max(100),
   tariffPriorities: z.array(
     z.object({
       priority: z.number().int().positive(),

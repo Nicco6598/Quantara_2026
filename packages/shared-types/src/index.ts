@@ -24,6 +24,7 @@ export type {
   TariffVoice,
   TariffVoiceCategory,
   TariffVoiceId,
+  TariffWarning,
   UpdateDesktopTariffBookRecordRequest,
   WorkInterruptionKind,
 } from "./accounting";

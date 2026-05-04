@@ -24,7 +24,7 @@ export type ContractRecord = {
   applicationContractCode: string;
   frameworkAgreementCode: string;
   contractualAmount: Money;
-  safetyCostsNotSubjectToDiscount: Money;
+  tenderDiscountPercent: number;
   tariffPriorities: readonly TariffPriority[];
 };
 
@@ -39,7 +39,7 @@ export type DesktopContractRecord = {
   contractualAmount: Money;
   frameworkAgreementCode: string;
   id: string;
-  safetyCostsNotSubjectToDiscount: Money;
+  tenderDiscountPercent: number;
   tariffPriorities: DesktopTariffPriorityRecord[];
   title: string;
 };
@@ -49,7 +49,7 @@ export type CreateDesktopContractRecordRequest = {
   contractualAmount: number;
   frameworkAgreementCode: string;
   id: string;
-  safetyCostsNotSubjectToDiscount: number;
+  tenderDiscountPercent: number;
   tariffPriorities: DesktopTariffPriorityRecord[];
   title: string;
 };
@@ -71,6 +71,17 @@ export type DesktopTariffVoiceRecord = {
   tariffBookId: string;
   unitOfMeasure: string;
   unitPrice: number;
+  categoriaDesc?: string;
+  gruppoDesc?: string;
+  voce?: string;
+  voceDesc?: string;
+  warnings?: TariffWarning[];
+};
+
+export type TariffWarning = {
+  id: string;
+  title: string;
+  body: string;
 };
 
 export type CreateDesktopTariffBookRecordRequest = DesktopTariffBookRecord & {
@@ -84,6 +95,8 @@ export type TariffPdfMetadataRecord = {
   sourceName: string;
   voices: DesktopTariffVoiceRecord[];
   year: number;
+  pagesTotal?: number;
+  pagesParsed?: number;
 };
 
 export type TariffVoiceCategory =
