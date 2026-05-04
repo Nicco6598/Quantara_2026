@@ -5,8 +5,8 @@ export function useNavigate() {
   const { setActiveRoute } = useNavigationState();
 
   return useCallback(
-    (route: QuantaraRoute, context?: string) => {
-      setActiveRoute(route, context);
+    (route: QuantaraRoute, context?: string, replace?: boolean) => {
+      setActiveRoute(route, context, replace);
     },
     [setActiveRoute],
   );

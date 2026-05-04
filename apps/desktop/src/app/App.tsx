@@ -19,16 +19,30 @@ import {
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 import { RouteRenderer } from "@/routes/RouteRenderer";
-import {
-  useAppStore,
-  useNavigationState,
-  usePreferenceState,
-  useThemeState,
-} from "@/store/app-store";
+import { useAppStore, useNavigationState, usePreferenceState } from "@/store/app-store";
+
+function ThemeApplier() {
+  useEffect(() => {
+    const state = useAppStore.getState();
+    document.documentElement.dataset.theme = state.themeMode;
+    document.documentElement.style.colorScheme = state.themeMode === "dark" ? "dark" : "light";
+
+    const unsub = useAppStore.subscribe((current, prev) => {
+      if (current.themeMode === prev.themeMode) return;
+      document.documentElement.dataset.theme = current.themeMode;
+      document.documentElement.style.colorScheme = current.themeMode === "dark" ? "dark" : "light";
+    });
+
+    return unsub;
+  }, []);
+
+  return null;
+}
 
 export function App() {
   return (
     <ToastProvider>
+      <ThemeApplier />
       <AppShell />
     </ToastProvider>
   );
@@ -42,7 +56,6 @@ function AppShell() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();
-  const { themeMode, toggleTheme } = useThemeState();
   const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [commandPaletteAnchor, setCommandPaletteAnchor] = useState<DOMRect | null>(null);
@@ -53,11 +66,6 @@ function AppShell() {
   >({
     phase: "idle",
   });
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = themeMode;
-    document.documentElement.style.colorScheme = themeMode === "dark" ? "dark" : "light";
-  }, [themeMode]);
 
   useEffect(() => {
     document.documentElement.dataset.motion = motionMode;
@@ -122,6 +130,11 @@ function AppShell() {
         if (step >= 1 && step <= 4) {
           useAppStore.getState().setSalPendingStep(step);
         }
+        return;
+      }
+
+      if (actionId.startsWith("tariff-import-")) {
+        window.dispatchEvent(new CustomEvent("tariff-preview-action", { detail: actionId }));
         return;
       }
 
@@ -318,8 +331,6 @@ function AppShell() {
         onClose={() => setIsCommandPaletteOpen(false)}
         onPageAction={handleTopbarAction}
         onRouteChange={navigate}
-        onToggleTheme={toggleTheme}
-        themeMode={themeMode}
       />
 
       {isShortcutHelpOpen ? (

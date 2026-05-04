@@ -1,4 +1,6 @@
+import { Calculator } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
 import {
   buildActionSummary,
@@ -6,7 +8,6 @@ import {
   buildFocusRows,
   buildMilestones,
   buildOverviewMetrics,
-  Hero,
   Milestones,
   OperationalSites,
   PriorityActions,
@@ -19,6 +20,14 @@ import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+
+function timeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 6) return "Buonanotte";
+  if (hour < 13) return "Buongiorno";
+  if (hour < 18) return "Buon pomeriggio";
+  return "Buonasera";
+}
 
 export function DashboardScreen() {
   const { notify } = useToast();
@@ -53,6 +62,19 @@ export function DashboardScreen() {
     };
   }, [notify]);
 
+  const totalBudget = useMemo(() => projects.reduce((s, p) => s + p.budget.amount, 0), [projects]);
+  const totalSal = useMemo(
+    () =>
+      salDocuments.reduce((s, doc) => {
+        const view = buildSalDocumentView(doc, tariffVoices);
+        return s + view.total;
+      }, 0),
+    [salDocuments, tariffVoices],
+  );
+  const escalationCount = useMemo(
+    () => projects.filter((p) => p.tone === "danger").length,
+    [projects],
+  );
   const metrics = useMemo(() => buildOverviewMetrics(projects), [projects]);
   const distribution = useMemo(() => buildFocusRows(projects), [projects]);
   const activities = useMemo(() => buildActivityRows(projects), [projects]);
@@ -117,7 +139,42 @@ export function DashboardScreen() {
 
       <div className="grid min-w-0 gap-6 md:gap-7 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:gap-8">
         <main className="min-w-0 space-y-6">
-          <Hero />
+          <ScreenHero
+            badge={timeGreeting()}
+            title="Portafoglio lavori"
+            description="Monitora avanzamento, SAL e segnali di rischio dei cantieri attivi."
+            sidePanel={
+              <div>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                      Budget totale
+                    </div>
+                    <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+                      {totalBudget.toLocaleString("it-IT", {
+                        style: "currency",
+                        currency: "EUR",
+                        minimumFractionDigits: 0,
+                      })}
+                    </div>
+                  </div>
+                  <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+                    <Calculator className="size-6" />
+                  </span>
+                </div>
+                <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+                  {projects.length} cantier{projects.length === 1 ? "e" : "i"} ·{" "}
+                  {totalSal.toLocaleString("it-IT", {
+                    style: "currency",
+                    currency: "EUR",
+                    minimumFractionDigits: 0,
+                  })}{" "}
+                  SAL
+                  {escalationCount > 0 ? ` · ${escalationCount} criticita` : ""}
+                </p>
+              </div>
+            }
+          />
 
           <div className="animate-entry grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">
             {metrics.map((metric) => (

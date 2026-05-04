@@ -5,12 +5,14 @@ import {
   CaretDown,
   CaretLeft,
   CaretRight,
+  CheckCircle,
   FileText,
   MagnifyingGlass,
   Moon,
   Plus,
   SunDim,
   UploadSimple,
+  X,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRef, useState } from "react";
@@ -46,19 +48,23 @@ type PageActionMenuItem = {
   mark: string;
 };
 
+function todayLabel(): string {
+  const now = new Date();
+  const day = now.toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
+  const time = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  return `${day} · Aggiornato alle ${time}`;
+}
+
 const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
-  accounting: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Contabilità" },
-  dashboard: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Panoramica operativa" },
-  materials: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Materiali" },
-  "project-detail": {
-    dateLabel: "27 aprile 2025 · Aggiornato alle 17:40",
-    title: "Dettaglio progetto",
-  },
-  projects: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Progetti" },
-  "sal-create": { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Nuova SAL" },
-  settings: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Impostazioni" },
-  tariffs: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Tariffario" },
-  team: { dateLabel: "27 aprile 2025 · Aggiornato alle 17:40", title: "Team" },
+  accounting: { dateLabel: "", title: "Contabilità" },
+  dashboard: { dateLabel: "", title: "Panoramica operativa" },
+  materials: { dateLabel: "", title: "Materiali" },
+  "project-detail": { dateLabel: "", title: "Dettaglio progetto" },
+  projects: { dateLabel: "", title: "Progetti" },
+  "sal-create": { dateLabel: "", title: "Nuova SAL" },
+  settings: { dateLabel: "", title: "Impostazioni" },
+  tariffs: { dateLabel: "", title: "Tariffario" },
+  team: { dateLabel: "", title: "Team" },
 };
 
 const createMenuItems: PageActionMenuItem[] = [
@@ -120,9 +126,10 @@ type TopToolbarProps = {
 };
 
 export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarProps) {
-  const { activeRoute } = useNavigationState();
+  const { activeRoute, tariffImportToolbar } = useNavigationState();
   const meta = routeMetaMap[activeRoute];
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
+  const isTariffPreview = activeRoute === "tariffs" && tariffImportToolbar.phase === "preview";
 
   return (
     <header className="relative z-30 shrink-0 px-4 py-3 md:px-6">
@@ -134,15 +141,12 @@ export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarPro
           </div>
 
           <div className="min-w-0">
-            <div className="text-[9px] font-extrabold uppercase tracking-[0.24em] text-[var(--accent-primary)]">
-              Control surface
-            </div>
             <h1 className="truncate text-[22px] font-semibold leading-6 text-[var(--text-primary)] md:text-[24px]">
               {meta.title}
             </h1>
             <div className="mt-2 flex items-center gap-2.5">
               <span className="truncate text-[11px] font-semibold tracking-[0.02em] text-[var(--text-secondary)]">
-                {meta.dateLabel}
+                {todayLabel()}
               </span>
               <SaveIndicator status="saved" lastSavedAt={null} />
             </div>
@@ -151,7 +155,9 @@ export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarPro
 
         <div className="flex shrink-0 items-center gap-2">
           <GlobalSearch onOpen={onOpenCommandPalette} />
-          {activeRoute === "sal-create" ? (
+          {isTariffPreview ? (
+            <TariffImportControls onAction={onPageAction} />
+          ) : activeRoute === "sal-create" ? (
             <SalStepNav onAction={onPageAction} />
           ) : (
             <>
@@ -164,6 +170,200 @@ export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarPro
         </div>
       </BezelSurface>
     </header>
+  );
+}
+
+function TariffImportControls({ onAction }: { onAction: (actionId: string) => void }) {
+  const { tariffImportToolbar } = useNavigationState();
+  const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
+  const fileCount = tariffImportToolbar.fileLabels.length;
+  const activeLabel = tariffImportToolbar.fileLabels[tariffImportToolbar.activeIndex];
+  const canGoPrevious = tariffImportToolbar.activeIndex > 0;
+  const canGoNext = tariffImportToolbar.activeIndex < fileCount - 1;
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="mx-1.5 h-[34px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
+      <motion.button
+        className="top-toolbar-icon-button flex size-10 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)]"
+        onClick={() => onAction("tariff-import-cancel")}
+        title="Torna al catalogo"
+        type="button"
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.92 }}
+      >
+        <X size={16} weight="bold" />
+      </motion.button>
+      <div className="relative hidden min-w-0 items-center gap-1 xl:flex">
+        <button
+          className={cn(
+            "top-toolbar-icon-button flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)]",
+            !canGoPrevious && "cursor-not-allowed opacity-40",
+          )}
+          disabled={!canGoPrevious}
+          onClick={() => onAction(`tariff-import-select-${tariffImportToolbar.activeIndex - 1}`)}
+          title="File precedente"
+          type="button"
+        >
+          <CaretLeft size={14} weight="bold" />
+        </button>
+        <button
+          aria-expanded={isFileMenuOpen}
+          className="flex h-9 min-w-[190px] max-w-[260px] items-center justify-between gap-2 rounded-full bg-[var(--bg-muted)] px-3 text-left text-[11px] font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+          onClick={() => setIsFileMenuOpen((current) => !current)}
+          title={activeLabel}
+          type="button"
+        >
+          <span className="min-w-0 truncate">{activeLabel ?? "Preview importazione"}</span>
+          <span className="shrink-0 text-[var(--text-secondary)]">
+            {fileCount > 0 ? `${tariffImportToolbar.activeIndex + 1}/${fileCount}` : "0/0"}
+          </span>
+          <CaretDown
+            size={10}
+            weight="bold"
+            className={cn("shrink-0 transition-transform", isFileMenuOpen && "rotate-180")}
+          />
+        </button>
+        <button
+          className={cn(
+            "top-toolbar-icon-button flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)]",
+            !canGoNext && "cursor-not-allowed opacity-40",
+          )}
+          disabled={!canGoNext}
+          onClick={() => onAction(`tariff-import-select-${tariffImportToolbar.activeIndex + 1}`)}
+          title="File successivo"
+          type="button"
+        >
+          <CaretRight size={14} weight="bold" />
+        </button>
+        <AnimatePresence>
+          {isFileMenuOpen ? (
+            <>
+              <button
+                aria-label="Chiudi selezione file"
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={() => setIsFileMenuOpen(false)}
+                type="button"
+              />
+              <motion.div
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                className="absolute right-0 top-full z-50 mt-3 w-[360px] overflow-hidden rounded-[22px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_72%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
+                exit={{ opacity: 0, scale: 0.96, y: -8 }}
+                initial={{ opacity: 0, scale: 0.96, y: -8 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="max-h-[360px] overflow-y-auto rounded-[17px] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] p-1">
+                  {tariffImportToolbar.fileLabels.map((label, index) => {
+                    const isActive = index === tariffImportToolbar.activeIndex;
+                    return (
+                      <button
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition-colors",
+                          isActive
+                            ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+                        )}
+                        key={label}
+                        onClick={() => {
+                          onAction(`tariff-import-select-${index}`);
+                          setIsFileMenuOpen(false);
+                        }}
+                        type="button"
+                      >
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-current/10 text-[10px] font-black">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            </>
+          ) : null}
+        </AnimatePresence>
+      </div>
+      <div className="hidden min-h-10 items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3.5 py-1 text-[11px] font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)] 2xl:flex">
+        <div className="flex flex-col justify-center gap-0.5 leading-none">
+          <span
+            className={cn(
+              "text-[11px]",
+              tariffImportToolbar.reviewedVoiceCount === tariffImportToolbar.totalVoices &&
+                tariffImportToolbar.totalVoices > 0
+                ? "text-[var(--success-base)]"
+                : tariffImportToolbar.reviewedVoiceCount > 0
+                  ? "text-[var(--warning-base)]"
+                  : "text-[var(--text-secondary)]",
+            )}
+          >
+            {tariffImportToolbar.reviewedVoiceCount.toLocaleString("it-IT")}/
+            {tariffImportToolbar.totalVoices.toLocaleString("it-IT")} voci
+          </span>
+          <span
+            className={cn(
+              "text-[10px]",
+              tariffImportToolbar.reviewedCount === fileCount && fileCount > 0
+                ? "text-[var(--success-base)]"
+                : tariffImportToolbar.reviewedCount > 0
+                  ? "text-[var(--warning-base)]"
+                  : "text-[var(--text-secondary)]",
+            )}
+          >
+            {tariffImportToolbar.reviewedCount}/{fileCount} revisionati
+          </span>
+        </div>
+      </div>
+      <motion.button
+        className={cn(
+          "top-toolbar-action group flex h-10 items-center gap-2 rounded-full px-3.5 text-[13px] font-bold transition-colors",
+          tariffImportToolbar.activeReviewed
+            ? "bg-[color-mix(in_srgb,var(--success-base)_14%,var(--surface-base))] text-[color-mix(in_srgb,var(--success-base)_74%,var(--text-primary))] ring-1 ring-[color-mix(in_srgb,var(--success-base)_42%,var(--border-subtle))] shadow-[inset_0_1px_0_color-mix(in_srgb,white_58%,transparent)]"
+            : "top-toolbar-action-outline text-[var(--text-primary)]",
+        )}
+        onClick={() => onAction("tariff-import-toggle-reviewed")}
+        type="button"
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.97 }}
+      >
+        <span
+          className={cn(
+            "top-toolbar-action-mark",
+            tariffImportToolbar.activeReviewed &&
+              "shadow-[0_0_0_1px_color-mix(in_srgb,var(--success-base)_70%,transparent)]",
+          )}
+          style={
+            tariffImportToolbar.activeReviewed
+              ? { background: "var(--success-base)", color: "#fff" }
+              : undefined
+          }
+        >
+          <CheckCircle size={13} weight="bold" />
+        </span>
+        <span>{tariffImportToolbar.activeReviewed ? "Revisionato" : "Revisiona"}</span>
+      </motion.button>
+      <motion.button
+        className={cn(
+          "top-toolbar-action top-toolbar-action-primary group flex h-10 items-center gap-2 rounded-full px-3.5 text-[13px] font-bold text-[var(--text-inverse)]",
+          !tariffImportToolbar.canConfirm && "cursor-not-allowed opacity-45",
+        )}
+        disabled={!tariffImportToolbar.canConfirm}
+        onClick={() => onAction("tariff-import-confirm")}
+        type="button"
+        {...(tariffImportToolbar.canConfirm
+          ? {
+              whileHover: { y: -1 },
+              whileTap: { scale: 0.97 },
+            }
+          : {})}
+      >
+        <span className="top-toolbar-action-mark">
+          <CheckCircle size={13} weight="bold" />
+        </span>
+        <span>Approva import</span>
+      </motion.button>
+    </div>
   );
 }
 
@@ -298,7 +498,7 @@ function GlobalSearch({ onOpen }: { onOpen: (anchorRect: DOMRect) => void }) {
       />
       <span>Cerca...</span>
       <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2.5 py-1 text-[10px] font-bold text-[var(--text-secondary)]">
-        Ctrl+K
+        {navigator.platform?.includes("Mac") ? "Cmd+K" : "Ctrl+K"}
       </kbd>
     </motion.button>
   );
