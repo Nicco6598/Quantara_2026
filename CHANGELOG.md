@@ -2,6 +2,88 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.3 - 2026-05-04
+
+### Ribasso d'asta sul progetto
+
+- **% ribasso gara spostata sul contratto** — la percentuale di sconto si imposta una sola volta in creazione progetto (e nella modifica progetto), non piu nella SAL. Inseriscila nello step economico insieme all'importo contrattuale.
+- **Ribasso automatico in SAL** — quando crei una nuova SAL, il ribasso viene letto dal progetto e non e piu modificabile. Niente piu dimenticanze o discrepanze tra progetto e SAL.
+- **Rimossi definitivamente gli oneri sicurezza dal contratto** — il vecchio campo "Oneri sicurezza non soggetti a ribasso" e stato eliminato dal database, dal form di creazione progetto e da tutti i tipi condivisi. Le voci OS vengono riconosciute automaticamente dalla categoria della voce (campo `isSafetyCost`) e continuano a essere escluse dal ribasso.
+- **Template non sovrascrivono il ribasso** — quando applichi un template SAL, il ribasso del progetto rimane invariato. I template salvano solo voci, fattori e maggiorazioni.
+- **Migrazione automatica del database** — all'avvio, il database esistente viene aggiornato: la colonna `safety_costs_not_subject_to_discount_cents` viene eliminata e viene aggiunta `tender_discount_percent` con valore predefinito 0.
+
+### Budget residuo e metriche piu leggibili
+
+- **Budget residuo nella conferma finale** — ora trovi il budget residuo (in verde o rosso) nell'ultima pagina del wizard, sia in fase Conferma che nella schermata Completata. Prima era visibile solo durante l'inserimento voci.
+- **Metriche piu grandi e chiare** — nella fase Conferma, i tre indicatori (Totale SAL, Budget residuo, Voci/importo lordo) sono aumentati a 26px e incorniciati in card dedicate. Anche il riepilogo economico sottostante ha testi piu grandi.
+- **Rimosso il budget residuo dalla fase Voci** — durante l'inserimento, lo spazio e dedicato alla tabella voci. Il budget si controlla in fase di verifica finale.
+
+### Ricerca voci migliorata
+
+- **Gerarchia invertita nell'autocomplete** — il codice voce appare ora in grassetto colorato come elemento principale, seguito dalla descrizione. Categoria, unita di misura e prezzo sono secondari. Prima era il contrario e il codice era meno visibile.
+
+### Audio toast affidabile
+
+- **Audio suono notifiche risolto per macOS e WebView** — il contesto audio viene sbloccato al primo clic o tocco dell'utente (requisito dei browser moderni). Se WebAudio rimane sospeso, viene usato un fallback silenzioso senza bloccare l'interfaccia.
+
+### Layout piu adattivo
+
+- **Griglie elastiche** — le card delle metriche, i riquadri dei tariffari e le righe di output ora usano `grid-template-columns: repeat(auto-fit, minmax(...))` invece di colonne fisse. I layout si adattano meglio a schermi da 1280px, 1512px e 1728px.
+- **Overflow delle tabelle SAL gestito** — la tabella delle voci nella fase Voci ora scorre orizzontalmente invece di tagliare il contenuto su schermi stretti.
+- **Utility CSS** — aggiunte classi `responsive-grid-elastic`, `responsive-table-wrap`, `min-w-0` e `break-words` per layout controllati senza hardcode.
+
+### Performance
+
+- **Lookup voci ottimizzato** — le ricerche di voci nei flussi template e cronologia SAL ora usano una `Map` invece di `.find()` in loop, riducendo la complessita da O(n*m) a O(n+m).
+- **Opzioni autocomplete memoizzate** — l'array di opzioni per la ricerca voci non viene piu ricreato a ogni render, ma solo quando cambia l'elenco delle voci.
+- **Riduzione render** — rimossi state derivati e funzioni che causavano re-render non necessari nella creazione SAL.
+
+### Dashboard rinnovata
+
+- **Nuova hero con budget totale** — la dashboard apre con un'intestazione chiara (saluto in tempo reale), il budget totale del portafoglio e il conteggio dei cantieri. Via l'indice operativo astratto.
+- **Azioni prioritarie compatte** — le azioni urgenti sono in una card singola invece di due pannelli separati, con messaggio chiaro.
+- **Pannello laterale riscritto** — distribuzione stato con grafico donut, attivita recenti dai dati reali e azioni rapide (Nuova SAL, Importa tariffario, Crea progetto).
+- **Stato vuoto** — se non ci sono progetti, la dashboard mostra messaggi espliciti invece di dati di esempio.
+
+### Team dinamico
+
+- **Membri e ruoli letti dai dati reali** — conteggi aggiornati automaticamente, non piu valori fissi.
+- **Ricerca e filtro per ruolo** — cerca membri per nome/email e filtra per ruolo con menu a tendina.
+- **Paginazione reale** — navigazione tra pagine (10 per pagina).
+- **Avatar con iniziali** — niente piu immagini esterne Unsplash.
+
+### Import tariffari nella toolbar
+
+- **Toolbar dedicata per anteprima import** — quando importi un PDF, la toolbar superiore mostra i controlli di navigazione tra file, conteggio voci, stato revisione e pulsante "Approva import". Niente piu modale separata.
+- **Navigazione multi-file** — passa da un file all'altro dalla toolbar, con menu a comparsa e indicatori di avanzamento.
+- **Import parallelo** — i PDF vengono elaborati in parallelo sfruttando tutti i core disponibili. Fino a 5 file elaborati contemporaneamente invece che uno dopo l'altro.
+
+### Stati SAL estesi
+
+- **Nuovi stati: In revisione e Approvata** — le SAL ora possono essere "Bozza", "In revisione", "Approvata" o "Chiusa". Il cambio stato si fa dal menu a tre puntini nel dettaglio progetto.
+- **Filtro per stato** — in Contabilita e Dettaglio progetto puoi filtrare le SAL per stato specifico.
+- **Salvataggio bozze SAL** — puoi salvare una bozza della creazione SAL e ritrovarla nel registro progetti. Le bozze vengono anche salvate automaticamente nel localStorage locale.
+
+### Card appaltatori ridisegnate
+
+- **Effetto cartella con indicatore di stato** — le card mostrano "Stabile" o "Presidio" in base alle criticità, con menu azioni che appare solo all'hover.
+- **Intera card cliccabile** — clicca in qualsiasi punto per aprire il workspace.
+
+### Parser RFI migliorato
+
+- **Pattern code automatico** — il parser riconosce automaticamente il formato del codice voce tra 4 varianti, senza hardcode.
+- **Unione codici su piu righe** — i codici spezzati su piu righe nel PDF vengono ricostruiti correttamente.
+- **Estrazione avvertenze** — le note e avvertenze presenti nel tariffario vengono estratte come dati strutturati.
+- **Deduplicazione voci** — le voci duplicate vengono filtrate automaticamente.
+- **Campione per pattern matching** — la selezione del pattern di parsing analizza solo 200 righe campione invece di tutto il PDF, riducendo i tempi di avvio parsing.
+- **Dettaglio pagine** — il parser restituisce pagine totali e pagine elaborate del PDF.
+
+### Performance backend
+
+- **Connessioni database centralizzate** — tutte le connessioni al database sono gestite con stato Tauri (`DbConnection` managed), riducendo aperture/chiusure multiple.
+- **Import PDF asincrono** — il parsing dei PDF non blocca piu l'interfaccia.
+- **Parsing multi-file parallelo** — quando importi piu tariffari, ogni file viene processato su un thread separato usando tutti i core CPU disponibili.
+
 ## 0.2.2 - 2026-05-02
 
 ### Navigazione e interfaccia generale

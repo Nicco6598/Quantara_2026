@@ -373,7 +373,7 @@ export function ProjectsScreen() {
       contractorName: selectedContractor.contractor,
       contractualAmount: "",
       frameworkAgreementCode: "",
-      safetyCostsNotSubjectToDiscount: "",
+      tenderDiscountPercent: "",
       tariffBookId: tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id,
       title: "",
     };

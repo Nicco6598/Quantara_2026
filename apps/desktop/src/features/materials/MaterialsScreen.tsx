@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch } from "@/components/filters";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
-import { fallbackMaterials } from "@/features/materials/materials-data";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import {
   type DesktopMaterial,
@@ -57,9 +56,15 @@ export function MaterialsScreen() {
 
   const loadMaterials = useCallback(() => {
     let active = true;
-    listDesktopMaterials(fallbackMaterials).then((result) => {
+    const fbPromise: Promise<DesktopMaterial[]> = import.meta.env.DEV
+      ? import("@/features/materials/materials-data").then((m) => m.fallbackMaterials)
+      : Promise.resolve([]);
+    fbPromise.then((fb) => {
       if (!active) return;
-      setMaterials(result.data);
+      listDesktopMaterials(fb).then((result) => {
+        if (!active) return;
+        setMaterials(result.data);
+      });
     });
     return () => {
       active = false;
@@ -652,17 +657,29 @@ function AddMaterialModal({
                 />
               </Field>
               <Field label="Unità">
-                <select
-                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  onChange={(e) => setUnit(e.target.value)}
-                  value={unit}
-                >
-                  {units.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                    onChange={(e) => setUnit(e.target.value)}
+                    value={unit}
+                  >
+                    {units.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    aria-hidden={true}
+                    className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </div>
               </Field>
             </div>
 
@@ -677,17 +694,29 @@ function AddMaterialModal({
             </Field>
 
             <Field label="Categoria">
-              <select
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                onChange={(e) => setCategory(e.target.value)}
-                value={category}
-              >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  onChange={(e) => setCategory(e.target.value)}
+                  value={category}
+                >
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  aria-hidden={true}
+                  className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </div>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
