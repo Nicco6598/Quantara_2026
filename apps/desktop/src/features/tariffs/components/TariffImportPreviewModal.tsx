@@ -1,7 +1,7 @@
 import { parseEuroAmount } from "@quantara/domain-utils";
 import { motion } from "framer-motion";
 import { CheckCircle2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
@@ -14,30 +14,37 @@ import { ValidationLine } from "./ValidationLine";
 const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
 
 export function TariffImportPreviewModal({
+  activeIndex = 0,
   isBusy,
   metadatas,
   onCancel,
   onConfirm,
+  onPageCanConfirmChange,
+  pageView = false,
 }: {
+  activeIndex?: number;
   isBusy: boolean;
   metadatas: TariffPdfMetadata[];
   onCancel: () => void;
   onConfirm: (metadatas: TariffPdfMetadata[]) => void;
+  onPageCanConfirmChange?: (canConfirm: boolean) => void;
+  pageView?: boolean;
 }) {
-  const [activeIndex, setActiveIndex] = useState(0);
   const [editableVoicesList, setEditableVoicesList] = useState(metadatas.map((m) => m.voices));
-  const [reviewedFiles, setReviewedFiles] = useState<Set<number>>(
+  const [modalActiveIndex, setModalActiveIndex] = useState(0);
+  const [modalReviewedFiles, setModalReviewedFiles] = useState<Set<number>>(
     () => new Set(metadatas.length === 1 ? [0] : []),
   );
-  const activeMetadata = metadatas[activeIndex];
-  const activeVoices = editableVoicesList[activeIndex] ?? [];
+  const localActiveIndex = pageView ? activeIndex : modalActiveIndex;
+  const activeMetadata = metadatas[localActiveIndex];
+  const activeVoices = editableVoicesList[localActiveIndex] ?? [];
 
   const validations = useMemo(
     () => metadatas.map((_, i) => getImportValidation(editableVoicesList[i] ?? [])),
     [metadatas, editableVoicesList],
   );
   const activeValidation =
-    validations[activeIndex] ??
+    validations[localActiveIndex] ??
     ({
       canSubmit: false,
       checks: {
@@ -63,7 +70,13 @@ export function TariffImportPreviewModal({
     metadatas.every((_, i) => {
       const voices = editableVoicesList[i];
       const v = validations[i];
-      return voices && voices.length > 0 && v && v.invalidCount === 0 && reviewedFiles.has(i);
+      return (
+        voices &&
+        voices.length > 0 &&
+        v &&
+        v.invalidCount === 0 &&
+        (pageView || modalReviewedFiles.has(i))
+      );
     });
   const duplicateCodes = useMemo(
     () => new Set<string>(activeValidation.duplicateExamples),
@@ -83,27 +96,54 @@ export function TariffImportPreviewModal({
     [activeValidation],
   );
 
-  function updateVoice(index: number, field: keyof DesktopTariffVoice, value: string) {
-    setEditableVoicesList((current) =>
-      current.map((voices, listIndex) =>
-        listIndex !== activeIndex
-          ? voices
-          : voices.map((voice, voiceIndex) =>
-              voiceIndex === index
-                ? {
-                    ...voice,
-                    [field]:
-                      field === "unitPrice"
-                        ? parseEuroAmount(value)
-                        : field === "laborPercentage"
-                          ? parseOptionalPercent(value)
-                          : value,
-                  }
-                : voice,
-            ),
-      ),
-    );
-  }
+  const updateVoice = useCallback(
+    (index: number, field: keyof DesktopTariffVoice, value: string) => {
+      setEditableVoicesList((current) =>
+        current.map((voices, listIndex) =>
+          listIndex !== localActiveIndex
+            ? voices
+            : voices.map((voice, voiceIndex) =>
+                voiceIndex === index
+                  ? {
+                      ...voice,
+                      [field]:
+                        field === "unitPrice"
+                          ? parseEuroAmount(value)
+                          : field === "laborPercentage"
+                            ? parseOptionalPercent(value)
+                            : value,
+                    }
+                  : voice,
+              ),
+        ),
+      );
+    },
+    [localActiveIndex],
+  );
+
+  useEffect(() => {
+    if (pageView) {
+      onPageCanConfirmChange?.(canConfirm);
+    }
+  }, [canConfirm, onPageCanConfirmChange, pageView]);
+
+  useEffect(() => {
+    if (!pageView) {
+      return;
+    }
+
+    const handleToolbarAction = (event: Event) => {
+      const actionId = (event as CustomEvent<string>).detail;
+      if (actionId !== "tariff-import-confirm" || !canConfirm) {
+        return;
+      }
+
+      onConfirm(metadatas.map((meta, i) => ({ ...meta, voices: editableVoicesList[i] ?? [] })));
+    };
+
+    window.addEventListener("tariff-preview-action", handleToolbarAction);
+    return () => window.removeEventListener("tariff-preview-action", handleToolbarAction);
+  }, [canConfirm, editableVoicesList, metadatas, onConfirm, pageView]);
 
   function focusImportCell(rowIndex: number, field: string) {
     const cell = document.getElementById(`import-cell-${rowIndex}-${field}`);
@@ -111,7 +151,95 @@ export function TariffImportPreviewModal({
     cell?.focus();
   }
 
-  return (
+  return pageView ? (
+    <div className="flex w-full flex-col gap-5">
+      <div className="grid grid-flow-dense gap-3 md:grid-cols-4">
+        <ImportMetric label="Righe rilevate" value={activeVoices.length.toLocaleString("it-IT")} />
+        <ImportMetric
+          label="Valide"
+          tone={activeValidation.validCount > 0 ? "success" : "warning"}
+          value={activeValidation.validCount.toLocaleString("it-IT")}
+        />
+        <ImportMetric
+          label="Warning"
+          tone={activeValidation.warningCount > 0 ? "warning" : "neutral"}
+          value={activeValidation.warningCount.toLocaleString("it-IT")}
+        />
+        <ImportMetric
+          label="Duplicati"
+          tone={activeValidation.duplicateCount > 0 ? "warning" : "neutral"}
+          value={activeValidation.duplicateCount.toLocaleString("it-IT")}
+        />
+      </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <EditableTariffVoicesGrid
+          duplicateCodes={duplicateCodes}
+          groups={editableGroups}
+          onChange={updateVoice}
+          validation={activeValidation}
+        />
+        <div className="space-y-3 lg:sticky lg:top-0">
+          <div className="rounded-[20px] bg-[var(--bg-muted)]/65 p-4">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+              Validazioni
+            </div>
+            <div className="mt-3 space-y-2 text-[12px] font-medium text-[var(--text-secondary)]">
+              <ValidationLine ok={hasVoices} text="Voci prezzo rilevate" />
+              <ValidationLine
+                ok={activeValidation.invalidCount === 0}
+                text={`${activeValidation.invalidCount.toLocaleString("it-IT")} voci con dati mancanti`}
+              />
+              <ValidationLine
+                ok={activeValidation.duplicateCount === 0}
+                text={`${activeValidation.duplicateCount.toLocaleString("it-IT")} codici duplicati`}
+              />
+              <ValidationLine
+                ok={activeMetadata?.sourceName !== "Ente da confermare"}
+                text="Ente riconosciuto"
+              />
+              <ValidationLine
+                ok={(activeMetadata?.year ?? 0) >= 1900 && (activeMetadata?.year ?? 0) <= 2200}
+                text="Anno coerente"
+              />
+            </div>
+          </div>
+          {activeValidation.duplicateExamples.length > 0 ||
+          activeValidation.invalidExamples.length > 0 ? (
+            <div className="rounded-[20px] bg-[var(--warning-soft)] p-4 text-[12px] font-medium leading-5 text-[var(--warning-base)]">
+              {activeValidation.duplicateExamples.length > 0 ? (
+                <div>Duplicati: {activeValidation.duplicateExamples.join(", ")}</div>
+              ) : null}
+              {activeValidation.invalidExamples.length > 0 ? (
+                <div>Dati mancanti: {activeValidation.invalidExamples.join(", ")}</div>
+              ) : null}
+              {invalidRows.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {invalidRows.map((row) => (
+                    <button
+                      className="rounded-full bg-[var(--warning-base)]/15 px-3 py-1 text-[11px] font-bold transition-colors hover:bg-[var(--warning-base)]/25"
+                      key={`${row.index}-${row.field}`}
+                      onClick={() => focusImportCell(row.index, row.field)}
+                      type="button"
+                    >
+                      Riga {row.index + 1}: {row.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {!hasVoices ? (
+        <div className="rounded-[20px] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
+          Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento contenga
+          codici, unita di misura e prezzi leggibili.
+        </div>
+      ) : null}
+    </div>
+  ) : (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
       <button
         aria-label="Chiudi preview"
@@ -157,19 +285,19 @@ export function TariffImportPreviewModal({
                 const voices = editableVoicesList[i];
                 const hasErrors = (v?.invalidCount ?? 0) > 0 || (v?.duplicateCount ?? 0) > 0;
                 const isValid = (voices?.length ?? 0) > 0 && !hasErrors;
-                const isReviewed = reviewedFiles.has(i);
+                const isReviewed = modalReviewedFiles.has(i);
                 return (
                   <button
                     className={cn(
                       "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[12px] font-semibold transition-all duration-200",
-                      i === activeIndex
+                      i === localActiveIndex
                         ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
                         : isReviewed
                           ? "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/30"
                           : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:text-[var(--text-primary)]",
                     )}
                     key={meta.name}
-                    onClick={() => setActiveIndex(i)}
+                    onClick={() => setModalActiveIndex(i)}
                     type="button"
                   >
                     {isReviewed ? (
@@ -286,18 +414,24 @@ export function TariffImportPreviewModal({
               <ProjectControlButton onClick={onCancel} variant="neutral">
                 Annulla
               </ProjectControlButton>
-              {metadatas.length > 1 && !reviewedFiles.has(activeIndex) ? (
+              {metadatas.length > 1 && !modalReviewedFiles.has(localActiveIndex) ? (
                 <ProjectControlButton
                   icon={CheckCircle2}
-                  onClick={() => setReviewedFiles((current) => new Set([...current, activeIndex]))}
+                  onClick={() =>
+                    setModalReviewedFiles((current) => {
+                      const next = new Set(current);
+                      next.add(localActiveIndex);
+                      return next;
+                    })
+                  }
                   variant="soft"
                 >
                   Segna come revisionato
                 </ProjectControlButton>
               ) : null}
-              {metadatas.length > 1 && reviewedFiles.size > 0 ? (
+              {metadatas.length > 1 && modalReviewedFiles.size > 0 ? (
                 <span className="text-[12px] font-medium text-[var(--text-secondary)]">
-                  {reviewedFiles.size}/{metadatas.length} revisionati
+                  {modalReviewedFiles.size}/{metadatas.length} revisionati
                 </span>
               ) : null}
             </div>
@@ -312,9 +446,9 @@ export function TariffImportPreviewModal({
               variant="primary"
             >
               {metadatas.length > 1
-                ? reviewedFiles.size === metadatas.length
+                ? modalReviewedFiles.size === metadatas.length
                   ? `Conferma tutti (${metadatas.length})`
-                  : `Revisiona prima di confermare (${reviewedFiles.size}/${metadatas.length})`
+                  : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
                 : "Conferma importazione"}
             </ProjectControlButton>
           </div>

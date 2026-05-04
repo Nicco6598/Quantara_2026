@@ -70,7 +70,9 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
                         : file.status === "processing"
                           ? "Lettura in corso..."
                           : file.status === "done"
-                            ? "Completato"
+                            ? file.pagesTotal
+                              ? `${file.pagesParsed} pagine elaborate su ${file.pagesTotal} totali`
+                              : "Completato"
                             : "Errore"}
                     </div>
                   )}

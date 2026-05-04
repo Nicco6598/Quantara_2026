@@ -13,6 +13,7 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
@@ -21,7 +22,6 @@ import { cn } from "@/lib/utils";
 type MemberStatus = "active" | "inactive" | "invited";
 
 type TeamMember = {
-  avatar?: string;
   email: string;
   id: string;
   lastAccess: string;
@@ -33,48 +33,50 @@ type TeamMember = {
 
 type TeamRole = "Super Admin" | "Project Manager" | "Ingegnere" | "Contabile" | "Viewer";
 
+const ALL_ROLES: TeamRole[] = [
+  "Super Admin",
+  "Project Manager",
+  "Ingegnere",
+  "Contabile",
+  "Viewer",
+];
+
 const roleMeta: Record<
   TeamRole,
   {
-    count: number;
     description: string;
     icon: LucideIcon;
     tone: "blue" | "green" | "orange" | "slate";
   }
 > = {
   Contabile: {
-    count: 3,
     description: "Gestisce aspetti economici e contabili",
     icon: ShieldCheck,
     tone: "orange",
   },
   Ingegnere: {
-    count: 6,
     description: "Crea e modifica SAL e tariffari",
     icon: Users,
     tone: "blue",
   },
   "Project Manager": {
-    count: 4,
     description: "Gestisce progetti e team",
     icon: Users,
     tone: "green",
   },
   "Super Admin": {
-    count: 3,
     description: "Accesso completo a tutte le funzionalita",
     icon: Crown,
     tone: "blue",
   },
   Viewer: {
-    count: 2,
     description: "Visualizza dati e documenti",
     icon: ShieldCheck,
     tone: "slate",
   },
 };
 
-const teamMembers: TeamMember[] = [
+const initialMembers: TeamMember[] = [
   {
     email: "marco.bianchi@azienda.it",
     id: "1",
@@ -85,8 +87,6 @@ const teamMembers: TeamMember[] = [
     status: "active",
   },
   {
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=96&q=80",
     email: "laura.rossi@azienda.it",
     id: "2",
     lastAccess: "Oggi, 08:45",
@@ -105,8 +105,6 @@ const teamMembers: TeamMember[] = [
     status: "active",
   },
   {
-    avatar:
-      "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=96&q=80",
     email: "giulia.colombo@azienda.it",
     id: "4",
     lastAccess: "Ieri, 14:20",
@@ -143,8 +141,6 @@ const teamMembers: TeamMember[] = [
     status: "invited",
   },
   {
-    avatar:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=96&q=80",
     email: "martina.deluca@azienda.it",
     id: "8",
     lastAccess: "Invito inviato",
@@ -155,53 +151,50 @@ const teamMembers: TeamMember[] = [
   },
 ];
 
-const metricCards = [
-  {
-    detail: "Utenti nel workspace",
-    icon: Users,
-    label: "Membri totali",
-    tone: "blue" as const,
-    value: "18",
-  },
-  {
-    detail: "Utenti attivi",
-    icon: CheckCircle2,
-    label: "Membri attivi",
-    tone: "green" as const,
-    value: "16",
-  },
-  {
-    detail: "Ruoli personalizzati",
-    icon: ShieldCheck,
-    label: "Ruoli definiti",
-    tone: "orange" as const,
-    value: "5",
-  },
-  {
-    detail: "Inviti in attesa",
-    icon: Send,
-    label: "Inviti pendenti",
-    tone: "violet" as const,
-    value: "2",
-  },
-];
-
 const statusMeta: Record<MemberStatus, { className: string; label: string }> = {
-  active: {
-    className: "bg-[var(--success-soft)] text-[var(--success-base)]",
-    label: "Attivo",
-  },
-  inactive: {
-    className: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-    label: "Inattivo",
-  },
-  invited: {
-    className: "bg-violet-100 text-violet-700",
-    label: "Invitato",
-  },
+  active: { className: "bg-[var(--success-soft)] text-[var(--success-base)]", label: "Attivo" },
+  inactive: { className: "bg-[var(--danger-soft)] text-[var(--danger-base)]", label: "Inattivo" },
+  invited: { className: "bg-[var(--info-soft)] text-[var(--info-base)]", label: "Invitato" },
 };
 
+const PAGE_SIZE = 10;
+
 export function TeamScreen() {
+  const [members] = useState(initialMembers);
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | TeamRole>("all");
+  const [page, setPage] = useState(1);
+
+  const activeCount = members.filter((m) => m.status === "active").length;
+  const pendingCount = members.filter((m) => m.status === "invited").length;
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    return members.filter((m) => {
+      if (roleFilter !== "all" && m.role !== roleFilter) return false;
+      if (q && !m.name.toLowerCase().includes(q) && !m.email.toLowerCase().includes(q))
+        return false;
+      return true;
+    });
+  }, [members, query, roleFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const rolesData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const m of members) {
+      counts[m.role] = (counts[m.role] ?? 0) + 1;
+    }
+    return ALL_ROLES.map((role) => ({ role, count: counts[role] ?? 0 }));
+  }, [members]);
+
+  function handleSearch(value: string) {
+    setQuery(value);
+    setPage(1);
+  }
+
   return (
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_15%_10%,color-mix(in_srgb,var(--accent-primary)_13%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--success-base)_12%,transparent),transparent_32%)]" />
@@ -216,27 +209,67 @@ export function TeamScreen() {
               Membri attivi
             </div>
             <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
-              16 / 18
+              {activeCount} / {members.length}
             </div>
             <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-              Due inviti sono ancora in attesa di conferma.
+              {pendingCount > 0
+                ? `${pendingCount} invito${pendingCount === 1 ? "" : "i"} ${pendingCount === 1 ? "è" : "sono"} ancora in attesa di conferma.`
+                : "Nessun invito in attesa."}
             </p>
           </div>
         }
       />
 
       <section className="mt-8 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metricCards.map((metric) => (
-          <TeamMetricCard {...metric} key={metric.label} />
-        ))}
+        <TeamMetricCard
+          detail="Utenti nel workspace"
+          icon={Users}
+          label="Membri totali"
+          tone="blue"
+          value={String(members.length)}
+        />
+        <TeamMetricCard
+          detail="Utenti attivi"
+          icon={CheckCircle2}
+          label="Membri attivi"
+          tone="green"
+          value={String(activeCount)}
+        />
+        <TeamMetricCard
+          detail="Ruoli personalizzati"
+          icon={ShieldCheck}
+          label="Ruoli definiti"
+          tone="orange"
+          value={String(ALL_ROLES.length)}
+        />
+        <TeamMetricCard
+          detail="Inviti in attesa"
+          icon={Send}
+          label="Inviti pendenti"
+          tone="info"
+          value={String(pendingCount)}
+        />
       </section>
 
       <section className="mt-8 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <TeamMembersPanel />
+        <TeamMembersPanel
+          members={paginated}
+          filteredCount={filtered.length}
+          page={safePage}
+          totalPages={totalPages}
+          query={query}
+          roleFilter={roleFilter}
+          onQueryChange={handleSearch}
+          onRoleFilterChange={(r) => {
+            setRoleFilter(r);
+            setPage(1);
+          }}
+          onPageChange={setPage}
+        />
 
         <aside className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
           <InviteMemberCard />
-          <RolesCard />
+          <RolesCard rolesData={rolesData} />
         </aside>
       </section>
 
@@ -261,14 +294,14 @@ function TeamMetricCard({
   detail: string;
   icon: LucideIcon;
   label: string;
-  tone: "blue" | "green" | "orange" | "violet";
+  tone: "blue" | "green" | "info" | "orange";
   value: string;
 }) {
   const toneClass = {
     blue: "bg-[var(--info-soft)] text-[var(--info-base)]",
     green: "bg-[var(--success-soft)] text-[var(--success-base)]",
+    info: "bg-[var(--info-soft)] text-[var(--info-base)]",
     orange: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-    violet: "bg-violet-100 text-violet-700",
   }[tone];
 
   return (
@@ -298,7 +331,29 @@ function TeamMetricCard({
   );
 }
 
-function TeamMembersPanel() {
+function TeamMembersPanel({
+  members,
+  filteredCount,
+  page,
+  totalPages,
+  query,
+  roleFilter,
+  onQueryChange,
+  onRoleFilterChange,
+  onPageChange,
+}: {
+  members: TeamMember[];
+  filteredCount: number;
+  page: number;
+  totalPages: number;
+  query: string;
+  roleFilter: "all" | TeamRole;
+  onQueryChange: (v: string) => void;
+  onRoleFilterChange: (r: "all" | TeamRole) => void;
+  onPageChange: (p: number) => void;
+}) {
+  const [roleOpen, setRoleOpen] = useState(false);
+
   return (
     <BezelSurface innerClassName="overflow-hidden p-0">
       <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -311,14 +366,72 @@ function TeamMembersPanel() {
             <span className="sr-only">Cerca membro</span>
             <input
               className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              onChange={(e) => onQueryChange(e.target.value)}
               placeholder="Cerca membro..."
               type="search"
+              value={query}
             />
           </label>
-          <ProjectControlButton className="min-w-[168px] justify-between" variant="neutral">
-            Tutti i ruoli
-            <ChevronDown className="size-4 text-[var(--text-secondary)]" />
-          </ProjectControlButton>
+          <div className="relative">
+            <button
+              className="inline-flex h-10 min-w-[168px] items-center justify-between rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 text-[13px] font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              onClick={() => setRoleOpen(!roleOpen)}
+              type="button"
+            >
+              {roleFilter === "all" ? "Tutti i ruoli" : roleFilter}
+              <ChevronDown
+                className={cn(
+                  "size-4 text-[var(--text-secondary)] transition-transform",
+                  roleOpen && "rotate-180",
+                )}
+              />
+            </button>
+            {roleOpen && (
+              <>
+                <button
+                  className="fixed inset-0 z-40 cursor-default"
+                  onClick={() => setRoleOpen(false)}
+                  type="button"
+                  aria-label="Chiudi"
+                />
+                <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[180px] overflow-hidden rounded-[14px] bg-[var(--surface-base)] p-1 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
+                  <button
+                    className={cn(
+                      "flex w-full items-center rounded-[10px] px-3 py-2 text-left text-[13px] font-medium transition-colors",
+                      roleFilter === "all"
+                        ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                        : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+                    )}
+                    onClick={() => {
+                      onRoleFilterChange("all");
+                      setRoleOpen(false);
+                    }}
+                    type="button"
+                  >
+                    Tutti i ruoli
+                  </button>
+                  {ALL_ROLES.map((role) => (
+                    <button
+                      className={cn(
+                        "flex w-full items-center rounded-[10px] px-3 py-2 text-left text-[13px] font-medium transition-colors",
+                        roleFilter === role
+                          ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                          : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+                      )}
+                      key={role}
+                      onClick={() => {
+                        onRoleFilterChange(role);
+                        setRoleOpen(false);
+                      }}
+                      type="button"
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -336,7 +449,7 @@ function TeamMembersPanel() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-subtle)]">
-            {teamMembers.map((member) => (
+            {members.map((member) => (
               <TeamMemberRow key={member.id} member={member} />
             ))}
           </tbody>
@@ -345,29 +458,49 @@ function TeamMembersPanel() {
 
       {/* --- Mobile card view --- */}
       <div className="divide-y divide-[var(--border-subtle)] md:hidden">
-        {teamMembers.map((member) => (
+        {members.map((member) => (
           <MobileMemberCard key={member.id} member={member} />
         ))}
       </div>
 
       <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-[12px] font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          Mostra
-          <ProjectControlButton className="h-8 px-2.5" variant="neutral">
-            10
-            <ChevronDown className="size-3.5" />
-          </ProjectControlButton>
-          di 18 risultati
+          Mostra {PAGE_SIZE} di {filteredCount} risult{filteredCount === 1 ? "ato" : "i"}
         </div>
         <div className="flex items-center gap-2">
-          <PaginationButton icon={ChevronLeft} label="Pagina precedente" />
-          <ProjectControlButton className="size-8 px-0 text-[12px]" variant="soft">
-            1
-          </ProjectControlButton>
-          <ProjectControlButton className="size-8 px-0 text-[12px]" variant="neutral">
-            2
-          </ProjectControlButton>
-          <PaginationButton icon={ChevronRight} label="Pagina successiva" />
+          <button
+            aria-label="Pagina precedente"
+            className="flex size-8 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}
+            type="button"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button
+              className={cn(
+                "flex size-8 items-center justify-center rounded-full text-[12px] font-bold transition-colors",
+                p === page
+                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                  : "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted)]",
+              )}
+              key={p}
+              onClick={() => onPageChange(p)}
+              type="button"
+            >
+              {p}
+            </button>
+          ))}
+          <button
+            aria-label="Pagina successiva"
+            className="flex size-8 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={page >= totalPages}
+            onClick={() => onPageChange(page + 1)}
+            type="button"
+          >
+            <ChevronRight className="size-4" />
+          </button>
         </div>
       </div>
     </BezelSurface>
@@ -490,9 +623,8 @@ function InviteMemberCard() {
   );
 }
 
-function RolesCard() {
+function RolesCard({ rolesData }: { rolesData: { role: TeamRole; count: number }[] }) {
   const { notify } = useToast();
-  const roles = Object.entries(roleMeta) as [TeamRole, (typeof roleMeta)[TeamRole]][];
 
   return (
     <BezelSurface innerClassName="p-5">
@@ -503,7 +635,8 @@ function RolesCard() {
         Gestisci ruoli e permessi del workspace.
       </p>
       <div className="mt-5 space-y-2">
-        {roles.map(([role, meta]) => {
+        {rolesData.map(({ role, count }) => {
+          const meta = roleMeta[role];
           const Icon = meta.icon;
 
           return (
@@ -528,7 +661,7 @@ function RolesCard() {
                 </div>
               </div>
               <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-muted)] text-[12px] font-bold text-[var(--text-secondary)]">
-                {meta.count}
+                {count}
               </span>
             </div>
           );
@@ -558,16 +691,6 @@ function Avatar({ member }: { member: TeamMember }) {
     .split(" ")
     .map((part) => part[0])
     .join("");
-
-  if (member.avatar) {
-    return (
-      <img
-        alt=""
-        className="size-10 shrink-0 rounded-full object-cover ring-1 ring-[var(--border-subtle)]"
-        src={member.avatar}
-      />
-    );
-  }
 
   return (
     <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[12px] font-bold text-[var(--text-inverse)]">
@@ -604,14 +727,6 @@ function StatusPill({ status }: { status: MemberStatus }) {
       <span className="size-1.5 rounded-full bg-current" />
       {meta.label}
     </span>
-  );
-}
-
-function PaginationButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return (
-    <ProjectControlButton aria-label={label} className="size-8 px-0" variant="icon">
-      <Icon className="size-4" />
-    </ProjectControlButton>
   );
 }
 

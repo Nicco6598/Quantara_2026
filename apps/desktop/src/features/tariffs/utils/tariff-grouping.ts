@@ -6,14 +6,38 @@ type TariffGroup<T> = {
   description: string;
 };
 
+export type SubVoiceRow = {
+  index: number;
+  voice: DesktopTariffVoice;
+};
+
+export type VoiceGroup = {
+  children: SubVoiceRow[];
+  code: string;
+  description: string;
+  voce: string;
+  voceDesc: string;
+  categoria: string;
+  gruppo: string;
+  gruppoDesc: string;
+};
+
 function getGroupCode(voice: DesktopTariffVoice): string {
   const codeParts = voice.officialCode.split(".");
   return codeParts.length >= 4 ? codeParts.slice(0, 4).join(".") : voice.officialCode || "Altro";
 }
 
+function extractVoceFromCode(officialCode: string): string {
+  const parts = officialCode.split(".");
+  if (parts.length >= 4) return parts[3] ?? "";
+  if (parts.length >= 3) return parts[2] ?? "";
+  return "";
+}
+
 function inferGroupDescription(voice: DesktopTariffVoice): string {
   if (voice.category.includes("VOCE")) {
-    return voice.category;
+    const voceIndex = voice.category.indexOf("VOCE");
+    return voice.category.slice(voceIndex);
   }
   if (voice.category === "armament") {
     return "Armamento ferroviario";
@@ -44,17 +68,22 @@ export function groupTariffVoices(voices: DesktopTariffVoice[]): TariffGroup<Des
   return [...groups.values()];
 }
 
-export function groupEditableTariffVoices(
-  voices: DesktopTariffVoice[],
-): TariffGroup<{ index: number; voice: DesktopTariffVoice }>[] {
-  const groups = new Map<string, TariffGroup<{ index: number; voice: DesktopTariffVoice }>>();
+export function groupEditableTariffVoices(voices: DesktopTariffVoice[]): VoiceGroup[] {
+  const groups = new Map<string, VoiceGroup>();
 
   for (const [index, voice] of voices.entries()) {
     const groupCode = getGroupCode(voice);
+    const codeVoce = extractVoceFromCode(voice.officialCode);
+    const voce = codeVoce || voice.voce || "";
     const group = groups.get(groupCode) ?? {
       children: [],
       code: groupCode,
       description: inferGroupDescription(voice),
+      voce,
+      voceDesc: voice.voceDesc ?? "",
+      categoria: voice.officialCode.split(".")[1] ?? "",
+      gruppo: voice.officialCode.split(".")[2] ?? "",
+      gruppoDesc: voice.gruppoDesc ?? "",
     };
     group.children.push({ index, voice });
     groups.set(groupCode, group);

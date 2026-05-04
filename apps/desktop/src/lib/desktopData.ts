@@ -7,6 +7,7 @@ import type {
   DesktopTariffVoiceRecord,
   Money,
   TariffPdfMetadataRecord,
+  TariffWarning,
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
@@ -21,6 +22,7 @@ export type DesktopTariffVoice = DesktopTariffVoiceRecord;
 export type CreateDesktopTariffBookRequest = CreateDesktopTariffBookRecordRequest;
 export type UpdateDesktopTariffBookRequest = UpdateDesktopTariffBookRecordRequest;
 export type TariffPdfMetadata = TariffPdfMetadataRecord;
+export type { TariffWarning };
 
 export type DesktopDataResult<T> =
   | {
@@ -74,10 +76,7 @@ export async function createDesktopContract(
     },
     frameworkAgreementCode: request.frameworkAgreementCode,
     id: request.id,
-    safetyCostsNotSubjectToDiscount: {
-      amount: request.safetyCostsNotSubjectToDiscount,
-      currency: "EUR",
-    },
+    tenderDiscountPercent: request.tenderDiscountPercent,
     tariffPriorities: request.tariffPriorities,
     title: request.title,
   };
@@ -210,17 +209,35 @@ export async function selectMultipleTariffPdfMetadatas(
     return [];
   }
 
-  const results: TariffPdfMetadata[] = [];
   const paths = selectedPaths as string[];
 
+  paths.forEach((path, index) => {
+    const fallback = inferTariffMetadataFromPath(path);
+    onProgress({ fileName: fallback.name, index, total: paths.length, status: "pending" });
+  });
+
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+
+  // Mark all files as "processing" synchronously so the modal shows them all at once
   for (const [index, path] of paths.entries()) {
     const fallback = inferTariffMetadataFromPath(path);
     onProgress({ fileName: fallback.name, index, total: paths.length, status: "processing" });
+  }
 
+  // Process all files in parallel — each resolve triggers its own progress update
+  const pending = paths.map(async (path, index) => {
+    const fallback = inferTariffMetadataFromPath(path);
     try {
       const metadata = await invoke<TariffPdfMetadata>("import_tariff_pdf_preview", { path });
-      results.push(metadata);
-      onProgress({ fileName: fallback.name, index, total: paths.length, status: "done" });
+      onProgress({
+        fileName: fallback.name,
+        index,
+        total: paths.length,
+        status: "done",
+        ...(metadata.pagesTotal !== undefined && { pagesTotal: metadata.pagesTotal }),
+        ...(metadata.pagesParsed !== undefined && { pagesParsed: metadata.pagesParsed }),
+      });
+      return metadata;
     } catch (error) {
       onProgress({
         fileName: fallback.name,
@@ -229,10 +246,12 @@ export async function selectMultipleTariffPdfMetadatas(
         status: "error",
         error: error instanceof Error ? error.message : String(error),
       });
+      return null;
     }
-  }
+  });
 
-  return results;
+  const results = await Promise.all(pending);
+  return results.filter(Boolean) as TariffPdfMetadata[];
 }
 
 export type ImportFileProgress = {
@@ -241,6 +260,8 @@ export type ImportFileProgress = {
   total: number;
   status: "pending" | "processing" | "done" | "error";
   error?: string;
+  pagesTotal?: number;
+  pagesParsed?: number;
 };
 
 function inferTariffMetadataFromPath(path: string): TariffPdfMetadata {
