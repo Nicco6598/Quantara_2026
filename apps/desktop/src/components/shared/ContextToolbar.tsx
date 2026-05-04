@@ -34,7 +34,7 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
             <span className="flex size-6 items-center justify-center rounded-[8px] bg-[var(--accent-primary)] text-[11px] font-bold text-white">
               {count}
             </span>
-            {entityLabel} selezionat{count === 1 ? "o" : "i"}
+            {entityLabel} selezionat{count === 1 ? (entityLabel.endsWith("a") ? "a" : "o") : "i"}
           </span>
 
           <div className="mx-1.5 h-[26px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
@@ -43,7 +43,7 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
             {actions.map((action) => (
               <motion.button
                 className={
-                  "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold ring-1 transition-colors " +
+                  "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold ring-1 transition-colors focus-visible:outline-2 focus-visible:outline-[var(--ring-focus)] focus-visible:outline-offset-2 " +
                   (action.tone === "danger"
                     ? "bg-[var(--danger-soft)] text-[var(--danger-base)] ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
                     : "bg-[var(--bg-muted)] text-[var(--text-primary)] ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]")

@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useSelectionStore } from "@/store/selection-store";
 
-const STATUS_OPTIONS = ["Tutti", "Bozza", "Chiuso"] as const;
+const STATUS_OPTIONS = ["Tutti", "Bozza", "In revisione", "Approvata", "Chiuso"] as const;
 
 export function AccountingScreen() {
   const { notify } = useToast();
@@ -136,11 +136,15 @@ export function AccountingScreen() {
           const contractor = projectContractorMap.get(doc.projectId);
           if (contractor !== filterContractor) return false;
         }
-        if (
-          filterStatus !== "Tutti" &&
-          doc.status !== (filterStatus === "Bozza" ? "draft" : "closed")
-        )
-          return false;
+        if (filterStatus !== "Tutti") {
+          const statusMap: Record<string, string> = {
+            Bozza: "draft",
+            "In revisione": "in-review",
+            Approvata: "approved",
+            Chiuso: "closed",
+          };
+          if (doc.status !== statusMap[filterStatus]) return false;
+        }
         if (dateFrom && doc.date < dateFrom) return false;
         if (dateTo && doc.date > dateTo) return false;
         if (
@@ -413,8 +417,20 @@ export function AccountingScreen() {
                               <div className="text-[14px] font-bold text-[var(--text-primary)]">
                                 {formatMoney({ amount: view.total, currency: "EUR" })}
                               </div>
-                              <StatusPill tone={doc.status === "closed" ? "success" : "warning"}>
-                                {doc.status === "closed" ? "Chiuso" : "Bozza"}
+                              <StatusPill
+                                tone={
+                                  doc.status === "closed" || doc.status === "approved"
+                                    ? "success"
+                                    : doc.status === "in-review"
+                                      ? "info"
+                                      : "warning"
+                                }
+                              >
+                                {doc.status === "closed" || doc.status === "approved"
+                                  ? "Approvata"
+                                  : doc.status === "in-review"
+                                    ? "In revisione"
+                                    : "Bozza"}
                               </StatusPill>
                             </div>
                           </div>
@@ -618,11 +634,18 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusPill({ children, tone }: { children: string; tone: "success" | "warning" }) {
+function StatusPill({
+  children,
+  tone,
+}: {
+  children: string;
+  tone: "info" | "success" | "warning";
+}) {
   return (
     <span
       className={cn(
         "shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold",
+        tone === "info" && "bg-[var(--info-soft)] text-[var(--info-base)]",
         tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
         tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
       )}

@@ -374,44 +374,31 @@ function ContractorCard({
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="group relative rounded-2xl border-[0.5px] border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent-primary)]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
-      <button
-        aria-label={`Apri ${folder.contractor}`}
-        className="absolute inset-0 rounded-2xl text-left"
-        onClick={() => onOpenFolder(folder.id)}
-        type="button"
-      />
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--accent-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]">
-            <HardHat className="size-5" />
-          </span>
-          <span className="truncate text-[15px] font-bold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
-            {folder.contractor}
-          </span>
-        </div>
-        <div className="relative z-10 flex shrink-0 items-center gap-1.5">
+    <div className="group relative rounded-2xl border-[0.5px] border-[var(--border-subtle)] bg-[var(--surface-base)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent-primary)]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
+      {/* Folder tab — effetto cartella */}
+      <div className="flex h-8 items-center justify-between rounded-t-2xl bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-4">
+        <div className="flex items-center gap-1.5">
           <span
             className={cn(
-              "inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-[10px] font-semibold",
-              hasCriticalItems
-                ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20"
-                : "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20",
+              "size-2 rounded-full",
+              hasCriticalItems ? "bg-[var(--warning-base)]" : "bg-[var(--success-base)]",
             )}
-          >
-            <span className="size-1.5 rounded-full bg-current" />
+          />
+          <span className="text-[10px] font-medium text-[var(--text-secondary)]">
             {hasCriticalItems ? "Presidio" : "Stabile"}
           </span>
+        </div>
+        <div className="relative z-10">
           <button
             aria-label={`Azioni ${folder.contractor}`}
-            className="flex size-8 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+            className="flex size-7 items-center justify-center rounded-full text-[var(--text-secondary)] opacity-0 transition-all hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)] group-hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               setMenuOpen((open) => !open);
             }}
             type="button"
           >
-            <MoreVertical className="size-4" />
+            <MoreVertical className="size-3.5" />
           </button>
           {menuOpen ? (
             <>
@@ -440,24 +427,41 @@ function ContractorCard({
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-3 divide-x divide-[var(--border-subtle)]/60 overflow-hidden rounded-xl border-[0.5px] border-[var(--border-subtle)]/50">
-        <CardMetric
-          label="Valore"
-          value={formatMoney({ amount: folder.budget, currency: "EUR" })}
-        />
-        <CardMetric label="Progetti" value={`${folder.projectCount}`} />
-        <CardMetric
-          label="Alert"
-          value={`${folder.criticalCount}`}
-          highlight={folder.criticalCount > 0}
-        />
-      </div>
+      {/* Corpo della card — cliccabile */}
+      <button
+        aria-label={`Apri ${folder.contractor}`}
+        className="w-full px-4 pb-4 pt-3 text-left"
+        onClick={() => onOpenFolder(folder.id)}
+        type="button"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--accent-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]">
+            <HardHat className="size-5" />
+          </span>
+          <span className="min-w-0 break-words text-[15px] font-bold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+            {folder.contractor}
+          </span>
+        </div>
 
-      <div className="mt-4 flex items-center justify-end">
-        <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent-primary)] opacity-0 transition-all duration-200 -translate-x-1 group-hover:translate-x-0 group-hover:opacity-100">
-          Apri workspace <ChevronRight className="size-3.5" />
-        </span>
-      </div>
+        <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border-subtle)]/60 overflow-hidden rounded-xl border-[0.5px] border-[var(--border-subtle)]/50">
+          <CardMetric
+            label="Valore"
+            value={formatMoney({ amount: folder.budget, currency: "EUR" })}
+          />
+          <CardMetric label="Progetti" value={`${folder.projectCount}`} />
+          <CardMetric
+            label="Alert"
+            value={`${folder.criticalCount}`}
+            highlight={folder.criticalCount > 0}
+          />
+        </div>
+
+        <div className="mt-4 flex items-center justify-end">
+          <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent-primary)] opacity-0 transition-all duration-200 -translate-x-1 group-hover:translate-x-0 group-hover:opacity-100">
+            Apri workspace <ChevronRight className="size-3.5" />
+          </span>
+        </div>
+      </button>
     </div>
   );
 }

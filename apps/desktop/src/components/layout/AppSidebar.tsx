@@ -13,7 +13,6 @@ import {
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
-import { fallbackMaterials as materialRows } from "@/features/materials/materials-data";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { isPlaceholderContractorName } from "@/features/projects/utils/projects-helpers";
 import { APP_VERSION } from "@/generated/appVersion";
@@ -124,14 +123,8 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
   }, [loadProjects]);
 
   const projectCount = projects.length;
-  const criticalMaterialsCount = useMemo(
-    () => materialRows.filter((m) => m.quantity === 0 || m.quantity < m.minQuantity).length,
-    [],
-  );
-  const warningMaterialsCount = useMemo(
-    () => materialRows.filter((m) => m.quantity > 0 && m.quantity < m.minQuantity * 1.5).length,
-    [],
-  );
+  const criticalMaterialsCount = 0;
+  const warningMaterialsCount = 0;
 
   const primaryNavItems: NavItem[] = useMemo(
     () => [
@@ -163,7 +156,7 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
       { icon: ChartBar, label: "Contabilità", route: "accounting" },
       { icon: Users, label: "Team", route: "team" },
     ],
-    [contractorCount, projectCount, criticalMaterialsCount, warningMaterialsCount],
+    [contractorCount, projectCount],
   );
 
   const utilityNavItems: NavItem[] = useMemo(

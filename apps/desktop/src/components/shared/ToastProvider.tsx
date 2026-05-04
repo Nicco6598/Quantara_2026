@@ -68,8 +68,31 @@ const toneBorder = {
 };
 
 let audioCtx: AudioContext | null = null;
+let audioUnlocked = false;
 
-function getAudioContext() {
+function unlockAudioOnGesture() {
+  if (audioUnlocked || typeof window === "undefined") return;
+  const handler = async () => {
+    if (audioUnlocked) return;
+    try {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+      audioUnlocked = true;
+    } catch {
+      // Gesture unlock failed silently — rely on fallback
+    }
+  };
+  const events = ["click", "touchstart", "keydown"] as const;
+  for (const event of events) {
+    window.addEventListener(event, handler, { once: true });
+  }
+}
+
+async function getAudioContext() {
   if (typeof window === "undefined") return null;
   if (!audioCtx) {
     try {
@@ -79,14 +102,18 @@ function getAudioContext() {
     }
   }
   if (audioCtx.state === "suspended") {
-    audioCtx.resume();
+    try {
+      await audioCtx.resume();
+    } catch {
+      return null;
+    }
   }
   return audioCtx;
 }
 
-function playToastSound(tone?: ToastTone) {
+async function playToastSound(tone?: ToastTone) {
   try {
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
     if (!ctx) return;
 
     const gain = ctx.createGain();
@@ -104,12 +131,36 @@ function playToastSound(tone?: ToastTone) {
     osc.start(now);
     osc.stop(now + 0.12);
   } catch {
-    // audio fallback silently
+    // Fallback: HTMLAudio beep if WebAudio unavailable
+    try {
+      const audioFallbackCtx = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      )();
+      if (audioFallbackCtx.state === "suspended") {
+        await audioFallbackCtx.resume();
+      }
+      const osc = audioFallbackCtx.createOscillator();
+      const gain = audioFallbackCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioFallbackCtx.destination);
+      osc.frequency.value = tone === "danger" ? 660 : tone === "warning" ? 520 : 880;
+      gain.gain.value = 0.06;
+      osc.start();
+      osc.stop(audioFallbackCtx.currentTime + 0.12);
+    } catch {
+      // Audio completely unavailable — silent fallback
+    }
   }
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  // Unlock audio context on first user gesture (macOS/WebView)
+  useEffect(() => {
+    unlockAudioOnGesture();
+  }, []);
 
   const dismiss = useCallback((id: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
@@ -117,7 +168,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const notify = useCallback(
     (toast: ToastInput) => {
-      playToastSound(toast.tone);
+      void playToastSound(toast.tone);
       const id =
         typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()

@@ -7,6 +7,7 @@ import {
   FileText,
   Layers3,
   MoreVertical,
+  Play,
   Plus,
   Radio,
   ReceiptText,
@@ -17,7 +18,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
@@ -115,6 +116,8 @@ export function ProjectDetailScreen() {
     return { committed, contractual, currentSalAmount, executed, progress, residual };
   }, [salViews, selectedProject]);
 
+  const [filterSalStatus, setFilterSalStatus] = useState<string>("Tutti");
+
   const salRows = useMemo(
     () =>
       salViews.map((row) => ({
@@ -122,16 +125,31 @@ export function ProjectDetailScreen() {
         date: row.closedAt ?? row.date,
         id: row.id,
         isClosed: row.status === "closed",
+        isApproved: row.status === "approved",
+        isDraft: row.status === "draft",
+        isReview: row.status === "in-review",
         period: row.description || row.title,
         sal: row.title,
-        status: row.status === "closed" ? "Approvata" : "Bozza",
-        tone: (row.status === "closed" ? "success" : "warning") as
-          | "danger"
-          | "info"
-          | "success"
-          | "warning",
+        status:
+          row.status === "closed"
+            ? "Approvata"
+            : row.status === "approved"
+              ? "Approvata"
+              : row.status === "in-review"
+                ? "In revisione"
+                : "Bozza",
+        tone: (row.status === "closed" || row.status === "approved"
+          ? "success"
+          : row.status === "in-review"
+            ? "info"
+            : "warning") as "danger" | "info" | "success" | "warning",
       })),
     [salViews],
+  );
+
+  const filteredSalRows = useMemo(
+    () => salRows.filter((r) => filterSalStatus === "Tutti" || r.status === filterSalStatus),
+    [salRows, filterSalStatus],
   );
 
   const detail = useMemo(
@@ -156,7 +174,7 @@ export function ProjectDetailScreen() {
 
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const deleteSal = useSalWorkflowStore((state) => state.deleteSal);
-  const closeSal = useSalWorkflowStore((state) => state.closeSal);
+  const setSalStatus = useSalWorkflowStore((state) => state.setSalStatus);
 
   function handleCreateSal() {
     if (!selectedProject) {
@@ -187,17 +205,20 @@ export function ProjectDetailScreen() {
     [deleteSal, notify, salDocuments],
   );
 
-  const handleCloseSal = useCallback(
-    (salId: string) => {
+  const handleSetSalStatus = useCallback(
+    (salId: string, status: "in-review" | "approved" | "closed") => {
       const sal = salDocuments.find((d) => d.id === salId);
-      closeSal(salId);
+      setSalStatus(salId, status);
       notify({
-        message: `"${sal?.title ?? salId}" approvata e chiusa.`,
-        title: "SAL approvata",
+        message:
+          status === "in-review"
+            ? `"${sal?.title ?? salId}" inviata in revisione.`
+            : `"${sal?.title ?? salId}" ${status === "closed" ? "approvata e chiusa." : "approvata."}`,
+        title: status === "in-review" ? "In revisione" : "Approvata",
         tone: "success",
       });
     },
-    [closeSal, notify, salDocuments],
+    [setSalStatus, notify, salDocuments],
   );
 
   if (isLoading) {
@@ -437,13 +458,61 @@ export function ProjectDetailScreen() {
                 ]}
                 entityLabel="SAL"
               />
-              {salRows.map((row) => (
+              {/* Status filter tabs */}
+              <div className="flex flex-wrap items-center gap-1.5 px-1 pt-3">
+                {["Tutti", "Bozza", "In revisione", "Approvata"].map((s) => (
+                  <button
+                    className={cn(
+                      "rounded-full px-3 py-1 text-[11px] font-semibold transition-colors",
+                      filterSalStatus === s
+                        ? s === "Bozza"
+                          ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                          : s === "In revisione"
+                            ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+                            : s === "Approvata"
+                              ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+                              : "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                        : "bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted-strong)]",
+                    )}
+                    key={s}
+                    onClick={() => setFilterSalStatus(s)}
+                    type="button"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {filteredSalRows.map((row) => (
                 <SalCard
                   key={row.id}
                   date={row.date}
                   id={row.id}
+                  isApproved={row.isApproved}
                   isClosed={row.isClosed}
-                  onClose={() => handleCloseSal(row.id)}
+                  isDraft={row.isDraft}
+                  isReview={row.isReview}
+                  onClose={() =>
+                    handleSetSalStatus(
+                      row.id,
+                      row.isDraft ? "in-review" : row.isReview ? "approved" : "closed",
+                    )
+                  }
+                  onContinue={
+                    row.isDraft
+                      ? () => {
+                          try {
+                            window.sessionStorage.setItem(
+                              "quantara.selectedProjectDetail.v1",
+                              JSON.stringify(selectedProject),
+                            );
+                            window.sessionStorage.setItem("quantara.salResumeDraft.v1", row.id);
+                          } catch {
+                            /* no-op */
+                          }
+                          navigate("sal-create");
+                        }
+                      : undefined
+                  }
                   onDelete={() => setDeleteTargetId(row.id)}
                   period={row.period}
                   sal={row.sal}
@@ -452,7 +521,7 @@ export function ProjectDetailScreen() {
                   value={formatMoney({ amount: row.amount, currency: "EUR" })}
                 />
               ))}
-              {salRows.length === 0 ? (
+              {filteredSalRows.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 rounded-[16px] border-[0.5px] border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-4 py-8 text-center">
                   <FileText className="size-8 text-[var(--text-secondary)]" />
                   <p className="text-[13px] font-medium text-[var(--text-secondary)]">
@@ -751,8 +820,12 @@ function InfoBlock({ label, note, value }: { label: string; note?: string; value
 function SalCard({
   date,
   id,
-  isClosed,
+  isApproved = false,
+  isClosed = false,
+  isDraft = false,
+  isReview = false,
   onClose,
+  onContinue,
   onDelete,
   period,
   sal,
@@ -762,8 +835,12 @@ function SalCard({
 }: {
   date: string;
   id: string;
-  isClosed: boolean;
+  isApproved?: boolean;
+  isClosed?: boolean;
+  isDraft?: boolean;
+  isReview?: boolean;
   onClose: () => void;
+  onContinue?: (() => void) | undefined;
   onDelete: () => void;
   period: string;
   sal: string;
@@ -773,6 +850,8 @@ function SalCard({
 }) {
   const isSelected = useSelectionStore((state) => state.ids.has(id));
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
 
   return (
     <div
@@ -801,10 +880,10 @@ function SalCard({
         <motion.button
           aria-checked={isSelected}
           className={cn(
-            "flex size-[20px] shrink-0 items-center justify-center rounded-[5px] border transition-colors",
+            "flex size-[20px] shrink-0 items-center justify-center rounded-[5px] border transition-all",
             isSelected
-              ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]"
-              : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
+              ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] opacity-100"
+              : "border-[var(--border-subtle)] bg-[var(--surface-base)] opacity-0 group-hover:opacity-100",
           )}
           onClick={(e) => {
             e.stopPropagation();
@@ -858,49 +937,89 @@ function SalCard({
       </div>
 
       <div className="pointer-events-auto relative z-10 flex shrink-0 items-center gap-1">
-        {isClosed ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-3 py-1 text-[11px] font-semibold text-[var(--success-base)]">
-            <ThumbsUp className="size-3.5" />
-            Approvata
-          </span>
-        ) : (
-          <ProjectControlButton
-            aria-label="Approva SAL"
-            className="size-9"
-            icon={ThumbsUp}
+        {isDraft ? (
+          <button
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--accent-primary)] px-3.5 text-[11px] font-bold text-white shadow-sm transition-all hover:bg-[var(--accent-primary)]/90"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onContinue?.();
+            }}
+            type="button"
+          >
+            <Play className="size-3.5" />
+            Continua
+          </button>
+        ) : isReview ? (
+          <button
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-3.5 text-[11px] font-bold text-[var(--info-base)] ring-1 ring-[var(--info-base)]/30 transition-all hover:bg-[var(--info-soft)]/80"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onClose();
             }}
-            variant="icon"
+            type="button"
           >
-            <span className="sr-only">Approva</span>
-          </ProjectControlButton>
-        )}
+            <ThumbsUp className="size-3.5" />
+            Approva
+          </button>
+        ) : isClosed || isApproved ? (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold",
+              "bg-[var(--success-soft)] text-[var(--success-base)]",
+            )}
+          >
+            <ThumbsUp className="size-3.5" />
+            Approvata
+          </span>
+        ) : null}
 
         <div className="relative">
-          <ProjectControlButton
+          <button
+            ref={menuBtnRef}
             aria-label="Azioni SAL"
-            className="size-9"
-            icon={MoreVertical}
+            className="projects-control-button-neutral flex size-9 shrink-0 items-center justify-center gap-2 rounded-full text-[var(--text-secondary)] outline-none projects-control-button"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
+              if (!menuOpen && menuBtnRef.current) {
+                const rect = menuBtnRef.current.getBoundingClientRect();
+                setMenuPos({
+                  top: rect.bottom + 6,
+                  right: document.documentElement.clientWidth - rect.right,
+                });
+              }
               setMenuOpen((v) => !v);
             }}
-            variant="icon"
+            type="button"
           >
-            <span className="sr-only">Azioni</span>
-          </ProjectControlButton>
+            <MoreVertical className="size-4" />
+          </button>
           {menuOpen ? (
             <>
               <button
                 aria-label="Chiudi menu"
-                className="fixed inset-0 z-40 cursor-default"
+                className="fixed inset-0 z-[9998] cursor-default"
                 onClick={() => setMenuOpen(false)}
                 type="button"
               />
-              <div className="absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]/70">
-                {!isClosed ? (
+              <div
+                className="fixed z-[9999] w-52 overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1 shadow-[0_18px_44px_-18px_rgba(15,23,42,0.35)] ring-1 ring-[var(--border-subtle)]/70"
+                style={{ top: menuPos.top, right: menuPos.right }}
+              >
+                {isDraft ? (
+                  <button
+                    className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                      onContinue?.();
+                    }}
+                    type="button"
+                  >
+                    <Play className="size-4 text-[var(--info-base)]" />
+                    Continua bozza
+                  </button>
+                ) : null}
+                {isDraft || isReview ? (
                   <button
                     className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
                     onClick={(e) => {
@@ -911,7 +1030,7 @@ function SalCard({
                     type="button"
                   >
                     <ThumbsUp className="size-4 text-[var(--info-base)]" />
-                    Approva
+                    {isDraft ? "Invia in revisione" : "Approva"}
                   </button>
                 ) : null}
                 <button

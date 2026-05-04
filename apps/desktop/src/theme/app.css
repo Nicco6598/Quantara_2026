@@ -2,6 +2,49 @@
 @import "tw-animate-css";
 @import "@quantara/ui-tokens/tokens.css";
 
+/* ── Responsive utilities ── */
+@utility min-w-0 {
+  min-width: 0;
+}
+
+@utility break-words {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+main {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* ── Native date input — hide browser picker icon, keep functionality ── */
+.date-input-native {
+  appearance: none;
+  -webkit-appearance: none;
+}
+.date-input-native::-webkit-calendar-picker-indicator {
+  display: none;
+}
+.date-input-native::-webkit-inner-spin-button {
+  display: none;
+}
+
+input[type="date"]::-webkit-datetime-edit {
+  color: inherit;
+  font: inherit;
+}
+
+/* ── Responsive container patterns ── */
+.responsive-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-grid-elastic {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
 html,
 body,
 #root {
