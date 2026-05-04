@@ -1,64 +1,54 @@
-use tauri::AppHandle;
+use tauri::State;
 
-use crate::{
-    infrastructure::{
-        contract_repository::{ContractRecord, CreateContractRequest, UpdateContractRequest},
-        local_storage::open_app_database,
-    },
-    models::app_error::AppError,
+use crate::infrastructure::{
+    contract_repository::{ContractRecord, CreateContractRequest, UpdateContractRequest},
+    local_storage::{with_db, with_db_mut, DbConnection},
 };
 
 #[tauri::command]
-pub fn list_contracts(app: AppHandle) -> Result<Vec<ContractRecord>, String> {
-    let connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::contract_repository::list_contracts(&connection)
-        .map_err(to_command_error)
+pub fn list_contracts(state: State<'_, DbConnection>) -> Result<Vec<ContractRecord>, String> {
+    with_db(&state, |conn| {
+        crate::infrastructure::contract_repository::list_contracts(conn)
+    })
 }
 
 #[tauri::command]
-pub fn get_contract(app: AppHandle, contract_id: String) -> Result<Option<ContractRecord>, String> {
-    let connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::contract_repository::get_contract(&connection, &contract_id)
-        .map_err(to_command_error)
+pub fn get_contract(
+    state: State<'_, DbConnection>,
+    contract_id: String,
+) -> Result<Option<ContractRecord>, String> {
+    with_db(&state, |conn| {
+        crate::infrastructure::contract_repository::get_contract(conn, &contract_id)
+    })
 }
 
 #[tauri::command]
 pub fn create_contract(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     request: CreateContractRequest,
 ) -> Result<ContractRecord, String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::contract_repository::create_contract(&mut connection, request)
-        .map_err(to_command_error)
+    with_db_mut(&state, |conn| {
+        crate::infrastructure::contract_repository::create_contract(conn, request)
+    })
 }
 
 #[tauri::command]
 pub fn update_contract(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     contract_id: String,
     request: UpdateContractRequest,
 ) -> Result<ContractRecord, String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::contract_repository::update_contract(
-        &mut connection,
-        &contract_id,
-        request,
-    )
-    .map_err(to_command_error)
+    with_db_mut(&state, |conn| {
+        crate::infrastructure::contract_repository::update_contract(conn, &contract_id, request)
+    })
 }
 
 #[tauri::command]
-pub fn delete_contract(app: AppHandle, contract_id: String) -> Result<(), String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-
-    crate::infrastructure::contract_repository::delete_contract(&mut connection, &contract_id)
-        .map_err(to_command_error)
-}
-
-fn to_command_error(error: AppError) -> String {
-    error.to_string()
+pub fn delete_contract(
+    state: State<'_, DbConnection>,
+    contract_id: String,
+) -> Result<(), String> {
+    with_db_mut(&state, |conn| {
+        crate::infrastructure::contract_repository::delete_contract(conn, &contract_id)
+    })
 }

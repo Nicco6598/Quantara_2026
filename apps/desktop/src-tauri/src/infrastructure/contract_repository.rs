@@ -20,7 +20,7 @@ pub struct CreateContractRequest {
     pub contractual_amount: f64,
     pub framework_agreement_code: String,
     pub id: String,
-    pub safety_costs_not_subject_to_discount: f64,
+    pub tender_discount_percent: f64,
     pub tariff_priorities: Vec<TariffPriorityRecord>,
     pub title: String,
 }
@@ -34,7 +34,7 @@ pub struct ContractRecord {
     pub contractual_amount: Money,
     pub framework_agreement_code: String,
     pub id: String,
-    pub safety_costs_not_subject_to_discount: Money,
+    pub tender_discount_percent: f64,
     pub tariff_priorities: Vec<TariffPriorityRecord>,
     pub title: String,
 }
@@ -45,7 +45,7 @@ pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, Ap
     let mut statement = connection
         .prepare(
             "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
-             , safety_costs_not_subject_to_discount_cents
+             , tender_discount_percent
              FROM contracts
              ORDER BY updated_at DESC, title ASC",
         )
@@ -75,7 +75,7 @@ pub fn get_contract(
     let mut contract = connection
         .query_row(
             "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
-             , safety_costs_not_subject_to_discount_cents
+             , tender_discount_percent
              FROM contracts
              WHERE id = ?1",
             [contract_id],
@@ -100,7 +100,6 @@ pub fn create_contract(
 
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
-    let safety_costs_cents = money_to_cents(request.safety_costs_not_subject_to_discount);
 
     transaction
         .execute(
@@ -110,7 +109,7 @@ pub fn create_contract(
                 application_contract_code,
                 framework_agreement_code,
                 contractual_amount_cents,
-                safety_costs_not_subject_to_discount_cents
+                tender_discount_percent
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 request.id,
@@ -118,7 +117,7 @@ pub fn create_contract(
                 request.application_contract_code,
                 request.framework_agreement_code,
                 amount_cents,
-                safety_costs_cents
+                request.tender_discount_percent
             ],
         )
         .map_err(to_database_error)?;
@@ -154,7 +153,6 @@ pub fn update_contract(
 
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
-    let safety_costs_cents = money_to_cents(request.safety_costs_not_subject_to_discount);
 
     let updated = transaction
         .execute(
@@ -163,7 +161,7 @@ pub fn update_contract(
                  application_contract_code = ?2,
                  framework_agreement_code = ?3,
                  contractual_amount_cents = ?4,
-                 safety_costs_not_subject_to_discount_cents = ?5,
+                 tender_discount_percent = ?5,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = ?6",
             params![
@@ -171,7 +169,7 @@ pub fn update_contract(
                 request.application_contract_code,
                 request.framework_agreement_code,
                 amount_cents,
-                safety_costs_cents,
+                request.tender_discount_percent,
                 contract_id
             ],
         )
@@ -261,7 +259,7 @@ fn list_priorities(
 
 fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord> {
     let amount_cents: i64 = row.get(4)?;
-    let safety_costs_cents: i64 = row.get(5)?;
+    let tender_discount_percent: f64 = row.get(5)?;
 
     Ok(ContractRecord {
         application_contract_code: row.get(2)?,
@@ -271,10 +269,7 @@ fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord>
         },
         framework_agreement_code: row.get(3)?,
         id: row.get(0)?,
-        safety_costs_not_subject_to_discount: Money {
-            amount: cents_to_money(safety_costs_cents),
-            currency: "EUR",
-        },
+        tender_discount_percent,
         tariff_priorities: Vec::new(),
         title: row.get(1)?,
     })
@@ -297,17 +292,12 @@ fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppE
         ));
     }
 
-    if !request.safety_costs_not_subject_to_discount.is_finite()
-        || request.safety_costs_not_subject_to_discount < 0.0
+    if !request.tender_discount_percent.is_finite()
+        || request.tender_discount_percent < 0.0
+        || request.tender_discount_percent > 100.0
     {
         return Err(AppError::Validation(
-            "safety costs must be a finite non-negative number".into(),
-        ));
-    }
-
-    if request.safety_costs_not_subject_to_discount > request.contractual_amount {
-        return Err(AppError::Validation(
-            "safety costs cannot exceed contractual amount".into(),
+            "tender discount percent must be between 0 and 100".into(),
         ));
     }
 
@@ -357,10 +347,7 @@ mod tests {
 
         assert_eq!(created.id, "contract_milano_verona");
         assert_eq!(created.contractual_amount.amount, 26_150_000.25);
-        assert_eq!(
-            created.safety_costs_not_subject_to_discount.amount,
-            250_000.45
-        );
+        assert!((created.tender_discount_percent - 18.25).abs() < f64::EPSILON);
         assert_eq!(created.tariff_priorities.len(), 2);
 
         let contracts = list_contracts(&connection).expect("contracts listed");
@@ -423,7 +410,7 @@ mod tests {
             contractual_amount: 26_150_000.25,
             framework_agreement_code: "AQ-RFI-2026".into(),
             id: "contract_milano_verona".into(),
-            safety_costs_not_subject_to_discount: 250_000.45,
+            tender_discount_percent: 18.25,
             tariff_priorities: vec![
                 TariffPriorityRecord {
                     priority: 1,

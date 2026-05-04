@@ -52,8 +52,12 @@ pub fn backup_database(
 
     // Write: [metadata_len][metadata][ls_len][localStorage JSON][DB bytes]
     let mut output = std::fs::File::create(&dest).map_err(to_error)?;
-    output.write_all(&meta_len.to_le_bytes()).map_err(to_error)?;
-    output.write_all(metadata_json.as_bytes()).map_err(to_error)?;
+    output
+        .write_all(&meta_len.to_le_bytes())
+        .map_err(to_error)?;
+    output
+        .write_all(metadata_json.as_bytes())
+        .map_err(to_error)?;
     output.write_all(&ls_len.to_le_bytes()).map_err(to_error)?;
     output.write_all(ls_bytes).map_err(to_error)?;
     output.write_all(&db_bytes).map_err(to_error)?;
@@ -72,7 +76,8 @@ pub fn restore_database(app: AppHandle, source_path: String) -> Result<String, S
     let db_path = get_database_path(&app).map_err(to_error)?;
     let source = std::path::PathBuf::from(&source_path);
 
-    let mut file = std::fs::File::open(&source).map_err(|e| format!("impossibile aprire file: {e}"))?;
+    let mut file =
+        std::fs::File::open(&source).map_err(|e| format!("impossibile aprire file: {e}"))?;
 
     // Read metadata length
     let mut len_buf = [0u8; 4];

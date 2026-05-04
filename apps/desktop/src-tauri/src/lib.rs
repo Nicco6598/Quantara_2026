@@ -6,6 +6,9 @@ mod infrastructure;
 mod models;
 mod updater;
 
+use infrastructure::local_storage::DbConnection;
+use tauri::Manager;
+
 pub fn run() {
     #[cfg(all(target_os = "windows", not(debug_assertions)))]
     updater::windows_shell::reconcile();
@@ -15,6 +18,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            let db = DbConnection::open(app.handle())?;
+            app.manage(db);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::health::get_health_snapshot,
             commands::accounting::preview_sal_total,
@@ -29,6 +37,7 @@ pub fn run() {
             commands::tariffs::delete_tariff_book,
             commands::tariffs::list_tariff_voices,
             commands::tariffs::import_tariff_pdf_preview,
+            commands::tariffs::import_tariff_pdf_preview_batch,
             commands::materials::list_materials,
             commands::materials::create_material,
             commands::materials::update_material,

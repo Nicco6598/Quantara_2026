@@ -1,79 +1,77 @@
-use tauri::AppHandle;
+use tauri::State;
 
-use crate::{
-    infrastructure::{
-        local_storage::open_app_database,
-        material_repository::{
-            self, CreateMaterialRequest, MaterialRecord, MaterialTransactionRecord,
-            UpdateMaterialRequest,
-        },
+use crate::infrastructure::{
+    local_storage::{with_db, with_db_mut, DbConnection},
+    material_repository::{
+        self, CreateMaterialRequest, MaterialRecord, MaterialTransactionRecord,
+        UpdateMaterialRequest,
     },
-    models::app_error::AppError,
 };
 
 #[tauri::command]
-pub fn list_materials(app: AppHandle) -> Result<Vec<MaterialRecord>, String> {
-    let connection = open_app_database(&app).map_err(to_command_error)?;
-    material_repository::list_materials(&connection).map_err(to_command_error)
+pub fn list_materials(state: State<'_, DbConnection>) -> Result<Vec<MaterialRecord>, String> {
+    with_db(&state, |conn| material_repository::list_materials(conn))
 }
 
 #[tauri::command]
 pub fn create_material(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     request: CreateMaterialRequest,
 ) -> Result<MaterialRecord, String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-    material_repository::create_material(&mut connection, request).map_err(to_command_error)
+    with_db_mut(&state, |conn| {
+        material_repository::create_material(conn, request)
+    })
 }
 
 #[tauri::command]
 pub fn update_material(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     material_id: String,
     request: UpdateMaterialRequest,
 ) -> Result<MaterialRecord, String> {
-    let connection = open_app_database(&app).map_err(to_command_error)?;
-    material_repository::update_material(&connection, &material_id, request)
-        .map_err(to_command_error)
+    with_db(&state, |conn| {
+        material_repository::update_material(conn, &material_id, request)
+    })
 }
 
 #[tauri::command]
-pub fn delete_material(app: AppHandle, material_id: String) -> Result<(), String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-    material_repository::delete_material(&mut connection, &material_id).map_err(to_command_error)
+pub fn delete_material(
+    state: State<'_, DbConnection>,
+    material_id: String,
+) -> Result<(), String> {
+    with_db_mut(&state, |conn| {
+        material_repository::delete_material(conn, &material_id)
+    })
 }
 
 #[tauri::command]
 pub fn adjust_material_stock(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     material_id: String,
     new_quantity: f64,
     description: String,
 ) -> Result<MaterialRecord, String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-    material_repository::adjust_material_stock(&mut connection, &material_id, new_quantity, &description)
-        .map_err(to_command_error)
+    with_db_mut(&state, |conn| {
+        material_repository::adjust_material_stock(conn, &material_id, new_quantity, &description)
+    })
 }
 
 #[tauri::command]
 pub fn deduct_materials(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     deductions: Vec<(String, f64, String)>,
 ) -> Result<Vec<MaterialRecord>, String> {
-    let mut connection = open_app_database(&app).map_err(to_command_error)?;
-    material_repository::deduct_materials(&mut connection, &deductions).map_err(to_command_error)
+    with_db_mut(&state, |conn| {
+        material_repository::deduct_materials(conn, &deductions)
+    })
 }
 
 #[tauri::command]
 pub fn list_material_transactions(
-    app: AppHandle,
+    state: State<'_, DbConnection>,
     material_id: String,
 ) -> Result<Vec<MaterialTransactionRecord>, String> {
-    let connection = open_app_database(&app).map_err(to_command_error)?;
-    material_repository::list_material_transactions(&connection, &material_id)
-        .map_err(to_command_error)
-}
-
-fn to_command_error(error: AppError) -> String {
-    error.to_string()
+    with_db(&state, |conn| {
+        material_repository::list_material_transactions(conn, &material_id)
+    })
 }
