@@ -3,7 +3,7 @@ import { memo, type ReactNode, useState } from "react";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
 import { InlineEdit } from "@/components/shared/InlineEdit";
 import { cn } from "@/lib/utils";
-import type { SalLineDraft, SalLineView, SalVerificationCheck } from "../types";
+import type { SalEconomicSummary, SalLineDraft, SalLineView, SalVerificationCheck } from "../types";
 
 export function Currency({ value }: { value: number }) {
   return (
@@ -43,18 +43,20 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onSurcharge: (voiceId: string, percent: number) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-[20px] bg-[var(--bg-muted)]/40 ring-1 ring-[var(--border-subtle)]/60">
+    <div className="overflow-x-auto rounded-[20px] bg-[var(--bg-muted)]/40 ring-1 ring-[var(--border-subtle)]/60">
       <div className="max-h-[680px] overflow-y-auto">
-        <div className="min-w-[1060px]">
-          <div className="sticky top-0 z-10 grid grid-cols-[1.2fr_72px_100px_100px_100px_120px_100px_110px_120px_44px] items-center gap-1 bg-[var(--surface-base)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)] shadow-[0_1px_0_var(--border-subtle)]">
+        <div className="min-w-[1320px] break-words">
+          <div className="sticky top-0 z-10 grid grid-cols-[1.2fr_72px_92px_92px_92px_112px_118px_112px_100px_118px_88px_44px] items-center gap-1 bg-[var(--surface-base)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)] shadow-[0_1px_0_var(--border-subtle)]">
             <span>Voce</span>
             <span>U.M.</span>
             <span className="text-right">Fattore 1</span>
             <span className="text-right">Fattore 2</span>
             <span className="text-right">Fattore 3</span>
             <span className="text-right">Quantità</span>
+            <span className="text-right">Totale voci</span>
+            <span className="text-right">Sconto</span>
             <span className="text-right">Magg.</span>
-            <span className="text-right">Totale</span>
+            <span className="text-right">Totale SAL</span>
             <span className="text-right">Dettaglio</span>
             <span />
           </div>
@@ -114,7 +116,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
         index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/20",
       )}
     >
-      <div className="grid grid-cols-[1.2fr_72px_100px_100px_100px_120px_100px_110px_120px_44px] items-center gap-1 px-4 py-2.5 text-[13px]">
+      <div className="grid grid-cols-[1.2fr_72px_92px_92px_92px_112px_118px_112px_100px_118px_88px_44px] items-center gap-1 px-4 py-2.5 text-[13px]">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="shrink-0 text-[11px] font-medium text-[var(--text-secondary)]">
             {index + 1}
@@ -163,6 +165,25 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
 
         <span className="text-right font-semibold text-[var(--text-primary)]">
           <NumberValue value={line.quantity} />
+        </span>
+
+        <span className="text-right font-semibold text-[var(--text-primary)]">
+          <Currency value={line.grossAmount} />
+        </span>
+
+        <span
+          className={cn(
+            "text-right font-bold",
+            line.discountAmount > 0 ? "text-[var(--danger-base)]" : "text-[var(--text-secondary)]",
+          )}
+          title={
+            line.voice.isSafetyCost && line.discountAmount === 0
+              ? "Voce sicurezza esclusa dal ribasso"
+              : "Ribasso gara applicato alla voce"
+          }
+        >
+          {line.discountAmount > 0 ? "-" : ""}
+          <Currency value={line.discountAmount} />
         </span>
 
         <div className="flex justify-end">
@@ -286,14 +307,16 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   return (
     <div className="overflow-x-auto rounded-[20px] bg-[var(--bg-muted)]/50">
       <div className="min-w-[1100px]">
-        <div className="sticky top-0 z-10 grid grid-cols-[44px_160px_110px_minmax(260px,1fr)_74px_130px_130px_120px_54px] bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
+        <div className="sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
           <span />
           <span>Tariffario</span>
           <span>Codice</span>
           <span>Descrizione voce</span>
           <span>U.M.</span>
           <span>Quantità totale</span>
-          <span>Importo</span>
+          <span>Totale voci</span>
+          <span>Sconto</span>
+          <span>Totale SAL</span>
           <span>Stato</span>
           <span />
         </div>
@@ -303,7 +326,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
             <div className="border-t border-[var(--border-subtle)]/50" key={line.id}>
               <button
                 aria-expanded={expanded}
-                className="grid w-full grid-cols-[44px_160px_110px_minmax(260px,1fr)_74px_130px_130px_120px_54px] items-center px-3 py-3 text-left text-[13px] hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] items-center px-3 py-3 text-left text-[13px] hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => setExpandedId(expanded ? null : line.id)}
                 type="button"
               >
@@ -321,6 +344,12 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                   <NumberValue value={line.quantity} />
                 </span>
                 <span className="font-semibold">
+                  <Currency value={line.grossAmount} />
+                </span>
+                <span className="font-semibold text-[var(--danger-base)]">
+                  -<Currency value={line.discountAmount} />
+                </span>
+                <span className="font-bold text-[var(--accent-primary)]">
                   <Currency value={line.totalAmount} />
                 </span>
                 <StatusPill tone={line.status === "complete" ? "success" : "warning"}>
@@ -403,11 +432,22 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
 export function DocumentPreview({
   compact = false,
   lines = [],
+  summary,
 }: {
   compact?: boolean;
   lines?: SalLineView[];
+  summary?: SalEconomicSummary;
 }) {
-  const total = lines.reduce((sum, line) => sum + line.totalAmount, 0);
+  const grossTotal = summary?.grossAmount ?? lines.reduce((sum, line) => sum + line.grossAmount, 0);
+  const discountTotal =
+    summary?.discountAmount ?? lines.reduce((sum, line) => sum + line.discountAmount, 0);
+  const linkedTotal =
+    summary?.linkedChargeAmount ??
+    lines.reduce(
+      (sum, line) => sum + line.linkedCharges.reduce((inner, charge) => inner + charge.total, 0),
+      0,
+    );
+  const total = summary?.total ?? lines.reduce((sum, line) => sum + line.totalAmount, 0);
   return (
     <div
       className={cn(
@@ -472,10 +512,32 @@ export function DocumentPreview({
           )}
         </tbody>
       </table>
-      <div className="mt-3 grid grid-cols-[1fr_180px] border border-[#c9d2e3] text-xs font-semibold">
-        <div className="p-2">TOTALE COMPLESSIVO DOCUMENTO</div>
-        <div className="border-l border-[#c9d2e3] p-2 text-right text-[#006BFF]">
-          {total.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+      <div className="mt-3 overflow-hidden rounded-[8px] border border-[#c9d2e3] text-xs">
+        <div className="grid grid-cols-[1fr_180px] border-b border-[#c9d2e3]">
+          <div className="p-2 font-semibold">Totale voci</div>
+          <div className="border-l border-[#c9d2e3] p-2 text-right font-semibold">
+            {grossTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+        {linkedTotal > 0 ? (
+          <div className="grid grid-cols-[1fr_180px] border-b border-[#c9d2e3]">
+            <div className="p-2">Maggiorazioni</div>
+            <div className="border-l border-[#c9d2e3] p-2 text-right">
+              {linkedTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+        ) : null}
+        <div className="grid grid-cols-[1fr_180px] border-b border-[#c9d2e3] text-[#b42318]">
+          <div className="p-2">Ribasso gara</div>
+          <div className="border-l border-[#c9d2e3] p-2 text-right">
+            -{discountTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+        <div className="grid grid-cols-[1fr_180px] bg-[#eef5ff] font-bold">
+          <div className="p-2">TOTALE ATTUALE SAL</div>
+          <div className="border-l border-[#c9d2e3] p-2 text-right text-[#006BFF]">
+            {total.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+          </div>
         </div>
       </div>
     </div>

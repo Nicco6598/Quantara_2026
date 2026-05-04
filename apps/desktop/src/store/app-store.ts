@@ -18,6 +18,17 @@ export type ThemeMode = "light" | "dark";
 type WorkflowAction = "new-project" | "new-sal" | "import-tariff" | null;
 export type PendingWorkflowAction = WorkflowAction;
 
+export type TariffImportToolbarState = {
+  activeIndex: number;
+  activeReviewed: boolean;
+  canConfirm: boolean;
+  fileLabels: string[];
+  phase: "idle" | "preview";
+  reviewedCount: number;
+  reviewedVoiceCount: number;
+  totalVoices: number;
+};
+
 type NavEntry = {
   route: QuantaraRoute;
   context?: string;
@@ -34,9 +45,11 @@ type NavigationSlice = {
   routeHistory: NavEntry[];
   routeHistoryIndex: number;
   salPendingStep: number | null;
-  setActiveRoute: (route: QuantaraRoute, context?: string) => void;
+  setTariffImportToolbar: (state: TariffImportToolbarState) => void;
+  setActiveRoute: (route: QuantaraRoute, context?: string, replace?: boolean) => void;
   setPendingWorkflowAction: (action: WorkflowAction) => void;
   setSalPendingStep: (step: number | null) => void;
+  tariffImportToolbar: TariffImportToolbarState;
 };
 
 type ThemeSlice = {
@@ -107,12 +120,30 @@ export const useAppStore = create<AppStore>()(
         }),
       pendingWorkflowAction: null,
       salPendingStep: null,
-      setActiveRoute: (route, context) =>
+      tariffImportToolbar: {
+        activeIndex: 0,
+        activeReviewed: false,
+        canConfirm: false,
+        fileLabels: [],
+        phase: "idle",
+        reviewedCount: 0,
+        reviewedVoiceCount: 0,
+        totalVoices: 0,
+      },
+      setActiveRoute: (route, context, replace) =>
         set((state) => {
           const currentEntry = state.routeHistory[state.routeHistoryIndex];
 
           if (route === currentEntry?.route && context === currentEntry?.context) {
             return state;
+          }
+
+          if (replace) {
+            const nextHistory = state.routeHistory.slice(0, state.routeHistoryIndex);
+            nextHistory.push(context !== undefined ? { route, context } : { route });
+            return {
+              ...createNavigationState(nextHistory, nextHistory.length - 1),
+            };
           }
 
           const nextHistory = state.routeHistory.slice(0, state.routeHistoryIndex + 1);
@@ -129,6 +160,10 @@ export const useAppStore = create<AppStore>()(
       setSalPendingStep: (salPendingStep) =>
         set({
           salPendingStep,
+        }),
+      setTariffImportToolbar: (tariffImportToolbar) =>
+        set({
+          tariffImportToolbar,
         }),
       setAutoCheckUpdatesOnLaunch: (autoCheckUpdatesOnLaunch) =>
         set({
@@ -195,6 +230,8 @@ export function useNavigationState() {
       pendingWorkflowAction: state.pendingWorkflowAction,
       setActiveRoute: state.setActiveRoute,
       setPendingWorkflowAction: state.setPendingWorkflowAction,
+      setTariffImportToolbar: state.setTariffImportToolbar,
+      tariffImportToolbar: state.tariffImportToolbar,
     })),
   );
 }

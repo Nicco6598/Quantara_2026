@@ -18,6 +18,7 @@ type LoadState = {
   contracts: DesktopContract[];
   error: string | null;
   isLoading: boolean;
+  selectedContractId: string;
   selectedTariffBookIds: string[];
   tariffBooks: DesktopTariffBook[];
   voices: SalVoiceDraft[];
@@ -27,12 +28,32 @@ const initialLoadState: LoadState = {
   contracts: [],
   error: null,
   isLoading: true,
+  selectedContractId: "",
   selectedTariffBookIds: [],
   tariffBooks: [],
   voices: [],
 };
 
 const projectContractorStorageKey = "quantara.projectContractors.v1";
+
+function readSelectedProjectId(): string | null {
+  try {
+    const rawValue = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
+    if (!rawValue) return null;
+    const parsed = JSON.parse(rawValue) as { id?: unknown };
+    return typeof parsed.id === "string" ? parsed.id : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSelectedProjectId(id: string) {
+  try {
+    window.sessionStorage.setItem("quantara.selectedProjectDetail.v1", JSON.stringify({ id }));
+  } catch {
+    /* no-op */
+  }
+}
 
 export function useSalCreationData() {
   const [state, setState] = useState<LoadState>(initialLoadState);
@@ -48,14 +69,14 @@ export function useSalCreationData() {
           listDesktopTariffBooks([]),
         ]);
 
-        if (!active) {
-          return;
-        }
+        if (!active) return;
 
         const contracts = contractsResult.data;
         const tariffBooks = tariffBooksResult.data;
-        const selectedContract = selectContract(contracts);
-        const orderedBooks = mapTariffBooksForContract(tariffBooks, selectedContract);
+        const savedId = readSelectedProjectId();
+        const defaultContract = contracts.find((c) => c.id === savedId) ?? contracts[0] ?? null;
+        const defaultId = defaultContract?.id ?? "";
+        const orderedBooks = mapTariffBooksForContract(tariffBooks, defaultContract);
         const defaultSelectedIds =
           orderedBooks
             .filter((book) => book.isPriority)
@@ -69,22 +90,19 @@ export function useSalCreationData() {
               : [];
         const voices = await loadVoicesForBooks(selectedTariffBookIds, tariffBooks);
 
-        if (!active) {
-          return;
-        }
+        if (!active) return;
 
         setState({
           contracts,
           error: null,
           isLoading: false,
+          selectedContractId: defaultId,
           selectedTariffBookIds,
           tariffBooks,
           voices,
         });
       } catch (error) {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setState((current) => ({
           ...current,
           error:
@@ -95,13 +113,16 @@ export function useSalCreationData() {
     }
 
     void load();
-
     return () => {
       active = false;
     };
   }, []);
 
-  const selectedContract = useMemo(() => selectContract(state.contracts), [state.contracts]);
+  const selectedContract = useMemo(
+    () =>
+      state.contracts.find((c) => c.id === state.selectedContractId) ?? state.contracts[0] ?? null,
+    [state.contracts, state.selectedContractId],
+  );
   const projectContractors = useMemo(() => readStringRecord(projectContractorStorageKey), []);
   const project = useMemo<SalProjectContext | null>(
     () =>
@@ -128,16 +149,12 @@ export function useSalCreationData() {
 
   async function selectTariffBook(tariffBookId: string) {
     const exists = state.tariffBooks.some((book) => book.id === tariffBookId);
-    if (!exists) {
-      return;
-    }
+    if (!exists) return;
     const isSelected = state.selectedTariffBookIds.includes(tariffBookId);
     const nextSelectedIds = isSelected
       ? state.selectedTariffBookIds.filter((id) => id !== tariffBookId)
       : [...state.selectedTariffBookIds, tariffBookId];
-    if (nextSelectedIds.length === 0) {
-      return;
-    }
+    if (nextSelectedIds.length === 0) return;
 
     setState((current) => ({
       ...current,
@@ -163,14 +180,48 @@ export function useSalCreationData() {
     }
   }
 
+  async function setContract(contractId: string) {
+    const contract = state.contracts.find((c) => c.id === contractId);
+    if (!contract) return;
+    writeSelectedProjectId(contractId);
+    const bookIds = mapTariffBooksForContract(state.tariffBooks, contract)
+      .filter((b) => b.isPriority)
+      .map((b) => b.id)
+      .slice(0, 3);
+    setState((current) => ({
+      ...current,
+      error: null,
+      isLoading: true,
+      selectedContractId: contractId,
+      selectedTariffBookIds: bookIds,
+    }));
+    try {
+      const voices = bookIds.length > 0 ? await loadVoicesForBooks(bookIds, state.tariffBooks) : [];
+      setState((current) => ({
+        ...current,
+        error: null,
+        isLoading: false,
+        voices,
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Errore nel cambio progetto.",
+        isLoading: false,
+      }));
+    }
+  }
+
   return {
     contracts: state.contracts,
     error: state.error,
     isLoading: state.isLoading,
     project,
+    selectedContractId: state.selectedContractId,
     selectedTariffBook,
     selectedTariffBooks,
     selectTariffBook,
+    setContract,
     tariffBookOptions,
     voices: state.voices,
   };
@@ -195,27 +246,4 @@ async function loadVoicesForBooks(
     uniqueById.set(voice.id, voice);
   }
   return [...uniqueById.values()];
-}
-
-function selectContract(contracts: readonly DesktopContract[]): DesktopContract | null {
-  if (contracts.length === 0) {
-    return null;
-  }
-
-  const selectedProjectId = readSelectedProjectId();
-  return contracts.find((contract) => contract.id === selectedProjectId) ?? contracts[0] ?? null;
-}
-
-function readSelectedProjectId(): string | null {
-  try {
-    const rawValue = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
-    if (!rawValue) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawValue) as { id?: unknown };
-    return typeof parsed.id === "string" ? parsed.id : null;
-  } catch {
-    return null;
-  }
 }

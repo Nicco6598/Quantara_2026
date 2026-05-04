@@ -151,6 +151,7 @@ export function AutocompleteInput({
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold text-[var(--text-primary)]">
+                  <span className="font-mono text-[var(--accent-primary)]">{option.value}</span>{" "}
                   {option.label}
                 </span>
                 {option.metadata && (
@@ -158,9 +159,6 @@ export function AutocompleteInput({
                     {option.metadata}
                   </span>
                 )}
-              </span>
-              <span className="shrink-0 text-[12px] font-mono font-semibold text-[var(--accent-primary)]">
-                {option.value}
               </span>
             </button>
           ))}

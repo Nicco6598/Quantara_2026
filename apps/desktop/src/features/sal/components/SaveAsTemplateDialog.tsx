@@ -91,10 +91,7 @@ export function SaveAsTemplateDialog({
               />
             </div>
             <div className="mt-2 text-[12px] text-[var(--text-secondary)]">
-              {voiceEntries.length} voci ·{" "}
-              {economicRules.discountEnabled
-                ? `ribasso ${economicRules.discountPercent.toLocaleString("it-IT")}%`
-                : "ribasso disattivato"}
+              {voiceEntries.length} voci · fattori e maggiorazioni
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button

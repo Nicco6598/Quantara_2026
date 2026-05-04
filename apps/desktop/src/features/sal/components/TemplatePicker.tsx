@@ -70,10 +70,7 @@ export function TemplatePicker({ onApply, tariffBookId }: TemplatePickerProps) {
                     {template.name}
                   </div>
                   <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
-                    {template.voiceEntries.length} voci
-                    {template.economicRules.discountEnabled
-                      ? ` · ribasso ${template.economicRules.discountPercent.toLocaleString("it-IT")}%`
-                      : ""}
+                    {template.voiceEntries.length} voci · ribasso dal contratto
                   </div>
                 </button>
                 <button

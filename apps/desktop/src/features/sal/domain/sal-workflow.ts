@@ -25,7 +25,7 @@ export type SalLine = {
   voiceId: string;
 };
 
-export type SalDocumentStatus = "draft" | "closed";
+export type SalDocumentStatus = "draft" | "in-review" | "approved" | "closed";
 
 export type SalDocument = {
   closedAt?: string;

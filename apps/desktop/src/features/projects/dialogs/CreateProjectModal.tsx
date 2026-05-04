@@ -30,7 +30,7 @@ export type ProjectFormState = {
   contractorName: string;
   contractualAmount: string;
   frameworkAgreementCode: string;
-  safetyCostsNotSubjectToDiscount: string;
+  tenderDiscountPercent: string;
   tariffBookId: string;
   title: string;
 };
@@ -57,7 +57,7 @@ function createInitialProjectForm(defaultTariffBookId: string): ProjectFormState
     contractorName: "",
     contractualAmount: "",
     frameworkAgreementCode: "",
-    safetyCostsNotSubjectToDiscount: "",
+    tenderDiscountPercent: "",
     tariffBookId: defaultTariffBookId,
     title: "",
   };
@@ -104,7 +104,11 @@ export function CreateProjectModal({
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<ProjectModalStep>(1);
   const amount = parseLocalizedMoney(draft.contractualAmount);
-  const safetyCostsAmount = parseLocalizedMoney(draft.safetyCostsNotSubjectToDiscount);
+  const discountPercent = parseFloat(draft.tenderDiscountPercent.replace(",", "."));
+  const parsedDiscount =
+    Number.isFinite(discountPercent) && discountPercent >= 0 && discountPercent <= 100
+      ? discountPercent
+      : Number.NaN;
   const validation = getProjectValidation(draft);
 
   useEffect(() => {
@@ -157,7 +161,7 @@ export function CreateProjectModal({
       contractualAmount: amount,
       frameworkAgreementCode: sanitizeTextValue(draft.frameworkAgreementCode),
       id: `contract_locale_${Date.now()}`,
-      safetyCostsNotSubjectToDiscount: safetyCostsAmount,
+      tenderDiscountPercent: Number.isFinite(parsedDiscount) ? parsedDiscount : 0,
       tariffPriorities: [],
       title: sanitizeTextValue(draft.title),
     };
@@ -165,10 +169,7 @@ export function CreateProjectModal({
     const parsed = contractSchema.safeParse({
       ...request,
       contractualAmount: { amount: request.contractualAmount, currency: "EUR" },
-      safetyCostsNotSubjectToDiscount: {
-        amount: request.safetyCostsNotSubjectToDiscount,
-        currency: "EUR",
-      },
+      tenderDiscountPercent: request.tenderDiscountPercent,
     });
 
     if (!parsed.success) {
@@ -215,12 +216,12 @@ export function CreateProjectModal({
                 Nuovo progetto
               </div>
               <h3 className="mt-2 max-w-3xl text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)] md:text-[30px]">
-                {step === 1 ? "Dati contratto e perimetro" : "Importo e oneri sicurezza"}
+                {step === 1 ? "Dati contratto e perimetro" : "Importo e ribasso gara"}
               </h3>
               <p className="mt-2 max-w-2xl text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
                 {step === 1
                   ? "Definisci identita, codici contrattuali e appaltatore del progetto."
-                  : "Definisci importo contrattuale e oneri della sicurezza esclusi dal ribasso."}
+                  : "Definisci importo contrattuale e percentuale di ribasso d'asta."}
               </p>
             </div>
             <button
@@ -332,21 +333,38 @@ export function CreateProjectModal({
                         placeholder="26.150.000,00"
                         value={draft.contractualAmount}
                       />
-                      <ProjectCurrencyField
-                        label="Oneri della sicurezza non soggetti a ribassi"
-                        onChange={(value) =>
-                          setDraft((state) => ({
-                            ...state,
-                            safetyCostsNotSubjectToDiscount: value,
-                          }))
-                        }
-                        placeholder="0,00"
-                        value={draft.safetyCostsNotSubjectToDiscount}
-                      />
+                      <label className="block">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                          Ribasso d'asta (%)
+                        </span>
+                        <input
+                          className="mt-3 h-11 w-full rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                          max={100}
+                          min={0}
+                          onChange={(event) => {
+                            const v = event.target.value;
+                            if (v === "" || v === "-") {
+                              setDraft((state) => ({ ...state, tenderDiscountPercent: v }));
+                              return;
+                            }
+                            const parsed = parseFloat(v.replace(",", "."));
+                            if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) {
+                              setDraft((state) => ({
+                                ...state,
+                                tenderDiscountPercent: String(Math.round(parsed * 100) / 100),
+                              }));
+                            }
+                          }}
+                          placeholder="18,25"
+                          step="0.01"
+                          type="number"
+                          value={draft.tenderDiscountPercent}
+                        />
+                      </label>
                     </div>
                     <div className="mt-5 rounded-[18px] bg-[var(--bg-muted)]/70 px-4 py-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
-                      Gli oneri della sicurezza vengono salvati sul progetto e saranno usati nei
-                      flussi SAL senza applicazione del ribasso.
+                      Il ribasso viene applicato a tutte le voci SAL. Le voci OS (oneri sicurezza)
+                      sono escluse automaticamente.
                     </div>
                   </section>
                 )}
@@ -381,10 +399,10 @@ export function CreateProjectModal({
                     />
                     <PreviewMetric
                       icon={<ShieldCheck className="size-5" />}
-                      label="Oneri sicurezza"
+                      label="Ribasso d'asta"
                       value={
-                        Number.isFinite(safetyCostsAmount)
-                          ? formatMoney({ amount: safetyCostsAmount, currency: "EUR" })
+                        Number.isFinite(parsedDiscount)
+                          ? `${parsedDiscount.toLocaleString("it-IT")}%`
                           : "Da inserire"
                       }
                     />
@@ -405,12 +423,8 @@ export function CreateProjectModal({
                     label="Importo contrattuale valido"
                   />
                   <QuickCheckRow
-                    isOk={validation.checks.safetyCosts}
-                    label="Oneri sicurezza validi"
-                  />
-                  <QuickCheckRow
-                    isOk={validation.checks.safetyCostsWithinBudget}
-                    label="Oneri entro budget"
+                    isOk={validation.checks.discount}
+                    label="Ribasso valido (0-100%)"
                   />
                 </div>
               </div>
@@ -804,20 +818,19 @@ function validateProjectIdentity(draft: ProjectFormState) {
 function getProjectValidation(draft: ProjectFormState) {
   const identityError = validateProjectIdentity(draft);
   const amount = parseLocalizedMoney(draft.contractualAmount);
-  const safetyCostsAmount = parseLocalizedMoney(draft.safetyCostsNotSubjectToDiscount);
+  const discountStr = draft.tenderDiscountPercent.replace(",", ".");
+  const discountVal = parseFloat(discountStr);
   const hasValidAmount = Number.isFinite(amount) && amount > 0;
-  const hasValidSafetyCosts = Number.isFinite(safetyCostsAmount) && safetyCostsAmount >= 0;
-  const safetyCostsWithinBudget =
-    hasValidAmount && hasValidSafetyCosts && safetyCostsAmount <= amount;
+  const hasValidDiscount =
+    discountStr === "" || (Number.isFinite(discountVal) && discountVal >= 0 && discountVal <= 100);
 
   if (identityError) {
     return {
       canSubmit: false,
       checks: {
         amount: hasValidAmount,
+        discount: hasValidDiscount,
         identity: false,
-        safetyCosts: hasValidSafetyCosts,
-        safetyCostsWithinBudget,
       },
       identityError,
       submitError: identityError,
@@ -827,19 +840,16 @@ function getProjectValidation(draft: ProjectFormState) {
   let submitError: string | null = null;
   if (!hasValidAmount) {
     submitError = "Inserisci un importo contrattuale valido e maggiore di zero.";
-  } else if (!hasValidSafetyCosts) {
-    submitError = "Inserisci oneri sicurezza validi (zero o valore positivo).";
-  } else if (!safetyCostsWithinBudget) {
-    submitError = "Gli oneri sicurezza non possono superare l'importo contrattuale.";
+  } else if (!hasValidDiscount) {
+    submitError = "Inserisci un ribasso valido tra 0 e 100%.";
   }
 
   return {
     canSubmit: submitError === null,
     checks: {
       amount: hasValidAmount,
+      discount: hasValidDiscount,
       identity: true,
-      safetyCosts: hasValidSafetyCosts,
-      safetyCostsWithinBudget,
     },
     identityError,
     submitError,

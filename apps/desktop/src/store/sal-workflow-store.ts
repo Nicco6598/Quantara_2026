@@ -4,6 +4,7 @@ import { generateSalTitle } from "@/features/sal/domain/sal-utils";
 import {
   createId,
   type SalDocument,
+  type SalDocumentStatus,
   type SalLine,
   type SalProject,
   type SalSurchargeKind,
@@ -17,6 +18,13 @@ type CreateDraftSalWithLinesInput = CreateSalInput & {
   voices: SalTariffVoice[];
 };
 type CloseNewSalInput = CreateSalInput & {
+  lines: SalLine[];
+  status?: SalDocumentStatus;
+  total?: number;
+  voices?: SalTariffVoice[];
+};
+type UpdateSalDraftInput = CreateSalInput & {
+  id: string;
   lines: SalLine[];
   total?: number;
   voices?: SalTariffVoice[];
@@ -39,7 +47,9 @@ type SalWorkflowStore = {
   salDocuments: SalDocument[];
   setActiveProject: (projectId: string) => void;
   setActiveSal: (salId: string) => void;
+  setSalStatus: (salId: string, status: SalDocumentStatus) => void;
   tariffVoices: SalTariffVoice[];
+  updateSalDraft: (input: UpdateSalDraftInput) => SalDocument | null;
   updateLineQuantity: (salId: string, lineId: string, quantity: number) => void;
   updateLineSurcharge: (salId: string, lineId: string, surcharge: SalSurchargeKind) => void;
 };
@@ -120,6 +130,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
         ).length;
         const existingVoiceIds = new Set(get().tariffVoices.map((voice) => voice.id));
         const voicesToAdd = (input.voices ?? []).filter((voice) => !existingVoiceIds.has(voice.id));
+        const isDraft = input.status === "draft";
         const sal: SalDocument = {
           date: input.date,
           description: input.description,
@@ -127,9 +138,9 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           lines: input.lines,
           notes: input.notes,
           projectId: input.projectId,
-          status: "closed",
+          status: isDraft ? "draft" : "closed",
           title: generateSalTitle(input.title, currentCount),
-          closedAt: new Date().toISOString().slice(0, 10),
+          ...(isDraft ? {} : { closedAt: new Date().toISOString().slice(0, 10) }),
           ...(typeof input.total === "number" && Number.isFinite(input.total)
             ? { total: input.total }
             : {}),
@@ -223,6 +234,12 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           salDocuments: state.salDocuments.filter((sal) => sal.id !== salId),
           activeSalId: state.activeSalId === salId ? "" : state.activeSalId,
         })),
+      setSalStatus: (salId: string, status: SalDocumentStatus) =>
+        set((state) => ({
+          salDocuments: state.salDocuments.map((sal) =>
+            sal.id === salId ? { ...sal, status } : sal,
+          ),
+        })),
       projects: [],
       salDocuments: [],
       setActiveProject: (projectId) =>
@@ -241,6 +258,39 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           };
         }),
       tariffVoices: [],
+      updateSalDraft: (input) => {
+        const existingVoiceIds = new Set(get().tariffVoices.map((voice) => voice.id));
+        const voicesToAdd = (input.voices ?? []).filter((voice) => !existingVoiceIds.has(voice.id));
+        let updated: SalDocument | null = null;
+
+        set((state) => ({
+          activeProjectId: input.projectId,
+          activeSalId: input.id,
+          salDocuments: state.salDocuments.map((sal) => {
+            if (sal.id !== input.id || sal.status !== "draft") {
+              return sal;
+            }
+
+            updated = {
+              ...sal,
+              date: input.date,
+              description: input.description,
+              lines: input.lines,
+              notes: input.notes,
+              projectId: input.projectId,
+              title: input.title.trim() || sal.title,
+              ...(typeof input.total === "number" && Number.isFinite(input.total)
+                ? { total: input.total }
+                : {}),
+            };
+
+            return updated;
+          }),
+          tariffVoices: [...voicesToAdd, ...state.tariffVoices],
+        }));
+
+        return updated;
+      },
       updateLineQuantity: (salId, lineId, quantity) =>
         set((state) => ({
           salDocuments: state.salDocuments.map((sal) =>
