@@ -16,7 +16,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import type { QuantaraRoute, ThemeMode } from "@/store/app-store";
+import type { QuantaraRoute } from "@/store/app-store";
+import { useThemeState } from "@/store/app-store";
 
 type PaletteCommand = {
   group: string;
@@ -33,8 +34,6 @@ type CommandPaletteProps = {
   onClose: () => void;
   onPageAction: (actionId: string) => void;
   onRouteChange: (route: QuantaraRoute) => void;
-  onToggleTheme: () => void;
-  themeMode: ThemeMode;
 };
 
 const routeCommands: Array<{
@@ -83,12 +82,11 @@ export function CommandPalette({
   onClose,
   onPageAction,
   onRouteChange,
-  onToggleTheme,
-  themeMode,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { themeMode, toggleTheme } = useThemeState();
 
   const commands = useMemo<PaletteCommand[]>(
     () => [
@@ -128,10 +126,10 @@ export function CommandPalette({
         id: "toggle-theme",
         keywords: "tema dark light chiaro scuro",
         label: themeMode === "light" ? "Attiva modo scuro" : "Attiva modo chiaro",
-        run: onToggleTheme,
+        run: toggleTheme,
       },
     ],
-    [onPageAction, onRouteChange, onToggleTheme, themeMode],
+    [onPageAction, onRouteChange, themeMode, toggleTheme],
   );
 
   const normalizedQuery = query.trim().toLowerCase();
