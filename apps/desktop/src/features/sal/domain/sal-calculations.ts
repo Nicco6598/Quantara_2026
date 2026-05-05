@@ -24,13 +24,13 @@ export function buildLineViews(
     const grossAmount = roundCurrency(quantity * line.voice.unitPrice);
     const linkedCharges = buildLinkedCharges(line, grossAmount);
     const linkedTotal = linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
+    const netAmount = roundCurrency(grossAmount + linkedTotal);
     const discountable =
-      line.voice.isSafetyCost && !rules.applyDiscountToSafetyCosts ? 0 : grossAmount;
+      line.voice.isSafetyCost && !rules.applyDiscountToSafetyCosts ? 0 : netAmount;
     const discountAmount = rules.discountEnabled
       ? roundCurrency(discountable * (rules.discountPercent / 100))
       : 0;
-    const netAmount = roundCurrency(grossAmount - discountAmount);
-    const totalAmount = roundCurrency(netAmount + linkedTotal);
+    const totalAmount = roundCurrency(netAmount - discountAmount);
 
     return {
       ...line,
@@ -55,22 +55,33 @@ export function summarizeSalLines(
   const summary = lineViews.reduce(
     (current, line) => {
       const linkedChargeAmount = line.linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
+      const hasDiscountableAmount = line.discountableAmount > 0;
       return {
         discountAmount: current.discountAmount + line.discountAmount,
         discountableAmount: current.discountableAmount + line.discountableAmount,
+        discountedVoiceCount: current.discountedVoiceCount + (line.discountAmount > 0 ? 1 : 0),
+        excludedSafetyVoiceCount:
+          current.excludedSafetyVoiceCount +
+          (line.voice.isSafetyCost && line.discountAmount === 0 ? 1 : 0),
         grossAmount: current.grossAmount + line.grossAmount,
         linkedChargeAmount: current.linkedChargeAmount + linkedChargeAmount,
         safetyAmount: current.safetyAmount + (line.voice.isSafetyCost ? line.grossAmount : 0),
         total: current.total + line.totalAmount,
+        zeroDiscountableVoiceCount:
+          current.zeroDiscountableVoiceCount +
+          (hasDiscountableAmount && line.discountAmount === 0 ? 1 : 0),
       };
     },
     {
       discountAmount: 0,
       discountableAmount: 0,
+      discountedVoiceCount: 0,
+      excludedSafetyVoiceCount: 0,
       grossAmount: 0,
       linkedChargeAmount: 0,
       safetyAmount: 0,
       total: 0,
+      zeroDiscountableVoiceCount: 0,
     },
   );
 
@@ -79,6 +90,8 @@ export function summarizeSalLines(
     budgetResidual: roundCurrency(contractAmount - previousProgressiveAmount - total),
     discountAmount: roundCurrency(summary.discountAmount),
     discountableAmount: roundCurrency(summary.discountableAmount),
+    discountedVoiceCount: summary.discountedVoiceCount,
+    excludedSafetyVoiceCount: summary.excludedSafetyVoiceCount,
     grossAmount: roundCurrency(summary.grossAmount),
     linkedChargeAmount: roundCurrency(summary.linkedChargeAmount),
     netDiscountableAmount: roundCurrency(summary.discountableAmount - summary.discountAmount),
@@ -86,6 +99,7 @@ export function summarizeSalLines(
     safetyAmount: roundCurrency(summary.safetyAmount),
     total,
     voiceCount: lineViews.length,
+    zeroDiscountableVoiceCount: summary.zeroDiscountableVoiceCount,
   };
 }
 
@@ -94,14 +108,34 @@ export function buildVerificationChecks(
   summary: SalEconomicSummary,
   economicRules: SalEconomicRules,
 ): SalVerificationCheck[] {
-  const completeLines = lineViews.filter((line) => line.status === "complete").length;
-  const safetyLines = lineViews.filter((line) => line.voice.isSafetyCost).length;
-  const linkedLines = lineViews.filter((line) => line.linkedCharges.length > 0).length;
+  let completeLines = 0;
+  let safetyLines = 0;
+  let linkedLines = 0;
   const hasBudgetOverflow = summary.budgetResidual < 0;
-  const zeroQtyLines = lineViews.filter((line) => line.quantity <= 0);
-  const zeroPriceLines = lineViews.filter((line) => line.voice.unitPrice <= 0);
-  const highSurchargeLines = lineViews.filter((line) => line.surchargePercent > 25);
+  const zeroQtyLines: SalLineView[] = [];
+  const zeroPriceLines: SalLineView[] = [];
+  const highSurchargeLines: SalLineView[] = [];
   const highDiscount = economicRules.discountEnabled && economicRules.discountPercent > 30;
+  const shouldCheckMissingDiscount =
+    economicRules.discountEnabled && economicRules.discountPercent > 0;
+  const discountableWithoutDiscount: SalLineView[] = [];
+
+  for (const line of lineViews) {
+    if (line.status === "complete") completeLines += 1;
+    if (line.voice.isSafetyCost) safetyLines += 1;
+    if (line.linkedCharges.length > 0) linkedLines += 1;
+    if (line.quantity <= 0) zeroQtyLines.push(line);
+    if (line.voice.unitPrice <= 0) zeroPriceLines.push(line);
+    if (line.surchargePercent > 25) highSurchargeLines.push(line);
+    if (
+      shouldCheckMissingDiscount &&
+      !line.voice.isSafetyCost &&
+      line.discountableAmount > 0 &&
+      line.discountAmount <= 0
+    ) {
+      discountableWithoutDiscount.push(line);
+    }
+  }
 
   const checks: SalVerificationCheck[] = [];
 
@@ -239,6 +273,16 @@ export function buildVerificationChecks(
         currency: "EUR",
       }),
       tone: "success",
+    });
+  }
+
+  if (discountableWithoutDiscount.length > 0) {
+    checks.push({
+      detail: `Le voci ${discountableWithoutDiscount.map((line) => line.voice.code).join(", ")} sono ribassabili ma non hanno sconto calcolato.`,
+      id: "discount-missing",
+      label: "Ribasso non applicato",
+      result: `${discountableWithoutDiscount.length} voci`,
+      tone: "warning",
     });
   }
 

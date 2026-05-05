@@ -93,6 +93,8 @@ export type SalEconomicSummary = {
   budgetResidual: number;
   discountAmount: number;
   discountableAmount: number;
+  discountedVoiceCount: number;
+  excludedSafetyVoiceCount: number;
   grossAmount: number;
   linkedChargeAmount: number;
   netDiscountableAmount: number;
@@ -100,6 +102,7 @@ export type SalEconomicSummary = {
   safetyAmount: number;
   total: number;
   voiceCount: number;
+  zeroDiscountableVoiceCount: number;
 };
 
 export type SalVerificationCheck = {

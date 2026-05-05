@@ -16,7 +16,7 @@ import {
 import { MetricCard } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
 import { readStringRecord } from "@/features/projects/utils/projects-helpers";
-import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
@@ -65,10 +65,7 @@ export function DashboardScreen() {
   const totalBudget = useMemo(() => projects.reduce((s, p) => s + p.budget.amount, 0), [projects]);
   const totalSal = useMemo(
     () =>
-      salDocuments.reduce((s, doc) => {
-        const view = buildSalDocumentView(doc, tariffVoices);
-        return s + view.total;
-      }, 0),
+      buildSalDocumentViews(salDocuments, tariffVoices).reduce((sum, view) => sum + view.total, 0),
     [salDocuments, tariffVoices],
   );
   const escalationCount = useMemo(
@@ -89,9 +86,8 @@ export function DashboardScreen() {
       projects.map((project) => [project.id, project.budget.amount]),
     );
 
-    for (const document of salDocuments) {
-      const view = buildSalDocumentView(document, tariffVoices);
-      const current = totals.get(document.projectId) ?? {
+    for (const view of buildSalDocumentViews(salDocuments, tariffVoices)) {
+      const current = totals.get(view.projectId) ?? {
         approvedAmount: 0,
         committedAmount: 0,
         progressPercent: 0,
@@ -99,12 +95,12 @@ export function DashboardScreen() {
 
       const committedAmount = current.committedAmount + view.total;
       const approvedAmount =
-        document.status === "closed" ? current.approvedAmount + view.total : current.approvedAmount;
-      const budgetAmount = contractBudgetById.get(document.projectId) ?? 0;
+        view.status === "closed" ? current.approvedAmount + view.total : current.approvedAmount;
+      const budgetAmount = contractBudgetById.get(view.projectId) ?? 0;
       const progressPercent =
         budgetAmount > 0 ? Math.min(100, (committedAmount / budgetAmount) * 100) : 0;
 
-      totals.set(document.projectId, {
+      totals.set(view.projectId, {
         approvedAmount,
         committedAmount,
         progressPercent,

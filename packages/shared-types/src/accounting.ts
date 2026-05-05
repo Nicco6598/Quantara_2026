@@ -78,6 +78,11 @@ export type DesktopTariffVoiceRecord = {
   warnings?: TariffWarning[];
 };
 
+export type DesktopTariffVoiceCountRecord = {
+  count: number;
+  tariffBookId: string;
+};
+
 export type TariffWarning = {
   id: string;
   title: string;

@@ -3,6 +3,7 @@ import {
   normalizeContractorName,
 } from "@/features/projects/utils/projects-helpers";
 import type { DesktopContract, DesktopTariffBook, DesktopTariffVoice } from "@/lib/desktopData";
+import { isSafetyVoice } from "../domain/sal-safety";
 import type { SalProjectContext, SalTariffBookOption, SalVoiceDraft } from "../types";
 
 export function mapContractToSalProject(
@@ -63,7 +64,11 @@ export function mapVoiceToDraft(
     code: voice.officialCode,
     description: truncateVoiceDescription(voice.description),
     id: createDesktopVoiceKey(voice.tariffBookId, voice.id),
-    isSafetyCost: isSafetyVoice(voice),
+    isSafetyCost: isSafetyVoice({
+      category: voice.category,
+      code: voice.officialCode,
+      description: voice.description,
+    }),
     laborPercentage: voice.laborPercentage ?? 0,
     source: voice,
     tariffBookId: voice.tariffBookId,
@@ -72,17 +77,6 @@ export function mapVoiceToDraft(
     unit: voice.unitOfMeasure,
     unitPrice: voice.unitPrice,
   };
-}
-
-function isSafetyVoice(voice: DesktopTariffVoice) {
-  const searchable = `${voice.category} ${voice.officialCode} ${voice.description}`.toLowerCase();
-  return (
-    searchable.includes("sicurezza") ||
-    searchable.includes("oneri") ||
-    searchable.includes(" os ") ||
-    searchable.startsWith("os") ||
-    voice.category.toLowerCase().includes("safety")
-  );
 }
 
 function truncateVoiceDescription(description: string, maxLength = 100): string {

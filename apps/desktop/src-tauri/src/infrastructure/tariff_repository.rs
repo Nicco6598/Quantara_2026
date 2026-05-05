@@ -260,6 +260,38 @@ pub fn list_tariff_voices(
         .map_err(to_database_error)
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TariffVoiceCountRecord {
+    pub tariff_book_id: String,
+    pub count: i64,
+}
+
+pub fn list_tariff_voice_counts(
+    connection: &Connection,
+) -> Result<Vec<TariffVoiceCountRecord>, AppError> {
+    apply_migrations(connection).map_err(to_database_error)?;
+
+    let mut statement = connection
+        .prepare(
+            "SELECT tariff_book_id, COUNT(*) as voice_count
+             FROM tariff_voices
+             GROUP BY tariff_book_id",
+        )
+        .map_err(to_database_error)?;
+
+    statement
+        .query_map([], |row| {
+            Ok(TariffVoiceCountRecord {
+                tariff_book_id: row.get(0)?,
+                count: row.get(1)?,
+            })
+        })
+        .map_err(to_database_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(to_database_error)
+}
+
 pub fn import_tariff_pdf_preview(
     path: &Path,
     app: Option<&AppHandle>,

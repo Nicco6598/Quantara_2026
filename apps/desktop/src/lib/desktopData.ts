@@ -4,6 +4,7 @@ import type {
   DesktopContractRecord,
   DesktopTariffBookRecord,
   DesktopTariffPriorityRecord,
+  DesktopTariffVoiceCountRecord,
   DesktopTariffVoiceRecord,
   Money,
   TariffPdfMetadataRecord,
@@ -19,6 +20,7 @@ export type DesktopContract = DesktopContractRecord;
 export type CreateDesktopContractRequest = CreateDesktopContractRecordRequest;
 export type DesktopTariffBook = DesktopTariffBookRecord;
 export type DesktopTariffVoice = DesktopTariffVoiceRecord;
+export type DesktopTariffVoiceCount = DesktopTariffVoiceCountRecord;
 export type CreateDesktopTariffBookRequest = CreateDesktopTariffBookRecordRequest;
 export type UpdateDesktopTariffBookRequest = UpdateDesktopTariffBookRecordRequest;
 export type TariffPdfMetadata = TariffPdfMetadataRecord;
@@ -39,6 +41,7 @@ type InflightKey =
   | "contracts"
   | "materials"
   | `tariff-books:${number}`
+  | `tariff-voice-counts:${number}:${number}`
   | `tariff-voices:${string}:${number}`;
 
 const inflightRequests = new Map<InflightKey, Promise<DesktopDataResult<unknown>>>();
@@ -155,6 +158,22 @@ export async function listDesktopTariffVoices(
 ): Promise<DesktopDataResult<DesktopTariffVoice[]>> {
   return withInflightCache(`tariff-voices:${tariffBookId}:${fallback.length}`, () =>
     invokeWithFallback("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative"),
+  );
+}
+
+export async function listDesktopTariffVoiceCounts(
+  fallbackBooks: readonly DesktopTariffBook[],
+  fallbackVoices: readonly DesktopTariffVoice[],
+): Promise<DesktopDataResult<DesktopTariffVoiceCount[]>> {
+  const fallbackCounts = fallbackBooks.map((book) => ({
+    count: fallbackVoices.filter((voice) => voice.tariffBookId === book.id).length,
+    tariffBookId: book.id,
+  }));
+
+  return withInflightCache(
+    `tariff-voice-counts:${fallbackBooks.length}:${fallbackVoices.length}`,
+    () =>
+      invokeWithFallback("list_tariff_voice_counts", {}, fallbackCounts, "conteggi dimostrativi"),
   );
 }
 

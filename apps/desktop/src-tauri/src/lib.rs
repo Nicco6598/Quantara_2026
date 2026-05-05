@@ -36,6 +36,7 @@ pub fn run() {
             commands::tariffs::update_tariff_book,
             commands::tariffs::delete_tariff_book,
             commands::tariffs::list_tariff_voices,
+            commands::tariffs::list_tariff_voice_counts,
             commands::tariffs::import_tariff_pdf_preview,
             commands::tariffs::import_tariff_pdf_preview_batch,
             commands::materials::list_materials,

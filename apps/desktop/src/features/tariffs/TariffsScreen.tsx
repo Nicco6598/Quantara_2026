@@ -30,6 +30,7 @@ import {
   deleteDesktopTariffBook,
   listDesktopContracts,
   listDesktopTariffBooks,
+  listDesktopTariffVoiceCounts,
   listDesktopTariffVoices,
   type TariffPdfMetadata,
   updateDesktopTariffBook,
@@ -326,20 +327,14 @@ export function TariffsScreen() {
     let active = true;
     const books = tariffBooksState.data;
 
-    Promise.all(
-      books.map(async (book) => {
-        const fallbackForBook = fallbackTariffVoices.filter(
-          (voice) => voice.tariffBookId === book.id,
-        );
-        const result = await listDesktopTariffVoices(book.id, fallbackForBook);
-        return [book.id, result.data.length] as const;
-      }),
-    )
-      .then((entries) => {
+    listDesktopTariffVoiceCounts(books, fallbackTariffVoices)
+      .then((result) => {
         if (!active) {
           return;
         }
 
+        const counts = new Map(result.data.map((entry) => [entry.tariffBookId, entry.count]));
+        const entries = books.map((book) => [book.id, counts.get(book.id) ?? 0] as const);
         setVoiceCountByBookId(Object.fromEntries(entries));
       })
       .catch(() => {
@@ -445,6 +440,23 @@ export function TariffsScreen() {
     reviewedFiles,
     setTariffImportToolbar,
   ]);
+
+  useEffect(() => {
+    if (importPhase !== "preview" || importPreviews.length === 0) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const host = getScrollableAncestor(screenRef.current);
+      if (host) {
+        host.scrollTo({ top: 0, behavior: "auto" });
+        return;
+      }
+
+      window.scrollTo({ top: 0, behavior: "auto" });
+      document.documentElement.scrollTo?.({ top: 0, behavior: "auto" });
+    });
+  }, [importPhase, importPreviews.length]);
 
   useEffect(
     () => () => {
@@ -678,7 +690,10 @@ export function TariffsScreen() {
   return (
     <main
       ref={screenRef}
-      className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6"
+      className={cn(
+        "relative w-full max-w-full px-4 pb-10 pt-4 md:px-6",
+        importPhase === "preview" && importPreviews.length > 0 ? "" : "overflow-x-hidden",
+      )}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
 

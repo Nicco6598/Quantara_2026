@@ -8,6 +8,7 @@ export type {
   DesktopContractRecord,
   DesktopTariffBookRecord,
   DesktopTariffPriorityRecord,
+  DesktopTariffVoiceCountRecord,
   DesktopTariffVoiceRecord,
   ISODate,
   LaborSurchargeRule,

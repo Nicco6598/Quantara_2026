@@ -3,8 +3,8 @@ use tauri::{AppHandle, State};
 use crate::infrastructure::{
     local_storage::{with_db, with_db_mut, DbConnection},
     tariff_repository::{
-        CreateTariffBookRequest, TariffBookRecord, TariffPdfImportPreview, TariffVoiceRecord,
-        UpdateTariffBookRequest,
+        CreateTariffBookRequest, TariffBookRecord, TariffPdfImportPreview, TariffVoiceCountRecord,
+        TariffVoiceRecord, UpdateTariffBookRequest,
     },
 };
 
@@ -57,6 +57,15 @@ pub fn list_tariff_voices(
 ) -> Result<Vec<TariffVoiceRecord>, String> {
     with_db(&state, |conn| {
         crate::infrastructure::tariff_repository::list_tariff_voices(conn, &tariff_book_id)
+    })
+}
+
+#[tauri::command]
+pub fn list_tariff_voice_counts(
+    state: State<'_, DbConnection>,
+) -> Result<Vec<TariffVoiceCountRecord>, String> {
+    with_db(&state, |conn| {
+        crate::infrastructure::tariff_repository::list_tariff_voice_counts(conn)
     })
 }
 

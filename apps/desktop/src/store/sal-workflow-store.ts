@@ -17,13 +17,15 @@ type CreateSalInput = Pick<SalDocument, "date" | "description" | "notes" | "proj
 type CreateDraftSalWithLinesInput = CreateSalInput & {
   voices: SalTariffVoice[];
 };
-type CloseNewSalInput = CreateSalInput & {
+type CreateSalWithLinesInput = CreateSalInput & {
+  economicRules?: SalDocument["economicRules"];
   lines: SalLine[];
   status?: SalDocumentStatus;
   total?: number;
   voices?: SalTariffVoice[];
 };
 type UpdateSalDraftInput = CreateSalInput & {
+  economicRules?: SalDocument["economicRules"];
   id: string;
   lines: SalLine[];
   total?: number;
@@ -37,7 +39,7 @@ type SalWorkflowStore = {
   closeSal: (salId: string) => void;
   createProject: (input: CreateProjectInput) => SalProject;
   createProjectWithId: (input: SalProject) => SalProject;
-  createClosedSal: (input: CloseNewSalInput) => SalDocument;
+  createSalWithLines: (input: CreateSalWithLinesInput) => SalDocument;
   createSal: (input: CreateSalInput) => SalDocument;
   createSalDraftWithLines: (input: CreateDraftSalWithLinesInput) => SalDocument;
   createTariffVoice: (input: CreateTariffVoiceInput) => SalTariffVoice;
@@ -124,7 +126,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
 
         return input;
       },
-      createClosedSal: (input) => {
+      createSalWithLines: (input) => {
         const currentCount = get().salDocuments.filter(
           (sal) => sal.projectId === input.projectId,
         ).length;
@@ -134,6 +136,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
         const sal: SalDocument = {
           date: input.date,
           description: input.description,
+          ...(input.economicRules ? { economicRules: input.economicRules } : {}),
           id: createId("sal"),
           lines: input.lines,
           notes: input.notes,
@@ -275,6 +278,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
               ...sal,
               date: input.date,
               description: input.description,
+              ...(input.economicRules ? { economicRules: input.economicRules } : {}),
               lines: input.lines,
               notes: input.notes,
               projectId: input.projectId,

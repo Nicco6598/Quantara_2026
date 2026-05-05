@@ -29,32 +29,41 @@ export function SalWorkflowTopbar({
       <BezelSurface innerClassName="flex min-h-14 items-center justify-end gap-3 px-3">
         <div className="flex flex-wrap items-center justify-end gap-2">
           {canGoBack ? (
-            <button
+            <motion.button
               className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
               onClick={onBack}
               type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ duration: 0.42, ease: SOFT_EASE }}
             >
               <ArrowLeft className="size-4" />
               Indietro
-            </button>
+            </motion.button>
           ) : null}
-          <button
+          <motion.button
             className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
             onClick={onDraft}
             type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ duration: 0.42, ease: SOFT_EASE }}
           >
             <Save className="size-4" />
             Salva bozza
-          </button>
+          </motion.button>
           {showPrimary ? (
-            <button
+            <motion.button
               className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-semibold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
               onClick={onPrimary}
               type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ duration: 0.42, ease: SOFT_EASE }}
             >
               {primaryLabel}
               <ArrowRight className="size-4" />
-            </button>
+            </motion.button>
           ) : null}
         </div>
       </BezelSurface>

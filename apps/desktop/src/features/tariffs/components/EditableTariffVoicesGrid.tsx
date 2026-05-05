@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Info, X } from "lucide-react";
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DesktopTariffVoice, TariffWarning } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 import type { VoiceGroup } from "../utils/tariff-grouping";
@@ -115,12 +115,16 @@ function DescriptionCell({
 export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   duplicateCodes,
   groups,
+  loadMoreAnchorId,
   onChange,
+  onLoadMoreVisibilityChange,
   validation,
 }: {
   duplicateCodes: Set<string>;
   groups: VoiceGroup[];
+  loadMoreAnchorId?: string;
   onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  onLoadMoreVisibilityChange?: (isVisible: boolean) => void;
   validation: ImportValidation;
 }) {
   const invalidCellKeys = useMemo(
@@ -162,6 +166,10 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   const SECTION_CHUNK = 3;
   const visibleSections = showAll ? sections : sections.slice(0, SECTION_CHUNK);
   const hasMore = sections.length > SECTION_CHUNK;
+
+  useEffect(() => {
+    onLoadMoreVisibilityChange?.(hasMore && !showAll);
+  }, [hasMore, onLoadMoreVisibilityChange, showAll]);
 
   return (
     <div className="space-y-6">
@@ -328,6 +336,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
 
       {hasMore && !showAll ? (
         <motion.button
+          id={loadMoreAnchorId}
           className="w-full rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/30 py-3 text-[12px] font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]"
           initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}

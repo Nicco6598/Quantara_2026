@@ -5,6 +5,13 @@ import {
   defaultSalEconomicRules,
   summarizeSalLines,
 } from "../../apps/desktop/src/features/sal/domain/sal-calculations";
+import { isSafetyVoice } from "../../apps/desktop/src/features/sal/domain/sal-safety";
+import {
+  buildSalDocumentView,
+  buildSalDocumentViews,
+  type SalDocument,
+  type SalTariffVoice,
+} from "../../apps/desktop/src/features/sal/domain/sal-workflow";
 import type { SalLineDraft } from "../../apps/desktop/src/features/sal/types";
 
 const ordinaryLine: SalLineDraft = {
@@ -50,12 +57,12 @@ describe("SAL calculations", () => {
     const views = buildLineViews([ordinaryLine, safetyLine], defaultSalEconomicRules);
 
     expect(views[0]).toMatchObject({
-      discountAmount: 438,
-      discountableAmount: 2400,
+      discountAmount: 481.8,
+      discountableAmount: 2640,
       grossAmount: 2400,
-      netAmount: 1962,
+      netAmount: 2640,
       quantity: 24,
-      totalAmount: 2202,
+      totalAmount: 2158.2,
     });
     expect(views[0]?.linkedCharges[0]?.total).toBe(240);
     expect(views[1]).toMatchObject({
@@ -74,13 +81,15 @@ describe("SAL calculations", () => {
     const checks = buildVerificationChecks(views, summary, defaultSalEconomicRules);
 
     expect(summary).toMatchObject({
-      budgetResidual: -302,
-      discountAmount: 438,
-      discountableAmount: 2400,
+      budgetResidual: -258.2,
+      discountAmount: 481.8,
+      discountableAmount: 2640,
+      discountedVoiceCount: 1,
+      excludedSafetyVoiceCount: 1,
       grossAmount: 2900,
       linkedChargeAmount: 240,
       safetyAmount: 500,
-      total: 2702,
+      total: 2658.2,
     });
     expect(checks.find((check) => check.id === "budget-overflow")?.tone).toBe("danger");
   });
@@ -145,5 +154,151 @@ describe("SAL calculations", () => {
       grossAmount: 400,
       total: 360,
     });
+  });
+
+  it("applies tender discount to every discountable line in the same SAL", () => {
+    const views = buildLineViews(
+      [
+        { ...ordinaryLine, id: "line-1", voice: { ...ordinaryLine.voice, id: "voice-1" } },
+        { ...ordinaryLine, id: "line-2", voice: { ...ordinaryLine.voice, id: "voice-2" } },
+        { ...ordinaryLine, id: "line-3", voice: { ...ordinaryLine.voice, id: "voice-3" } },
+      ],
+      defaultSalEconomicRules,
+    );
+
+    expect(views).toHaveLength(3);
+    expect(views.every((view) => view.discountAmount > 0)).toBe(true);
+  });
+
+  it("can include safety costs in discount calculation when explicitly configured", () => {
+    const views = buildLineViews([safetyLine], {
+      ...defaultSalEconomicRules,
+      applyDiscountToSafetyCosts: true,
+    });
+
+    expect(views[0]?.discountAmount).toBeGreaterThan(0);
+  });
+
+  it("does not create fake discounts for zero quantity or zero price", () => {
+    const views = buildLineViews(
+      [
+        { ...ordinaryLine, factor1: 0, factor2: 1, factor3: 1 },
+        { ...ordinaryLine, id: "zero-price", voice: { ...ordinaryLine.voice, unitPrice: 0 } },
+      ],
+      defaultSalEconomicRules,
+    );
+
+    expect(views.map((view) => view.discountAmount)).toEqual([0, 0]);
+  });
+
+  it("keeps verification check output stable for mixed line states", () => {
+    const lines = [
+      { ...ordinaryLine, surchargePercent: 30 },
+      safetyLine,
+      { ...ordinaryLine, id: "zero-qty", factor1: 0, factor2: 1, factor3: 1 },
+      { ...ordinaryLine, id: "zero-price", voice: { ...ordinaryLine.voice, unitPrice: 0 } },
+    ];
+    const views = buildLineViews(lines, {
+      ...defaultSalEconomicRules,
+      discountPercent: 35,
+    });
+    const summary = summarizeSalLines(views, 500, 0);
+
+    expect(
+      buildVerificationChecks(views, summary, {
+        ...defaultSalEconomicRules,
+        discountPercent: 35,
+      }).map((check) => check.id),
+    ).toEqual([
+      "total",
+      "count",
+      "measurements",
+      "zero-qty",
+      "zero-price",
+      "high-surcharge",
+      "linked",
+      "safety",
+      "budget-overflow",
+      "high-discount",
+      "discount",
+    ]);
+  });
+
+  it("builds batch SAL document views equivalent to individual views", () => {
+    const voices: SalTariffVoice[] = [
+      {
+        category: "Opere",
+        code: "OP-001",
+        description: "Voce ordinaria",
+        id: "voice-ordinary",
+        isSafetyCost: false,
+        projectYear: 2026,
+        unit: "m",
+        unitPrice: 100,
+      },
+      {
+        category: "Sicurezza",
+        code: "OS-001",
+        description: "Oneri sicurezza",
+        id: "voice-safety",
+        isSafetyCost: true,
+        projectYear: 2026,
+        unit: "cad",
+        unitPrice: 50,
+      },
+    ];
+    const documents: SalDocument[] = [
+      {
+        date: "2026-05-01",
+        description: "SAL ordinaria",
+        id: "sal-1",
+        lines: [
+          { id: "line-1", quantity: 2, surcharge: "day", voiceId: "voice-ordinary" },
+          { id: "line-2", quantity: 1, surcharge: "none", voiceId: "voice-safety" },
+        ],
+        notes: "",
+        projectId: "project-1",
+        status: "closed",
+        title: "SAL 1",
+      },
+      {
+        date: "2026-05-02",
+        description: "SAL economica",
+        economicRules: defaultSalEconomicRules,
+        id: "sal-2",
+        lines: [{ id: "line-3", quantity: 3, surcharge: "none", voiceId: "voice-ordinary" }],
+        notes: "",
+        projectId: "project-1",
+        status: "draft",
+        title: "SAL 2",
+      },
+    ];
+
+    expect(buildSalDocumentViews(documents, voices)).toEqual(
+      documents.map((document) => buildSalDocumentView(document, voices)),
+    );
+  });
+});
+
+describe("isSafetyVoice", () => {
+  it("detects OS codes and explicit safety-cost phrases", () => {
+    expect(isSafetyVoice({ category: "Oneri", code: "OS.001", description: "" })).toBe(true);
+    expect(
+      isSafetyVoice({
+        category: "Opere civili",
+        code: "01.A01",
+        description: "Oneri della sicurezza per cantiere",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not classify generic oneri text as safety cost", () => {
+    expect(
+      isSafetyVoice({
+        category: "Opere civili",
+        code: "01.A01",
+        description: "Compenso per oneri di trasporto e movimentazione",
+      }),
+    ).toBe(false);
   });
 });

@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   Building2,
@@ -8,6 +9,7 @@ import {
   FileSpreadsheet,
   FileText,
   Printer,
+  RotateCcw,
   Save,
   Wallet,
 } from "lucide-react";
@@ -18,6 +20,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
@@ -60,6 +63,8 @@ import type {
   SalTariffBookOption,
   SalVoiceDraft,
 } from "./types";
+
+const BUTTER_EASE = [0.22, 1, 0.36, 1] as const;
 
 const PHASE_ORDER: SalWorkflowPhase[] = ["context", "voices", "review", "confirm", "completed"];
 const DRAFT_STORAGE_KEY = "quantara.salCreationDraft.v1";
@@ -156,8 +161,8 @@ export function SalCreationScreen() {
   const navigate = useNavigate();
   const data = useSalCreationData();
   const createSalProjectWithId = useSalWorkflowStore((state) => state.createProjectWithId);
-  const createClosedSal = useSalWorkflowStore((state) => state.createClosedSal);
   const closeSal = useSalWorkflowStore((state) => state.closeSal);
+  const createSalWithLines = useSalWorkflowStore((state) => state.createSalWithLines);
   const updateSalDraft = useSalWorkflowStore((state) => state.updateSalDraft);
   const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
   const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
@@ -379,6 +384,26 @@ export function SalCreationScreen() {
     [lines, notify],
   );
 
+  const setNotes = useCallback((voiceId: string, notes: string) => {
+    setLines((current) => current.map((l) => (l.voice.id === voiceId ? { ...l, notes } : l)));
+  }, []);
+
+  const handlePasteLine = useCallback(
+    (draft: SalLineDraft) => {
+      const newId = `draft-${draft.voice.id}-${Date.now()}`;
+      setLines((current) => [
+        ...current,
+        { ...draft, id: newId, quantity: draft.factor1 * draft.factor2 * draft.factor3 },
+      ]);
+      notify({
+        message: `${draft.voice.code} duplicata via incolla.`,
+        title: "Voce incollata",
+        tone: "success",
+      });
+    },
+    [notify],
+  );
+
   const handleApplyTemplate = useCallback(
     (template: SalTemplate) => {
       const newLines: SalLineDraft[] = template.voiceEntries
@@ -504,7 +529,7 @@ export function SalCreationScreen() {
       updateSalDraft({ ...finalSalPayload, id: editingDraftSalId });
       closeSal(editingDraftSalId);
     } else {
-      createClosedSal(finalSalPayload);
+      createSalWithLines(finalSalPayload);
     }
 
     setCreatedSalTitle(salTitle.trim() || data.project.salTitle);
@@ -566,7 +591,7 @@ export function SalCreationScreen() {
     };
     const draftSal = editingDraftSalId
       ? updateSalDraft({ ...draftPayload, id: editingDraftSalId })
-      : createClosedSal(draftPayload);
+      : createSalWithLines(draftPayload);
     const draftSalId = draftSal?.id ?? editingDraftSalId;
     if (draftSalId) {
       setEditingDraftSalId(draftSalId);
@@ -603,7 +628,7 @@ export function SalCreationScreen() {
     notify,
     lineViews,
     createSalProjectWithId,
-    createClosedSal,
+    createSalWithLines,
     editingDraftSalId,
     updateSalDraft,
     navigate,
@@ -671,6 +696,8 @@ export function SalCreationScreen() {
                 lineViews={lineViews}
                 lines={lines}
                 onFactorChange={setFactor}
+                onNotesChange={setNotes}
+                onPasteLine={handlePasteLine}
                 onPrimary={goPrimary}
                 onReorder={setLines}
                 onRemove={removeLine}
@@ -776,10 +803,13 @@ function SetupStep({
       <div className="rounded-[16px] bg-[var(--surface-base)] px-5 py-5 ring-1 ring-[var(--border-subtle)]/70">
         {showContractSelector ? (
           <div className="relative">
-            <button
+            <motion.button
               className="flex w-full items-center gap-5 text-left"
               onClick={() => setProjectOpen(!projectOpen)}
               type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.99 }}
+              transition={{ duration: 0.42, ease: BUTTER_EASE }}
             >
               <span className="flex size-14 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
                 <Building2 className="size-7" />
@@ -815,7 +845,7 @@ function SetupStep({
                   className={cn("size-3 transition-transform", projectOpen && "rotate-180")}
                 />
               </span>
-            </button>
+            </motion.button>
             {projectOpen && (
               <>
                 <button
@@ -828,7 +858,7 @@ function SetupStep({
                   {contracts.map((c) => {
                     const isActive = c.id === project.id;
                     return (
-                      <button
+                      <motion.button
                         className={cn(
                           "flex w-full items-center gap-3 rounded-[12px] px-3 py-3 text-left transition-all",
                           isActive
@@ -841,6 +871,9 @@ function SetupStep({
                           setProjectOpen(false);
                         }}
                         type="button"
+                        whileHover={{ y: -1 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ duration: 0.42, ease: BUTTER_EASE }}
                       >
                         <span
                           className={cn(
@@ -865,7 +898,7 @@ function SetupStep({
                             <Check className="size-3.5" strokeWidth={3} />
                           </span>
                         )}
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -935,13 +968,16 @@ function SetupStep({
             </div>
           </div>
           {tariffBooks.length > 3 ? (
-            <button
+            <motion.button
               className="rounded-full border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--bg-muted)]"
               onClick={() => setShowAll(!showAll)}
               type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ duration: 0.42, ease: BUTTER_EASE }}
             >
               {showAll ? "Mostra meno" : `Tutti (${tariffBooks.length})`}
-            </button>
+            </motion.button>
           ) : null}
         </div>
         {tariffBooks.length === 0 ? (
@@ -953,7 +989,7 @@ function SetupStep({
             {(showAll ? tariffBooks : tariffBooks.slice(0, 3)).map((book) => {
               const isSelected = selectedTariffBooks.some((b) => b.id === book.id);
               return (
-                <button
+                <motion.button
                   className={cn(
                     "relative flex min-h-[148px] items-center gap-5 rounded-[14px] border p-5 text-left transition-all duration-200",
                     isSelected
@@ -963,6 +999,9 @@ function SetupStep({
                   key={book.id}
                   onClick={() => void selectTariffBook(book.id)}
                   type="button"
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.42, ease: BUTTER_EASE }}
                 >
                   <div
                     className={cn(
@@ -1008,7 +1047,7 @@ function SetupStep({
                   ) : (
                     <span className="absolute right-4 top-4 size-5 shrink-0 rounded-full border-2 border-[var(--border-subtle)]" />
                   )}
-                </button>
+                </motion.button>
               );
             })}
           </div>
@@ -1083,24 +1122,30 @@ function SetupStep({
 
       <div className="flex items-center justify-between">
         {onSaveDraft ? (
-          <button
+          <motion.button
             className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
             onClick={onSaveDraft}
             type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             <Save className="size-4" />
             Salva bozza
-          </button>
+          </motion.button>
         ) : (
           <div />
         )}
-        <button
+        <motion.button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Continua <ArrowRight className="size-4" />
-        </button>
+        </motion.button>
       </div>
     </div>
   );
@@ -1126,6 +1171,8 @@ function VoicesStep({
   lineViews,
   lines,
   onFactorChange,
+  onNotesChange,
+  onPasteLine,
   onPrimary,
   onReorder,
   onRemove,
@@ -1143,6 +1190,8 @@ function VoicesStep({
   lineViews: SalLineView[];
   lines: SalLineDraft[];
   onFactorChange: (vid: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
+  onNotesChange: (vid: string, notes: string) => void;
+  onPasteLine: (line: SalLineDraft) => void;
   onPrimary: () => void;
   onReorder: (l: SalLineDraft[]) => void;
   onRemove: (vid: string) => void;
@@ -1169,8 +1218,101 @@ function VoicesStep({
       })),
     [voices],
   );
+  const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
+  const [noteModalVoiceId, setNoteModalVoiceId] = useState<string | null>(null);
+  const [noteModalDraft, setNoteModalDraft] = useState("");
+  const lastInteractedRef = useRef<string | null>(null);
+
+  const handleCopyLine = useCallback(
+    (voiceId: string) => {
+      const line = lineViews.find((l) => l.voice.id === voiceId);
+      if (!line) return;
+      setCopiedLine({
+        id: line.id,
+        factor1: line.factor1,
+        factor2: line.factor2,
+        factor3: line.factor3,
+        notes: line.notes,
+        quantity: line.quantity,
+        surchargePercent: line.surchargePercent,
+        voice: line.voice,
+      });
+    },
+    [lineViews],
+  );
+
+  const handleOpenNote = useCallback(
+    (voiceId: string) => {
+      const line = lineViews.find((l) => l.voice.id === voiceId);
+      setNoteModalDraft(line?.notes ?? "");
+      setNoteModalVoiceId(voiceId);
+    },
+    [lineViews],
+  );
+
+  const handleNoteSave = useCallback(() => {
+    if (noteModalVoiceId) {
+      onNotesChange(noteModalVoiceId, noteModalDraft);
+    }
+    setNoteModalVoiceId(null);
+  }, [noteModalVoiceId, noteModalDraft, onNotesChange]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      const mod = e.ctrlKey || e.metaKey;
+
+      if (mod && key === "c" && lastInteractedRef.current) {
+        const voiceId = lastInteractedRef.current;
+        const line = lineViews.find((l) => l.voice.id === voiceId);
+        if (line) {
+          e.preventDefault();
+          setCopiedLine({
+            id: line.id,
+            factor1: line.factor1,
+            factor2: line.factor2,
+            factor3: line.factor3,
+            notes: line.notes,
+            quantity: line.quantity,
+            surchargePercent: line.surchargePercent,
+            voice: line.voice,
+          });
+        }
+      }
+
+      if (mod && key === "v" && copiedLine) {
+        e.preventDefault();
+        const uniqueVoice = {
+          ...copiedLine.voice,
+          id: `${copiedLine.voice.id}-copy-${Date.now()}`,
+          code: `${copiedLine.voice.code} (copia)`,
+        };
+        const pastedLine: SalLineDraft = {
+          ...copiedLine,
+          id: `draft-${uniqueVoice.id}`,
+          voice: uniqueVoice,
+          quantity: copiedLine.factor1 * copiedLine.factor2 * copiedLine.factor3,
+        };
+        onPasteLine(pastedLine);
+        setCopiedLine(null);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [copiedLine, onPasteLine, lineViews]);
+
   return (
-    <div className="space-y-3">
+    <div
+      role="none"
+      className="space-y-3"
+      onClick={(e) => {
+        const row = (e.target as HTMLElement).closest("[data-voice-id]");
+        if (row) {
+          lastInteractedRef.current = row.getAttribute("data-voice-id");
+        }
+      }}
+      onKeyDown={() => {}}
+    >
       <div className="flex items-center gap-2 rounded-[12px] bg-[var(--surface-base)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]/60">
         <div className="min-w-0 flex-1">
           <AutocompleteInput
@@ -1184,18 +1326,24 @@ function VoicesStep({
         </div>
         <TemplatePicker onApply={onApplyTemplate} tariffBookId={tariffBookId} />
         {lines.length > 0 && (
-          <button
+          <motion.button
             className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 text-[11px] font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
             onClick={onOpenTemplateDialog}
             type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             Salva come template
-          </button>
+          </motion.button>
         )}
       </div>
       <SelectedVoicesPanel
         lines={lineViews}
+        copiedVoiceId={copiedLine?.voice.id ?? null}
+        onCopyLine={handleCopyLine}
         onFactorChange={onFactorChange}
+        onOpenNote={handleOpenNote}
         onRemove={onRemove}
         onReorder={onReorder}
         onSurcharge={onSurcharge}
@@ -1241,14 +1389,17 @@ function VoicesStep({
       {/* Total + continue */}
       <div className="flex items-center justify-between rounded-[12px] bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/60">
         {onSaveDraft ? (
-          <button
+          <motion.button
             className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
             onClick={onSaveDraft}
             type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             <Save className="size-4" />
             Salva bozza
-          </button>
+          </motion.button>
         ) : (
           <div />
         )}
@@ -1258,6 +1409,14 @@ function VoicesStep({
           <span className="text-[var(--text-secondary)]">
             Qtà: <NumberValue value={totalQty} />
           </span>
+          <span className="text-[var(--border-subtle)]">·</span>
+          <span className="font-semibold text-[var(--danger-base)]">
+            Ribasso: -<Currency value={summary.discountAmount} />
+          </span>
+          <span className="text-[var(--border-subtle)]">·</span>
+          <span className="font-semibold text-[var(--success-base)]">
+            Residuo: <Currency value={summary.budgetResidual} />
+          </span>
           {linked > 0 && (
             <>
               <span className="text-[var(--border-subtle)]">·</span>
@@ -1265,14 +1424,115 @@ function VoicesStep({
             </>
           )}
         </div>
-        <button
+        <motion.button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Continua <ArrowRight className="size-4" />
-        </button>
+        </motion.button>
       </div>
+
+      <AnimatePresence>
+        {noteModalVoiceId ? (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setNoteModalVoiceId(null)}
+          >
+            <motion.div
+              className="flex w-full max-w-lg flex-col overflow-hidden rounded-[22px] bg-[var(--surface-base)] p-6 shadow-2xl ring-1 ring-[var(--border-subtle)] sm:max-w-xl"
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.96 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
+                  <svg
+                    aria-hidden="true"
+                    className="size-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </span>
+                <div>
+                  <div className="text-[17px] font-bold leading-tight text-[var(--text-primary)]">
+                    Nota descrittiva
+                  </div>
+                  <div className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
+                    {lineViews.find((l) => l.voice.id === noteModalVoiceId)?.voice.code ?? ""} —{" "}
+                    {lineViews.find((l) => l.voice.id === noteModalVoiceId)?.voice.description ??
+                      ""}
+                  </div>
+                </div>
+              </div>
+              <textarea
+                className="mt-5 h-52 w-full resize-y rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-muted)]/40 px-4 py-3 text-[14px] leading-6 outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                onChange={(e) => setNoteModalDraft(e.target.value)}
+                placeholder="Inserisci il descrittivo per questa voce…"
+                value={noteModalDraft}
+              />
+              {noteModalVoiceId && noteModalDraft.trim().length > 0 ? (
+                <motion.button
+                  className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)] hover:ring-[var(--danger-base)]/30"
+                  onClick={() => {
+                    if (noteModalVoiceId) {
+                      onNotesChange(noteModalVoiceId, "");
+                    }
+                    setNoteModalVoiceId(null);
+                  }}
+                  type="button"
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.96 }}
+                  transition={{ duration: 0.42, ease: BUTTER_EASE }}
+                >
+                  <RotateCcw className="size-3.5" />
+                  Resetta nota
+                </motion.button>
+              ) : null}
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+                  {noteModalDraft.length} caratteri
+                </span>
+                <div className="flex gap-2">
+                  <motion.button
+                    className="inline-flex h-10 items-center rounded-full bg-[var(--bg-muted)] px-5 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+                    onClick={() => setNoteModalVoiceId(null)}
+                    type="button"
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.96 }}
+                    transition={{ duration: 0.42, ease: BUTTER_EASE }}
+                  >
+                    Annulla
+                  </motion.button>
+                  <motion.button
+                    className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+                    onClick={handleNoteSave}
+                    type="button"
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.96 }}
+                    transition={{ duration: 0.42, ease: BUTTER_EASE }}
+                  >
+                    Salva nota
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1297,85 +1557,99 @@ function ReviewStep({
   compareLines: SalLineView[] | null;
   onToggleCompare: () => void;
 }) {
+  const hasDanger = checks.some((c) => c.tone === "danger");
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 rounded-[12px] bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/60">
-        {checks.map((c) => (
-          <span
-            key={c.id}
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${c.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success-base)]" : c.tone === "warning" ? "bg-[var(--warning-soft)] text-[var(--warning-base)]" : "bg-[var(--danger-soft)] text-[var(--danger-base)]"}`}
-            title={c.detail}
-          >
-            {c.result}
-          </span>
-        ))}
+      {/* Checks + compare button */}
+      <div className="flex flex-wrap items-center gap-2 rounded-[12px] bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/50">
+        <div className="flex flex-1 flex-wrap items-center gap-1.5">
+          {checks.map((c) => (
+            <span
+              key={c.id}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${c.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success-base)]" : c.tone === "warning" ? "bg-[var(--warning-soft)] text-[var(--warning-base)]" : "bg-[var(--danger-soft)] text-[var(--danger-base)]"}`}
+              title={c.detail}
+            >
+              {c.result}
+            </span>
+          ))}
+        </div>
         {previousSalLines.length > 0 && (
-          <button
-            className="ml-auto inline-flex h-7 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 text-[11px] font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+          <motion.button
+            className={cn(
+              "shrink-0 inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-[12px] font-semibold ring-1 transition-colors",
+              compareLines
+                ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] ring-[var(--accent-primary)]/30 hover:bg-[var(--accent-primary)]/20"
+                : "bg-[var(--accent-primary)] text-white ring-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90 shadow-sm",
+            )}
             onClick={onToggleCompare}
             type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
+            <ArrowRight className={cn("size-3.5", compareLines && "rotate-180")} />
             {compareLines ? "Nascondi confronto" : "Confronta con SAL precedente"}
-          </button>
+          </motion.button>
         )}
       </div>
 
       {compareLines && <SalComparisonView before={previousSalLines} after={lineViews} />}
 
       <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
-        <div className="overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/70">
+        <div className="overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
           <div className="bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-5 py-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+            <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
               Verifica economica
             </div>
-            <div className="mt-1 text-[20px] font-black text-[var(--text-primary)]">
-              Totale attuale SAL <Currency value={summary.total} />
+            <div className="mt-2 text-[24px] font-bold leading-none tracking-[-0.025em] text-[var(--text-primary)]">
+              <Currency value={summary.total} />
+            </div>
+            <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
+              Totale attuale SAL
             </div>
           </div>
           <div className="p-5">
             <EconomicEquation summary={summary} />
-            <dl className="mt-5 space-y-2">
+            <dl className="mt-5 space-y-1.5">
               <SummaryLine
                 label="Totale voci lordo"
                 value={<Currency value={summary.grossAmount} />}
-                large
               />
               <SummaryLine
                 label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`}
                 value={<Currency value={-summary.discountAmount} />}
                 tone="danger"
-                large
               />
               <SummaryLine
                 label="Maggiorazioni"
                 value={<Currency value={summary.linkedChargeAmount} />}
-                large
               />
               <SummaryLine
                 label="Voci OS incluse"
                 value={<Currency value={summary.safetyAmount} />}
-                large
               />
-              <SummaryLine
-                label="Totale attuale SAL"
-                value={<Currency value={summary.total} />}
-                tone="info"
-                large
-              />
+              <div className="mt-3 border-t border-[var(--border-subtle)]/50 pt-3">
+                <SummaryLine
+                  label="Totale attuale SAL"
+                  value={<Currency value={summary.total} />}
+                  tone={hasDanger ? "danger" : "accent"}
+                  large
+                />
+              </div>
             </dl>
           </div>
         </div>
-        <div className="overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/70">
+        <div className="overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
           <div className="flex items-center justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-5 py-4">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+              <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                 Anteprima verifica
               </div>
-              <div className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">
+              <div className="mt-1 text-[13px] font-medium text-[var(--text-primary)]">
                 Libretto con ribasso evidenziato
               </div>
             </div>
-            <span className="rounded-full bg-[var(--success-soft)] px-3 py-1 text-[11px] font-bold text-[var(--success-base)]">
+            <span className="rounded-full bg-[var(--success-soft)] px-3 py-1 text-[10px] font-semibold text-[var(--success-base)]">
               Netto calcolato
             </span>
           </div>
@@ -1384,8 +1658,9 @@ function ReviewStep({
           </div>
         </div>
       </div>
-      <details className="rounded-[12px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
-        <summary className="cursor-pointer px-4 py-3 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+      <details className="rounded-[14px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
+        <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
+          <ChevronDown className="size-3.5 transition-transform [details[open]_&]:rotate-180" />
           Dettaglio voci ({lineViews.length})
         </summary>
         <div className="border-t border-[var(--border-subtle)]/50 px-4 pb-3 pt-3">
@@ -1393,13 +1668,16 @@ function ReviewStep({
         </div>
       </details>
       <div className="flex justify-end">
-        <button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+        <motion.button
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Continua <ArrowRight className="size-4" />
-        </button>
+        </motion.button>
       </div>
     </div>
   );
@@ -1504,14 +1782,17 @@ function ConfirmStep({
         />
       </div>
       <div className="flex justify-end">
-        <button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+        <motion.button
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           <CheckCircle2 className="size-4" />
           Conferma SAL
-        </button>
+        </motion.button>
       </div>
     </div>
   );
@@ -1547,20 +1828,26 @@ function CompletedView({
         <StepMetric label="Stato" value="Confermata" />
       </div>
       <div className="flex justify-end gap-2">
-        <button
+        <motion.button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
           onClick={onClose}
           type="button"
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Chiudi
-        </button>
-        <button
+        </motion.button>
+        <motion.button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onNew}
           type="button"
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Nuova revisione
-        </button>
+        </motion.button>
       </div>
     </div>
   );
@@ -1675,7 +1962,7 @@ function SummaryLine({
 }: {
   label: string;
   large?: boolean;
-  tone?: "danger" | "info" | "success" | "warning";
+  tone?: "accent" | "danger" | "info" | "success" | "warning";
   value: ReactNode;
 }) {
   return (
@@ -1690,8 +1977,9 @@ function SummaryLine({
       </span>
       <strong
         className={cn(
-          large ? "text-[15px]" : "text-[13px]",
+          large ? "text-[16px]" : "text-[13px]",
           "font-semibold",
+          tone === "accent" && "text-[var(--accent-primary)]",
           tone === "danger" && "text-[var(--danger-base)]",
           tone === "success" && "text-[var(--success-base)]",
           tone === "warning" && "text-[var(--warning-base)]",

@@ -1,9 +1,12 @@
-import { ChevronDown, Download, MoreHorizontal, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { Check, ChevronDown, Copy, Download, MoreHorizontal, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useState } from "react";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
 import { InlineEdit } from "@/components/shared/InlineEdit";
 import { cn } from "@/lib/utils";
 import type { SalEconomicSummary, SalLineDraft, SalLineView, SalVerificationCheck } from "../types";
+
+const BUTTER_EASE = [0.22, 1, 0.36, 1] as const;
 
 export function Currency({ value }: { value: number }) {
   return (
@@ -27,17 +30,23 @@ export function NumberValue({ value }: { value: number }) {
 
 export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   lines,
+  copiedVoiceId,
+  onCopyLine,
   onFactorChange,
+  onOpenNote,
   onRemove,
   onReorder,
   onSurcharge,
 }: {
   lines: SalLineView[];
+  copiedVoiceId: string | null;
+  onCopyLine: (voiceId: string) => void;
   onFactorChange: (
     voiceId: string,
     field: "factor1" | "factor2" | "factor3",
     value: number,
   ) => void;
+  onOpenNote: (voiceId: string) => void;
   onRemove: (voiceId: string) => void;
   onReorder: (lines: SalLineDraft[]) => void;
   onSurcharge: (voiceId: string, percent: number) => void;
@@ -45,8 +54,8 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   return (
     <div className="overflow-x-auto rounded-[20px] bg-[var(--bg-muted)]/40 ring-1 ring-[var(--border-subtle)]/60">
       <div className="max-h-[680px] overflow-y-auto">
-        <div className="min-w-[1320px] break-words">
-          <div className="sticky top-0 z-10 grid grid-cols-[1.2fr_72px_92px_92px_92px_112px_118px_112px_100px_118px_88px_44px] items-center gap-1 bg-[var(--surface-base)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)] shadow-[0_1px_0_var(--border-subtle)]">
+        <div className="min-w-[1460px] break-words">
+          <div className="sticky top-0 z-10 grid grid-cols-[1.2fr_72px_92px_92px_92px_112px_118px_112px_100px_118px_112px_40px_40px_40px_44px] items-center gap-1 bg-[var(--surface-base)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)] shadow-[0_1px_0_var(--border-subtle)]">
             <span>Voce</span>
             <span>U.M.</span>
             <span className="text-right">Fattore 1</span>
@@ -57,7 +66,9 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
             <span className="text-right">Sconto</span>
             <span className="text-right">Magg.</span>
             <span className="text-right">Totale SAL</span>
-            <span className="text-right">Dettaglio</span>
+            <span />
+            <span />
+            <span />
             <span />
           </div>
 
@@ -76,7 +87,10 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
                   index={index}
                   key={line.id}
                   line={line}
+                  isCopied={copiedVoiceId === line.voice.id}
+                  onCopy={() => onCopyLine(line.voice.id)}
                   onFactorChange={onFactorChange}
+                  onOpenNote={() => onOpenNote(line.voice.id)}
                   onRemove={onRemove}
                   onSurcharge={onSurcharge}
                 />
@@ -93,17 +107,23 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
 const SelectedVoiceRow = memo(function SelectedVoiceRow({
   index,
   line,
+  isCopied,
+  onCopy,
   onFactorChange,
+  onOpenNote,
   onRemove,
   onSurcharge,
 }: {
   index: number;
   line: SalLineView;
+  isCopied: boolean;
+  onCopy: () => void;
   onFactorChange: (
     voiceId: string,
     field: "factor1" | "factor2" | "factor3",
     value: number,
   ) => void;
+  onOpenNote: () => void;
   onRemove: (voiceId: string) => void;
   onSurcharge: (voiceId: string, percent: number) => void;
 }) {
@@ -111,12 +131,13 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
 
   return (
     <div
+      data-voice-id={line.voice.id}
       className={cn(
         "border-t border-[var(--border-subtle)]/50",
         index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/20",
       )}
     >
-      <div className="grid grid-cols-[1.2fr_72px_92px_92px_92px_112px_118px_112px_100px_118px_88px_44px] items-center gap-1 px-4 py-2.5 text-[13px]">
+      <div className="grid grid-cols-[1.2fr_72px_92px_92px_92px_112px_118px_112px_100px_118px_112px_40px_40px_40px_44px] items-center gap-1 px-4 py-2.5 text-[13px]">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="shrink-0 text-[11px] font-medium text-[var(--text-secondary)]">
             {index + 1}
@@ -171,40 +192,102 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
           <Currency value={line.grossAmount} />
         </span>
 
-        <span
-          className={cn(
-            "text-right font-bold",
-            line.discountAmount > 0 ? "text-[var(--danger-base)]" : "text-[var(--text-secondary)]",
-          )}
-          title={
-            line.voice.isSafetyCost && line.discountAmount === 0
-              ? "Voce sicurezza esclusa dal ribasso"
-              : "Ribasso gara applicato alla voce"
-          }
-        >
-          {line.discountAmount > 0 ? "-" : ""}
-          <Currency value={line.discountAmount} />
-        </span>
+        <div className="flex min-w-0 flex-col items-end gap-1">
+          <span
+            className={cn(
+              "text-right font-bold",
+              line.discountAmount > 0
+                ? "text-[var(--danger-base)]"
+                : "text-[var(--text-secondary)]",
+            )}
+            title={
+              line.voice.isSafetyCost && line.discountAmount === 0
+                ? "Voce OS esclusa dal ribasso"
+                : "Ribasso gara applicato alla voce"
+            }
+          >
+            {line.discountAmount > 0 ? "-" : ""}
+            <Currency value={line.discountAmount} />
+          </span>
+          <DiscountBadge line={line} />
+        </div>
 
         <div className="flex justify-end">
-          <select
-            aria-label={`Maggiorazione per ${line.voice.code}`}
-            className="h-8 w-[76px] rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 text-[12px] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-            onChange={(event) => onSurcharge(line.voice.id, Number(event.target.value))}
-            value={line.surchargePercent}
-          >
-            <option value={0}>0%</option>
-            <option value={10}>10%</option>
-            <option value={25}>25%</option>
-          </select>
+          <input
+            aria-label={`Maggiorazione % per ${line.voice.code}`}
+            className="h-8 w-[76px] rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 text-right text-[12px] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            inputMode="decimal"
+            onChange={(event) => {
+              const raw = event.target.value.replace(",", ".");
+              if (raw === "") {
+                onSurcharge(line.voice.id, 0);
+                return;
+              }
+              const val = Number.parseFloat(raw);
+              if (Number.isFinite(val) && val >= 0) {
+                onSurcharge(line.voice.id, val);
+              }
+            }}
+            type="text"
+            value={line.surchargePercent || ""}
+          />
         </div>
 
         <span className="text-right font-bold text-[var(--accent-primary)]">
           <Currency value={line.totalAmount} />
         </span>
 
-        <div className="flex justify-end">
-          <button
+        <div className="flex justify-center">
+          <motion.button
+            aria-label={line.notes ? "Modifica nota" : "Aggiungi nota"}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-[10px] transition-all",
+              line.notes
+                ? "bg-[var(--accent-primary)]/8 text-[var(--accent-primary)]"
+                : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]",
+            )}
+            onClick={onOpenNote}
+            type="button"
+            title={line.notes || "Aggiungi nota descrittiva"}
+            whileHover={{ scale: 1.1, y: -1 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
+          >
+            <svg
+              aria-hidden="true"
+              className="size-[18px]"
+              fill={line.notes ? "currentColor" : "none"}
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={line.notes ? 2 : 1.5}
+            >
+              <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </motion.button>
+        </div>
+
+        <div className="flex justify-center">
+          <motion.button
+            aria-label={isCopied ? "Copiata" : "Copia voce"}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-[10px] transition-all",
+              isCopied
+                ? "text-[var(--success-base)]"
+                : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+            )}
+            onClick={onCopy}
+            type="button"
+            title={isCopied ? "Voce copiata — premi Ctrl+V per incollare" : "Copia voce (Ctrl+C)"}
+            whileHover={{ scale: 1.1, y: -1 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
+          >
+            {isCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+          </motion.button>
+        </div>
+
+        <div className="flex justify-center">
+          <motion.button
             aria-label="Espandi dettaglio"
             className={cn(
               "flex size-8 items-center justify-center rounded-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)]",
@@ -212,19 +295,25 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             )}
             onClick={() => setExpanded((v) => !v)}
             type="button"
+            whileHover={{ scale: 1.1, y: -1 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             <ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} />
-          </button>
+          </motion.button>
         </div>
 
-        <button
+        <motion.button
           aria-label={`Rimuovi ${line.voice.code}`}
           className="flex size-8 items-center justify-center rounded-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
           onClick={() => onRemove(line.voice.id)}
           type="button"
+          whileHover={{ scale: 1.1, y: -1 }}
+          whileTap={{ scale: 0.92 }}
+          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           <Trash2 className="size-4" />
-        </button>
+        </motion.button>
       </div>
 
       {expanded && (
@@ -293,6 +382,30 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   );
 });
 
+function DiscountBadge({ line }: { line: SalLineView }) {
+  if (line.discountAmount > 0) {
+    return (
+      <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--success-base)]">
+        Ribassata
+      </span>
+    );
+  }
+
+  if (line.voice.isSafetyCost) {
+    return (
+      <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--warning-base)]">
+        OS esclusa
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full bg-[var(--bg-muted)] px-2 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
+      Non ribassata
+    </span>
+  );
+}
+
 export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(lines[0]?.id ?? null);
 
@@ -324,11 +437,14 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
           const expanded = expandedId === line.id;
           return (
             <div className="border-t border-[var(--border-subtle)]/50" key={line.id}>
-              <button
+              <motion.button
                 aria-expanded={expanded}
                 className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] items-center px-3 py-3 text-left text-[13px] hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => setExpandedId(expanded ? null : line.id)}
                 type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.99 }}
+                transition={{ duration: 0.42, ease: BUTTER_EASE }}
               >
                 <ChevronDown
                   className={cn(
@@ -356,7 +472,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                   {line.status === "complete" ? "Completa" : "Da completare"}
                 </StatusPill>
                 <MoreHorizontal className="size-5 text-[var(--text-secondary)]" />
-              </button>
+              </motion.button>
               {expanded ? (
                 <div className="grid gap-3 border-t border-[var(--border-subtle)] bg-[var(--bg-muted)]/20 p-3 lg:grid-cols-[1.25fr_1fr]">
                   <NestedTable

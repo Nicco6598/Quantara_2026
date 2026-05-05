@@ -2,6 +2,14 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.31 - 2026-05-05
+
+- **Campo note nelle voci SAL** — aggiunto un campo note opzionale per ogni voce nella tabella SAL, utile per annotazioni tecniche o interne direttamente sulla riga.
+- **Copia e incolla sempre disponibile** — la funzionalità copia e incolla (cliccare su icona apposita nella voce e poi incollare con Ctrl+V, dopo il primo incolla bisogna ri-copiare) ora funziona su tutte le voci SAL in qualsiasi stato, non solo in bozza.
+- **Bug fix import tariffario da revisionare** — risolti problemi minori nella schermata di revisione import, con feedback piu coerente durante la navigazione tra le voci.
+- **Scorri rapido "Carica altre voci"** — nella schermata di revisione import, il pulsante per caricare altre voci ora Scrolla automaticamente la pagina per mostrare le nuove righe aggiunte.
+- **Ottimizzazioni varie** — performance e stabilità migliorate in diverse aree dell'applicazione.
+
 ## 0.2.3 - 2026-05-04
 
 ### Ribasso d'asta sul progetto
