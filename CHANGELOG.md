@@ -2,6 +2,13 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.34 - 2026-05-07
+
+- **Modale aggiornamento responsive** — la finestra che segnala un update disponibile ora resta dentro lo schermo anche su laptop e viewport piccoli: header e azioni rimangono accessibili, mentre le note scorrono internamente.
+- **Release notes post-riavvio fixate** — la modale mostrata all'apertura dopo un aggiornamento non sborda piu con changelog lunghi: contenuto scrollabile, testi a capo correttamente e pulsante Continua sempre raggiungibile.
+- **Niente scroll orizzontale nelle note** — descrizioni molto lunghe, nomi estesi e righe duplicate vengono gestiti con wrapping controllato senza rompere il layout.
+- **Fix titlebar MacOS/Linux** — fix layout della titlebar per sistemi operativi basati su linux.
+
 ## 0.2.33 - 2026-05-07
 
 - **Titlebar desktop ridisegnata** — la finestra ora usa una barra superiore personalizzata con navigazione sezione, comandi rapidi, cambio tema, controllo aggiornamenti e pulsante per espandere o compattare la sidebar.

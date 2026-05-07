@@ -71,6 +71,7 @@ function ThemeApplier() {
 function WindowTitleBar({
   activeRoute,
   isSidebarCollapsed,
+  isMacOs,
   onCheckUpdates,
   onOpenCommandPalette,
   onRouteChange,
@@ -78,6 +79,7 @@ function WindowTitleBar({
 }: {
   activeRoute: QuantaraRoute;
   isSidebarCollapsed: boolean;
+  isMacOs: boolean;
   onCheckUpdates: () => void;
   onOpenCommandPalette: (anchorRect: DOMRect) => void;
   onRouteChange: (route: QuantaraRoute) => void;
@@ -110,9 +112,73 @@ function WindowTitleBar({
     await currentWindow.close();
   }, []);
 
+  const windowControls = (
+    <div
+      className={
+        isMacOs
+          ? "window-titlebar-controls window-titlebar-controls-macos"
+          : "window-titlebar-controls"
+      }
+    >
+      {isMacOs ? (
+        <button
+          aria-label="Chiudi finestra"
+          className="window-titlebar-button window-titlebar-button-danger"
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleWindowAction("close");
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          type="button"
+        >
+          <X size={8} weight="bold" />
+        </button>
+      ) : null}
+      <button
+        aria-label="Minimizza finestra"
+        className="window-titlebar-button window-titlebar-button-minimize"
+        onClick={(event) => {
+          event.stopPropagation();
+          void handleWindowAction("minimize");
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+        type="button"
+      >
+        <Minus size={isMacOs ? 8 : 13} weight="bold" />
+      </button>
+      <button
+        aria-label="Massimizza finestra"
+        className="window-titlebar-button window-titlebar-button-maximize"
+        onClick={(event) => {
+          event.stopPropagation();
+          void handleWindowAction("maximize");
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+        type="button"
+      >
+        <Square size={isMacOs ? 7 : 11} weight="bold" />
+      </button>
+      {isMacOs ? null : (
+        <button
+          aria-label="Chiudi finestra"
+          className="window-titlebar-button window-titlebar-button-danger"
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleWindowAction("close");
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          type="button"
+        >
+          <X size={13} weight="bold" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="window-titlebar">
+    <div className={isMacOs ? "window-titlebar window-titlebar-macos" : "window-titlebar"}>
       <div className="window-titlebar-drag-strip" data-tauri-drag-region />
+      {isMacOs ? windowControls : null}
       <div className="window-titlebar-left">
         <button
           aria-label={isSidebarCollapsed ? "Espandi sidebar" : "Compatta sidebar"}
@@ -250,44 +316,7 @@ function WindowTitleBar({
         </button>
       </div>
 
-      <div className="window-titlebar-controls">
-        <button
-          aria-label="Minimizza finestra"
-          className="window-titlebar-button"
-          onClick={(event) => {
-            event.stopPropagation();
-            void handleWindowAction("minimize");
-          }}
-          onMouseDown={(event) => event.stopPropagation()}
-          type="button"
-        >
-          <Minus size={13} weight="bold" />
-        </button>
-        <button
-          aria-label="Massimizza finestra"
-          className="window-titlebar-button"
-          onClick={(event) => {
-            event.stopPropagation();
-            void handleWindowAction("maximize");
-          }}
-          onMouseDown={(event) => event.stopPropagation()}
-          type="button"
-        >
-          <Square size={11} weight="bold" />
-        </button>
-        <button
-          aria-label="Chiudi finestra"
-          className="window-titlebar-button window-titlebar-button-danger"
-          onClick={(event) => {
-            event.stopPropagation();
-            void handleWindowAction("close");
-          }}
-          onMouseDown={(event) => event.stopPropagation()}
-          type="button"
-        >
-          <X size={13} weight="bold" />
-        </button>
-      </div>
+      {isMacOs ? null : windowControls}
     </div>
   );
 }
@@ -311,6 +340,7 @@ function AppShell() {
   const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();
   const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMacOs, setIsMacOs] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [commandPaletteAnchor, setCommandPaletteAnchor] = useState<DOMRect | null>(null);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
@@ -440,9 +470,62 @@ function AppShell() {
           checkedAt: new Date().toISOString(),
           currentVersion: "0.1.43",
           notes: [
-            "Rework update modal theme-aware per tema chiaro e scuro.",
-            "Command palette agganciata alla searchbar della topbar.",
-            "Dashboard e dettaglio progetto collegati ai dati reali disponibili.",
+            "Titlebar desktop ridisegnata con controlli finestra, cambio tema, ricerca comandi e navigazione sezione sempre disponibili.",
+            "Sidebar integrata direttamente nel background dell'app per dare piu profondita alla view principale e ridurre i bordi doppi.",
+            "Cronologia di navigazione spostata in un menu a tendina compatto, con voci recenti ordinate e ritorno rapido alla pagina visitata.",
+            "Breadcrumb semplificato in un chip piu leggibile, evitando percorsi lunghi che occupavano tutta la toolbar.",
+            "Command palette ancorata correttamente alla titlebar anche quando viene aperta dal pulsante Comandi.",
+            "Toolbar superiore ripulita dai doppioni: ricerca globale, cambio tema e update check ora vivono nella titlebar.",
+            "Controlli finestra Tauri ripristinati con permessi espliciti per minimizza, massimizza, chiudi e drag della finestra.",
+            "Variante macOS della titlebar con controlli stile traffic light a sinistra e layout piu vicino al comportamento nativo MacBook.",
+            "Fix overflow orizzontale nella cronologia a tendina quando il cursore passa su voci molto lunghe o con descrizioni estese.",
+            "Fix layout responsive delle modali aggiornamento: su schermi piccoli il contenuto resta dentro la viewport e le note scorrono internamente.",
+            "Release notes post-riavvio riorganizzate con header fisso, lista scrollabile e footer azione sempre raggiungibile.",
+            "Migliorata la gestione di testi lunghi nelle card update con wrapping controllato e senza scroll orizzontale indesiderato.",
+            "Stress test dev ampliato per verificare release notes con molte voci, descrizioni lunghe e viewport ridotte.",
+            "Pulizia visiva dei pannelli update con spaziature piu compatte su laptop e layout a colonne solo quando lo schermo lo consente.",
+            "Stabilita generale migliorata nella shell desktop dopo il rework di topbar, sidebar e titlebar.",
+            "Import tariffari: pannello revisione piu stabile quando il parser restituisce molte voci ravvicinate con descrizioni simili.",
+            "Import tariffari: azioni rapide per resettare singoli campi senza perdere la revisione gia completata sulle altre righe.",
+            "Import tariffari: eliminazione diretta delle righe non valide dalla vista di controllo, senza dover riavviare l'import.",
+            "Import tariffari: indicatore di stato sempre visibile anche durante scroll prolungato su liste molto dense.",
+            "Import tariffari: migliorata la deduplicazione quando il PDF contiene descrizioni ripetute, note tecniche o intestazioni pagina.",
+            "Creazione SAL: riepilogo economico piu leggibile nella conferma finale con budget residuo evidenziato in base allo stato.",
+            "Creazione SAL: tabella voci piu robusta su schermi stretti, con overflow orizzontale controllato e colonne non tagliate.",
+            "Creazione SAL: ricerca voce con gerarchia invertita, codice principale piu visibile e descrizione usata come dettaglio secondario.",
+            "Creazione SAL: copia e incolla disponibile anche su stati non bozza, mantenendo il flusso operativo piu veloce.",
+            "Progetti: card appaltatori piu leggibili con azioni disponibili solo quando servono e apertura cliccando l'intera card.",
+            "Progetti: dati aggregati aggiornati in modo piu coerente dopo creazione, modifica o cancellazione di una SAL.",
+            "Dashboard: hero iniziale piu chiara con budget totale, conteggio cantieri e messaggi espliciti negli stati vuoti.",
+            "Dashboard: pannello laterale con attivita recenti lette dai dati reali invece di contenuti dimostrativi.",
+            "Team: ricerca e filtro ruolo ora lavorano sui membri reali, con paginazione e avatar generati dalle iniziali.",
+            "Contabilita: filtri appaltatore, progetto, periodo e stato resi piu coerenti con i dati presenti nel registro locale.",
+            "Contabilita: selezione multipla SAL e azioni bulk mantenute visibili solo quando ci sono elementi selezionati.",
+            "Materiali: schermata allineata al resto dell'app con dati reali, creazione, modifica ed eliminazione materiali.",
+            "Tema chiaro: palette neutra piu morbida con superfici meno bianche e contrasti piu adatti a sessioni lunghe.",
+            "Tema scuro: sfondo carbon caldo, bordi meno aggressivi e colori stato piu leggibili sui pannelli principali.",
+            "Performance: lookup voci ottimizzato con strutture dati piu efficienti nei flussi template e cronologia SAL.",
+            "Performance: ridotti render non necessari nelle schermate piu dense della creazione SAL.",
+            "Backend: connessioni database centralizzate per ridurre aperture e chiusure ripetute durante le operazioni Tauri.",
+            "Backend: parsing PDF asincrono per evitare blocchi dell'interfaccia durante import di tariffari pesanti.",
+            "Updater: fallback piu robusto quando il controllo aggiornamenti fallisce o quando il canale non supporta update automatici.",
+            "Updater: fallback piu robusto quando il controllo aggiornamenti fallisce o quando il canale non supporta update automatici.",
+            "Accessibilita: labels piu chiari sui controlli finestra, sui menu di navigazione e sulle azioni principali.",
+            "Accessibilita: escape globale mantiene il comportamento prevedibile chiudendo modali e menu prima di navigare indietro.",
+            "Layout: griglie elastiche con colonne automatiche per adattarsi meglio a 1180px, 1280px, 1512px e schermi esterni.",
+            "Layout: pannelli principali meno incapsulati e maggiore profondita visiva tra sidebar, contenuto e background app.",
+            "Toolbar: separazione piu netta tra comandi globali nella titlebar e azioni contestuali nella toolbar pagina.",
+            "Toolbar: separazione piu netta tra comandi globali nella titlebar e azioni contestuali nella toolbar pagina.",
+            "Breadcrumb: rappresentazione piu sintetica del percorso corrente per ridurre rumore quando la cronologia e lunga.",
+            "Cronologia: menu compatto con ritorno rapido alle pagine precedenti senza occupare tutta la testata.",
+            "Cronologia: protezione contro etichette lunghissime generate da progetti, appaltatori o SAL con nomi estesi.",
+            "MacBook: titlebar piu nativa con controlli semaforo a sinistra e spazio drag calibrato per evitare click accidentali.",
+            "Windows: titlebar custom mantenuta con controlli a destra e comportamento coerente con il layout desktop precedente.",
+            "Shell: stato collapsed della sidebar centralizzato per evitare doppioni tra toolbar, sidebar e titlebar.",
+            "Shell: apertura command palette da scorciatoia e da pulsante titlebar allineata allo stesso punto di ancoraggio.",
+            "Release notes: questo testo volutamente molto lungo serve a verificare che una singola voce con tante parole, riferimenti a funzionalita diverse, nomi di schermate, import tariffari, creazione SAL, dashboard, contabilita e impostazioni non generi piu scroll orizzontale nella modale.",
+            "Release notes: altra voce volutamente estesa per simulare changelog reali copiati da GitHub o generati dal sistema di update, con frasi lunghe, punteggiatura, dettagli tecnici e descrizioni utente che devono andare a capo correttamente.",
+            "Release notes: voce finale di stress test per controllare che il bottone Continua o Aggiorna e riavvia resti raggiungibile anche quando il contenuto supera abbondantemente l'altezza della finestra.",
           ].join("\n"),
           version: "0.1.44",
         });
@@ -560,6 +643,11 @@ function AppShell() {
 
   const toggleSidebar = useCallback(() => setIsSidebarCollapsed((current) => !current), []);
 
+  useEffect(() => {
+    const platform = `${navigator.platform} ${navigator.userAgent}`.toLowerCase();
+    setIsMacOs(platform.includes("mac"));
+  }, []);
+
   return (
     <div
       className="app-window-frame relative flex h-screen overflow-hidden bg-[var(--bg-app-accent)] [font-family:var(--font-sans)] text-[var(--text-primary)]"
@@ -568,6 +656,7 @@ function AppShell() {
       <WindowTitleBar
         activeRoute={activeRoute}
         isSidebarCollapsed={isSidebarCollapsed}
+        isMacOs={isMacOs}
         onCheckUpdates={() => handleTopbarAction("check-updates")}
         onOpenCommandPalette={(anchorRect) => {
           setCommandPaletteAnchor(anchorRect);

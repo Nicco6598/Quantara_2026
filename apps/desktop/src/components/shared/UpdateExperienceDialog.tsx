@@ -24,7 +24,7 @@ export function UpdateExperienceDialog({
   return createPortal(
     <div
       aria-modal="true"
-      className="fixed inset-0 z-[210] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[210] flex min-h-0 items-center justify-center overflow-hidden bg-black/45 p-3 backdrop-blur-sm sm:p-4"
       role="dialog"
     >
       <button
@@ -35,18 +35,18 @@ export function UpdateExperienceDialog({
         type="button"
       />
       <motion.div
-        className="relative w-full max-w-3xl overflow-hidden rounded-[30px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        className="relative flex max-h-[calc(100dvh-24px)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-[26px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] sm:max-h-[calc(100dvh-32px)] sm:rounded-[30px] sm:p-1.5"
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: SOFT_EASE }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
       >
-        <div className="rounded-[24px] bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-          <div className="flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
-            <div>
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] sm:rounded-[24px]">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3 sm:gap-4 sm:px-5 sm:py-4">
+            <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                 Aggiornamento disponibile
               </div>
-              <h3 className="mt-1 text-[18px] font-semibold text-[var(--text-primary)]">
+              <h3 className="mt-1 truncate text-[17px] font-semibold text-[var(--text-primary)] sm:text-[18px]">
                 Da v{update.currentVersion} a v{update.version}
               </h3>
             </div>
@@ -61,25 +61,25 @@ export function UpdateExperienceDialog({
             </button>
           </div>
 
-          <div className="grid min-h-0 lg:grid-cols-[minmax(0,1fr)_260px]">
-            <div className="p-5">
+          <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="flex min-h-0 flex-col p-4 sm:p-5">
               <span className="inline-flex items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
                 <Sparkles className="size-3" />
                 Nuova versione pronta
               </span>
-              <h2 className="mt-4 text-[22px] font-semibold leading-tight text-[var(--text-primary)]">
+              <h2 className="mt-4 text-[20px] font-semibold leading-tight text-[var(--text-primary)] sm:text-[22px]">
                 Cosa cambia in v{update.version}
               </h2>
-              <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+              <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)] sm:leading-6">
                 Quantara scaricherà la patch, applicherà l'update e riaprirà l'app sulla nuova
                 versione.
               </p>
 
-              <div className="mt-5 max-h-[38vh] space-y-2 overflow-y-auto pr-1">
+              <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden pr-1 sm:mt-5">
                 {notes.length > 0 ? (
                   notes.map((note, i) => (
                     <div
-                      className="flex items-start gap-3 rounded-[14px] bg-[var(--bg-muted)] px-4 py-3 ring-1 ring-[var(--border-subtle)]"
+                      className="flex min-w-0 items-start gap-3 rounded-[14px] bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)] sm:px-4 sm:py-3"
                       key={note.key}
                     >
                       <span
@@ -92,7 +92,7 @@ export function UpdateExperienceDialog({
                               : "bg-[var(--accent-primary)]",
                         )}
                       />
-                      <span className="text-[13px] leading-5 text-[var(--text-primary)]">
+                      <span className="min-w-0 break-words text-[13px] leading-5 text-[var(--text-primary)]">
                         {note.text}
                       </span>
                     </div>
@@ -105,8 +105,8 @@ export function UpdateExperienceDialog({
               </div>
             </div>
 
-            <aside className="border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_30%,transparent)] p-5 lg:border-l lg:border-t-0">
-              <div className="space-y-3">
+            <aside className="flex min-h-0 shrink-0 flex-col border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_30%,transparent)] p-4 sm:p-5 lg:border-l lg:border-t-0">
+              <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1 lg:gap-3">
                 <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
                 <MetricPill
                   icon={Clock3}
@@ -122,7 +122,7 @@ export function UpdateExperienceDialog({
                 </div>
               ) : null}
 
-              <div className="mt-5 flex flex-col gap-2">
+              <div className="mt-4 flex flex-col gap-2 lg:mt-auto lg:pt-5">
                 <ActionButton disabled={isBusy} onClick={onInstall}>
                   {isBusy ? (
                     <>

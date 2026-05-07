@@ -231,6 +231,24 @@ body {
   z-index: 0;
 }
 
+.window-titlebar-macos {
+  justify-content: center;
+  padding-left: 78px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-base) 78%, transparent),
+    color-mix(in srgb, var(--surface-base) 64%, var(--bg-app) 36%)
+  );
+  border-bottom-color: color-mix(in srgb, var(--border-subtle) 38%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 14%, transparent),
+    0 1px 0 color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.window-titlebar-macos .window-titlebar-drag-strip {
+  inset: 0 16px 0 118px;
+}
+
 .window-titlebar-left {
   position: relative;
   z-index: 1;
@@ -239,6 +257,11 @@ body {
   height: 100%;
   align-items: center;
   gap: 8px;
+}
+
+.window-titlebar-macos .window-titlebar-left {
+  position: absolute;
+  left: 76px;
 }
 
 .window-titlebar-center {
@@ -281,6 +304,16 @@ body {
   color: var(--text-secondary);
   font-size: 10px;
   font-weight: 500;
+}
+
+.window-titlebar-macos .window-titlebar-brand {
+  opacity: 0.78;
+}
+
+.window-titlebar-macos .window-titlebar-mark,
+.window-titlebar-macos .window-titlebar-separator,
+.window-titlebar-macos .window-titlebar-subtitle {
+  display: none;
 }
 
 .window-titlebar-tool {
@@ -450,6 +483,14 @@ body {
   align-items: stretch;
 }
 
+.window-titlebar-controls-macos {
+  position: absolute;
+  left: 14px;
+  gap: 8px;
+  height: auto;
+  align-items: center;
+}
+
 .window-titlebar-button {
   display: grid;
   width: 46px;
@@ -460,6 +501,38 @@ body {
     color 180ms ease;
 }
 
+.window-titlebar-controls-macos .window-titlebar-button {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 999px;
+  color: color-mix(in srgb, #4a2824 64%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, black 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 36%, transparent);
+}
+
+.window-titlebar-controls-macos .window-titlebar-button svg {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.window-titlebar-controls-macos:hover .window-titlebar-button svg {
+  opacity: 0.72;
+}
+
+.window-titlebar-controls-macos .window-titlebar-button-danger {
+  background: #ff5f57;
+}
+
+.window-titlebar-controls-macos .window-titlebar-button-minimize {
+  background: #ffbd2e;
+}
+
+.window-titlebar-controls-macos .window-titlebar-button-maximize {
+  background: #28c840;
+}
+
 .window-titlebar-button:hover {
   background: color-mix(in srgb, var(--bg-muted-strong) 76%, transparent);
   color: var(--text-primary);
@@ -468,6 +541,22 @@ body {
 .window-titlebar-button-danger:hover {
   background: var(--danger-base);
   color: var(--text-inverse);
+}
+
+.window-titlebar-controls-macos .window-titlebar-button:hover {
+  color: color-mix(in srgb, #4a2824 78%, transparent);
+}
+
+.window-titlebar-controls-macos .window-titlebar-button-danger:hover {
+  background: #ff5f57;
+}
+
+.window-titlebar-controls-macos .window-titlebar-button-minimize:hover {
+  background: #ffbd2e;
+}
+
+.window-titlebar-controls-macos .window-titlebar-button-maximize:hover {
+  background: #28c840;
 }
 
 .sidebar-rail {
