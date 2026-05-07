@@ -6,18 +6,21 @@ import {
   CheckCircle2,
   Copy,
   Database,
+  Eye,
   FileText,
   type LucideIcon,
   MoreVertical,
+  Pencil,
   Save,
   Sparkles,
   Star,
+  Trash2,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
-import { SummaryLine } from "@/components/shared/Screen";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
@@ -38,7 +41,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import { QuickAction } from "./components/QuickAction";
-import { TariffBookRow } from "./components/TariffBookRow";
 import { TariffEditField } from "./components/TariffEditField";
 import { TariffImportLoadingModal } from "./components/TariffImportLoadingModal";
 import { TariffImportPreviewModal } from "./components/TariffImportPreviewModal";
@@ -52,6 +54,9 @@ import {
 import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
 import { groupTariffVoices } from "./utils/tariff-grouping";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
+
+const BUTTER_EASE = [0.22, 1, 0.36, 1] as const;
+const TARIFF_MENU_WIDTH = 224;
 
 function getScrollableAncestor(element: HTMLElement | null) {
   let current = element?.parentElement ?? null;
@@ -94,6 +99,7 @@ export function TariffsScreen() {
   >([]);
   const [importPhase, setImportPhase] = useState<"idle" | "loading" | "preview">("idle");
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
+  const [detailBookId, setDetailBookId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditTariffBookForm>({
     name: "",
     sourceName: "",
@@ -606,6 +612,19 @@ export function TariffsScreen() {
     setEditingBookId(null);
   }
 
+  function handleShowTariffBookDetails(book: DesktopTariffBook) {
+    setSelectedTariffBookId(book.id);
+    setEditingBookId(null);
+    setDetailBookId((current) => (current === book.id ? null : book.id));
+  }
+
+  function handleOpenVoices(book: DesktopTariffBook) {
+    setSelectedTariffBookId(book.id);
+    setEditingBookId(null);
+    setDetailBookId(null);
+    setIsVoicesExplorerOpen(true);
+  }
+
   function handleToggleFavorite(bookId: string) {
     setFavoriteBookIds((current) =>
       current.includes(bookId) ? current.filter((id) => id !== bookId) : [...current, bookId],
@@ -615,6 +634,7 @@ export function TariffsScreen() {
   function handleStartEdit(book: DesktopTariffBook) {
     setSelectedTariffBookId(book.id);
     setEditingBookId(book.id);
+    setDetailBookId(null);
     setEditForm({
       name: book.name,
       sourceName: book.sourceName,
@@ -644,6 +664,7 @@ export function TariffsScreen() {
           : { source: "desktop" }),
       }));
       setEditingBookId(null);
+      setDetailBookId(updated.id);
       notify({
         message: "Dati tariffario aggiornati.",
         title: "Tariffario modificato",
@@ -672,6 +693,7 @@ export function TariffsScreen() {
       if (selectedTariffBookId === bookId) {
         setSelectedTariffBookId(tariffBooksState.data.find((b) => b.id !== bookId)?.id ?? "");
       }
+      setDetailBookId((current) => (current === bookId ? null : current));
       setFavoriteBookIds((current) => current.filter((id) => id !== bookId));
       notify({
         message: `${deletedBook?.name ?? "Tariffario"} eliminato dal catalogo.`,
@@ -827,7 +849,7 @@ export function TariffsScreen() {
             </div>
           </ScreenHero>
 
-          <section className="mt-8 grid gap-5 lg:grid-cols-[220px_1fr] 2xl:grid-cols-[260px_1fr_380px]">
+          <section className="mt-8 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
             <div className="space-y-4 xl:self-start">
               <Panel>
                 <PanelTitle>Azioni rapide</PanelTitle>
@@ -855,33 +877,9 @@ export function TariffsScreen() {
                   />
                 </div>
               </Panel>
-
-              <Panel>
-                <div className="text-[13px] font-bold text-[var(--text-primary)]">
-                  Come funzionano i tariffari?
-                </div>
-                <p className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-                  Un tariffario puo contenere voci importate da PDF che verranno rese disponibili
-                  nei progetti.
-                </p>
-                <button
-                  className="mt-3 text-[12px] font-bold text-[var(--info-base)]"
-                  onClick={() =>
-                    notify({
-                      message:
-                        "La guida sui tariffari sara disponibile in un prossimo aggiornamento.",
-                      title: "In arrivo",
-                      tone: "info",
-                    })
-                  }
-                  type="button"
-                >
-                  Scopri di piu
-                </button>
-              </Panel>
             </div>
 
-            <Panel className="min-w-0 p-0">
+            <Panel className="min-w-0 overflow-visible p-0">
               <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                   <button
@@ -969,173 +967,49 @@ export function TariffsScreen() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto" ref={catalogRef}>
-                <div className="hidden grid-cols-[36px_minmax(190px,1.5fr)_minmax(130px,0.8fr)_70px_82px_100px_92px_36px] border-b border-[var(--border-subtle)] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)] 2xl:grid">
-                  <span />
-                  <span>Nome tariffario</span>
-                  <span>Ente</span>
-                  <span>Anno</span>
-                  <span>Stato</span>
-                  <span>Progetti collegati</span>
-                  <span>Voci</span>
-                  <span />
-                </div>
-                <div className="divide-y divide-[var(--border-subtle)]">
+              <div ref={catalogRef}>
+                <div className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-3">
                   {visibleTariffBooks.length > 0 ? (
                     visibleTariffBooks.map((book) => (
-                      <TariffBookRow
+                      <TariffBookPreviewCard
                         key={book.id}
                         book={book}
+                        editForm={editForm}
+                        editing={editingBookId === book.id}
                         isFavorite={favoriteBookIdSet.has(book.id)}
                         isSelected={selectedTariffBook.id === book.id}
                         linkedProjectCount={linkedProjectCountByTariffBookId.get(book.id) ?? 0}
+                        onCancelEdit={() => setEditingBookId(null)}
                         onDelete={() => handleDeleteFromDropdown(book.id)}
                         onEdit={() => handleStartEdit(book)}
+                        onEditFormChange={setEditForm}
+                        onOpenVoices={() => handleOpenVoices(book)}
+                        onSaveEdit={handleSaveEdit}
                         onSelect={() => handleSelectTariffBook(book)}
+                        onShowDetails={() => handleShowTariffBookDetails(book)}
                         onToggleFavorite={() => handleToggleFavorite(book.id)}
+                        showDetails={detailBookId === book.id}
                         voiceCount={voiceCountByBookId[book.id]}
                       />
                     ))
                   ) : (
-                    <div className="p-8 text-[13px] text-[var(--text-secondary)]">
-                      {activeCatalogTab === "favorites"
-                        ? "Nessun preferito trovato con i filtri correnti."
-                        : "Nessun tariffario nel filtro corrente."}
+                    <div className="col-span-full rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 p-10 text-center">
+                      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+                        <Database className="size-5" />
+                      </div>
+                      <div className="mt-4 text-[15px] font-bold text-[var(--text-primary)]">
+                        Nessun tariffario trovato
+                      </div>
+                      <p className="mx-auto mt-2 max-w-[360px] text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+                        {activeCatalogTab === "favorites"
+                          ? "I filtri correnti non includono tariffari preferiti."
+                          : "Modifica i filtri o importa un nuovo PDF/JSON tariffario."}
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
             </Panel>
-
-            <aside className="space-y-4 lg:col-span-2 xl:col-span-1 2xl:col-span-1">
-              <Panel className={cn(selectedTariffBook && "ring-1 ring-[var(--accent-primary)]/15")}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                    <Star className="size-4 fill-[var(--warning-base)] text-[var(--warning-base)]" />
-                    Dettaglio tariffario
-                  </div>
-                  <ProjectControlButton
-                    onClick={() => handleStartEdit(selectedTariffBook)}
-                    variant="icon"
-                  >
-                    <MoreVertical className="size-4" />
-                  </ProjectControlButton>
-                </div>
-                {editingBookId === selectedTariffBook.id ? (
-                  <div className="mt-4 space-y-3">
-                    <TariffEditField
-                      label="Nome"
-                      onChange={(value) => setEditForm((form) => ({ ...form, name: value }))}
-                      value={editForm.name}
-                    />
-                    <TariffEditField
-                      label="Ente"
-                      onChange={(value) => setEditForm((form) => ({ ...form, sourceName: value }))}
-                      value={editForm.sourceName}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <TariffEditField
-                        label="Anno"
-                        onChange={(value) => setEditForm((form) => ({ ...form, year: value }))}
-                        value={editForm.year}
-                      />
-                      <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
-                        Stato
-                        <div className="relative mt-1">
-                          <select
-                            className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-[13px] font-medium normal-case tracking-normal text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                            onChange={(event) =>
-                              setEditForm((form) => ({ ...form, status: event.target.value }))
-                            }
-                            value={editForm.status}
-                          >
-                            <option value="active">active</option>
-                            <option value="draft">draft</option>
-                            <option value="validated">validated</option>
-                          </select>
-                          <svg
-                            aria-hidden={true}
-                            className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path d="M6 9l6 6 6-6" />
-                          </svg>
-                        </div>
-                      </label>
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <ProjectControlButton
-                        className="flex-1"
-                        icon={Save}
-                        onClick={handleSaveEdit}
-                        variant="primary"
-                      >
-                        Salva
-                      </ProjectControlButton>
-                      <ProjectControlButton
-                        onClick={() => setEditingBookId(null)}
-                        variant="neutral"
-                      >
-                        Annulla
-                      </ProjectControlButton>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-4">
-                    <Badge
-                      className="float-right"
-                      variant={selectedTariffBook.status === "active" ? "success" : "info"}
-                    >
-                      {selectedTariffBook.status}
-                    </Badge>
-                    <div className="text-[20px] font-bold leading-tight text-[var(--text-primary)]">
-                      {selectedTariffBook.name}
-                    </div>
-                    <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
-                      ID: {selectedTariffBook.id}
-                    </div>
-                    <dl className="mt-6 space-y-3">
-                      <SummaryLine label="Ente" value={selectedTariffBook.sourceName} />
-                      <SummaryLine label="Anno" value={String(selectedTariffBook.year)} />
-                      <SummaryLine label="Stato" value={selectedTariffBook.status} />
-                      <SummaryLine
-                        label="Progetti collegati"
-                        value={`${linkedProjectCountByTariffBookId.get(selectedTariffBook.id) ?? 0} progetti`}
-                      />
-                      <SummaryLine
-                        label="Voci totali"
-                        value={voicesState.data.length.toLocaleString("it-IT")}
-                      />
-                      <SummaryLine label="Ultimo aggiornamento" value="27 apr 2025" />
-                    </dl>
-                  </div>
-                )}
-              </Panel>
-
-              <Panel>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[13px] font-bold text-[var(--text-primary)]">
-                    Voci tariffarie
-                  </div>
-                  <ProjectControlButton
-                    onClick={() => setIsVoicesExplorerOpen(true)}
-                    variant="neutral"
-                  >
-                    Apri vista completa
-                  </ProjectControlButton>
-                </div>
-                <p className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-                  Consulta voci e sottovoci in una vista dedicata con ricerca e righe apribili.
-                </p>
-                <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)]">
-                  {groupedVoices.length.toLocaleString("it-IT")} voci principali ·{" "}
-                  {voicesState.data.length.toLocaleString("it-IT")} sottovoci
-                </div>
-              </Panel>
-            </aside>
           </section>
         </>
       )}
@@ -1149,6 +1023,340 @@ export function TariffsScreen() {
         />
       ) : null}
     </main>
+  );
+}
+
+function TariffBookPreviewCard({
+  book,
+  editForm,
+  editing,
+  isFavorite,
+  isSelected,
+  linkedProjectCount,
+  onCancelEdit,
+  onDelete,
+  onEdit,
+  onEditFormChange,
+  onOpenVoices,
+  onSaveEdit,
+  onSelect,
+  onShowDetails,
+  onToggleFavorite,
+  showDetails,
+  voiceCount,
+}: {
+  book: DesktopTariffBook;
+  editForm: EditTariffBookForm;
+  editing: boolean;
+  isFavorite: boolean;
+  isSelected: boolean;
+  linkedProjectCount: number;
+  onCancelEdit: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
+  onEditFormChange: Dispatch<SetStateAction<EditTariffBookForm>>;
+  onOpenVoices: () => void;
+  onSaveEdit: () => void;
+  onSelect: () => void;
+  onShowDetails: () => void;
+  onToggleFavorite: () => void;
+  showDetails: boolean;
+  voiceCount: number | undefined;
+}) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ left: 16, top: 16 });
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isActive = book.status === "active" || book.status === "validated";
+  const displayVoiceCount = voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT");
+
+  function toggleMenu() {
+    if (isMenuOpen) {
+      setIsMenuOpen(false);
+      return;
+    }
+
+    const rect = menuRef.current?.getBoundingClientRect();
+    if (rect && typeof window !== "undefined") {
+      setMenuPosition({
+        left: Math.min(
+          Math.max(8, rect.right - TARIFF_MENU_WIDTH),
+          window.innerWidth - TARIFF_MENU_WIDTH - 8,
+        ),
+        top: Math.min(rect.bottom + 6, window.innerHeight - 260),
+      });
+    }
+    setIsMenuOpen(true);
+  }
+
+  return (
+    <motion.article
+      className={cn(
+        "relative min-h-[168px] rounded-[14px] border p-4 text-left transition-colors duration-200",
+        isSelected
+          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
+          : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
+      )}
+      initial={{ opacity: 0, y: 10 }}
+      transition={{ duration: 0.42, ease: BUTTER_EASE }}
+      viewport={{ amount: 0.18, once: true }}
+      whileHover={{ y: -2 }}
+      whileInView={{ opacity: 1, y: 0 }}
+    >
+      <div className="flex h-full flex-col">
+        <div className="flex items-start justify-between gap-3">
+          <button
+            className="flex min-w-0 flex-1 items-start gap-4 rounded-[12px] text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+            onClick={onSelect}
+            type="button"
+          >
+            <div
+              className={cn(
+                "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-[8px] border bg-white text-[10px] font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]",
+                isSelected ? "border-[var(--accent-primary)]" : "border-[var(--border-subtle)]",
+              )}
+            >
+              <span className="absolute left-[-6px] top-2 rounded-[4px] bg-[var(--danger-base)] px-1.5 py-1 text-[9px] font-black text-white">
+                PDF
+              </span>
+              <div className="space-y-1.5 text-slate-300">
+                <div className="h-1 w-9 rounded bg-current" />
+                <div className="h-1 w-7 rounded bg-current" />
+                <div className="h-1 w-10 rounded bg-current" />
+                <div className="mt-4 h-1 w-8 rounded bg-current" />
+                <div className="h-1 w-11 rounded bg-current" />
+              </div>
+            </div>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={isActive ? "success" : "warning"}>{book.status}</Badge>
+                <span className="text-[12px] font-semibold text-[var(--text-secondary)]">
+                  Anno {book.year}
+                </span>
+              </div>
+              <h3 className="mt-3 truncate text-[16px] font-bold leading-tight text-[var(--text-primary)]">
+                {book.name}
+              </h3>
+              <p className="mt-2 truncate text-[13px] text-[var(--text-secondary)]">
+                {book.sourceName}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+                <span>{displayVoiceCount} voci</span>
+                <span>·</span>
+                <span>{linkedProjectCount} progetti</span>
+              </div>
+            </div>
+          </button>
+
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              aria-label={isFavorite ? "Rimuovi dai preferiti" : "Segna come preferito"}
+              className={cn(
+                "flex size-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[var(--warning-soft)] hover:text-[var(--warning-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
+                isFavorite && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+              )}
+              onClick={onToggleFavorite}
+              type="button"
+            >
+              <Star className={cn("size-4", isFavorite && "fill-current")} />
+            </button>
+            <div className="relative" ref={menuRef}>
+              <ProjectControlButton onClick={toggleMenu} variant="icon">
+                <MoreVertical className="size-4" />
+              </ProjectControlButton>
+              {isMenuOpen && typeof document !== "undefined"
+                ? createPortal(
+                    <>
+                      <button
+                        aria-label="Chiudi menu tariffario"
+                        className="fixed inset-0 z-[139] cursor-default"
+                        onClick={() => setIsMenuOpen(false)}
+                        type="button"
+                      />
+                      <motion.div
+                        className="fixed z-[140] w-56 overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]"
+                        initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        style={menuPosition}
+                        transition={{ duration: 0.22, ease: BUTTER_EASE }}
+                      >
+                        <TariffMenuItem
+                          icon={Eye}
+                          label={showDetails ? "Nascondi scheda" : "Mostra scheda"}
+                          onClick={() => {
+                            onShowDetails();
+                            setIsMenuOpen(false);
+                          }}
+                        />
+                        <TariffMenuItem
+                          icon={Pencil}
+                          label="Modifica dettagli"
+                          onClick={() => {
+                            onEdit();
+                            setIsMenuOpen(false);
+                          }}
+                        />
+                        <TariffMenuItem
+                          icon={Database}
+                          label="Esplora voci"
+                          onClick={() => {
+                            onOpenVoices();
+                            setIsMenuOpen(false);
+                          }}
+                        />
+                        <div className="my-1 h-px bg-[var(--border-subtle)]/70" />
+                        <TariffMenuItem
+                          icon={Trash2}
+                          label="Elimina tariffario"
+                          onClick={() => {
+                            onDelete();
+                            setIsMenuOpen(false);
+                          }}
+                          tone="danger"
+                        />
+                      </motion.div>
+                    </>,
+                    document.body,
+                  )
+                : null}
+            </div>
+          </div>
+        </div>
+
+        {editing ? (
+          <div className="mt-4 space-y-3 rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3">
+            <TariffEditField
+              label="Nome"
+              onChange={(value) => onEditFormChange((form) => ({ ...form, name: value }))}
+              value={editForm.name}
+            />
+            <TariffEditField
+              label="Ente"
+              onChange={(value) => onEditFormChange((form) => ({ ...form, sourceName: value }))}
+              value={editForm.sourceName}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <TariffEditField
+                label="Anno"
+                onChange={(value) => onEditFormChange((form) => ({ ...form, year: value }))}
+                value={editForm.year}
+              />
+              <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                Stato
+                <div className="relative mt-1">
+                  <select
+                    className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-[13px] font-medium normal-case tracking-normal text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                    onChange={(event) =>
+                      onEditFormChange((form) => ({ ...form, status: event.target.value }))
+                    }
+                    value={editForm.status}
+                  >
+                    <option value="active">active</option>
+                    <option value="draft">draft</option>
+                    <option value="validated">validated</option>
+                  </select>
+                  <svg
+                    aria-hidden={true}
+                    className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </div>
+              </label>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <ProjectControlButton
+                className="flex-1"
+                icon={Save}
+                onClick={onSaveEdit}
+                variant="primary"
+              >
+                Salva
+              </ProjectControlButton>
+              <ProjectControlButton onClick={onCancelEdit} variant="neutral">
+                Annulla
+              </ProjectControlButton>
+            </div>
+          </div>
+        ) : showDetails ? (
+          <motion.div
+            className="mt-4 rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/40 p-3"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.32, ease: BUTTER_EASE }}
+          >
+            <div className="grid gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+              <DetailLine label="ID" value={book.id} />
+              <DetailLine label="Ente" value={book.sourceName} />
+              <DetailLine label="Stato" value={book.status} />
+              <DetailLine label="Progetti collegati" value={`${linkedProjectCount}`} />
+              <DetailLine label="Sottovoci" value={displayVoiceCount} />
+            </div>
+          </motion.div>
+        ) : null}
+      </div>
+      {isSelected ? (
+        <span className="absolute bottom-4 right-4 flex size-6 shrink-0 items-center justify-center rounded-[8px] bg-[var(--accent-primary)] text-white">
+          <CheckCircle2 className="size-4" strokeWidth={3} />
+        </span>
+      ) : null}
+    </motion.article>
+  );
+}
+
+function DetailLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[112px_minmax(0,1fr)] items-baseline gap-3">
+      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+        {label}
+      </span>
+      <span className="truncate text-right text-[12px] font-semibold text-[var(--text-primary)]">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function TariffMenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  tone = "neutral",
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  tone?: "danger" | "neutral";
+}) {
+  return (
+    <motion.button
+      className={cn(
+        "flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-semibold transition-colors",
+        tone === "danger"
+          ? "text-[var(--danger-base)] hover:bg-[var(--danger-soft)]/55"
+          : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+      )}
+      onClick={onClick}
+      type="button"
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.32, ease: BUTTER_EASE }}
+    >
+      <span
+        className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-[10px]",
+          tone === "danger"
+            ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+            : "bg-[var(--info-soft)] text-[var(--info-base)]",
+        )}
+      >
+        <Icon className="size-4" strokeWidth={1.9} />
+      </span>
+      <span className="truncate">{label}</span>
+    </motion.button>
   );
 }
 

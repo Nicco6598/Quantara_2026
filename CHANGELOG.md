@@ -2,6 +2,11 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.40 - 2026-05-08
+
+- **Cambio Motore Parser** — Aggiornato il motore da pdfplumber a pypdfium2, velocizzando di molto il parsing dei file (Pdf con 300 pagine passato da 39s a 0.76s).
+- **Fix Vari** — Vari fix apportati nella schermata tariffari per allineare la grafica, Risolti nella pagina di import e revisione alcuni bug relativi a importi negativi e caricamento voci (ora si caricano tutte subito).
+
 ## 0.2.35 - 2026-05-07
 
 - **Bug Fixes** — Bug fix generali e correzione parser.

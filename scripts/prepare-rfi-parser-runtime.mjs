@@ -45,7 +45,16 @@ if (!existsSync(pythonExecutable)) {
 }
 
 run(pythonExecutable, ["-m", "pip", "install", "--upgrade", "pip"]);
-run(pythonExecutable, ["-m", "pip", "install", "--upgrade", "pyinstaller", "pdfplumber"]);
+run(pythonExecutable, [
+  "-m",
+  "pip",
+  "install",
+  "--upgrade",
+  "pyinstaller",
+  "pypdfium2",
+  "pdfplumber",
+  "pypdf",
+]);
 
 rmSync(parserBinary, { force: true });
 

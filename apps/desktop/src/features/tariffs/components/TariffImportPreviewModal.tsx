@@ -1,3 +1,4 @@
+import { parseEuroAmount } from "@quantara/domain-utils";
 import { motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, ListChecks, Trash2, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";

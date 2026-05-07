@@ -434,7 +434,7 @@ fn parse_rfi_pdf_with_python_direct(
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!(
-            "RFI PDF parser failed. Install pdfplumber in the active Python environment. {stderr}"
+            "RFI PDF parser failed. Verify that the bundled parser includes a supported PDF engine. {stderr}"
         ));
     }
 
@@ -635,7 +635,7 @@ fn parse_rfi_pdf_with_python(
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(AppError::Validation(format!(
-            "RFI PDF parser failed. Install pdfplumber in the active Python environment. {stderr}"
+            "RFI PDF parser failed. Verify that the bundled parser includes a supported PDF engine. {stderr}"
         )));
     }
 
