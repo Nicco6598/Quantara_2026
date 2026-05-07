@@ -55,4 +55,3 @@ pub fn get_database_path(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(dir.join(default_database_name()))
 }
 
-

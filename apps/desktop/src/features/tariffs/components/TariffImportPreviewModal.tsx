@@ -1,7 +1,8 @@
 import { parseEuroAmount } from "@quantara/domain-utils";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowDownToLine, CheckCircle2, ListChecks, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ArrowDownToLine, CheckCircle2, ListChecks, Trash2, X } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/shared/ToastProvider";
 import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
@@ -31,7 +32,13 @@ export function TariffImportPreviewModal({
   onPageCanConfirmChange?: (canConfirm: boolean) => void;
   pageView?: boolean;
 }) {
+  const { notify } = useToast();
   const [editableVoicesList, setEditableVoicesList] = useState(metadatas.map((m) => m.voices));
+  const [deleteTarget, setDeleteTarget] = useState<{
+    code: string;
+    description: string;
+    index: number;
+  } | null>(null);
   const [modalActiveIndex, setModalActiveIndex] = useState(0);
   const [modalReviewedFiles, setModalReviewedFiles] = useState<Set<number>>(
     () => new Set(metadatas.length === 1 ? [0] : []),
@@ -117,9 +124,13 @@ export function TariffImportPreviewModal({
                       ...voice,
                       [field]:
                         field === "unitPrice"
-                          ? parseEuroAmount(value)
+                          ? value.trim() === ""
+                            ? Number.NaN
+                            : parseEuroAmount(value)
                           : field === "laborPercentage"
-                            ? parseOptionalPercent(value)
+                            ? value.trim() === ""
+                              ? null
+                              : parseOptionalPercent(value)
                             : value,
                     }
                   : voice,
@@ -129,6 +140,35 @@ export function TariffImportPreviewModal({
     },
     [localActiveIndex],
   );
+
+  const askDeleteVoice = useCallback(
+    (index: number) => {
+      const voice = activeVoices[index];
+      if (!voice) return;
+      setDeleteTarget({
+        code: voice.officialCode || `Riga ${index + 1}`,
+        description: voice.description,
+        index,
+      });
+    },
+    [activeVoices],
+  );
+
+  const confirmDeleteVoice = useCallback(() => {
+    if (!deleteTarget) return;
+    setEditableVoicesList((current) =>
+      current.map((voices, listIndex) =>
+        listIndex !== localActiveIndex
+          ? voices
+          : voices.filter((_, voiceIndex) => voiceIndex !== deleteTarget.index),
+      ),
+    );
+    notify({
+      message: `${deleteTarget.code} eliminata dalla preview.`,
+      tone: "success",
+    });
+    setDeleteTarget(null);
+  }, [deleteTarget, localActiveIndex, notify]);
 
   useEffect(() => {
     if (pageView) {
@@ -161,182 +201,98 @@ export function TariffImportPreviewModal({
   }
 
   function scrollToLoadMore() {
-    document.getElementById(loadMoreAnchorId)?.scrollIntoView({
+    const anchor = document.getElementById(loadMoreAnchorId);
+    const scrollContainer =
+      anchor?.closest("[data-tariff-preview-scroll]") ?? getScrollableAncestor(anchor);
+
+    if (scrollContainer instanceof HTMLElement) {
+      scrollContainer.scrollTo({
+        behavior: "smooth",
+        top: scrollContainer.scrollHeight,
+      });
+      return;
+    }
+
+    window.scrollTo({
       behavior: "smooth",
-      block: "center",
-      inline: "nearest",
+      top: document.documentElement.scrollHeight,
     });
   }
 
-  return pageView ? (
-    <div className="flex w-full flex-col gap-5">
-      <div className="grid grid-flow-dense gap-3 md:grid-cols-4">
-        <ImportMetric label="Righe rilevate" value={activeVoices.length.toLocaleString("it-IT")} />
-        <ImportMetric
-          label="Valide"
-          tone={activeValidation.validCount > 0 ? "success" : "warning"}
-          value={activeValidation.validCount.toLocaleString("it-IT")}
-        />
-        <ImportMetric
-          label="Warning"
-          tone={activeValidation.warningCount > 0 ? "warning" : "neutral"}
-          value={activeValidation.warningCount.toLocaleString("it-IT")}
-        />
-        <ImportMetric
-          label="Duplicati"
-          tone={activeValidation.duplicateCount > 0 ? "warning" : "neutral"}
-          value={activeValidation.duplicateCount.toLocaleString("it-IT")}
-        />
-      </div>
+  const deleteDialog = deleteTarget ? (
+    <DeleteVoiceDialog
+      code={deleteTarget.code}
+      description={deleteTarget.description}
+      onCancel={() => setDeleteTarget(null)}
+      onConfirm={confirmDeleteVoice}
+    />
+  ) : null;
 
-      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 self-start">
-          <EditableTariffVoicesGrid
-            duplicateCodes={duplicateCodes}
-            groups={editableGroups}
-            loadMoreAnchorId={loadMoreAnchorId}
-            onChange={updateVoice}
-            onLoadMoreVisibilityChange={setIsLoadMoreLinkVisible}
-            validation={activeValidation}
+  return pageView ? (
+    <>
+      <div className="flex w-full flex-col gap-5 pb-[56dvh] xl:pb-0 xl:pr-[360px]">
+        <div className="grid grid-flow-dense gap-3 md:grid-cols-4">
+          <ImportMetric
+            label="Righe rilevate"
+            value={activeVoices.length.toLocaleString("it-IT")}
+          />
+          <ImportMetric
+            label="Valide"
+            tone={activeValidation.validCount > 0 ? "success" : "warning"}
+            value={activeValidation.validCount.toLocaleString("it-IT")}
+          />
+          <ImportMetric
+            label="Warning"
+            tone={activeValidation.warningCount > 0 ? "warning" : "neutral"}
+            value={activeValidation.warningCount.toLocaleString("it-IT")}
+          />
+          <ImportMetric
+            label="Duplicati"
+            tone={activeValidation.duplicateCount > 0 ? "warning" : "neutral"}
+            value={activeValidation.duplicateCount.toLocaleString("it-IT")}
           />
         </div>
-        <div className="min-w-0 self-start md:sticky md:top-4 md:z-[5] md:max-h-[calc(100dvh-8rem)] md:overflow-y-auto">
-          <div className="space-y-3">
-            <div className="overflow-hidden rounded-[18px] bg-[color-mix(in_srgb,var(--surface-base)_86%,var(--bg-muted)_14%)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] shadow-[0_18px_46px_rgba(15,23,42,0.12)]">
-              <div
-                className={cn(
-                  "border-b px-4 py-3",
-                  isReviewReady
-                    ? "border-[var(--success-base)]/20 bg-[var(--success-soft)]/40"
-                    : "border-[var(--warning-base)]/20 bg-[var(--warning-soft)]/55",
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                      <ListChecks className="size-3.5" />
-                      Centro controllo
-                    </div>
-                    <div className="mt-2 text-[15px] font-bold leading-tight text-[var(--text-primary)]">
-                      {isReviewReady ? "Import pronto" : "Verifiche richieste"}
-                    </div>
-                  </div>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold",
-                      isReviewReady
-                        ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
-                        : "bg-[var(--warning-base)] text-[var(--text-inverse)]",
-                    )}
-                  >
-                    {completionPercent}%
-                  </span>
-                </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-base)]/75">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-[width] duration-300",
-                      isReviewReady ? "bg-[var(--success-base)]" : "bg-[var(--warning-base)]",
-                    )}
-                    style={{ width: `${completionPercent}%` }}
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-3 divide-x divide-[var(--border-subtle)]/70 border-b border-[var(--border-subtle)]/70">
-                <ControlStat label="Valide" tone="success" value={activeValidation.validCount} />
-                <ControlStat label="Warning" tone="warning" value={activeValidation.warningCount} />
-                <ControlStat
-                  label="Blocchi"
-                  tone={blockingIssueCount > 0 ? "warning" : "neutral"}
-                  value={blockingIssueCount}
-                />
-              </div>
-
-              <div className="space-y-4 p-4">
-                <div className="space-y-2 text-[12px] font-medium text-[var(--text-secondary)]">
-                  <ValidationLine ok={hasVoices} text="Voci prezzo rilevate" />
-                  <ValidationLine
-                    ok={activeValidation.invalidCount === 0}
-                    text={`${activeValidation.invalidCount.toLocaleString("it-IT")} voci con dati mancanti`}
-                  />
-                  <ValidationLine
-                    ok={activeValidation.duplicateCount === 0}
-                    text={`${activeValidation.duplicateCount.toLocaleString("it-IT")} codici duplicati`}
-                  />
-                  <ValidationLine
-                    ok={activeMetadata?.sourceName !== "Ente da confermare"}
-                    text="Ente riconosciuto"
-                  />
-                  <ValidationLine
-                    ok={(activeMetadata?.year ?? 0) >= 1900 && (activeMetadata?.year ?? 0) <= 2200}
-                    text="Anno coerente"
-                  />
-                </div>
-
-                {isLoadMoreLinkVisible ? (
-                  <motion.button
-                    className="group flex w-full items-center justify-between gap-3 rounded-[14px] border border-dashed border-[var(--accent-primary)]/45 bg-[var(--accent-primary)]/10 px-3 py-2.5 text-left text-[12px] font-bold text-[var(--accent-primary)] transition-colors hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-                    onClick={scrollToLoadMore}
-                    type="button"
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ duration: 0.42, ease: BUTTER_EASE }}
-                  >
-                    <span>Vai al caricamento altre voci</span>
-                    <ArrowDownToLine className="size-4 shrink-0 transition-transform group-hover:translate-y-0.5" />
-                  </motion.button>
-                ) : null}
-
-                {activeValidation.duplicateExamples.length > 0 ||
-                activeValidation.invalidExamples.length > 0 ? (
-                  <div className="rounded-[14px] bg-[var(--warning-soft)]/80 p-3 text-[12px] font-medium leading-5 text-[var(--warning-base)]">
-                    <div className="flex items-center gap-2 font-bold">
-                      <AlertTriangle className="size-4 shrink-0" />
-                      Interventi rapidi
-                    </div>
-                    {activeValidation.duplicateExamples.length > 0 ? (
-                      <div className="mt-2">
-                        Duplicati: {activeValidation.duplicateExamples.join(", ")}
-                      </div>
-                    ) : null}
-                    {activeValidation.invalidExamples.length > 0 ? (
-                      <div className="mt-1">
-                        Dati mancanti: {activeValidation.invalidExamples.join(", ")}
-                      </div>
-                    ) : null}
-                    {invalidRows.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {invalidRows.map((row) => (
-                          <motion.button
-                            className="rounded-full bg-[var(--warning-base)]/15 px-3 py-1 text-[11px] font-bold transition-colors hover:bg-[var(--warning-base)]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-                            key={`${row.index}-${row.field}`}
-                            onClick={() => focusImportCell(row.index, row.field)}
-                            type="button"
-                            whileHover={{ y: -1 }}
-                            whileTap={{ scale: 0.96 }}
-                            transition={{ duration: 0.42, ease: BUTTER_EASE }}
-                          >
-                            Riga {row.index + 1}: {row.label}
-                          </motion.button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </div>
+        <div className="min-w-0">
+          <div className="min-w-0 self-start">
+            <EditableTariffVoicesGrid
+              duplicateCodes={duplicateCodes}
+              groups={editableGroups}
+              loadMoreAnchorId={loadMoreAnchorId}
+              onChange={updateVoice}
+              onDelete={askDeleteVoice}
+              onLoadMoreVisibilityChange={setIsLoadMoreLinkVisible}
+              validation={activeValidation}
+            />
           </div>
         </div>
-      </div>
 
-      {!hasVoices ? (
-        <div className="rounded-[20px] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
-          Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento contenga
-          codici, unita di misura e prezzi leggibili.
-        </div>
-      ) : null}
-    </div>
+        {!hasVoices ? (
+          <div className="rounded-[20px] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
+            Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento contenga
+            codici, unita di misura e prezzi leggibili.
+          </div>
+        ) : null}
+      </div>
+      <FloatingControlDock>
+        <ControlPanel
+          activeMetadata={activeMetadata}
+          activeValidation={activeValidation}
+          blockingIssueCount={blockingIssueCount}
+          completionPercent={completionPercent}
+          hasVoices={hasVoices}
+          isLoadMoreLinkVisible={isLoadMoreLinkVisible}
+          isReviewReady={isReviewReady}
+          onLoadMore={scrollToLoadMore}
+        />
+        <InterventionPanel
+          activeValidation={activeValidation}
+          invalidRows={invalidRows}
+          onFocusCell={focusImportCell}
+        />
+      </FloatingControlDock>
+      {deleteDialog}
+    </>
   ) : (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
       <motion.button
@@ -421,8 +377,8 @@ export function TariffImportPreviewModal({
             </div>
           ) : null}
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="p-5">
+          <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-h-0 overflow-y-auto p-5" data-tariff-preview-scroll>
               <div className="grid grid-flow-dense gap-3 md:grid-cols-4">
                 <ImportMetric
                   label="Righe rilevate"
@@ -445,83 +401,16 @@ export function TariffImportPreviewModal({
                 />
               </div>
 
-              <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="mt-4 min-w-0">
                 <EditableTariffVoicesGrid
                   duplicateCodes={duplicateCodes}
                   groups={editableGroups}
                   loadMoreAnchorId={loadMoreAnchorId}
                   onChange={updateVoice}
+                  onDelete={askDeleteVoice}
                   onLoadMoreVisibilityChange={setIsLoadMoreLinkVisible}
                   validation={activeValidation}
                 />
-                <div className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-                  <div className="rounded-[20px] bg-[var(--bg-muted)]/65 p-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                      Validazioni
-                    </div>
-                    <div className="mt-3 space-y-2 text-[12px] font-medium text-[var(--text-secondary)]">
-                      <ValidationLine ok={hasVoices} text="Voci prezzo rilevate" />
-                      <ValidationLine
-                        ok={activeValidation.invalidCount === 0}
-                        text={`${activeValidation.invalidCount.toLocaleString("it-IT")} voci con dati mancanti`}
-                      />
-                      <ValidationLine
-                        ok={activeValidation.duplicateCount === 0}
-                        text={`${activeValidation.duplicateCount.toLocaleString("it-IT")} codici duplicati`}
-                      />
-                      <ValidationLine
-                        ok={activeMetadata?.sourceName !== "Ente da confermare"}
-                        text="Ente riconosciuto"
-                      />
-                      <ValidationLine
-                        ok={
-                          (activeMetadata?.year ?? 0) >= 1900 && (activeMetadata?.year ?? 0) <= 2200
-                        }
-                        text="Anno coerente"
-                      />
-                    </div>
-                    {isLoadMoreLinkVisible ? (
-                      <motion.button
-                        className="mt-4 w-full rounded-[14px] border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-left text-[12px] font-bold text-[var(--accent-primary)] transition-colors hover:border-[var(--accent-primary)] hover:bg-[var(--bg-muted)]"
-                        onClick={scrollToLoadMore}
-                        type="button"
-                        whileHover={{ y: -1 }}
-                        whileTap={{ scale: 0.97 }}
-                        transition={{ duration: 0.42, ease: BUTTER_EASE }}
-                      >
-                        Vai in fondo per caricare le altre voci
-                      </motion.button>
-                    ) : null}
-                  </div>
-                  {activeValidation.duplicateExamples.length > 0 ||
-                  activeValidation.invalidExamples.length > 0 ? (
-                    <div className="rounded-[20px] bg-[var(--warning-soft)] p-4 text-[12px] font-medium leading-5 text-[var(--warning-base)]">
-                      {activeValidation.duplicateExamples.length > 0 ? (
-                        <div>Duplicati: {activeValidation.duplicateExamples.join(", ")}</div>
-                      ) : null}
-                      {activeValidation.invalidExamples.length > 0 ? (
-                        <div>Dati mancanti: {activeValidation.invalidExamples.join(", ")}</div>
-                      ) : null}
-                      {invalidRows.length > 0 ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {invalidRows.map((row) => (
-                            <motion.button
-                              className="rounded-full bg-[var(--warning-base)]/15 px-3 py-1 text-[11px] font-bold transition-colors hover:bg-[var(--warning-base)]/25"
-                              key={`${row.index}-${row.field}`}
-                              onClick={() => focusImportCell(row.index, row.field)}
-                              type="button"
-                              whileHover={{ y: -1 }}
-                              whileTap={{ scale: 0.96 }}
-                              transition={{ duration: 0.42, ease: BUTTER_EASE }}
-                            >
-                              Riga {row.index + 1}: {row.label}
-                            </motion.button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
               </div>
 
               {!hasVoices ? (
@@ -531,6 +420,25 @@ export function TariffImportPreviewModal({
                 </div>
               ) : null}
             </div>
+            <aside className="hidden min-h-0 overflow-y-auto border-l border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-4 lg:block">
+              <div className="space-y-3">
+                <ControlPanel
+                  activeMetadata={activeMetadata}
+                  activeValidation={activeValidation}
+                  blockingIssueCount={blockingIssueCount}
+                  completionPercent={completionPercent}
+                  hasVoices={hasVoices}
+                  isLoadMoreLinkVisible={isLoadMoreLinkVisible}
+                  isReviewReady={isReviewReady}
+                  onLoadMore={scrollToLoadMore}
+                />
+                <InterventionPanel
+                  activeValidation={activeValidation}
+                  invalidRows={invalidRows}
+                  onFocusCell={focusImportCell}
+                />
+              </div>
+            </aside>
           </div>
 
           <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -578,6 +486,239 @@ export function TariffImportPreviewModal({
           </div>
         </div>
       </motion.div>
+      {deleteDialog}
+    </div>
+  );
+}
+
+function getScrollableAncestor(element: HTMLElement | null) {
+  let current = element?.parentElement ?? null;
+
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const canScroll =
+      /(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight;
+    if (canScroll) {
+      return current;
+    }
+
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
+function FloatingControlDock({ children }: { children: ReactNode }) {
+  return (
+    <aside className="fixed inset-x-4 bottom-4 z-20 xl:bottom-auto xl:left-auto xl:right-8 xl:top-[300px] xl:w-[336px]">
+      <div className="max-h-[52dvh] overflow-hidden rounded-[24px] xl:max-h-[calc(100dvh-324px)]">
+        <div className="max-h-[52dvh] overflow-y-auto rounded-[24px] p-1 xl:max-h-[calc(100dvh-324px)]">
+          <div className="space-y-3">{children}</div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function InterventionPanel({
+  activeValidation,
+  invalidRows,
+  onFocusCell,
+}: {
+  activeValidation: ImportValidation;
+  invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
+  onFocusCell: (rowIndex: number, field: string) => void;
+}) {
+  if (
+    activeValidation.duplicateExamples.length === 0 &&
+    activeValidation.invalidExamples.length === 0
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-[18px] bg-[var(--warning-soft)] p-4 text-[12px] font-medium leading-5 text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/15">
+      <div className="flex items-center gap-2 font-bold">
+        <AlertTriangle className="size-4 shrink-0" />
+        Interventi rapidi
+      </div>
+      {activeValidation.duplicateExamples.length > 0 ? (
+        <div className="mt-2">Duplicati: {activeValidation.duplicateExamples.join(", ")}</div>
+      ) : null}
+      {activeValidation.invalidExamples.length > 0 ? (
+        <div className="mt-1">Dati mancanti: {activeValidation.invalidExamples.join(", ")}</div>
+      ) : null}
+      {invalidRows.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {invalidRows.map((row) => (
+            <motion.button
+              className="rounded-full bg-[var(--warning-base)]/15 px-3 py-1 text-[11px] font-bold transition-colors hover:bg-[var(--warning-base)]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+              key={`${row.index}-${row.field}`}
+              onClick={() => onFocusCell(row.index, row.field)}
+              type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ duration: 0.42, ease: BUTTER_EASE }}
+            >
+              Riga {row.index + 1}: {row.label}
+            </motion.button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ControlPanel({
+  activeMetadata,
+  activeValidation,
+  blockingIssueCount,
+  completionPercent,
+  hasVoices,
+  isLoadMoreLinkVisible,
+  isReviewReady,
+  onLoadMore,
+}: {
+  activeMetadata: TariffPdfMetadata | undefined;
+  activeValidation: ImportValidation;
+  blockingIssueCount: number;
+  completionPercent: number;
+  hasVoices: boolean;
+  isLoadMoreLinkVisible: boolean;
+  isReviewReady: boolean;
+  onLoadMore: () => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[18px] bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--bg-muted)_12%)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] shadow-[0_18px_46px_rgba(15,23,42,0.12)]">
+      <div
+        className={cn(
+          "border-b px-4 py-3",
+          isReviewReady
+            ? "border-[var(--success-base)]/20 bg-[var(--success-soft)]/40"
+            : "border-[var(--warning-base)]/20 bg-[var(--warning-soft)]/55",
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+              <ListChecks className="size-3.5" />
+              Centro controllo
+            </div>
+            <div className="mt-2 text-[15px] font-bold leading-tight text-[var(--text-primary)]">
+              {isReviewReady ? "Import pronto" : "Verifiche richieste"}
+            </div>
+          </div>
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold",
+              isReviewReady
+                ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
+                : "bg-[var(--warning-base)] text-[var(--text-inverse)]",
+            )}
+          >
+            {completionPercent}%
+          </span>
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-base)]/75">
+          <div
+            className={cn(
+              "h-full rounded-full transition-[width] duration-300",
+              isReviewReady ? "bg-[var(--success-base)]" : "bg-[var(--warning-base)]",
+            )}
+            style={{ width: `${completionPercent}%` }}
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 divide-x divide-[var(--border-subtle)]/70 border-b border-[var(--border-subtle)]/70">
+        <ControlStat label="Valide" tone="success" value={activeValidation.validCount} />
+        <ControlStat label="Warning" tone="warning" value={activeValidation.warningCount} />
+        <ControlStat
+          label="Blocchi"
+          tone={blockingIssueCount > 0 ? "warning" : "neutral"}
+          value={blockingIssueCount}
+        />
+      </div>
+      <div className="space-y-4 p-4">
+        <div className="space-y-2 text-[12px] font-medium text-[var(--text-secondary)]">
+          <ValidationLine ok={hasVoices} text="Voci prezzo rilevate" />
+          <ValidationLine
+            ok={activeValidation.invalidCount === 0}
+            text={`${activeValidation.invalidCount.toLocaleString("it-IT")} voci con dati mancanti`}
+          />
+          <ValidationLine
+            ok={activeValidation.duplicateCount === 0}
+            text={`${activeValidation.duplicateCount.toLocaleString("it-IT")} codici duplicati`}
+          />
+          <ValidationLine
+            ok={activeMetadata?.sourceName !== "Ente da confermare"}
+            text="Ente riconosciuto"
+          />
+          <ValidationLine
+            ok={(activeMetadata?.year ?? 0) >= 1900 && (activeMetadata?.year ?? 0) <= 2200}
+            text="Anno coerente"
+          />
+        </div>
+        {isLoadMoreLinkVisible ? (
+          <motion.button
+            className="group flex w-full items-center justify-between gap-3 rounded-[14px] border border-dashed border-[var(--accent-primary)]/45 bg-[var(--accent-primary)]/10 px-3 py-2.5 text-left text-[12px] font-bold text-[var(--accent-primary)] transition-colors hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+            onClick={onLoadMore}
+            type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
+          >
+            <span>Vai al caricamento altre voci</span>
+            <ArrowDownToLine className="size-4 shrink-0 transition-transform group-hover:translate-y-0.5" />
+          </motion.button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DeleteVoiceDialog({
+  code,
+  description,
+  onCancel,
+  onConfirm,
+}: {
+  code: string;
+  description: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm">
+      <button
+        aria-label="Annulla eliminazione"
+        className="absolute inset-0"
+        onClick={onCancel}
+        type="button"
+      />
+      <div className="relative w-full max-w-md rounded-[22px] bg-[var(--surface-base)] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] ring-1 ring-[var(--border-subtle)]">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
+            <Trash2 className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-[18px] font-bold leading-tight text-[var(--text-primary)]">
+              Eliminare questa voce?
+            </h3>
+            <p className="mt-2 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+              {code}
+              {description ? ` - ${description.slice(0, 140)}` : ""}
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <ProjectControlButton onClick={onCancel} variant="neutral">
+            Annulla
+          </ProjectControlButton>
+          <ProjectControlButton icon={Trash2} onClick={onConfirm} variant="soft">
+            Elimina
+          </ProjectControlButton>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Info, X } from "lucide-react";
+import { Info, Trash2, X } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DesktopTariffVoice, TariffWarning } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
@@ -117,6 +117,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   groups,
   loadMoreAnchorId,
   onChange,
+  onDelete,
   onLoadMoreVisibilityChange,
   validation,
 }: {
@@ -124,6 +125,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   groups: VoiceGroup[];
   loadMoreAnchorId?: string;
   onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  onDelete: (index: number) => void;
   onLoadMoreVisibilityChange?: (isVisible: boolean) => void;
   validation: ImportValidation;
 }) {
@@ -249,12 +251,13 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                         ) : null}
 
                         <div>
-                          <div className="grid grid-cols-[160px_1fr_80px_100px_110px] gap-3 px-5 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+                          <div className="grid grid-cols-[160px_1fr_80px_100px_110px_36px] gap-3 px-5 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
                             <span>Codice</span>
                             <span>Descrizione</span>
                             <span>U.M.</span>
                             <span className="text-right">Manod.</span>
                             <span className="text-right">Prezzo</span>
+                            <span className="sr-only">Azioni</span>
                           </div>
 
                           <div className="divide-y divide-[var(--border-subtle)]/20">
@@ -270,7 +273,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
 
                               return (
                                 <div
-                                  className={`grid grid-cols-[160px_1fr_80px_100px_110px] gap-3 px-5 py-2 [contain:layout_style] ${
+                                  className={`grid grid-cols-[160px_1fr_80px_100px_110px_36px] gap-3 px-5 py-2 [contain:layout_style] ${
                                     isDuplicate ? "bg-[var(--warning-soft)]/25" : ""
                                   } ${index % 2 === 0 && !isDuplicate ? "bg-[var(--surface-base)]/35" : ""} ${
                                     rowInvalid && !isDuplicate
@@ -319,6 +322,15 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                                     }
                                     warnings={undefined}
                                   />
+                                  <button
+                                    aria-label={`Elimina voce ${voice.officialCode || index + 1}`}
+                                    className="flex size-9 items-center justify-center rounded-[10px] text-[var(--danger-base,var(--warning-base))] transition-colors hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+                                    onClick={() => onDelete(index)}
+                                    title="Elimina voce"
+                                    type="button"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
                                 </div>
                               );
                             })}

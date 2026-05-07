@@ -324,6 +324,14 @@ def parse(lines, code_re, voce_re):
                 if is_record_boundary(next_line, code_re):
                     if block_has_meta:
                         break
+                if (
+                    block_has_meta
+                    and (
+                        CATEGORY_HEADER_RE.match(next_line)
+                        or PAGE_HEADER_RE.match(next_line)
+                    )
+                ):
+                    break
                 if is_section_noise(next_line):
                     j += 1
                     continue

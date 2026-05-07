@@ -341,6 +341,7 @@ pub fn import_tariff_pdf_preview(
         .join("\n");
     let year = infer_year(&fallback_name).unwrap_or(2025);
     let source_name = infer_source_name(&source_text);
+    let records = merge_duplicate_rfi_records(records);
     let voices = records
         .iter()
         .filter_map(|record| rfi_record_to_tariff_voice(record, "tariff_import_preview"))
@@ -390,11 +391,17 @@ fn import_single_tariff_pdf(
     let source_text = records
         .iter()
         .take(200)
-        .map(|r| format!("{} {} {} {}", r.codice, r.voce_desc, r.descrizione, r.tariffa))
+        .map(|r| {
+            format!(
+                "{} {} {} {}",
+                r.codice, r.voce_desc, r.descrizione, r.tariffa
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
     let year = infer_year(&fallback_name).unwrap_or(2025);
     let source_name = infer_source_name(&source_text);
+    let records = merge_duplicate_rfi_records(records);
     let voices = records
         .iter()
         .filter_map(|r| rfi_record_to_tariff_voice(r, "tariff_import_preview"))
@@ -477,12 +484,13 @@ pub fn import_tariff_pdf_preview_batch(
     app: &AppHandle,
     max_concurrent: Option<usize>,
 ) -> Result<Vec<TariffPdfImportPreview>, Vec<(String, String)>> {
-    let max = max_concurrent.unwrap_or_else(|| {
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4)
-    })
-    .max(1);
+    let max = max_concurrent
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(4)
+        })
+        .max(1);
 
     let resource_dir = app.path().resource_dir().ok();
     let mut results: Vec<Option<Result<TariffPdfImportPreview, (String, String)>>> =
@@ -540,6 +548,70 @@ fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
             "parser JSON is not a valid RFI tariff export: {error}"
         ))
     })
+}
+
+fn merge_duplicate_rfi_records(records: Vec<RfiTariffRecord>) -> Vec<RfiTariffRecord> {
+    let mut merged: Vec<RfiTariffRecord> = Vec::with_capacity(records.len());
+
+    for record in records {
+        let code = record.codice.trim();
+        if code.is_empty() {
+            merged.push(record);
+            continue;
+        }
+
+        if let Some(existing) = merged
+            .iter_mut()
+            .find(|item| item.codice.trim().eq_ignore_ascii_case(code))
+        {
+            merge_rfi_record_description(existing, &record);
+            continue;
+        }
+
+        merged.push(record);
+    }
+
+    merged
+}
+
+fn merge_rfi_record_description(target: &mut RfiTariffRecord, duplicate: &RfiTariffRecord) {
+    let duplicate_description = clean_import_description(&duplicate.descrizione);
+    if duplicate_description.is_empty() {
+        return;
+    }
+
+    let current_description = clean_import_description(&target.descrizione);
+    if current_description
+        .to_ascii_lowercase()
+        .contains(&duplicate_description.to_ascii_lowercase())
+    {
+        return;
+    }
+
+    target.descrizione = if current_description.is_empty() {
+        duplicate_description
+    } else {
+        format!("{current_description}\n{duplicate_description}")
+    };
+}
+
+fn clean_import_description(value: &str) -> String {
+    let cleaned = clean_text(value);
+    let upper = cleaned.to_ascii_uppercase();
+    let markers = [
+        " TARIFFA ",
+        " CATEGORIA ",
+        " GRUPPO ",
+        " AVVERTENZE",
+        " AVVERTENZA",
+    ];
+
+    markers
+        .iter()
+        .filter_map(|marker| upper.find(marker))
+        .min()
+        .map(|index| cleaned[..index].trim().to_string())
+        .unwrap_or(cleaned)
 }
 
 fn parse_rfi_pdf_with_python(
@@ -762,7 +834,7 @@ fn rfi_record_to_tariff_voice(
 
     Some(TariffVoiceRecord {
         category,
-        description: clean_text(&record.descrizione),
+        description: clean_import_description(&record.descrizione),
         id: format!(
             "voice_{}_{}",
             tariff_book_id,

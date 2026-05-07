@@ -2,6 +2,10 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.32 - 2026-05-07
+
+- **Import Tariffari** — fixati bug di duplicati presi dalle descrizioni, possibilità di resettare un singolo campo o eliminare direttamente la riga, ora il pannello di check rimane sempre visibile.
+
 ## 0.2.31 - 2026-05-05
 
 - **Campo note nelle voci SAL** — aggiunto un campo note opzionale per ogni voce nella tabella SAL, utile per annotazioni tecniche o interne direttamente sulla riga.
