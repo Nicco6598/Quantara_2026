@@ -1,31 +1,23 @@
 import {
-  ArrowsClockwise,
   Bell,
   Briefcase,
   CaretDown,
   CaretLeft,
   CaretRight,
   CheckCircle,
+  ClockCounterClockwise,
   FileText,
-  MagnifyingGlass,
-  Moon,
   Plus,
-  SunDim,
   UploadSimple,
   X,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { SaveIndicator } from "@/components/shared/SaveIndicator";
 import { BezelSurface } from "@/features/projects/components/workspace-ui";
 import { cn } from "@/lib/utils";
-import {
-  type QuantaraRoute,
-  useNavigationState,
-  usePreferenceState,
-  useThemeState,
-} from "@/store/app-store";
+import { type QuantaraRoute, useNavigationState, usePreferenceState } from "@/store/app-store";
 
 type RouteMeta = {
   dateLabel: string;
@@ -121,31 +113,34 @@ function ActionMarkIcon({ mark, size = 12 }: { mark: string; size?: number }) {
 }
 
 type TopToolbarProps = {
-  onOpenCommandPalette: (anchorRect: DOMRect) => void;
   onPageAction: (actionId: string) => void;
 };
 
-export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarProps) {
+export function TopToolbar({ onPageAction }: TopToolbarProps) {
   const { activeRoute, tariffImportToolbar } = useNavigationState();
   const meta = routeMetaMap[activeRoute];
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
   const isTariffPreview = activeRoute === "tariffs" && tariffImportToolbar.phase === "preview";
 
   return (
-    <header className="relative z-30 shrink-0 px-4 py-3 md:px-6">
-      <BezelSurface innerClassName="flex min-h-[64px] items-center justify-between gap-5 px-4 py-2.5 md:px-5">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="animate-entry-sm flex min-w-0 items-center gap-4">
-            <HistoryNavigator />
+    <header className="top-toolbar-shell relative z-30 shrink-0 px-3 py-2 md:px-4">
+      <BezelSurface
+        className="top-toolbar-bezel"
+        innerClassName="top-toolbar-core flex min-h-[52px] items-center justify-between gap-3 py-2 pl-[58px] pr-3 md:pr-4"
+      >
+        <HistoryNavigator />
+
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="animate-entry-sm flex min-w-0 shrink-0 items-center">
             <Breadcrumbs />
           </div>
 
-          <div className="min-w-0">
-            <h1 className="truncate text-[22px] font-semibold leading-6 text-[var(--text-primary)] md:text-[24px]">
+          <div className="min-w-0 border-l border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] pl-3">
+            <h1 className="truncate text-[18px] font-semibold leading-5 text-[var(--text-primary)] md:text-[20px]">
               {meta.title}
             </h1>
-            <div className="mt-2 flex items-center gap-2.5">
-              <span className="truncate text-[11px] font-semibold tracking-[0.02em] text-[var(--text-secondary)]">
+            <div className="mt-0.5 hidden items-center gap-2 lg:flex">
+              <span className="truncate text-[10px] font-semibold text-[var(--text-secondary)]">
                 {todayLabel()}
               </span>
               <SaveIndicator status="saved" lastSavedAt={null} />
@@ -153,19 +148,18 @@ export function TopToolbar({ onOpenCommandPalette, onPageAction }: TopToolbarPro
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <GlobalSearch onOpen={onOpenCommandPalette} />
+        <div className="flex shrink-0 items-center gap-1.5">
           {isTariffPreview ? (
             <TariffImportControls onAction={onPageAction} />
           ) : activeRoute === "sal-create" ? (
             <SalStepNav onAction={onPageAction} />
           ) : (
             <>
-              <div className="mx-1.5 h-[34px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
+              <div className="top-toolbar-divider" />
               <PageActions actions={pageActions} onAction={onPageAction} />
             </>
           )}
-          <div className="mx-1.5 h-[34px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
+          <div className="top-toolbar-divider" />
           <UtilityButtons onAction={onPageAction} />
         </div>
       </BezelSurface>
@@ -182,10 +176,10 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
   const canGoNext = tariffImportToolbar.activeIndex < fileCount - 1;
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <div className="mx-1.5 h-[34px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
+    <div className="flex min-w-0 items-center gap-1.5">
+      <div className="top-toolbar-divider" />
       <motion.button
-        className="top-toolbar-icon-button flex size-10 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)]"
+        className="top-toolbar-icon-button flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)]"
         onClick={() => onAction("tariff-import-cancel")}
         title="Torna al catalogo"
         type="button"
@@ -209,7 +203,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         </button>
         <button
           aria-expanded={isFileMenuOpen}
-          className="flex h-9 min-w-[190px] max-w-[260px] items-center justify-between gap-2 rounded-full bg-[var(--bg-muted)] px-3 text-left text-[11px] font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+          className="flex h-8 min-w-[164px] max-w-[220px] items-center justify-between gap-2 rounded-full bg-[var(--bg-muted)] px-2.5 text-left text-[10px] font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
           onClick={() => setIsFileMenuOpen((current) => !current)}
           title={activeLabel}
           type="button"
@@ -285,7 +279,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
           ) : null}
         </AnimatePresence>
       </div>
-      <div className="hidden min-h-10 items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3.5 py-1 text-[11px] font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)] 2xl:flex">
+      <div className="hidden min-h-9 items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3 py-1 text-[10px] font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)] 2xl:flex">
         <div className="flex flex-col justify-center gap-0.5 leading-none">
           <span
             className={cn(
@@ -317,7 +311,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
       </div>
       <motion.button
         className={cn(
-          "top-toolbar-action group flex h-10 items-center gap-2 rounded-full px-3.5 text-[13px] font-bold transition-colors",
+          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold transition-colors",
           tariffImportToolbar.activeReviewed
             ? "bg-[color-mix(in_srgb,var(--success-base)_14%,var(--surface-base))] text-[color-mix(in_srgb,var(--success-base)_74%,var(--text-primary))] ring-1 ring-[color-mix(in_srgb,var(--success-base)_42%,var(--border-subtle))] shadow-[inset_0_1px_0_color-mix(in_srgb,white_58%,transparent)]"
             : "top-toolbar-action-outline text-[var(--text-primary)]",
@@ -345,7 +339,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
       </motion.button>
       <motion.button
         className={cn(
-          "top-toolbar-action top-toolbar-action-primary group flex h-10 items-center gap-2 rounded-full px-3.5 text-[13px] font-bold text-[var(--text-inverse)]",
+          "top-toolbar-action top-toolbar-action-primary group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold text-[var(--text-inverse)]",
           !tariffImportToolbar.canConfirm && "cursor-not-allowed opacity-45",
         )}
         disabled={!tariffImportToolbar.canConfirm}
@@ -378,7 +372,7 @@ function SalStepNav({ onAction }: { onAction?: (actionId: string) => void }) {
   ];
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       {steps.map((step, index) => {
         const stepNumber = index + 1;
         const isCurrent = salCurrentStep === stepNumber;
@@ -390,14 +384,14 @@ function SalStepNav({ onAction }: { onAction?: (actionId: string) => void }) {
             {index > 0 && (
               <div
                 className={cn(
-                  "mx-1 h-px w-4",
+                  "mx-0.5 h-px w-3",
                   isCompleted ? "bg-[var(--accent-primary)]" : "bg-[var(--border-subtle)]",
                 )}
               />
             )}
             <button
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold whitespace-nowrap transition-all duration-200",
+                "inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold whitespace-nowrap transition-all duration-200",
                 isCurrent && "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm",
                 isCompleted && "bg-[var(--success-soft)] text-[var(--success-base)]",
                 !isCurrent &&
@@ -422,17 +416,109 @@ function SalStepNav({ onAction }: { onAction?: (actionId: string) => void }) {
 }
 
 function HistoryNavigator() {
-  const { canGoBack, canGoForward, navigateBack, navigateForward } = useNavigationState();
+  const {
+    canGoBack,
+    canGoForward,
+    navigateBack,
+    navigateForward,
+    navigateToHistoryIndex,
+    routeHistory,
+    routeHistoryIndex,
+  } = useNavigationState();
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const visibleHistory = routeHistory
+    .map((entry, index) => ({ ...entry, index }))
+    .slice(Math.max(0, routeHistory.length - 8))
+    .reverse();
 
   return (
-    <div className="animate-entry-sm top-toolbar-history flex items-center gap-1 rounded-full p-1">
-      <HistoryButton disabled={!canGoBack} label="Torna indietro" onClick={navigateBack}>
-        <CaretLeft size={16} weight="regular" />
-      </HistoryButton>
-      <div className="h-4 w-px bg-[var(--border-subtle)]" />
-      <HistoryButton disabled={!canGoForward} label="Vai avanti" onClick={navigateForward}>
-        <CaretRight size={16} weight="regular" />
-      </HistoryButton>
+    <div className="animate-entry-sm top-toolbar-history-wrap">
+      <button
+        aria-expanded={isHistoryOpen}
+        aria-label="Apri cronologia pagine"
+        className="top-toolbar-history-trigger"
+        onClick={() => setIsHistoryOpen((current) => !current)}
+        title="Cronologia pagine"
+        type="button"
+      >
+        <ClockCounterClockwise size={15} weight="regular" />
+        <CaretDown
+          size={9}
+          weight="bold"
+          className={cn("transition-transform", isHistoryOpen && "rotate-180")}
+        />
+      </button>
+
+      <AnimatePresence>
+        {isHistoryOpen ? (
+          <>
+            <button
+              aria-label="Chiudi cronologia pagine"
+              className="fixed inset-0 z-40 cursor-default"
+              onClick={() => setIsHistoryOpen(false)}
+              type="button"
+            />
+            <motion.div
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="top-toolbar-history-menu absolute left-0 top-full z-50 mt-2 w-[260px] overflow-hidden rounded-[18px] p-1.5"
+              exit={{ opacity: 0, scale: 0.97, y: -6 }}
+              initial={{ opacity: 0, scale: 0.97, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="flex items-center gap-1 border-b border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] p-1 pb-1.5">
+                <HistoryButton disabled={!canGoBack} label="Torna indietro" onClick={navigateBack}>
+                  <CaretLeft size={14} weight="bold" />
+                </HistoryButton>
+                <HistoryButton
+                  disabled={!canGoForward}
+                  label="Vai avanti"
+                  onClick={navigateForward}
+                >
+                  <CaretRight size={14} weight="bold" />
+                </HistoryButton>
+                <span className="ml-auto px-2 text-[10px] font-semibold text-[var(--text-secondary)]">
+                  {routeHistoryIndex + 1}/{routeHistory.length}
+                </span>
+              </div>
+
+              <div className="mt-1 max-h-[280px] overflow-y-auto">
+                {visibleHistory.map((entry) => {
+                  const isActive = entry.index === routeHistoryIndex;
+                  return (
+                    <button
+                      className={cn(
+                        "top-toolbar-history-item flex w-full items-center gap-2 rounded-[12px] px-2.5 py-2 text-left",
+                        isActive && "top-toolbar-history-item-active",
+                      )}
+                      disabled={isActive}
+                      key={`${entry.route}-${entry.context ?? "root"}-${entry.index}`}
+                      onClick={() => {
+                        navigateToHistoryIndex(entry.index);
+                        setIsHistoryOpen(false);
+                      }}
+                      type="button"
+                    >
+                      <span className="top-toolbar-history-item-index">
+                        {String(entry.index + 1).padStart(2, "0")}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[12px] font-semibold text-[var(--text-primary)]">
+                          {routeMetaMap[entry.route].title}
+                        </span>
+                        {entry.context ? (
+                          <span className="mt-0.5 block truncate text-[10px] font-medium text-[var(--text-secondary)]">
+                            {entry.context}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
@@ -458,48 +544,19 @@ function HistoryButton({
   return (
     <motion.button
       className={cn(
-        "top-toolbar-icon-button flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)]",
+        "top-toolbar-history-button flex size-7 items-center justify-center rounded-full text-[var(--text-secondary)]",
         disabled ? "cursor-not-allowed opacity-40" : "hover:text-[var(--text-primary)]",
       )}
       disabled={disabled}
-      onClick={onClick}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       title={label}
       type="button"
       {...motionProps}
     >
       {children}
-    </motion.button>
-  );
-}
-
-function GlobalSearch({ onOpen }: { onOpen: (anchorRect: DOMRect) => void }) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  return (
-    <motion.button
-      className="top-toolbar-search relative hidden h-11 w-[340px] rounded-full pl-11 pr-16 text-left text-[13px] font-semibold text-[var(--text-secondary)] outline-none 2xl:block"
-      data-command-palette-anchor
-      onClick={() => {
-        const anchorRect = buttonRef.current?.getBoundingClientRect();
-
-        if (anchorRect) {
-          onOpen(anchorRect);
-        }
-      }}
-      ref={buttonRef}
-      type="button"
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.985 }}
-    >
-      <MagnifyingGlass
-        size={14}
-        weight="regular"
-        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 opacity-70"
-      />
-      <span>Cerca...</span>
-      <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2.5 py-1 text-[10px] font-bold text-[var(--text-secondary)]">
-        {navigator.platform?.includes("Mac") ? "Cmd+K" : "Ctrl+K"}
-      </kbd>
     </motion.button>
   );
 }
@@ -512,7 +569,7 @@ function PageActions({
   onAction: (actionId: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       {actions.map((action) => {
         if (action.menuItems) {
           return (
@@ -527,7 +584,7 @@ function PageActions({
         return (
           <motion.button
             className={cn(
-              "top-toolbar-action group flex h-10 items-center gap-2 rounded-full px-3.5 text-[13px] font-bold",
+              "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold",
               action.variant === "outline"
                 ? "top-toolbar-action-outline text-[var(--text-primary)]"
                 : "top-toolbar-action-primary text-[var(--text-inverse)]",
@@ -571,7 +628,7 @@ function PageActionMenu({
       <motion.button
         aria-expanded={isOpen}
         className={cn(
-          "top-toolbar-action group flex h-10 items-center gap-2 rounded-full px-3.5 text-[13px] font-bold",
+          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold",
           isPrimary
             ? "top-toolbar-action-primary text-[var(--text-inverse)]"
             : "top-toolbar-action-outline text-[var(--text-primary)]",
@@ -657,25 +714,10 @@ function PageActionMenu({
 }
 
 function UtilityButtons({ onAction }: { onAction: (actionId: string) => void }) {
-  const { themeMode, toggleTheme } = useThemeState();
-
   return (
     <div className="flex items-center gap-1">
       <UtilityButton label="Notifiche" onClick={() => onAction("notifications")}>
         <Bell size={15} weight="regular" />
-      </UtilityButton>
-      <UtilityButton
-        label={themeMode === "light" ? "Modo scuro" : "Modo chiaro"}
-        onClick={toggleTheme}
-      >
-        {themeMode === "light" ? (
-          <SunDim size={15} weight="regular" />
-        ) : (
-          <Moon size={15} weight="regular" />
-        )}
-      </UtilityButton>
-      <UtilityButton label="Controlla aggiornamenti" onClick={() => onAction("check-updates")}>
-        <ArrowsClockwise size={15} weight="regular" />
       </UtilityButton>
     </div>
   );
@@ -692,7 +734,7 @@ function UtilityButton({
 }) {
   return (
     <motion.button
-      className="top-toolbar-icon-button relative flex size-10 items-center justify-center rounded-full text-[var(--text-secondary)]"
+      className="top-toolbar-icon-button relative flex size-9 items-center justify-center rounded-full text-[var(--text-secondary)]"
       onClick={onClick}
       title={label}
       type="button"

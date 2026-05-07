@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  ArrowsClockwise,
+  CaretDown,
+  MagnifyingGlass,
+  Minus,
+  Moon,
+  SidebarSimple,
+  Square,
+  SunDim,
+  X,
+} from "@phosphor-icons/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopToolbar } from "@/components/layout/TopToolbar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
@@ -19,7 +30,25 @@ import {
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 import { RouteRenderer } from "@/routes/RouteRenderer";
-import { useAppStore, useNavigationState, usePreferenceState } from "@/store/app-store";
+import {
+  type QuantaraRoute,
+  useAppStore,
+  useNavigationState,
+  usePreferenceState,
+  useThemeState,
+} from "@/store/app-store";
+
+type TitlebarRoute = { label: string; route: QuantaraRoute; section: string };
+
+const TITLEBAR_ROUTES: [TitlebarRoute, ...TitlebarRoute[]] = [
+  { label: "Dashboard", route: "dashboard", section: "Operazioni" },
+  { label: "Appaltatori", route: "projects", section: "Progetti" },
+  { label: "Tariffario", route: "tariffs", section: "Dati" },
+  { label: "Materiali", route: "materials", section: "Magazzino" },
+  { label: "Contabilità", route: "accounting", section: "Gestione" },
+  { label: "Team", route: "team", section: "Organizzazione" },
+  { label: "Impostazioni", route: "settings", section: "Sistema" },
+];
 
 function ThemeApplier() {
   useEffect(() => {
@@ -37,6 +66,230 @@ function ThemeApplier() {
   }, []);
 
   return null;
+}
+
+function WindowTitleBar({
+  activeRoute,
+  isSidebarCollapsed,
+  onCheckUpdates,
+  onOpenCommandPalette,
+  onRouteChange,
+  onToggleSidebar,
+}: {
+  activeRoute: QuantaraRoute;
+  isSidebarCollapsed: boolean;
+  onCheckUpdates: () => void;
+  onOpenCommandPalette: (anchorRect: DOMRect) => void;
+  onRouteChange: (route: QuantaraRoute) => void;
+  onToggleSidebar: () => void;
+}) {
+  const [isRouteMenuOpen, setIsRouteMenuOpen] = useState(false);
+  const commandButtonRef = useRef<HTMLButtonElement>(null);
+  const { themeMode, toggleTheme } = useThemeState();
+  const activeRouteItem =
+    TITLEBAR_ROUTES.find((item) => item.route === activeRoute) ?? TITLEBAR_ROUTES[0];
+
+  const handleWindowAction = useCallback(async (action: "close" | "maximize" | "minimize") => {
+    if (!("__TAURI_INTERNALS__" in window)) {
+      return;
+    }
+
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const currentWindow = getCurrentWindow();
+
+    if (action === "minimize") {
+      await currentWindow.minimize();
+      return;
+    }
+
+    if (action === "maximize") {
+      await currentWindow.toggleMaximize();
+      return;
+    }
+
+    await currentWindow.close();
+  }, []);
+
+  return (
+    <div className="window-titlebar">
+      <div className="window-titlebar-drag-strip" data-tauri-drag-region />
+      <div className="window-titlebar-left">
+        <button
+          aria-label={isSidebarCollapsed ? "Espandi sidebar" : "Compatta sidebar"}
+          className="window-titlebar-tool"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleSidebar();
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          title={isSidebarCollapsed ? "Espandi sidebar" : "Compatta sidebar"}
+          type="button"
+        >
+          <SidebarSimple
+            className={isSidebarCollapsed ? "rotate-180" : undefined}
+            size={15}
+            weight="regular"
+          />
+        </button>
+
+        <div className="window-titlebar-brand" data-tauri-drag-region>
+          <span className="window-titlebar-mark" data-tauri-drag-region />
+          <span data-tauri-drag-region>Quantara</span>
+          <span className="window-titlebar-separator" data-tauri-drag-region />
+          <span className="window-titlebar-subtitle" data-tauri-drag-region>
+            Construction Suite
+          </span>
+        </div>
+      </div>
+
+      <div className="window-titlebar-center">
+        <div className="window-titlebar-route-picker">
+          <button
+            aria-expanded={isRouteMenuOpen}
+            className="window-titlebar-route-trigger"
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsRouteMenuOpen((current) => !current);
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+            title="Cambia sezione"
+            type="button"
+          >
+            <span className="window-titlebar-route-section">{activeRouteItem.section}</span>
+            <span className="window-titlebar-route-label">{activeRouteItem.label}</span>
+            <CaretDown
+              className={isRouteMenuOpen ? "rotate-180" : undefined}
+              size={9}
+              weight="bold"
+            />
+          </button>
+
+          {isRouteMenuOpen ? (
+            <>
+              <button
+                aria-label="Chiudi cambio sezione"
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={() => setIsRouteMenuOpen(false)}
+                onMouseDown={(event) => event.stopPropagation()}
+                type="button"
+              />
+              <div className="window-titlebar-route-menu">
+                {TITLEBAR_ROUTES.map((item) => {
+                  const isActive = item.route === activeRoute;
+                  return (
+                    <button
+                      className="window-titlebar-route-item"
+                      disabled={isActive}
+                      key={item.route}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRouteChange(item.route);
+                        setIsRouteMenuOpen(false);
+                      }}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      type="button"
+                    >
+                      <span>{item.label}</span>
+                      <span>{item.section}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        <button
+          className="window-titlebar-command"
+          data-command-palette-anchor
+          onClick={(event) => {
+            event.stopPropagation();
+            const anchorRect = commandButtonRef.current?.getBoundingClientRect();
+            if (anchorRect) {
+              onOpenCommandPalette(anchorRect);
+            }
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          ref={commandButtonRef}
+          title="Apri comandi"
+          type="button"
+        >
+          <MagnifyingGlass size={13} weight="regular" />
+          <span>Comandi</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+
+        <button
+          className="window-titlebar-tool"
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleTheme();
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          title={themeMode === "light" ? "Modo scuro" : "Modo chiaro"}
+          type="button"
+        >
+          {themeMode === "light" ? (
+            <SunDim size={14} weight="regular" />
+          ) : (
+            <Moon size={14} weight="regular" />
+          )}
+        </button>
+
+        <button
+          className="window-titlebar-tool"
+          onClick={(event) => {
+            event.stopPropagation();
+            onCheckUpdates();
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          title="Controlla aggiornamenti"
+          type="button"
+        >
+          <ArrowsClockwise size={14} weight="regular" />
+        </button>
+      </div>
+
+      <div className="window-titlebar-controls">
+        <button
+          aria-label="Minimizza finestra"
+          className="window-titlebar-button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleWindowAction("minimize");
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          type="button"
+        >
+          <Minus size={13} weight="bold" />
+        </button>
+        <button
+          aria-label="Massimizza finestra"
+          className="window-titlebar-button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleWindowAction("maximize");
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          type="button"
+        >
+          <Square size={11} weight="bold" />
+        </button>
+        <button
+          aria-label="Chiudi finestra"
+          className="window-titlebar-button window-titlebar-button-danger"
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleWindowAction("close");
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          type="button"
+        >
+          <X size={13} weight="bold" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function App() {
@@ -57,6 +310,7 @@ function AppShell() {
   const { notify } = useToast();
   const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();
   const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [commandPaletteAnchor, setCommandPaletteAnchor] = useState<DOMRect | null>(null);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
@@ -304,11 +558,25 @@ function AppShell() {
     }
   };
 
+  const toggleSidebar = useCallback(() => setIsSidebarCollapsed((current) => !current), []);
+
   return (
     <div
-      className="relative flex h-screen overflow-hidden bg-[var(--bg-app-accent)] [font-family:var(--font-sans)] text-[var(--text-primary)]"
+      className="app-window-frame relative flex h-screen overflow-hidden bg-[var(--bg-app-accent)] [font-family:var(--font-sans)] text-[var(--text-primary)]"
       style={{ fontFamily: "var(--font-sans)" }}
     >
+      <WindowTitleBar
+        activeRoute={activeRoute}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onCheckUpdates={() => handleTopbarAction("check-updates")}
+        onOpenCommandPalette={(anchorRect) => {
+          setCommandPaletteAnchor(anchorRect);
+          setIsCommandPaletteOpen(true);
+        }}
+        onRouteChange={navigate}
+        onToggleSidebar={toggleSidebar}
+      />
+
       {availableUpdate ? (
         <UpdateExperienceDialog
           installState={installState}
@@ -337,18 +605,16 @@ function AppShell() {
         <ShortcutHelpDialog onClose={() => setIsShortcutHelpOpen(false)} />
       ) : null}
 
-      <AppSidebar activeRoute={activeRoute} onRouteChange={navigate} />
+      <AppSidebar
+        activeRoute={activeRoute}
+        collapsed={isSidebarCollapsed}
+        onRouteChange={navigate}
+      />
 
       <main className="min-w-0 flex-1 overflow-hidden p-0">
         <section className="main-content-shell flex h-full min-w-0 overflow-hidden rounded-l-[28px] rounded-r-none bg-[var(--surface-base)]">
           <div className="flex min-w-0 flex-1 flex-col">
-            <TopToolbar
-              onOpenCommandPalette={(anchorRect) => {
-                setCommandPaletteAnchor(anchorRect);
-                setIsCommandPaletteOpen(true);
-              }}
-              onPageAction={handleTopbarAction}
-            />
+            <TopToolbar onPageAction={handleTopbarAction} />
 
             <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
               <RouteRenderer activeRoute={activeRoute} />

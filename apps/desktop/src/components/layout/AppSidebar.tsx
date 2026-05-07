@@ -1,8 +1,5 @@
 import {
-  Bell,
   BookOpen,
-  CaretDoubleLeft,
-  CaretDoubleRight,
   ChartBar,
   Folders,
   Gear,
@@ -37,18 +34,17 @@ type NavItem = {
 
 type AppSidebarProps = {
   activeRoute: QuantaraRoute;
+  collapsed: boolean;
   onRouteChange: (route: QuantaraRoute) => void;
 };
 
 const SIDEBAR_WIDTH_EXPANDED = 212;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
 
-export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebarProps) {
   const [projects, setProjects] = useState<{ id: string; contractor: string }[]>([]);
   const [contractorCount, setContractorCount] = useState(0);
   const debounceRef = useRef<number | undefined>(undefined);
-  const toggleCollapsed = useCallback(() => setCollapsed((prev) => !prev), []);
 
   const loadProjects = useCallback(() => {
     let active = true;
@@ -169,11 +165,11 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
   return (
     <motion.aside
       animate={{ width: sidebarWidth }}
-      className="relative z-40 flex h-full shrink-0 overflow-visible rounded-r-[28px] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%),color-mix(in_srgb,var(--surface-base)_96%,var(--bg-app)_4%))] shadow-[inset_-1px_0_0_color-mix(in_srgb,var(--border-subtle)_42%,transparent),18px_0_44px_color-mix(in_srgb,var(--text-primary)_4%,transparent)] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--surface-base)_42%,transparent)),linear-gradient(180deg,color-mix(in_srgb,var(--border-subtle)_14%,transparent),transparent_22%)] [font-family:var(--font-sans)] text-[var(--text-primary)]"
+      className="relative z-40 flex h-full shrink-0 overflow-visible bg-transparent [font-family:var(--font-sans)] text-[var(--text-primary)]"
       transition={{ type: "spring", stiffness: 280, damping: 34, mass: 0.35 }}
     >
-      <div className="relative flex min-h-0 w-full flex-col overflow-visible">
-        <div className="shrink-0 px-3 pb-4 pt-4">
+      <div className="sidebar-rail relative flex min-h-0 w-full flex-col overflow-visible">
+        <div className="shrink-0 px-3 pb-3 pt-3">
           <SidebarHeader collapsed={collapsed} />
         </div>
 
@@ -198,7 +194,7 @@ export function AppSidebar({ activeRoute, onRouteChange }: AppSidebarProps) {
         </div>
 
         <div className="shrink-0 px-2.5 pb-3 pt-3">
-          <SidebarFooter collapsed={collapsed} onToggle={toggleCollapsed} />
+          <SidebarFooter collapsed={collapsed} />
         </div>
       </div>
     </motion.aside>
@@ -209,34 +205,19 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-[18px]",
-        collapsed ? "justify-center px-0" : "justify-between px-1.5",
+        "flex items-center rounded-[18px]",
+        collapsed ? "justify-center px-0" : "justify-center px-1.5",
       )}
     >
-      <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
-        <div className="shrink-0">
-          <img
-            alt="Quantara"
-            className="h-9 w-9 object-contain"
-            height={36}
-            src={logoSidebar}
-            width={36}
-          />
-        </div>
-        {!collapsed && (
-          <div className="min-w-0 text-left">
-            <div className="text-[14px] font-bold text-[var(--text-primary)]">Quantara</div>
-            <div className="text-[10px] font-medium tracking-[0.08em] text-[var(--text-secondary)]">
-              Construction Suite
-            </div>
-          </div>
-        )}
+      <div className="shrink-0">
+        <img
+          alt="Quantara"
+          className={cn("object-contain", collapsed ? "h-9 w-9" : "h-10 w-10")}
+          height={40}
+          src={logoSidebar}
+          width={40}
+        />
       </div>
-      {!collapsed && (
-        <span className="flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)]">
-          <Bell size={16} weight="regular" />
-        </span>
-      )}
     </div>
   );
 }
@@ -398,7 +379,7 @@ function NavBadgePill({ badge }: { badge: NavBadge }) {
   );
 }
 
-function SidebarFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   return (
     <footer>
       <div
@@ -439,21 +420,6 @@ function SidebarFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: 
             </span>
           </div>
         )}
-        <button
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] transition-all duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring-focus)]",
-            !collapsed && "ml-auto",
-          )}
-          onClick={onToggle}
-          title={collapsed ? "Espandi sidebar" : "Comprimi sidebar"}
-          type="button"
-        >
-          {collapsed ? (
-            <CaretDoubleRight size={16} weight="regular" />
-          ) : (
-            <CaretDoubleLeft size={16} weight="regular" />
-          )}
-        </button>
       </div>
     </footer>
   );

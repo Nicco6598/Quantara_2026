@@ -2,6 +2,15 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.33 - 2026-05-07
+
+- **Titlebar desktop ridisegnata** — la finestra ora usa una barra superiore personalizzata con navigazione sezione, comandi rapidi, cambio tema, controllo aggiornamenti e pulsante per espandere o compattare la sidebar.
+- **Controlli finestra ripristinati** — minimizza, massimizza e chiudi funzionano correttamente anche con la titlebar custom, grazie ai permessi Tauri dedicati e a una gestione separata dell'area trascinabile.
+- **Sidebar piu integrata** — rimossa la sensazione di pannello incapsulato: la sidebar ora vive direttamente sul background dell'app, dando piu profondita alla vista principale e riducendo i bordi doppi.
+- **Toolbar superiore piu pulita** — rimossi doppioni come ricerca globale, cambio tema e aggiornamenti dalla toolbar principale, ora concentrati nella titlebar. La toolbar resta dedicata alle azioni della pagina corrente.
+- **Cronologia di navigazione a tendina** — sostituito il vecchio breadcrumb ingombrante con un menu cronologico compatto, piu leggibile e meno invasivo nella barra superiore.
+- **Breadcrumb semplificato** — il percorso pagina e stato ridotto a un chip piu compatto, evitando testo lungo e caos visivo nella testata.
+
 ## 0.2.32 - 2026-05-07
 
 - **Import Tariffari** — fixati bug di duplicati presi dalle descrizioni, possibilità di resettare un singolo campo o eliminare direttamente la riga, ora il pannello di check rimane sempre visibile.

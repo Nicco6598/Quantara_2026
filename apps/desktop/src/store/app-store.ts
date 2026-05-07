@@ -41,6 +41,7 @@ type NavigationSlice = {
   canGoForward: boolean;
   navigateBack: () => void;
   navigateForward: () => void;
+  navigateToHistoryIndex: (index: number) => void;
   pendingWorkflowAction: WorkflowAction;
   routeHistory: NavEntry[];
   routeHistoryIndex: number;
@@ -116,6 +117,20 @@ export const useAppStore = create<AppStore>()(
 
           return {
             ...createNavigationState(state.routeHistory, state.routeHistoryIndex + 1),
+          };
+        }),
+      navigateToHistoryIndex: (index) =>
+        set((state) => {
+          if (
+            index < 0 ||
+            index >= state.routeHistory.length ||
+            index === state.routeHistoryIndex
+          ) {
+            return state;
+          }
+
+          return {
+            ...createNavigationState(state.routeHistory, index),
           };
         }),
       pendingWorkflowAction: null,
@@ -227,7 +242,10 @@ export function useNavigationState() {
       canGoForward: state.canGoForward,
       navigateBack: state.navigateBack,
       navigateForward: state.navigateForward,
+      navigateToHistoryIndex: state.navigateToHistoryIndex,
       pendingWorkflowAction: state.pendingWorkflowAction,
+      routeHistory: state.routeHistory,
+      routeHistoryIndex: state.routeHistoryIndex,
       setActiveRoute: state.setActiveRoute,
       setPendingWorkflowAction: state.setPendingWorkflowAction,
       setTariffImportToolbar: state.setTariffImportToolbar,

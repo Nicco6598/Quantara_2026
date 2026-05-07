@@ -178,6 +178,325 @@ body {
   margin: 0;
 }
 
+.app-window-frame {
+  padding-top: 34px;
+}
+
+.app-window-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 20;
+  height: 28px;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent-primary) 14%, transparent),
+      transparent 42%
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-base) 76%, transparent), transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+}
+
+.window-titlebar {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 60;
+  display: flex;
+  height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-left: 8px;
+  background:
+    radial-gradient(
+      circle at 18% 0%,
+      color-mix(in srgb, var(--accent-primary) 12%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-base) 94%, var(--bg-muted) 6%),
+      color-mix(in srgb, var(--surface-base) 86%, var(--bg-app) 14%)
+    );
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 54%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+  user-select: none;
+}
+
+.window-titlebar-drag-strip {
+  position: absolute;
+  inset: 0 140px 0 214px;
+  z-index: 0;
+}
+
+.window-titlebar-left {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  gap: 8px;
+}
+
+.window-titlebar-center {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+}
+
+.window-titlebar-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+}
+
+.window-titlebar-mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 11%, transparent);
+}
+
+.window-titlebar-separator {
+  width: 1px;
+  height: 12px;
+  background: color-mix(in srgb, var(--border-strong) 58%, transparent);
+}
+
+.window-titlebar-subtitle {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.window-titlebar-tool {
+  display: grid;
+  width: 34px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-base) 58%, transparent);
+  color: var(--text-secondary);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.window-titlebar-tool:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-subtle));
+  background: color-mix(in srgb, var(--surface-base) 82%, var(--bg-muted) 18%);
+  color: var(--text-primary);
+}
+
+.window-titlebar-tool svg {
+  transition: transform 180ms ease;
+}
+
+.window-titlebar-route-picker {
+  position: relative;
+}
+
+.window-titlebar-route-trigger {
+  display: inline-flex;
+  height: 24px;
+  max-width: 210px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 54%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-base) 62%, transparent);
+  color: var(--text-primary);
+  padding: 0 9px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.window-titlebar-route-trigger:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 20%, var(--border-subtle));
+  background: color-mix(in srgb, var(--surface-base) 84%, var(--bg-muted) 16%);
+}
+
+.window-titlebar-route-section {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.window-titlebar-route-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.window-titlebar-route-menu {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 7px);
+  z-index: 70;
+  width: 210px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--surface-base) 96%, var(--bg-muted) 4%),
+    color-mix(in srgb, var(--surface-base) 88%, var(--bg-muted) 12%)
+  );
+  box-shadow:
+    0 22px 60px color-mix(in srgb, var(--text-primary) 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 22%, transparent);
+  padding: 5px;
+  transform: translateX(-50%);
+}
+
+.window-titlebar-route-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 11px;
+  padding: 7px 8px;
+  text-align: left;
+  transition: background-color 180ms ease;
+}
+
+.window-titlebar-route-item:hover {
+  background: color-mix(in srgb, var(--bg-muted) 78%, var(--surface-base) 22%);
+}
+
+.window-titlebar-route-item:disabled {
+  background: color-mix(in srgb, var(--accent-primary) 10%, var(--surface-base));
+  cursor: default;
+}
+
+.window-titlebar-route-item span:first-child {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.window-titlebar-route-item span:last-child {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.window-titlebar-command {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 54%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-base) 58%, transparent);
+  color: var(--text-secondary);
+  padding: 0 7px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.window-titlebar-command:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 20%, var(--border-subtle));
+  background: color-mix(in srgb, var(--surface-base) 84%, var(--bg-muted) 16%);
+  color: var(--text-primary);
+}
+
+.window-titlebar-command span {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.window-titlebar-command kbd {
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 66%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-base) 82%, transparent);
+  color: var(--text-secondary);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 5px;
+}
+
+.window-titlebar-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+}
+
+.window-titlebar-button {
+  display: grid;
+  width: 46px;
+  place-items: center;
+  color: var(--text-secondary);
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.window-titlebar-button:hover {
+  background: color-mix(in srgb, var(--bg-muted-strong) 76%, transparent);
+  color: var(--text-primary);
+}
+
+.window-titlebar-button-danger:hover {
+  background: var(--danger-base);
+  color: var(--text-inverse);
+}
+
+.sidebar-rail {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-base) 28%, transparent),
+      color-mix(in srgb, var(--surface-base) 10%, transparent) 58%,
+      transparent
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-app) 84%, transparent), transparent 38%);
+}
+
+.sidebar-rail::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--border-subtle) 54%, transparent) 18%,
+    color-mix(in srgb, var(--border-subtle) 36%, transparent) 76%,
+    transparent
+  );
+  box-shadow: 18px 0 36px color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
 .app-aura::before,
 .app-aura::after {
   content: "";
@@ -945,30 +1264,30 @@ body {
 }
 
 .top-toolbar-bezel {
-  border-radius: 28px;
-  background: transparent;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--bg-muted-strong) 42%, transparent);
   padding: 0;
 }
 
 .top-toolbar-core {
   position: relative;
   overflow: visible;
-  border: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
-  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 52%, transparent);
+  border-radius: 22px;
   background:
     radial-gradient(
       circle at 82% 0%,
-      color-mix(in srgb, var(--accent-primary) 5%, transparent),
+      color-mix(in srgb, var(--accent-primary) 4%, transparent),
       transparent 34%
     ),
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--surface-base) 94%, white 6%),
-      color-mix(in srgb, var(--surface-base) 88%, var(--bg-muted) 12%)
+      color-mix(in srgb, var(--surface-base) 96%, white 4%),
+      color-mix(in srgb, var(--surface-base) 91%, var(--bg-muted) 9%)
     );
   box-shadow:
-    0 18px 48px color-mix(in srgb, var(--text-primary) 7%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 28%, transparent);
+    0 12px 30px color-mix(in srgb, var(--text-primary) 5%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 24%, transparent);
 }
 
 .top-toolbar-core::before {
@@ -1006,7 +1325,7 @@ body {
 }
 
 .top-toolbar-divider {
-  height: 34px;
+  height: 28px;
   width: 1px;
   background: linear-gradient(
     180deg,
@@ -1014,7 +1333,7 @@ body {
     color-mix(in srgb, var(--border-strong) 74%, transparent),
     transparent
   );
-  margin-inline: 6px;
+  margin-inline: 4px;
 }
 
 .top-toolbar-history,
@@ -1024,6 +1343,129 @@ body {
   border: 1px solid color-mix(in srgb, var(--border-subtle) 46%, transparent);
   background: color-mix(in srgb, var(--surface-base) 68%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 20%, transparent);
+}
+
+.top-toolbar-history-wrap {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.top-toolbar-history-trigger {
+  display: flex;
+  height: 30px;
+  width: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 46%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-base) 68%, transparent);
+  color: var(--text-secondary);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 20%, transparent);
+  transition:
+    background-color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.top-toolbar-history-trigger:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 18%, var(--border-subtle));
+  background: color-mix(in srgb, var(--surface-base) 88%, var(--bg-muted) 12%);
+  color: var(--text-primary);
+  transform: translate3d(0, -1px, 0);
+}
+
+.top-toolbar-history-menu {
+  overflow-x: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--surface-base) 96%, var(--bg-muted) 4%),
+    color-mix(in srgb, var(--surface-base) 88%, var(--bg-muted) 12%)
+  );
+  box-shadow:
+    0 22px 60px color-mix(in srgb, var(--text-primary) 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 22%, transparent);
+}
+
+.top-toolbar-history-button {
+  border: 0;
+  background: transparent;
+  transition:
+    background-color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.top-toolbar-history-button:hover {
+  background: color-mix(in srgb, var(--accent-primary) 9%, transparent);
+  color: var(--accent-primary);
+}
+
+.top-toolbar-history-item {
+  min-width: 0;
+  color: var(--text-secondary);
+  transition:
+    background-color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.top-toolbar-history-item:hover {
+  background: color-mix(in srgb, var(--bg-muted) 78%, var(--surface-base) 22%);
+}
+
+.top-toolbar-history-item-active {
+  background: color-mix(in srgb, var(--accent-primary) 10%, var(--surface-base));
+}
+
+.top-toolbar-history-item-index {
+  display: grid;
+  width: 28px;
+  height: 24px;
+  place-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.breadcrumb-rail {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 260px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 44%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-base) 54%, transparent);
+  padding: 5px 9px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+}
+
+.breadcrumb-section {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.breadcrumb-separator {
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--text-secondary) 72%, transparent);
+}
+
+.breadcrumb-current {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .top-toolbar-search,
@@ -1057,7 +1499,7 @@ body {
     radial-gradient(circle at 30% 0%, color-mix(in srgb, white 16%, transparent), transparent 42%),
     linear-gradient(180deg, var(--accent-primary), var(--accent-primary-hover));
   box-shadow:
-    0 12px 24px color-mix(in srgb, var(--accent-primary) 20%, transparent),
+    0 8px 18px color-mix(in srgb, var(--accent-primary) 18%, transparent),
     inset 0 1px 0 color-mix(in srgb, white 24%, transparent);
 }
 
@@ -1082,9 +1524,9 @@ body {
 }
 
 .top-toolbar-action-mark {
-  width: 24px;
-  height: 24px;
-  font-size: 10px;
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
   font-weight: 900;
   transition: transform 440ms cubic-bezier(0.16, 1, 0.3, 1);
 }
