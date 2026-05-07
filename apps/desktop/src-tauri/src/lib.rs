@@ -7,7 +7,7 @@ mod models;
 mod updater;
 
 use infrastructure::local_storage::DbConnection;
-use tauri::Manager;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub fn run() {
     #[cfg(all(target_os = "windows", not(debug_assertions)))]
@@ -21,6 +21,39 @@ pub fn run() {
         .setup(|app| {
             let db = DbConnection::open(app.handle())?;
             app.manage(db);
+
+            #[cfg(target_os = "macos")]
+            {
+                WebviewWindowBuilder::new(
+                    app,
+                    "main",
+                    WebviewUrl::App("index.html".into()),
+                )
+                .title("Quantara")
+                .inner_size(1440.0, 900.0)
+                .min_inner_size(1180.0, 720.0)
+                .maximized(true)
+                .decorations(true)
+                .hidden_title(true)
+                .title_bar_style(tauri::TitleBarStyle::Overlay)
+                .build()?;
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                WebviewWindowBuilder::new(
+                    app,
+                    "main",
+                    WebviewUrl::App("index.html".into()),
+                )
+                .title("Quantara")
+                .inner_size(1440.0, 900.0)
+                .min_inner_size(1180.0, 720.0)
+                .maximized(true)
+                .decorations(false)
+                .build()?;
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

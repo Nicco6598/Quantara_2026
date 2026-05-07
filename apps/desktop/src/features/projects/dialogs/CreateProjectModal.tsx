@@ -196,7 +196,7 @@ export function CreateProjectModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8 backdrop-blur-md">
       <button
         aria-label="Chiudi creazione progetto"
         className="absolute inset-0 cursor-default"
@@ -209,8 +209,8 @@ export function CreateProjectModal({
         transition={{ duration: 0.5, ease: SPRING_EASE }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
       >
-        <div className="flex flex-col rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-          <div className="flex items-start justify-between gap-5 border-b border-[var(--border-subtle)] px-6 pb-5 pt-6 md:px-8 md:pt-7">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          <div className="flex items-start justify-between gap-5 border-b border-[var(--border-subtle)] px-6 pb-3 pt-4 md:px-8 md:pt-5">
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                 Nuovo progetto
@@ -234,7 +234,7 @@ export function CreateProjectModal({
             </button>
           </div>
 
-          <div className="px-6 py-5 md:px-8">
+          <div className="px-6 py-3 md:px-8">
             <ProjectStepper step={step} />
           </div>
 

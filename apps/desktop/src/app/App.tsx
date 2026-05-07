@@ -70,6 +70,7 @@ function ThemeApplier() {
 
 function WindowTitleBar({
   activeRoute,
+  isFullscreen,
   isSidebarCollapsed,
   isMacOs,
   onCheckUpdates,
@@ -78,6 +79,7 @@ function WindowTitleBar({
   onToggleSidebar,
 }: {
   activeRoute: QuantaraRoute;
+  isFullscreen: boolean;
   isSidebarCollapsed: boolean;
   isMacOs: boolean;
   onCheckUpdates: () => void;
@@ -176,9 +178,11 @@ function WindowTitleBar({
   );
 
   return (
-    <div className={isMacOs ? "window-titlebar window-titlebar-macos" : "window-titlebar"}>
+    <div
+      className={isMacOs ? "window-titlebar window-titlebar-macos" : "window-titlebar"}
+      data-fullscreen={isFullscreen && isMacOs ? "" : undefined}
+    >
       <div className="window-titlebar-drag-strip" data-tauri-drag-region />
-      {isMacOs ? windowControls : null}
       <div className="window-titlebar-left">
         <button
           aria-label={isSidebarCollapsed ? "Espandi sidebar" : "Compatta sidebar"}
@@ -341,6 +345,7 @@ function AppShell() {
   const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMacOs, setIsMacOs] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [commandPaletteAnchor, setCommandPaletteAnchor] = useState<DOMRect | null>(null);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
@@ -648,6 +653,30 @@ function AppShell() {
     setIsMacOs(platform.includes("mac"));
   }, []);
 
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    const setup = async () => {
+      if (!("__TAURI_INTERNALS__" in window)) return;
+
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      const appWindow = getCurrentWindow();
+
+      const update = async () => {
+        setIsFullscreen(await appWindow.isFullscreen());
+      };
+
+      await update();
+      unlisten = await appWindow.onResized(update);
+    };
+
+    setup();
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
   return (
     <div
       className="app-window-frame relative flex h-screen overflow-hidden bg-[var(--bg-app-accent)] [font-family:var(--font-sans)] text-[var(--text-primary)]"
@@ -655,6 +684,7 @@ function AppShell() {
     >
       <WindowTitleBar
         activeRoute={activeRoute}
+        isFullscreen={isFullscreen}
         isSidebarCollapsed={isSidebarCollapsed}
         isMacOs={isMacOs}
         onCheckUpdates={() => handleTopbarAction("check-updates")}

@@ -2,6 +2,11 @@
 @import "tw-animate-css";
 @import "@quantara/ui-tokens/tokens.css";
 
+/* ── Custom breakpoints ── */
+@theme {
+  --breakpoint-ml: 90rem;
+}
+
 /* ── Responsive utilities ── */
 @utility min-w-0 {
   min-width: 0;
@@ -10,6 +15,30 @@
 @utility break-words {
   overflow-wrap: break-word;
   word-break: break-word;
+}
+
+@utility text-fluid-sm {
+  font-size: clamp(0.8125rem, 0.5vw + 0.7rem, 0.875rem);
+}
+
+@utility text-fluid-base {
+  font-size: clamp(0.875rem, 0.5vw + 0.75rem, 0.9375rem);
+}
+
+@utility text-fluid-lg {
+  font-size: clamp(1rem, 0.8vw + 0.8rem, 1.125rem);
+}
+
+@utility text-fluid-xl {
+  font-size: clamp(1.25rem, 1.2vw + 0.9rem, 1.5rem);
+}
+
+@utility text-fluid-2xl {
+  font-size: clamp(1.5rem, 1.8vw + 1rem, 1.875rem);
+}
+
+@utility text-fluid-3xl {
+  font-size: clamp(1.75rem, 2.5vw + 1rem, 2.5rem);
 }
 
 main {
@@ -179,7 +208,7 @@ body {
 }
 
 .app-window-frame {
-  padding-top: 34px;
+  padding-top: 38px;
 }
 
 .app-window-frame::before {
@@ -204,7 +233,7 @@ body {
   inset: 0 0 auto;
   z-index: 60;
   display: flex;
-  height: 34px;
+  height: 38px;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
@@ -233,6 +262,7 @@ body {
 
 .window-titlebar-macos {
   justify-content: center;
+  height: 38px;
   padding-left: 78px;
   background: linear-gradient(
     180deg,
@@ -245,8 +275,16 @@ body {
     0 1px 0 color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 
+.window-titlebar-macos[data-fullscreen] {
+  padding-left: 10px;
+}
+
 .window-titlebar-macos .window-titlebar-drag-strip {
   inset: 0 16px 0 118px;
+}
+
+.window-titlebar-macos[data-fullscreen] .window-titlebar-drag-strip {
+  inset: 0 16px 0 50px;
 }
 
 .window-titlebar-left {
@@ -262,6 +300,10 @@ body {
 .window-titlebar-macos .window-titlebar-left {
   position: absolute;
   left: 76px;
+}
+
+.window-titlebar-macos[data-fullscreen] .window-titlebar-left {
+  left: 8px;
 }
 
 .window-titlebar-center {
@@ -1791,6 +1833,7 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--accent-primary) 40%, transparent) transparent;
+  scrollbar-gutter: stable;
 }
 
 .app-aura > * {
@@ -1800,8 +1843,11 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
 }
 
 button,
@@ -1820,6 +1866,36 @@ button:disabled,
 input,
 textarea {
   cursor: text;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--ring-focus);
+  outline-offset: 1px;
+}
+
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  display: none;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  display: none;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
 }
 
 :root[data-motion="reduced"] *,

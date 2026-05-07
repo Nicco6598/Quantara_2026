@@ -2,6 +2,10 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.35 - 2026-05-07
+
+- **Bug Fixes** — Bug fix generali e correzione parser.
+
 ## 0.2.34 - 2026-05-07
 
 - **Modale aggiornamento responsive** — la finestra che segnala un update disponibile ora resta dentro lo schermo anche su laptop e viewport piccoli: header e azioni rimangono accessibili, mentre le note scorrono internamente.
