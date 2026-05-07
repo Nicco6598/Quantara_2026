@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowRight,
   Building2,
@@ -9,7 +9,6 @@ import {
   FileSpreadsheet,
   FileText,
   Printer,
-  RotateCcw,
   Save,
   Wallet,
 } from "lucide-react";
@@ -519,6 +518,7 @@ export function SalCreationScreen() {
         code: l.voice.code,
         description: l.voice.description,
         id: l.voice.id,
+        laborPercentage: l.voice.laborPercentage,
         projectYear: l.voice.tariffYear,
         unit: l.voice.unit,
         unitPrice: l.voice.unitPrice,
@@ -584,6 +584,7 @@ export function SalCreationScreen() {
         code: l.voice.code,
         description: l.voice.description,
         id: l.voice.id,
+        laborPercentage: l.voice.laborPercentage,
         projectYear: l.voice.tariffYear,
         unit: l.voice.unit,
         unitPrice: l.voice.unitPrice,
@@ -1219,8 +1220,6 @@ function VoicesStep({
     [voices],
   );
   const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
-  const [noteModalVoiceId, setNoteModalVoiceId] = useState<string | null>(null);
-  const [noteModalDraft, setNoteModalDraft] = useState("");
   const lastInteractedRef = useRef<string | null>(null);
 
   const handleCopyLine = useCallback(
@@ -1240,22 +1239,6 @@ function VoicesStep({
     },
     [lineViews],
   );
-
-  const handleOpenNote = useCallback(
-    (voiceId: string) => {
-      const line = lineViews.find((l) => l.voice.id === voiceId);
-      setNoteModalDraft(line?.notes ?? "");
-      setNoteModalVoiceId(voiceId);
-    },
-    [lineViews],
-  );
-
-  const handleNoteSave = useCallback(() => {
-    if (noteModalVoiceId) {
-      onNotesChange(noteModalVoiceId, noteModalDraft);
-    }
-    setNoteModalVoiceId(null);
-  }, [noteModalVoiceId, noteModalDraft, onNotesChange]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1343,7 +1326,7 @@ function VoicesStep({
         copiedVoiceId={copiedLine?.voice.id ?? null}
         onCopyLine={handleCopyLine}
         onFactorChange={onFactorChange}
-        onOpenNote={handleOpenNote}
+        onNotesChange={onNotesChange}
         onRemove={onRemove}
         onReorder={onReorder}
         onSurcharge={onSurcharge}
@@ -1435,104 +1418,6 @@ function VoicesStep({
           Continua <ArrowRight className="size-4" />
         </motion.button>
       </div>
-
-      <AnimatePresence>
-        {noteModalVoiceId ? (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={() => setNoteModalVoiceId(null)}
-          >
-            <motion.div
-              className="flex w-full max-w-lg flex-col overflow-hidden rounded-[22px] bg-[var(--surface-base)] p-6 shadow-2xl ring-1 ring-[var(--border-subtle)] sm:max-w-xl"
-              initial={{ opacity: 0, y: 20, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.96 }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
-                  <svg
-                    aria-hidden="true"
-                    className="size-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </span>
-                <div>
-                  <div className="text-[17px] font-bold leading-tight text-[var(--text-primary)]">
-                    Nota descrittiva
-                  </div>
-                  <div className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
-                    {lineViews.find((l) => l.voice.id === noteModalVoiceId)?.voice.code ?? ""} —{" "}
-                    {lineViews.find((l) => l.voice.id === noteModalVoiceId)?.voice.description ??
-                      ""}
-                  </div>
-                </div>
-              </div>
-              <textarea
-                className="mt-5 h-52 w-full resize-y rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-muted)]/40 px-4 py-3 text-[14px] leading-6 outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                onChange={(e) => setNoteModalDraft(e.target.value)}
-                placeholder="Inserisci il descrittivo per questa voce…"
-                value={noteModalDraft}
-              />
-              {noteModalVoiceId && noteModalDraft.trim().length > 0 ? (
-                <motion.button
-                  className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)] hover:ring-[var(--danger-base)]/30"
-                  onClick={() => {
-                    if (noteModalVoiceId) {
-                      onNotesChange(noteModalVoiceId, "");
-                    }
-                    setNoteModalVoiceId(null);
-                  }}
-                  type="button"
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.96 }}
-                  transition={{ duration: 0.42, ease: BUTTER_EASE }}
-                >
-                  <RotateCcw className="size-3.5" />
-                  Resetta nota
-                </motion.button>
-              ) : null}
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <span className="text-[11px] font-medium text-[var(--text-secondary)]">
-                  {noteModalDraft.length} caratteri
-                </span>
-                <div className="flex gap-2">
-                  <motion.button
-                    className="inline-flex h-10 items-center rounded-full bg-[var(--bg-muted)] px-5 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-                    onClick={() => setNoteModalVoiceId(null)}
-                    type="button"
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.96 }}
-                    transition={{ duration: 0.42, ease: BUTTER_EASE }}
-                  >
-                    Annulla
-                  </motion.button>
-                  <motion.button
-                    className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
-                    onClick={handleNoteSave}
-                    type="button"
-                    whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.96 }}
-                    transition={{ duration: 0.42, ease: BUTTER_EASE }}
-                  >
-                    Salva nota
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </div>
   );
 }

@@ -2,11 +2,11 @@ import { CheckCircle2, FileText, Loader, ScanLine, XCircle } from "lucide-react"
 import type { ImportFileProgress } from "@/lib/desktopData";
 
 export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[] }) {
-  const doneCount = files.filter((f) => f.status === "done" || f.status === "error").length;
+  const doneCount = files.filter((f) => f.status === "done").length;
   const errorCount = files.filter((f) => f.status === "error").length;
-  const total = files[0]?.total ?? 0;
   const processingCount = files.filter((f) => f.status === "processing").length;
-  const currentIndex = files.findIndex((f) => f.status === "processing");
+  const total = files.length;
+  const completedCount = doneCount + errorCount;
 
   return (
     <div className="fixed inset-0 z-[82] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
@@ -24,23 +24,23 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
                 <h3 className="text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)]">
                   Importazione tariffari
                 </h3>
-                <span className="inline-flex h-7 items-center rounded-full bg-[var(--accent-primary)]/10 px-3 text-[12px] font-bold text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]/20">
-                  {currentIndex >= 0 ? currentIndex + 1 : doneCount}/{total}
+                <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-[var(--accent-primary)]/10 px-3 text-[12px] font-bold text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]/20">
+                  {completedCount}/{total}
                 </span>
               </div>
-              <p className="mt-2 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+              <p className="mt-1.5 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
                 {total === 0
-                  ? "Seleziona i file PDF da importare..."
+                  ? "In attesa dei file PDF..."
                   : processingCount > 0
                     ? `Elaborazione in corso...`
-                    : errorCount > 0
-                      ? `${total} file elaborati con ${errorCount} errori`
-                      : `${total} file pronti per la preview`}
+                    : completedCount === total && errorCount === 0
+                      ? `${total} file pronti per la preview`
+                      : `${completedCount}/${total} file elaborati`}
               </p>
             </div>
           </div>
 
-          <div className="mt-6 space-y-2">
+          <div className="mt-6 max-h-[50vh] space-y-2 overflow-y-auto pr-1">
             {files.map((file) => (
               <div
                 className="flex items-center gap-3 rounded-[14px] bg-[var(--bg-muted)]/60 px-4 py-3"
@@ -68,18 +68,29 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
                       {file.status === "pending"
                         ? "In attesa"
                         : file.status === "processing"
-                          ? "Lettura in corso..."
+                          ? file.pagesTotal
+                            ? `Lettura pagina ${file.pagesParsed ?? 0} di ${file.pagesTotal}`
+                            : "Lettura in corso..."
                           : file.status === "done"
                             ? file.pagesTotal
-                              ? `${file.pagesParsed} pagine elaborate su ${file.pagesTotal} totali`
+                              ? `${file.pagesTotal} pagine elaborate`
                               : "Completato"
                             : "Errore"}
                     </div>
                   )}
                 </div>
                 {file.status === "processing" ? (
-                  <div className="h-1.5 w-20 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-                    <div className="h-full w-1/3 animate-[tariff-import-scan_1.15s_cubic-bezier(0.22,1,0.36,1)_infinite] rounded-full bg-[var(--accent-primary)]" />
+                  <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
+                    {file.pagesTotal && file.pagesParsed ? (
+                      <div
+                        className="h-full rounded-full bg-[var(--accent-primary)] transition-all duration-300"
+                        style={{
+                          width: `${Math.min(100, (file.pagesParsed / file.pagesTotal) * 100)}%`,
+                        }}
+                      />
+                    ) : (
+                      <div className="h-full w-1/3 animate-[tariff-import-scan_1.15s_cubic-bezier(0.22,1,0.36,1)_infinite] rounded-full bg-[var(--accent-primary)]" />
+                    )}
                   </div>
                 ) : null}
               </div>

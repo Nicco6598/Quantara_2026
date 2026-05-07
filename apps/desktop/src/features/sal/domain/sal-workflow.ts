@@ -16,6 +16,7 @@ export type SalTariffVoice = {
   description: string;
   id: string;
   isSafetyCost?: boolean;
+  laborPercentage?: number;
   projectYear: number;
   unit: string;
   unitPrice: number;
@@ -127,7 +128,7 @@ function buildSalDocumentViewWithVoiceMap(
               code: voice.code,
               description: voice.description,
             }),
-          laborPercentage: 0,
+          laborPercentage: voice.laborPercentage ?? 0,
           source: voice as never,
           tariffBookId: "",
           tariffBookName: "",
@@ -168,6 +169,7 @@ function buildSalDocumentViewWithVoiceMap(
             description: line.voice.description,
             id: line.voice.id,
             isSafetyCost: line.voice.isSafetyCost,
+            laborPercentage: line.voice.laborPercentage,
             projectYear: line.voice.tariffYear,
             unit: line.voice.unit,
             unitPrice: line.voice.unitPrice,

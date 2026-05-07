@@ -314,12 +314,15 @@ function buildLinkedCharges(line: SalLineDraft, grossAmount: number): SalLinkedC
     return [];
   }
 
-  const total = roundCurrency(grossAmount * (line.surchargePercent / 100));
+  const laborPct = (line.voice.laborPercentage ?? 0) / 100;
+  const surchargePct = line.surchargePercent / 100;
+  const effectiveRate = surchargePct * laborPct;
+  const total = roundCurrency(grossAmount * effectiveRate);
   return [
     {
       baseAmount: grossAmount,
       code: `${line.voice.code}.MAG`,
-      description: "Maggiorazione applicata da regola economica",
+      description: `Maggiorazione ${line.surchargePercent}% × Manodopera ${line.voice.laborPercentage ?? 0}%`,
       id: `${line.id}-surcharge`,
       percent: line.surchargePercent,
       total,

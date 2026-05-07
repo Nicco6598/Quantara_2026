@@ -1,6 +1,5 @@
-import { parseEuroAmount } from "@quantara/domain-utils";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowDownToLine, CheckCircle2, ListChecks, Trash2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ListChecks, Trash2, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
@@ -43,11 +42,9 @@ export function TariffImportPreviewModal({
   const [modalReviewedFiles, setModalReviewedFiles] = useState<Set<number>>(
     () => new Set(metadatas.length === 1 ? [0] : []),
   );
-  const [isLoadMoreLinkVisible, setIsLoadMoreLinkVisible] = useState(false);
   const localActiveIndex = pageView ? activeIndex : modalActiveIndex;
   const activeMetadata = metadatas[localActiveIndex];
   const activeVoices = editableVoicesList[localActiveIndex] ?? [];
-  const loadMoreAnchorId = `tariff-import-load-more-${localActiveIndex}`;
 
   const validations = useMemo(
     () => metadatas.map((_, i) => getImportValidation(editableVoicesList[i] ?? [])),
@@ -196,27 +193,10 @@ export function TariffImportPreviewModal({
 
   function focusImportCell(rowIndex: number, field: string) {
     const cell = document.getElementById(`import-cell-${rowIndex}-${field}`);
-    cell?.scrollIntoView({ block: "center", inline: "nearest" });
-    cell?.focus();
-  }
-
-  function scrollToLoadMore() {
-    const anchor = document.getElementById(loadMoreAnchorId);
-    const scrollContainer =
-      anchor?.closest("[data-tariff-preview-scroll]") ?? getScrollableAncestor(anchor);
-
-    if (scrollContainer instanceof HTMLElement) {
-      scrollContainer.scrollTo({
-        behavior: "smooth",
-        top: scrollContainer.scrollHeight,
-      });
-      return;
+    if (cell) {
+      cell.scrollIntoView({ block: "center", inline: "nearest" });
+      cell.focus();
     }
-
-    window.scrollTo({
-      behavior: "smooth",
-      top: document.documentElement.scrollHeight,
-    });
   }
 
   const deleteDialog = deleteTarget ? (
@@ -258,17 +238,15 @@ export function TariffImportPreviewModal({
             <EditableTariffVoicesGrid
               duplicateCodes={duplicateCodes}
               groups={editableGroups}
-              loadMoreAnchorId={loadMoreAnchorId}
               onChange={updateVoice}
               onDelete={askDeleteVoice}
-              onLoadMoreVisibilityChange={setIsLoadMoreLinkVisible}
               validation={activeValidation}
             />
           </div>
         </div>
 
         {!hasVoices ? (
-          <div className="rounded-[20px] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
+          <div className="mt-4 rounded-[20px] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
             Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento contenga
             codici, unita di misura e prezzi leggibili.
           </div>
@@ -281,9 +259,7 @@ export function TariffImportPreviewModal({
           blockingIssueCount={blockingIssueCount}
           completionPercent={completionPercent}
           hasVoices={hasVoices}
-          isLoadMoreLinkVisible={isLoadMoreLinkVisible}
           isReviewReady={isReviewReady}
-          onLoadMore={scrollToLoadMore}
         />
         <InterventionPanel
           activeValidation={activeValidation}
@@ -405,10 +381,8 @@ export function TariffImportPreviewModal({
                 <EditableTariffVoicesGrid
                   duplicateCodes={duplicateCodes}
                   groups={editableGroups}
-                  loadMoreAnchorId={loadMoreAnchorId}
                   onChange={updateVoice}
                   onDelete={askDeleteVoice}
-                  onLoadMoreVisibilityChange={setIsLoadMoreLinkVisible}
                   validation={activeValidation}
                 />
               </div>
@@ -428,9 +402,7 @@ export function TariffImportPreviewModal({
                   blockingIssueCount={blockingIssueCount}
                   completionPercent={completionPercent}
                   hasVoices={hasVoices}
-                  isLoadMoreLinkVisible={isLoadMoreLinkVisible}
                   isReviewReady={isReviewReady}
-                  onLoadMore={scrollToLoadMore}
                 />
                 <InterventionPanel
                   activeValidation={activeValidation}
@@ -489,23 +461,6 @@ export function TariffImportPreviewModal({
       {deleteDialog}
     </div>
   );
-}
-
-function getScrollableAncestor(element: HTMLElement | null) {
-  let current = element?.parentElement ?? null;
-
-  while (current) {
-    const style = window.getComputedStyle(current);
-    const canScroll =
-      /(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight;
-    if (canScroll) {
-      return current;
-    }
-
-    current = current.parentElement;
-  }
-
-  return null;
 }
 
 function FloatingControlDock({ children }: { children: ReactNode }) {
@@ -575,18 +530,14 @@ function ControlPanel({
   blockingIssueCount,
   completionPercent,
   hasVoices,
-  isLoadMoreLinkVisible,
   isReviewReady,
-  onLoadMore,
 }: {
   activeMetadata: TariffPdfMetadata | undefined;
   activeValidation: ImportValidation;
   blockingIssueCount: number;
   completionPercent: number;
   hasVoices: boolean;
-  isLoadMoreLinkVisible: boolean;
   isReviewReady: boolean;
-  onLoadMore: () => void;
 }) {
   return (
     <div className="overflow-hidden rounded-[18px] bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--bg-muted)_12%)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] shadow-[0_18px_46px_rgba(15,23,42,0.12)]">
@@ -658,19 +609,6 @@ function ControlPanel({
             text="Anno coerente"
           />
         </div>
-        {isLoadMoreLinkVisible ? (
-          <motion.button
-            className="group flex w-full items-center justify-between gap-3 rounded-[14px] border border-dashed border-[var(--accent-primary)]/45 bg-[var(--accent-primary)]/10 px-3 py-2.5 text-left text-[12px] font-bold text-[var(--accent-primary)] transition-colors hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-            onClick={onLoadMore}
-            type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
-          >
-            <span>Vai al caricamento altre voci</span>
-            <ArrowDownToLine className="size-4 shrink-0 transition-transform group-hover:translate-y-0.5" />
-          </motion.button>
-        ) : null}
       </div>
     </div>
   );
@@ -706,7 +644,7 @@ function DeleteVoiceDialog({
             </h3>
             <p className="mt-2 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
               {code}
-              {description ? ` - ${description.slice(0, 140)}` : ""}
+              {description ? ` - ${description}` : ""}
             </p>
           </div>
         </div>

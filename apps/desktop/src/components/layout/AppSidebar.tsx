@@ -18,14 +18,12 @@ import { DATA_CHANGED_EVENT } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import type { QuantaraRoute } from "@/store/app-store";
 
-type NavBadge = {
-  label: string;
-  tone: "danger" | "info" | "neutral" | "success" | "warning";
-  value: string;
-};
-
 type NavItem = {
-  badges?: NavBadge[];
+  badges?: {
+    label: string;
+    tone: "danger" | "info" | "neutral" | "success" | "warning";
+    value: string;
+  }[];
   detail?: string;
   icon: React.ElementType;
   label: string;
@@ -39,7 +37,7 @@ type AppSidebarProps = {
 };
 
 const SIDEBAR_WIDTH_EXPANDED = 212;
-const SIDEBAR_WIDTH_COLLAPSED = 72;
+const SIDEBAR_WIDTH_COLLAPSED = 0;
 
 export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebarProps) {
   const [projects, setProjects] = useState<{ id: string; contractor: string }[]>([]);
@@ -165,15 +163,15 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   return (
     <motion.aside
       animate={{ width: sidebarWidth }}
-      className="relative z-40 flex h-full shrink-0 overflow-visible bg-transparent [font-family:var(--font-sans)] text-[var(--text-primary)]"
-      transition={{ type: "spring", stiffness: 280, damping: 34, mass: 0.35 }}
+      className="relative z-40 flex h-full shrink-0 overflow-hidden bg-transparent [font-family:var(--font-sans)] text-[var(--text-primary)]"
+      transition={{ type: "tween", duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="sidebar-rail relative flex min-h-0 w-full flex-col overflow-visible">
+      <div className="sidebar-rail relative flex min-h-0 w-full flex-col overflow-hidden">
         <div className="shrink-0 px-3 pb-3 pt-3">
           <SidebarHeader collapsed={collapsed} />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-visible px-2.5">
+        <div className="min-h-0 flex-1 overflow-hidden px-2.5">
           <div className="mb-6">
             <SidebarNav
               activeRoute={activeRoute}
@@ -301,19 +299,6 @@ function SidebarNavItem({
         )}
       >
         <NavIcon size={16} weight={active ? "fill" : "regular"} />
-        {collapsed && item.badges ? (
-          <span className="absolute -right-0.5 -top-0.5 flex gap-0.5">
-            {item.badges.map((badge) => (
-              <span
-                className={cn(
-                  "size-2 rounded-full ring-1 ring-[var(--surface-base)]",
-                  badgeDotClass(badge.tone),
-                )}
-                key={badge.label}
-              />
-            ))}
-          </span>
-        ) : null}
       </span>
 
       {!collapsed && item.label ? (
@@ -329,43 +314,19 @@ function SidebarNavItem({
           ))}
         </span>
       ) : null}
-
-      {collapsed || item.detail ? (
-        <span
-          className="pointer-events-none absolute left-full top-1/2 z-50 ml-[6px] w-max min-w-[140px] max-w-[240px] -translate-y-1/2 rounded-[16px] bg-[var(--surface-base)] px-4 py-3 text-left opacity-0 shadow-[0_20px_48px_-12px_rgba(0,0,0,0.2),inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_72%,transparent)] backdrop-blur-xl transition-all duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:opacity-100"
-          role="tooltip"
-        >
-          <span className="absolute -left-[4px] top-1/2 size-[8px] -translate-y-1/2 rotate-45 bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_52%,transparent)]" />
-          <div className="text-[13px] font-bold leading-snug text-[var(--text-primary)]">
-            {item.label}
-          </div>
-          {item.detail ? (
-            <div className="mt-1.5 text-[11px] font-medium leading-relaxed text-[var(--text-secondary)]">
-              {item.detail}
-            </div>
-          ) : null}
-          {item.badges ? (
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {item.badges.map((badge) => (
-                <span
-                  className={cn(
-                    "rounded-[8px] px-2 py-0.5 text-[10px] font-bold",
-                    badgePillClass(badge.tone),
-                  )}
-                  key={badge.label}
-                >
-                  {badge.label}: {badge.value}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </span>
-      ) : null}
     </button>
   );
 }
 
-function NavBadgePill({ badge }: { badge: NavBadge }) {
+function NavBadgePill({
+  badge,
+}: {
+  badge: {
+    label: string;
+    tone: "danger" | "info" | "neutral" | "success" | "warning";
+    value: string;
+  };
+}) {
   return (
     <span
       className={cn(
@@ -425,23 +386,13 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-function badgePillClass(tone: NavBadge["tone"]) {
+function badgePillClass(tone: "danger" | "info" | "neutral" | "success" | "warning") {
   return {
     danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
     info: "bg-[var(--info-soft)] text-[var(--info-base)]",
     neutral: "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
     success: "bg-[var(--success-soft)] text-[var(--success-base)]",
     warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-  }[tone];
-}
-
-function badgeDotClass(tone: NavBadge["tone"]) {
-  return {
-    danger: "bg-[var(--danger-base)]",
-    info: "bg-[var(--info-base)]",
-    neutral: "bg-[var(--text-secondary)]",
-    success: "bg-[var(--success-base)]",
-    warning: "bg-[var(--warning-base)]",
   }[tone];
 }
 

@@ -21,7 +21,7 @@ export function getImportValidation(voices: DesktopTariffVoice[]): ImportValidat
     if (voice.unitOfMeasure.trim().length === 0) {
       missingFields.push({ field: "unitOfMeasure", label: "U.M." });
     }
-    if (!Number.isFinite(voice.unitPrice) || voice.unitPrice <= 0) {
+    if (!Number.isFinite(voice.unitPrice)) {
       missingFields.push({ field: "unitPrice", label: "prezzo" });
     }
 

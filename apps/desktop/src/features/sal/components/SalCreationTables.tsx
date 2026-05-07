@@ -33,7 +33,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   copiedVoiceId,
   onCopyLine,
   onFactorChange,
-  onOpenNote,
+  onNotesChange,
   onRemove,
   onReorder,
   onSurcharge,
@@ -46,7 +46,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     field: "factor1" | "factor2" | "factor3",
     value: number,
   ) => void;
-  onOpenNote: (voiceId: string) => void;
+  onNotesChange: (voiceId: string, notes: string) => void;
   onRemove: (voiceId: string) => void;
   onReorder: (lines: SalLineDraft[]) => void;
   onSurcharge: (voiceId: string, percent: number) => void;
@@ -54,22 +54,18 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   return (
     <div className="overflow-x-auto rounded-[20px] bg-[var(--bg-muted)]/40 ring-1 ring-[var(--border-subtle)]/60">
       <div className="max-h-[680px] overflow-y-auto">
-        <div className="min-w-[1460px] break-words">
-          <div className="sticky top-0 z-10 grid grid-cols-[1.2fr_72px_92px_92px_92px_112px_118px_112px_100px_118px_112px_40px_40px_40px_44px] items-center gap-1 bg-[var(--surface-base)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)] shadow-[0_1px_0_var(--border-subtle)]">
-            <span>Voce</span>
-            <span>U.M.</span>
-            <span className="text-right">Fattore 1</span>
-            <span className="text-right">Fattore 2</span>
-            <span className="text-right">Fattore 3</span>
+        <div className="min-w-[1060px] break-words">
+          {/* LINE 2 header — data columns */}
+          <div className="grid-col-fade sticky top-0 z-10 grid grid-cols-[72px_92px_92px_92px_112px_130px_120px_100px_130px] items-center gap-3 bg-[var(--surface-base)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)] shadow-[0_1px_0_var(--border-subtle)]">
+            <span className="pl-1">U.M.</span>
+            <span className="pr-2 text-right">Fattore 1</span>
+            <span className="pr-2 text-right">Fattore 2</span>
+            <span className="pr-2 text-right">Fattore 3</span>
             <span className="text-right">Quantità</span>
             <span className="text-right">Totale voci</span>
             <span className="text-right">Sconto</span>
-            <span className="text-right">Magg.</span>
+            <span className="pr-2 text-right">Magg.</span>
             <span className="text-right">Totale SAL</span>
-            <span />
-            <span />
-            <span />
-            <span />
           </div>
 
           {lines.length === 0 ? (
@@ -90,7 +86,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
                   isCopied={copiedVoiceId === line.voice.id}
                   onCopy={() => onCopyLine(line.voice.id)}
                   onFactorChange={onFactorChange}
-                  onOpenNote={() => onOpenNote(line.voice.id)}
+                  onNotesChange={onNotesChange}
                   onRemove={onRemove}
                   onSurcharge={onSurcharge}
                 />
@@ -110,7 +106,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   isCopied,
   onCopy,
   onFactorChange,
-  onOpenNote,
+  onNotesChange,
   onRemove,
   onSurcharge,
 }: {
@@ -123,39 +119,76 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
     field: "factor1" | "factor2" | "factor3",
     value: number,
   ) => void;
-  onOpenNote: () => void;
+  onNotesChange: (voiceId: string, notes: string) => void;
   onRemove: (voiceId: string) => void;
   onSurcharge: (voiceId: string, percent: number) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const linkedTotal = line.linkedCharges.reduce((sum, c) => sum + c.total, 0);
+  const laborPct = line.voice.laborPercentage ?? 0;
 
   return (
     <div
       data-voice-id={line.voice.id}
       className={cn(
-        "border-t border-[var(--border-subtle)]/50",
-        index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/20",
+        "border-t border-[var(--border-subtle)]/60",
+        index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/30",
       )}
     >
-      <div className="grid grid-cols-[1.2fr_72px_92px_92px_92px_112px_118px_112px_100px_118px_112px_40px_40px_40px_44px] items-center gap-1 px-4 py-2.5 text-[13px]">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="shrink-0 text-[11px] font-medium text-[var(--text-secondary)]">
-            {index + 1}
+      {/* LINE 1 — Voice number + code + description + action buttons */}
+      <div className="flex items-start gap-3 px-4 pt-3 pb-1">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-[8px] bg-[var(--bg-muted)]/60 text-[11px] font-bold text-[var(--text-tertiary)]">
+          {index + 1}
+        </span>
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          <span className="mt-px shrink-0 font-bold text-[14px] tracking-tight text-[var(--text-primary)]">
+            {line.voice.code}
           </span>
-          <div className="min-w-0">
-            <div className="truncate font-semibold text-[var(--text-primary)]">
-              {line.voice.code}
-            </div>
-            <div
-              className="mt-0.5 truncate text-[12px] text-[var(--text-secondary)]"
-              title={line.voice.description}
-            >
-              {truncateDescription(line.voice.description, 64)}
-            </div>
-          </div>
+          <span className="min-w-0 flex-1 text-[12px] font-medium leading-normal text-[var(--text-secondary)]">
+            {line.voice.description}
+          </span>
+          {laborPct > 0 && (
+            <span className="mt-px shrink-0 rounded-full bg-[var(--info-soft)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--info-base)]">
+              Manodopera {laborPct}%
+            </span>
+          )}
         </div>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <motion.button
+            aria-label={isCopied ? "Copiata" : "Copia voce"}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-[10px] transition-all",
+              isCopied
+                ? "text-[var(--success-base)]"
+                : "text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+            )}
+            onClick={onCopy}
+            type="button"
+            title={isCopied ? "Voce copiata — premi Ctrl+V per incollare" : "Copia voce (Ctrl+C)"}
+            whileHover={{ scale: 1.1, y: -1 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
+          >
+            {isCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+          </motion.button>
+          <motion.button
+            aria-label={`Rimuovi ${line.voice.code}`}
+            className="flex size-8 items-center justify-center rounded-[10px] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+            onClick={() => onRemove(line.voice.id)}
+            type="button"
+            whileHover={{ scale: 1.1, y: -1 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ duration: 0.42, ease: BUTTER_EASE }}
+          >
+            <Trash2 className="size-4" />
+          </motion.button>
+        </div>
+      </div>
 
-        <span className="text-[var(--text-secondary)]">{line.voice.unit}</span>
+      {/* LINE 2 — Data grid: U.M. | Fattore 1 | Fattore 2 | Fattore 3 | Quantità | Totale Voci | Sconto | Magg. | Totale SAL */}
+      <div className="grid-col-fade grid grid-cols-[72px_92px_92px_92px_112px_130px_120px_100px_130px] items-center gap-3 px-4 py-1.5 text-[13px]">
+        <span className="text-[12px] font-medium text-[var(--text-tertiary)]">
+          {line.voice.unit}
+        </span>
 
         <div className="flex justify-end">
           <InlineEdit
@@ -184,11 +217,11 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
           />
         </div>
 
-        <span className="text-right font-semibold text-[var(--text-primary)]">
+        <span className="text-right font-bold text-[var(--text-primary)]">
           <NumberValue value={line.quantity} />
         </span>
 
-        <span className="text-right font-semibold text-[var(--text-primary)]">
+        <span className="text-right font-bold text-[var(--text-primary)]">
           <Currency value={line.grossAmount} />
         </span>
 
@@ -196,9 +229,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
           <span
             className={cn(
               "text-right font-bold",
-              line.discountAmount > 0
-                ? "text-[var(--danger-base)]"
-                : "text-[var(--text-secondary)]",
+              line.discountAmount > 0 ? "text-[var(--danger-base)]" : "text-[var(--text-tertiary)]",
             )}
             title={
               line.voice.isSafetyCost && line.discountAmount === 0
@@ -215,7 +246,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
         <div className="flex justify-end">
           <input
             aria-label={`Maggiorazione % per ${line.voice.code}`}
-            className="h-8 w-[76px] rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-2 text-right text-[12px] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            className="h-8 w-[76px] rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-muted)]/60 px-2 text-right text-[12px] font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] hover:border-[var(--text-secondary)]/40 focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
             inputMode="decimal"
             onChange={(event) => {
               const raw = event.target.value.replace(",", ".");
@@ -228,156 +259,64 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
                 onSurcharge(line.voice.id, val);
               }
             }}
+            placeholder="%"
             type="text"
             value={line.surchargePercent || ""}
           />
         </div>
 
-        <span className="text-right font-bold text-[var(--accent-primary)]">
+        <span className="text-right text-[14px] font-bold text-[var(--accent-primary)]">
           <Currency value={line.totalAmount} />
         </span>
-
-        <div className="flex justify-center">
-          <motion.button
-            aria-label={line.notes ? "Modifica nota" : "Aggiungi nota"}
-            className={cn(
-              "flex size-8 items-center justify-center rounded-[10px] transition-all",
-              line.notes
-                ? "bg-[var(--accent-primary)]/8 text-[var(--accent-primary)]"
-                : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]",
-            )}
-            onClick={onOpenNote}
-            type="button"
-            title={line.notes || "Aggiungi nota descrittiva"}
-            whileHover={{ scale: 1.1, y: -1 }}
-            whileTap={{ scale: 0.92 }}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
-          >
-            <svg
-              aria-hidden="true"
-              className="size-[18px]"
-              fill={line.notes ? "currentColor" : "none"}
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={line.notes ? 2 : 1.5}
-            >
-              <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </motion.button>
-        </div>
-
-        <div className="flex justify-center">
-          <motion.button
-            aria-label={isCopied ? "Copiata" : "Copia voce"}
-            className={cn(
-              "flex size-8 items-center justify-center rounded-[10px] transition-all",
-              isCopied
-                ? "text-[var(--success-base)]"
-                : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-            )}
-            onClick={onCopy}
-            type="button"
-            title={isCopied ? "Voce copiata — premi Ctrl+V per incollare" : "Copia voce (Ctrl+C)"}
-            whileHover={{ scale: 1.1, y: -1 }}
-            whileTap={{ scale: 0.92 }}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
-          >
-            {isCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          </motion.button>
-        </div>
-
-        <div className="flex justify-center">
-          <motion.button
-            aria-label="Espandi dettaglio"
-            className={cn(
-              "flex size-8 items-center justify-center rounded-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)]",
-              expanded && "bg-[var(--bg-muted)]",
-            )}
-            onClick={() => setExpanded((v) => !v)}
-            type="button"
-            whileHover={{ scale: 1.1, y: -1 }}
-            whileTap={{ scale: 0.92 }}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
-          >
-            <ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} />
-          </motion.button>
-        </div>
-
-        <motion.button
-          aria-label={`Rimuovi ${line.voice.code}`}
-          className="flex size-8 items-center justify-center rounded-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
-          onClick={() => onRemove(line.voice.id)}
-          type="button"
-          whileHover={{ scale: 1.1, y: -1 }}
-          whileTap={{ scale: 0.92 }}
-          transition={{ duration: 0.42, ease: BUTTER_EASE }}
-        >
-          <Trash2 className="size-4" />
-        </motion.button>
       </div>
 
-      {expanded && (
-        <div className="ml-4 border-l-2 border-[var(--border-subtle)] bg-[var(--bg-muted)]/30 px-4 py-3">
-          <div className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr]">
-            <NestedTable
-              columns={["#", "Descrizione", "U.M.", "F1", "F2", "F3", "Qtà", "Note"]}
-              title="Sottorighe misura"
-            >
-              {line.measurementRows.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-3 text-[var(--text-secondary)]" colSpan={8}>
-                    Compila i fattori per generare la misura.
-                  </td>
-                </tr>
-              ) : (
-                line.measurementRows.map((row, rowIndex) => (
-                  <tr className="border-t border-[var(--border-subtle)]/50" key={row.id}>
-                    <td className="px-3 py-2">{rowIndex + 1}</td>
-                    <td className="px-3 py-2">{row.description}</td>
-                    <td className="px-3 py-2">{row.unit}</td>
-                    <td className="px-3 py-2 text-right">{row.factor1.toLocaleString("it-IT")}</td>
-                    <td className="px-3 py-2 text-right">{row.factor2.toLocaleString("it-IT")}</td>
-                    <td className="px-3 py-2 text-right">{row.factor3.toLocaleString("it-IT")}</td>
-                    <td className="px-3 py-2 text-right font-semibold">
-                      {row.partialQuantity.toLocaleString("it-IT")}
-                    </td>
-                    <td className="px-3 py-2">{row.notes}</td>
-                  </tr>
-                ))
-              )}
-            </NestedTable>
-
-            <NestedTable
-              columns={["Codice", "Tipo", "Base", "%", "Importo"]}
-              title="Maggiorazioni / collegate"
-            >
-              {line.linkedCharges.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-3 text-[var(--text-secondary)]" colSpan={5}>
-                    Nessuna maggiorazione attiva.
-                  </td>
-                </tr>
-              ) : (
-                line.linkedCharges.map((charge) => (
-                  <tr className="border-t border-[var(--border-subtle)]/50" key={charge.id}>
-                    <td className="px-3 py-2">{charge.code}</td>
-                    <td className="px-3 py-2">{charge.description}</td>
-                    <td className="px-3 py-2 text-right">
-                      <Currency value={charge.baseAmount} />
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {charge.percent.toLocaleString("it-IT")} %
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold">
-                      <Currency value={charge.total} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </NestedTable>
-          </div>
+      {/* LINE 3 — Calculation breakdown: Prezzo Totale + Totale Maggiorazione */}
+      <div className="grid grid-cols-2 gap-3 px-4 py-1.5">
+        <div className="flex items-center gap-2 rounded-[8px] bg-[var(--surface-inset)] px-3 py-1.5">
+          <span className="shrink-0 text-[11px] font-semibold text-[var(--text-secondary)]">
+            Prezzo Totale:
+          </span>
+          <span className="font-mono text-[11px] text-[var(--text-tertiary)]">
+            {line.quantity.toLocaleString("it-IT")}{" "}
+            <span className="text-[var(--text-tertiary)]/60">×</span>{" "}
+            {line.voice.unitPrice.toLocaleString("it-IT", {
+              currency: "EUR",
+              minimumFractionDigits: 2,
+              style: "currency",
+            })}
+          </span>
+          <span className="ml-auto font-bold text-[12px] text-[var(--text-primary)]">
+            = <Currency value={line.grossAmount} />
+          </span>
         </div>
-      )}
+        <div className="flex items-center gap-2 rounded-[8px] bg-[var(--surface-inset)] px-3 py-1.5">
+          <span className="shrink-0 text-[11px] font-semibold text-[var(--text-secondary)]">
+            Maggiorazione:
+          </span>
+          <span className="font-mono text-[11px] text-[var(--text-tertiary)]">
+            {line.surchargePercent}% <span className="text-[var(--text-tertiary)]/60">×</span>{" "}
+            {laborPct}%
+          </span>
+          <span className="ml-auto font-bold text-[12px] text-[var(--success-base)]">
+            = <Currency value={linkedTotal} />
+          </span>
+          {laborPct === 0 && line.surchargePercent > 0 && (
+            <span className="shrink-0 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[9px] font-bold text-[var(--warning-base)]">
+              Manodopera 0%
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* LINE 4 — Notes inline input */}
+      <div className="px-4 pb-3">
+        <input
+          className="w-full rounded-[8px] border border-[var(--border-subtle)]/40 bg-[var(--bg-muted)]/30 px-3 py-1 text-[12px] text-[var(--text-secondary)] outline-none transition placeholder:text-[var(--text-tertiary)] hover:border-[var(--text-secondary)]/30 focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+          placeholder="Aggiungi nota descrittiva..."
+          value={line.notes}
+          onChange={(e) => onNotesChange(line.voice.id, e.target.value)}
+        />
+      </div>
     </div>
   );
 });
@@ -420,7 +359,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   return (
     <div className="overflow-x-auto rounded-[20px] bg-[var(--bg-muted)]/50">
       <div className="min-w-[1100px]">
-        <div className="sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
+        <div className="grid-col-fade sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] gap-3 bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
           <span />
           <span>Tariffario</span>
           <span>Codice</span>
@@ -768,14 +707,4 @@ function EmptyTableState({ message }: { message: string }) {
       {message}
     </div>
   );
-}
-
-function truncateDescription(description: string, maxLength = 100): string {
-  const normalized = description.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-
-  const lastSpace = normalized.lastIndexOf(" ", maxLength);
-  return lastSpace > 0
-    ? `${normalized.slice(0, lastSpace).trim()}...`
-    : `${normalized.slice(0, maxLength).trim()}...`;
 }

@@ -1,10 +1,14 @@
-import { motion } from "framer-motion";
 import { Info, Trash2, X } from "lucide-react";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DesktopTariffVoice, TariffWarning } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 import type { VoiceGroup } from "../utils/tariff-grouping";
 import { formatEditablePercent } from "../utils/tariffs-validation";
+
+const CELL_BASE =
+  "h-9 min-w-0 flex-1 rounded-[10px] border bg-[var(--surface-base)] px-2 text-[12px] font-medium text-[var(--text-primary)] outline-none transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
+const CELL_EDIT = "border-transparent hover:border-[var(--border-subtle)]";
+const GRID_COLS = "grid grid-cols-[160px_1fr_80px_100px_110px_36px] gap-3 px-5 py-2";
 
 function ImportCell({
   align = "left",
@@ -26,9 +30,7 @@ function ImportCell({
   return (
     <div className="relative flex items-center gap-1">
       <input
-        className={`h-9 min-w-0 flex-1 rounded-[10px] border bg-[var(--surface-base)] px-2 text-[12px] font-medium text-[var(--text-primary)] outline-none transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
-          align === "right" ? "text-right" : ""
-        } border-transparent hover:border-[var(--border-subtle)]`}
+        className={`${CELL_BASE} ${CELL_EDIT} ${align === "right" ? "text-right" : ""}`}
         id={`import-cell-${index}-${field}`}
         onChange={(event) => onChange(index, field, event.target.value)}
         value={value}
@@ -112,21 +114,89 @@ function DescriptionCell({
   );
 }
 
+const VoiceRow = memo(function VoiceRow({
+  index,
+  isDuplicate,
+  isInvalid,
+  voice,
+  onChange,
+  onDelete,
+}: {
+  index: number;
+  isDuplicate: boolean;
+  isInvalid: boolean;
+  voice: DesktopTariffVoice;
+  onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  onDelete: (index: number) => void;
+}) {
+  return (
+    <div
+      className={`${GRID_COLS} [contain:layout_style] ${
+        isDuplicate ? "bg-[var(--warning-soft)]/25" : ""
+      } ${index % 2 === 0 && !isDuplicate ? "bg-[var(--surface-base)]/35" : ""} ${
+        isInvalid && !isDuplicate ? "border-l-2 border-l-[var(--warning-base)]/50" : ""
+      }`}
+    >
+      <ImportCell
+        field="officialCode"
+        index={index}
+        onChange={onChange}
+        value={voice.officialCode}
+        warnings={voice.warnings}
+      />
+      <DescriptionCell
+        field="description"
+        index={index}
+        onChange={onChange}
+        value={voice.description}
+      />
+      <ImportCell
+        field="unitOfMeasure"
+        index={index}
+        onChange={onChange}
+        value={voice.unitOfMeasure}
+        warnings={undefined}
+      />
+      <ImportCell
+        align="right"
+        field="laborPercentage"
+        index={index}
+        onChange={onChange}
+        value={formatEditablePercent(voice.laborPercentage)}
+        warnings={undefined}
+      />
+      <ImportCell
+        align="right"
+        field="unitPrice"
+        index={index}
+        onChange={onChange}
+        value={Number.isFinite(voice.unitPrice) ? String(voice.unitPrice).replace(".", ",") : ""}
+        warnings={undefined}
+      />
+      <button
+        aria-label={`Elimina voce ${voice.officialCode || index + 1}`}
+        className="flex size-9 items-center justify-center rounded-[10px] text-[var(--danger-base,var(--warning-base))] transition-colors hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+        onClick={() => onDelete(index)}
+        title="Elimina voce"
+        type="button"
+      >
+        <Trash2 className="size-4" />
+      </button>
+    </div>
+  );
+});
+
 export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   duplicateCodes,
   groups,
-  loadMoreAnchorId,
   onChange,
   onDelete,
-  onLoadMoreVisibilityChange,
   validation,
 }: {
   duplicateCodes: Set<string>;
   groups: VoiceGroup[];
-  loadMoreAnchorId?: string;
   onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDelete: (index: number) => void;
-  onLoadMoreVisibilityChange?: (isVisible: boolean) => void;
   validation: ImportValidation;
 }) {
   const invalidCellKeys = useMemo(
@@ -140,18 +210,15 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
 
   const sections = useMemo(() => {
     const catMap = new Map<string, Map<string, VoiceGroup[]>>();
-
     for (const group of groups) {
       const cat = group.categoria || "Altre";
       const grp = group.gruppo || "Altro";
-
       if (!catMap.has(cat)) catMap.set(cat, new Map());
       const grpMap = catMap.get(cat);
       if (!grpMap) continue;
       if (!grpMap.has(grp)) grpMap.set(grp, []);
       grpMap.get(grp)?.push(group);
     }
-
     return [...catMap.entries()].map(([cat, grpMap]) => ({
       categoria: cat,
       groups: [...grpMap.entries()]
@@ -164,15 +231,6 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
     }));
   }, [groups]);
 
-  const [showAll, setShowAll] = useState(false);
-  const SECTION_CHUNK = 3;
-  const visibleSections = showAll ? sections : sections.slice(0, SECTION_CHUNK);
-  const hasMore = sections.length > SECTION_CHUNK;
-
-  useEffect(() => {
-    onLoadMoreVisibilityChange?.(hasMore && !showAll);
-  }, [hasMore, onLoadMoreVisibilityChange, showAll]);
-
   return (
     <div className="space-y-6">
       {sections.length === 0 ? (
@@ -180,14 +238,8 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
           Nessuna voce da importare.
         </div>
       ) : (
-        visibleSections.map((section, si) => (
-          <motion.div
-            key={section.categoria}
-            initial={{ opacity: 1, y: 0, scale: 1 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.58, delay: si * 0.08, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-5"
-          >
+        sections.map((section) => (
+          <div key={section.categoria} className="space-y-5">
             <div className="flex items-center gap-3">
               <div className="h-7 w-1 rounded-full bg-[var(--accent-primary)]" />
               <h4 className="text-[15px] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
@@ -195,7 +247,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
               </h4>
             </div>
 
-            {section.groups.map((grp, gi) => {
+            {section.groups.map((grp) => {
               const totalSubVoices = grp.voci.reduce((s, v) => s + v.children.length, 0);
               const grpWarnings = grp.voci.flatMap((v) =>
                 v.children.flatMap((c) => c.voice.warnings ?? []),
@@ -203,12 +255,9 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
               const hasGrpWarnings = grpWarnings.length > 0;
 
               return (
-                <motion.div
+                <div
                   className="overflow-hidden rounded-[20px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_60%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_50%,transparent)] [content-visibility:auto] [contain-intrinsic-size:auto_400px]"
                   key={grp.gruppo}
-                  initial={{ opacity: 1, y: 0 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: gi * 0.06, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-center justify-between bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--bg-muted)_12%)] px-5 py-3.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_60%,transparent)]">
                     <div className="flex items-center gap-2.5">
@@ -240,7 +289,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                               VOCE {voiceGroup.voce}
                             </span>
                             {voiceGroup.voceDesc ? (
-                              <span className="truncate text-[12px] font-medium text-[var(--text-secondary)]">
+                              <span className="min-w-0 flex-1 text-[12px] font-medium leading-normal text-[var(--text-secondary)]">
                                 — {voiceGroup.voceDesc}
                               </span>
                             ) : null}
@@ -251,7 +300,9 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                         ) : null}
 
                         <div>
-                          <div className="grid grid-cols-[160px_1fr_80px_100px_110px_36px] gap-3 px-5 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+                          <div
+                            className={`${GRID_COLS} text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]`}
+                          >
                             <span>Codice</span>
                             <span>Descrizione</span>
                             <span>U.M.</span>
@@ -272,66 +323,15 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                                 invalidCellKeys.has(`${index}-unitPrice`);
 
                               return (
-                                <div
-                                  className={`grid grid-cols-[160px_1fr_80px_100px_110px_36px] gap-3 px-5 py-2 [contain:layout_style] ${
-                                    isDuplicate ? "bg-[var(--warning-soft)]/25" : ""
-                                  } ${index % 2 === 0 && !isDuplicate ? "bg-[var(--surface-base)]/35" : ""} ${
-                                    rowInvalid && !isDuplicate
-                                      ? "border-l-2 border-l-[var(--warning-base)]/50"
-                                      : ""
-                                  }`}
+                                <VoiceRow
+                                  index={index}
+                                  isDuplicate={isDuplicate}
+                                  isInvalid={rowInvalid}
                                   key={voice.id}
-                                >
-                                  <ImportCell
-                                    field="officialCode"
-                                    index={index}
-                                    onChange={onChange}
-                                    value={voice.officialCode}
-                                    warnings={voice.warnings}
-                                  />
-                                  <DescriptionCell
-                                    field="description"
-                                    index={index}
-                                    onChange={onChange}
-                                    value={voice.description}
-                                  />
-                                  <ImportCell
-                                    field="unitOfMeasure"
-                                    index={index}
-                                    onChange={onChange}
-                                    value={voice.unitOfMeasure}
-                                    warnings={undefined}
-                                  />
-                                  <ImportCell
-                                    align="right"
-                                    field="laborPercentage"
-                                    index={index}
-                                    onChange={onChange}
-                                    value={formatEditablePercent(voice.laborPercentage)}
-                                    warnings={undefined}
-                                  />
-                                  <ImportCell
-                                    align="right"
-                                    field="unitPrice"
-                                    index={index}
-                                    onChange={onChange}
-                                    value={
-                                      Number.isFinite(voice.unitPrice)
-                                        ? String(voice.unitPrice).replace(".", ",")
-                                        : ""
-                                    }
-                                    warnings={undefined}
-                                  />
-                                  <button
-                                    aria-label={`Elimina voce ${voice.officialCode || index + 1}`}
-                                    className="flex size-9 items-center justify-center rounded-[10px] text-[var(--danger-base,var(--warning-base))] transition-colors hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-                                    onClick={() => onDelete(index)}
-                                    title="Elimina voce"
-                                    type="button"
-                                  >
-                                    <Trash2 className="size-4" />
-                                  </button>
-                                </div>
+                                  onChange={onChange}
+                                  onDelete={onDelete}
+                                  voice={voice}
+                                />
                               );
                             })}
                           </div>
@@ -339,38 +339,17 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                       </div>
                     ))}
                   </div>
-                </motion.div>
+                </div>
               );
             })}
-          </motion.div>
+          </div>
         ))
       )}
 
-      {hasMore && !showAll ? (
-        <motion.button
-          id={loadMoreAnchorId}
-          className="w-full rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/30 py-3 text-[12px] font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]"
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          onClick={() => setShowAll(true)}
-          type="button"
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          Mostra tutte le {sections.length} categorie ({totalVoices.toLocaleString("it-IT")} voci)
-        </motion.button>
-      ) : null}
-
-      <motion.div
-        className="rounded-[16px] border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/40 px-5 py-3 text-[12px] font-medium text-[var(--text-secondary)]"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-      >
+      <div className="rounded-[16px] border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/40 px-5 py-3 text-[12px] font-medium text-[var(--text-secondary)]">
         {totalVoices.toLocaleString("it-IT")} sottovoci in {groups.length.toLocaleString("it-IT")}{" "}
         voci
-      </motion.div>
+      </div>
     </div>
   );
 });

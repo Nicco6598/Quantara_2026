@@ -24,15 +24,16 @@
 
   --bg-app: var(--color-neutral-50);
   --bg-panel: var(--color-neutral-0);
-  --bg-muted: var(--color-neutral-50);
+  --bg-muted: #e4e8ee;
   --bg-muted-strong: var(--color-neutral-100);
   --surface-base: var(--color-neutral-0);
   --surface-raised: #fafbfc;
   --surface-inset: var(--color-neutral-25);
   --text-primary: var(--color-neutral-900);
-  --text-secondary: var(--color-neutral-500);
+  --text-secondary: #425063;
+  --text-tertiary: #8890a0;
   --text-inverse: #fafbfc;
-  --border-subtle: var(--color-neutral-100);
+  --border-subtle: #d2d7e0;
   --border-strong: var(--color-neutral-200);
   --ring-focus: color-mix(in srgb, var(--color-brand-500) 45%, transparent);
   --accent-primary: var(--color-brand-500);
@@ -87,16 +88,17 @@
 
   --bg-app: #121214;
   --bg-panel: #18181b;
-  --bg-muted: #1e1e22;
-  --bg-muted-strong: #26262c;
+  --bg-muted: #262630;
+  --bg-muted-strong: #2e2e38;
   --surface-base: #1a1a1e;
   --surface-raised: #202026;
   --surface-inset: #0f0f12;
-  --text-primary: #e8e8ed;
-  --text-secondary: #94949e;
-  --text-inverse: #e8e8ed;
-  --border-subtle: #2c2c34;
-  --border-strong: #3a3a44;
+  --text-primary: #ececf0;
+  --text-secondary: #afafba;
+  --text-tertiary: #6c6c7a;
+  --text-inverse: #ececf0;
+  --border-subtle: #383842;
+  --border-strong: #42424e;
   --ring-focus: color-mix(in srgb, var(--color-brand-500) 55%, transparent);
   --accent-primary: #ff6b4a;
   --accent-primary-hover: #ff8060;
@@ -130,6 +132,7 @@
   --color-muted: var(--bg-muted);
   --color-muted-strong: var(--bg-muted-strong);
   --color-muted-foreground: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
   --color-surface: var(--surface-base);
   --color-surface-raised: var(--surface-raised);
   --color-sidebar: var(--sidebar-bg);
