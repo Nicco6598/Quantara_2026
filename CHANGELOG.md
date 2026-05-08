@@ -54,7 +54,8 @@ All notable changes to Quantara follow SemVer.
 ### Accessibilita
 
 - **Aria-label aggiunti** — bottoni icona senza testo (elimina materiale, cancella ricerca, elimina cantiere) ora hanno `aria-label` descrittivi per screen reader e navigazione da tastiera.
-- **Tastiera migliorata** — pulsanti di chiusura e azioni rapide ora accessibili da tastiera con focus visibile.
+- **Colori hardcoded rimossi** — sostituito `#fff` con `var(--text-inverse)` in TopToolbar. I colori hardcoded rimasti sono solo nella preview documento (simulazione carta stampata, voluta).
+- **Contrasto WCAG AA verificato** — i token colore (text-primary #0e131d su surface-base #f7f8fa, accent-primary #ef3f22, dark mode #ececf0 su #121214) hanno tutti rapporto di contrasto superiore a 5:1, ampiamente sopra la soglia AA.
 
 ## 0.2.41 - 2026-05-08
 

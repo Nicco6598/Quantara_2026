@@ -332,7 +332,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
           )}
           style={
             tariffImportToolbar.activeReviewed
-              ? { background: "var(--success-base)", color: "#fff" }
+              ? { background: "var(--success-base)", color: "var(--text-inverse)" }
               : undefined
           }
         >

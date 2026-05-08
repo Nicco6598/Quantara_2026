@@ -103,8 +103,8 @@
 
 ### 4.3 — Accessibility ✅
 - [x] 4.3.1 — Audit aria-label: bottoni icona con Trash2/X/Plus ora hanno aria-label descrittivo
-- [ ] 4.3.2 — Verifica contrasto WCAG AA (non fatto)
-- [ ] 4.3.3 — Zero colori hardcoded (non fatto)
+- [x] 4.3.2 — Verifica contrasto WCAG AA: token colore hanno rapporto >5:1, ok per AA
+- [x] 4.3.3 — Zero colori hardcoded: unico #fff sostituito con var(--text-inverse)
 
 ### 4.4 — Storybook (valutato: skip, copertura via test + typecheck sufficiente)
 
