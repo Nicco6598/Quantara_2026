@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-rfi_tariffa_parser.py  — v4
+rfi_tariffa_parser.py  — v4.3
 Parser per tariffari RFI (BA, SB, FA, AC) in formato PDF.
 
 Uso:
@@ -8,6 +8,8 @@ Uso:
     python rfi_tariffa_parser.py <file.pdf> --debug
     python rfi_tariffa_parser.py <file.json>
 
+Fix v4.1:
+  - Tariffe con descrizioni in maiuscolo (es. SS) ora estratte correttamente.
 Fix v4:
   - Codici citati inline nella descrizione (es "AC.PP.B.3153.A .")
     non vengono parsati come record fantasma.
@@ -73,7 +75,7 @@ except ImportError:
 IMPORT_RE  = re.compile(r"IMPORTO\s+EURO[:\s]+([-]?[\d.,]+)")
 PERC_RE    = re.compile(r"PERCENTUALE[:\s]+([\d.,]+)")
 MANOD_RE   = re.compile(r"%\s*Manodopera[:\s]+([-]?[\d.,]+)")
-UNIT_RE    = re.compile(r"UNITA['\u2019]?\s*DI\s*MISURA[:\s]+([\w%\u00b2\u00b3]+)\s*\(([^)]+)\)")
+UNIT_RE    = re.compile(r"UNITA['\u2019]?\s*DI\s*MISURA[:\s]+([\w%\u00b2\u00b3\/\.\-]+)\s*\(([^)]+)\)")
 
 PAGE_HEADER_RE      = re.compile(r"^(?:\d+\s+)?TARIFFA\s+[A-Z]{2}\s+CATEGORIA\s+[A-Z]{2}|^(?:\d+\s+)?Il presente volume", re.I)
 AVVERTENZE_KW_RE    = re.compile(r"^AVVERTENZ[AE]$", re.I)
@@ -577,7 +579,6 @@ class RfiParser:
                     return
                 self._flush_warning()
                 self._flush_sottovoce()
-                self._reset_voce()
                 cat = m.group(1).upper()
                 self.ctx.categoria        = cat
                 self.ctx.categoria_desc   = clean(m.group(2))
@@ -601,7 +602,6 @@ class RfiParser:
                     return
                 self._flush_warning()
                 self._flush_sottovoce()
-                self._reset_voce()
                 g = m.group(1).upper()
                 self.ctx.gruppo          = g
                 self.ctx.gruppo_desc     = clean(m.group(2))
@@ -645,18 +645,27 @@ class RfiParser:
         self._dispatch_text(s)
 
     def _dispatch_text(self, s: str):
+        st = self.state
+
+        # FIX v4 SS/BA: se siamo in descrizione sottovoce (prima del prezzo)
+        # o in descrizione voce, le righe vanno SEMPRE alla descrizione —
+        # anche se maiuscole. Tariffe come SS usano tutto maiuscolo.
+        if st == State.IN_SOTTOVOCE_DESC and self.cur_importo is None:
+            self.sv_desc_lines.append(s)
+            return
+        if st == State.IN_VOCE_DESC:
+            vdl = self.ctx.voce_desc_lines
+            vdl.append(s)
+            self.ctx._voce_desc_cache = s if len(vdl) == 1 else clean(" ".join(vdl))
+            return
+
         if is_avvertenza_title(s):
             self._flush_warning()
             self.warning_acc = WarningAcc(title=s)
             self.state = State.IN_AVVERTENZA_BODY
             return
 
-        st = self.state
-        if st == State.IN_VOCE_DESC:
-            vdl = self.ctx.voce_desc_lines
-            vdl.append(s)
-            self.ctx._voce_desc_cache = s if len(vdl) == 1 else clean(" ".join(vdl))
-        elif st == State.IN_SOTTOVOCE_DESC:
+        if st == State.IN_SOTTOVOCE_DESC:
             if self.cur_importo is not None:
                 wa = self.warning_acc
                 if wa is None:

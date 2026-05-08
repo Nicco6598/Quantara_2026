@@ -20,8 +20,10 @@ export type PendingWorkflowAction = WorkflowAction;
 
 export type TariffImportToolbarState = {
   activeIndex: number;
+  activeDrafted: boolean;
   activeReviewed: boolean;
   canConfirm: boolean;
+  draftedCount: number;
   fileLabels: string[];
   phase: "idle" | "preview";
   reviewedCount: number;
@@ -137,8 +139,10 @@ export const useAppStore = create<AppStore>()(
       salPendingStep: null,
       tariffImportToolbar: {
         activeIndex: 0,
+        activeDrafted: false,
         activeReviewed: false,
         canConfirm: false,
+        draftedCount: 0,
         fileLabels: [],
         phase: "idle",
         reviewedCount: 0,

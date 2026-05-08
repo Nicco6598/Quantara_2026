@@ -1,7 +1,7 @@
 use tauri::{AppHandle, State};
 
 use crate::infrastructure::{
-    local_storage::{with_db, with_db_mut, DbConnection},
+    local_storage::{DbConnection, with_db, with_db_mut},
     tariff_repository::{
         CreateTariffBookRequest, TariffBookRecord, TariffPdfImportPreview, TariffVoiceCountRecord,
         TariffVoiceRecord, UpdateTariffBookRequest,
@@ -31,12 +31,8 @@ pub fn update_tariff_book(
     tariff_book_id: String,
     request: UpdateTariffBookRequest,
 ) -> Result<TariffBookRecord, String> {
-    with_db(&state, |conn| {
-        crate::infrastructure::tariff_repository::update_tariff_book(
-            conn,
-            &tariff_book_id,
-            request,
-        )
+    with_db_mut(&state, |conn| {
+        crate::infrastructure::tariff_repository::update_tariff_book(conn, &tariff_book_id, request)
     })
 }
 

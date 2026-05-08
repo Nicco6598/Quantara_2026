@@ -2,6 +2,11 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.41 - 2026-05-08
+
+- **Tariffari modificati** — Si possono ora salvare in bozza, eliminare e revisionare dall'import, una volta importati possono anche essere modificati dalla schermata generale (icona a 3 puntini) dei tariffari.
+- **Fix Parser** — Fix di logica su come importava alcune voci il parser.
+
 ## 0.2.40 - 2026-05-08
 
 - **Cambio Motore Parser** — Aggiornato il motore da pdfplumber a pypdfium2, velocizzando di molto il parsing dei file (Pdf con 300 pagine passato da 39s a 0.76s).

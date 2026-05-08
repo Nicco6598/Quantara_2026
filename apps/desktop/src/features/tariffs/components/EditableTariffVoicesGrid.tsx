@@ -6,9 +6,17 @@ import type { VoiceGroup } from "../utils/tariff-grouping";
 import { formatEditablePercent } from "../utils/tariffs-validation";
 
 const CELL_BASE =
-  "h-9 min-w-0 flex-1 rounded-[10px] border bg-[var(--surface-base)] px-2 text-[12px] font-medium text-[var(--text-primary)] outline-none transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
+  "h-8 min-w-0 flex-1 rounded-[8px] border bg-transparent px-2 text-[12px] font-semibold text-[var(--text-primary)] outline-none transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
 const CELL_EDIT = "border-transparent hover:border-[var(--border-subtle)]";
-const GRID_COLS = "grid grid-cols-[160px_1fr_80px_100px_110px_36px] gap-3 px-5 py-2";
+const GRID_COLS = "grid grid-cols-[160px_minmax(360px,1fr)_80px_100px_110px_36px] gap-3 px-5 py-2";
+
+export type TariffGridSectionSummary = {
+  id: string;
+  categoria: string;
+  groupsCount: number;
+  rowsCount: number;
+  warningCount: number;
+};
 
 function ImportCell({
   align = "left",
@@ -101,7 +109,7 @@ function DescriptionCell({
 
   return (
     <textarea
-      className="min-h-[38px] w-full resize-none rounded-[10px] border border-transparent bg-[var(--surface-base)] px-2.5 py-2 text-[12px] font-medium leading-[1.45] text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--border-subtle)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+      className="min-h-[34px] w-full resize-none rounded-[8px] border border-transparent bg-transparent px-2.5 py-2 text-[12px] font-semibold leading-[1.45] text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--border-subtle)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
       id={`import-cell-${index}-${field}`}
       onChange={(event) => {
         fitContent();
@@ -114,6 +122,15 @@ function DescriptionCell({
   );
 }
 
+type VoiceRowProps = {
+  index: number;
+  isDuplicate: boolean;
+  isInvalid: boolean;
+  voice: DesktopTariffVoice;
+  onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  onDelete: (index: number) => void;
+};
+
 const VoiceRow = memo(function VoiceRow({
   index,
   isDuplicate,
@@ -121,19 +138,12 @@ const VoiceRow = memo(function VoiceRow({
   voice,
   onChange,
   onDelete,
-}: {
-  index: number;
-  isDuplicate: boolean;
-  isInvalid: boolean;
-  voice: DesktopTariffVoice;
-  onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
-  onDelete: (index: number) => void;
-}) {
+}: VoiceRowProps) {
   return (
     <div
-      className={`${GRID_COLS} [contain:layout_style] ${
+      className={`${GRID_COLS} min-w-[900px] items-center [contain:layout_style] ${
         isDuplicate ? "bg-[var(--warning-soft)]/25" : ""
-      } ${index % 2 === 0 && !isDuplicate ? "bg-[var(--surface-base)]/35" : ""} ${
+      } ${index % 2 === 0 && !isDuplicate ? "bg-[var(--surface-base)]/55" : ""} ${
         isInvalid && !isDuplicate ? "border-l-2 border-l-[var(--warning-base)]/50" : ""
       }`}
     >
@@ -184,19 +194,32 @@ const VoiceRow = memo(function VoiceRow({
       </button>
     </div>
   );
-});
+}, areVoiceRowsEqual);
+
+function areVoiceRowsEqual(previous: Readonly<VoiceRowProps>, next: Readonly<VoiceRowProps>) {
+  return (
+    previous.index === next.index &&
+    previous.isDuplicate === next.isDuplicate &&
+    previous.isInvalid === next.isInvalid &&
+    previous.voice === next.voice &&
+    previous.onChange === next.onChange &&
+    previous.onDelete === next.onDelete
+  );
+}
 
 export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   duplicateCodes,
   groups,
   onChange,
   onDelete,
+  onSectionsChange,
   validation,
 }: {
   duplicateCodes: Set<string>;
   groups: VoiceGroup[];
   onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDelete: (index: number) => void;
+  onSectionsChange?: (sections: TariffGridSectionSummary[]) => void;
   validation: ImportValidation;
 }) {
   const invalidCellKeys = useMemo(
@@ -219,17 +242,57 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
       if (!grpMap.has(grp)) grpMap.set(grp, []);
       grpMap.get(grp)?.push(group);
     }
-    return [...catMap.entries()].map(([cat, grpMap]) => ({
-      categoria: cat,
-      groups: [...grpMap.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([grp, voci]) => ({
-          gruppo: grp,
-          gruppoDesc: voci[0]?.gruppoDesc ?? "",
-          voci: voci.sort((a, b) => Number(a.voce || "0") - Number(b.voce || "0")),
-        })),
-    }));
+    return [...catMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b, "it", { numeric: true }))
+      .map(([cat, grpMap]) => ({
+        id: createCategoryId(cat),
+        categoria: cat,
+        groups: [...grpMap.entries()]
+          .sort(([a], [b]) => a.localeCompare(b, "it", { numeric: true }))
+          .map(([grp, voci]) => ({
+            gruppo: grp,
+            gruppoDesc: voci[0]?.gruppoDesc ?? "",
+            voci: voci.sort((a, b) => Number(a.voce || "0") - Number(b.voce || "0")),
+          })),
+      }));
   }, [groups]);
+
+  const sectionSummaries = useMemo<TariffGridSectionSummary[]>(
+    () =>
+      sections.map((section) => {
+        const rowsCount = section.groups.reduce(
+          (sum, group) =>
+            sum + group.voci.reduce((voiceSum, voice) => voiceSum + voice.children.length, 0),
+          0,
+        );
+        const warningCount = section.groups.reduce(
+          (sum, group) =>
+            sum +
+            group.voci.reduce(
+              (voiceSum, voice) =>
+                voiceSum +
+                voice.children.reduce(
+                  (rowSum, child) => rowSum + (child.voice.warnings?.length ?? 0),
+                  0,
+                ),
+              0,
+            ),
+          0,
+        );
+        return {
+          id: section.id,
+          categoria: section.categoria,
+          groupsCount: section.groups.length,
+          rowsCount,
+          warningCount,
+        };
+      }),
+    [sections],
+  );
+
+  useLayoutEffect(() => {
+    onSectionsChange?.(sectionSummaries);
+  }, [onSectionsChange, sectionSummaries]);
 
   return (
     <div className="space-y-6">
@@ -239,12 +302,22 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
         </div>
       ) : (
         sections.map((section) => (
-          <div key={section.categoria} className="space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="h-7 w-1 rounded-full bg-[var(--accent-primary)]" />
-              <h4 className="text-[15px] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                Categoria {section.categoria}
+          <div
+            className="scroll-mt-24 space-y-4"
+            data-category={section.categoria}
+            id={section.id}
+            key={section.categoria}
+          >
+            <div className="flex items-center gap-3 pt-1">
+              <h4 className="text-[18px] font-bold tracking-[-0.03em] text-[var(--text-primary)]">
+                Categorie {section.categoria || "Altre"}
               </h4>
+              <span className="rounded-full bg-[var(--bg-muted-strong)] px-3 py-1 text-[12px] font-bold text-[var(--text-secondary)]">
+                {section.groups.reduce(
+                  (s, g) => s + g.voci.reduce((ss, v) => ss + v.children.length, 0),
+                  0,
+                )}
+              </span>
             </div>
 
             {section.groups.map((grp) => {
@@ -256,17 +329,17 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
 
               return (
                 <div
-                  className="overflow-hidden rounded-[20px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_60%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_50%,transparent)] [content-visibility:auto] [contain-intrinsic-size:auto_400px]"
+                  className="overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_18%,transparent)] [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
                   key={grp.gruppo}
                 >
-                  <div className="flex items-center justify-between bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--bg-muted)_12%)] px-5 py-3.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_60%,transparent)]">
+                  <div className="flex items-center justify-between border-b border-[var(--border-subtle)]/55 bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
-                      <span className="rounded-full bg-[var(--info-soft)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--info-base)]">
+                      <span className="rounded-[8px] bg-[var(--info-soft)] px-2 py-1 text-[12px] font-bold text-[var(--info-base)]">
                         {grp.gruppo}
                       </span>
                       {grp.gruppoDesc ? (
-                        <span className="text-[13px] font-medium text-[var(--text-secondary)]">
-                          — {grp.gruppoDesc}
+                        <span className="text-[13px] font-bold text-[var(--text-secondary)]">
+                          {grp.gruppoDesc}
                         </span>
                       ) : null}
                       {hasGrpWarnings ? (
@@ -280,17 +353,17 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                     </span>
                   </div>
 
-                  <div className="divide-y divide-[var(--border-subtle)]/40 bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)]">
+                  <div className="divide-y divide-[var(--border-subtle)]/45 bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)]">
                     {grp.voci.map((voiceGroup) => (
                       <div key={voiceGroup.code}>
                         {voiceGroup.voce || voiceGroup.voceDesc ? (
-                          <div className="flex items-center gap-2 bg-[var(--bg-muted)]/45 px-5 py-2.5">
-                            <span className="rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-[12px] font-bold text-[var(--accent-primary)]">
+                          <div className="flex items-center gap-3 bg-[var(--bg-muted)]/45 px-5 py-3">
+                            <span className="rounded-[8px] bg-[var(--warning-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent-primary)]">
                               VOCE {voiceGroup.voce}
                             </span>
                             {voiceGroup.voceDesc ? (
-                              <span className="min-w-0 flex-1 text-[12px] font-medium leading-normal text-[var(--text-secondary)]">
-                                — {voiceGroup.voceDesc}
+                              <span className="min-w-0 flex-1 text-[12px] font-semibold leading-normal text-[var(--text-secondary)]">
+                                {voiceGroup.voceDesc}
                               </span>
                             ) : null}
                             <span className="ml-auto shrink-0 text-[11px] font-medium text-[var(--text-secondary)]">
@@ -301,7 +374,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
 
                         <div>
                           <div
-                            className={`${GRID_COLS} text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]`}
+                            className={`${GRID_COLS} min-w-[900px] border-b border-[var(--border-subtle)]/35 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]`}
                           >
                             <span>Codice</span>
                             <span>Descrizione</span>
@@ -353,3 +426,8 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
     </div>
   );
 });
+
+export function createCategoryId(categoria: string): string {
+  const safeCategoria = categoria.replace(/[^a-zA-Z0-9_-]+/g, "-") || "altre";
+  return `tariff-cat-${safeCategoria}`;
+}

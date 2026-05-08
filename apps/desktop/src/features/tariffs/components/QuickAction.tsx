@@ -11,12 +11,14 @@ export function QuickAction({
   icon: LucideIcon;
   label: string;
   onClick: () => void;
-  tone: "info" | "success";
+  tone: "info" | "success" | "warning";
 }) {
   const toneClass =
     tone === "success"
       ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-      : "bg-[var(--info-soft)] text-[var(--info-base)]";
+      : tone === "warning"
+        ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+        : "bg-[var(--info-soft)] text-[var(--info-base)]";
 
   return (
     <button

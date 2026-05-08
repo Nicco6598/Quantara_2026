@@ -7,7 +7,9 @@ import {
   CheckCircle,
   ClockCounterClockwise,
   FileText,
+  FloppyDisk,
   Plus,
+  Trash,
   UploadSimple,
   X,
 } from "@phosphor-icons/react";
@@ -279,25 +281,11 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
           ) : null}
         </AnimatePresence>
       </div>
-      <div className="hidden min-h-9 items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3 py-1 text-[10px] font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)] 2xl:flex">
+      <div className="hidden min-h-9 items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3 py-1 text-[10px] font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)] 2xl:flex">
         <div className="flex flex-col justify-center gap-0.5 leading-none">
           <span
             className={cn(
               "text-[11px]",
-              tariffImportToolbar.reviewedVoiceCount === tariffImportToolbar.totalVoices &&
-                tariffImportToolbar.totalVoices > 0
-                ? "text-[var(--success-base)]"
-                : tariffImportToolbar.reviewedVoiceCount > 0
-                  ? "text-[var(--warning-base)]"
-                  : "text-[var(--text-secondary)]",
-            )}
-          >
-            {tariffImportToolbar.reviewedVoiceCount.toLocaleString("it-IT")}/
-            {tariffImportToolbar.totalVoices.toLocaleString("it-IT")} voci
-          </span>
-          <span
-            className={cn(
-              "text-[10px]",
               tariffImportToolbar.reviewedCount === fileCount && fileCount > 0
                 ? "text-[var(--success-base)]"
                 : tariffImportToolbar.reviewedCount > 0
@@ -305,8 +293,27 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
                   : "text-[var(--text-secondary)]",
             )}
           >
-            {tariffImportToolbar.reviewedCount}/{fileCount} revisionati
+            <span className="text-[10px] font-semibold text-[var(--text-secondary)]">Rev.</span>{" "}
+            {tariffImportToolbar.reviewedCount}/{fileCount}
           </span>
+          <span
+            className={cn(
+              "text-[11px]",
+              tariffImportToolbar.draftedCount > 0
+                ? "text-[var(--warning-base)]"
+                : "text-[var(--text-secondary)]",
+            )}
+          >
+            <span className="text-[10px] font-semibold text-[var(--text-secondary)]">Bozza</span>{" "}
+            {tariffImportToolbar.draftedCount}/{fileCount}
+          </span>
+        </div>
+        <div className="h-8 w-px bg-[var(--border-subtle)]/60" />
+        <div className="flex flex-col items-center">
+          <span className="text-[15px] font-black tabular-nums leading-none text-[var(--text-primary)]">
+            {fileCount}
+          </span>
+          <span className="text-[9px] font-semibold text-[var(--text-secondary)]">totali</span>
         </div>
       </div>
       <motion.button
@@ -336,6 +343,35 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
           <CheckCircle size={13} weight="bold" />
         </span>
         <span>{tariffImportToolbar.activeReviewed ? "Revisionato" : "Revisiona"}</span>
+      </motion.button>
+      <motion.button
+        className={cn(
+          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold transition-colors",
+          tariffImportToolbar.activeDrafted
+            ? "bg-[color-mix(in_srgb,var(--warning-base)_14%,var(--surface-base))] text-[color-mix(in_srgb,var(--warning-base)_76%,var(--text-primary))] ring-1 ring-[color-mix(in_srgb,var(--warning-base)_42%,var(--border-subtle))]"
+            : "top-toolbar-action-outline text-[var(--text-primary)]",
+        )}
+        onClick={() => onAction("tariff-import-save-draft")}
+        title="Salva questo file come bozza"
+        type="button"
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.97 }}
+      >
+        <span className="top-toolbar-action-mark">
+          <FloppyDisk size={13} weight="bold" />
+        </span>
+        <span>{tariffImportToolbar.activeDrafted ? "Salvato in bozza" : "Salva bozza"}</span>
+      </motion.button>
+      <motion.button
+        className="top-toolbar-icon-button flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)]"
+        disabled={fileCount === 0}
+        onClick={() => onAction("tariff-import-delete-file")}
+        title="Cancella file dalla revisione"
+        type="button"
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.92 }}
+      >
+        <Trash size={15} weight="bold" />
       </motion.button>
       <motion.button
         className={cn(

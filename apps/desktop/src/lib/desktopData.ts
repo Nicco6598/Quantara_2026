@@ -26,6 +26,8 @@ export type UpdateDesktopTariffBookRequest = UpdateDesktopTariffBookRecordReques
 export type TariffPdfMetadata = TariffPdfMetadataRecord;
 export type { TariffWarning };
 
+const tariffVoiceCache = new Map<string, DesktopTariffVoiceRecord[]>();
+
 export type DesktopDataResult<T> =
   | {
       data: T;
@@ -124,6 +126,10 @@ export async function createDesktopTariffBook(
   if (!isTauriRuntime()) {
     const { voices: _voices, ...book } = request;
 
+    if (_voices) {
+      tariffVoiceCache.set(book.id, _voices);
+    }
+
     return book;
   }
 
@@ -132,12 +138,18 @@ export async function createDesktopTariffBook(
 
 export async function updateDesktopTariffBook(
   tariffBookId: string,
-  request: UpdateDesktopTariffBookRequest,
+  request: UpdateDesktopTariffBookRequest & { voices?: DesktopTariffVoiceRecord[] },
 ): Promise<DesktopTariffBook> {
   if (!isTauriRuntime()) {
+    const { voices: _voices, ...book } = request;
+
+    if (_voices) {
+      tariffVoiceCache.set(tariffBookId, _voices);
+    }
+
     return {
       id: tariffBookId,
-      ...request,
+      ...book,
     };
   }
 
@@ -146,6 +158,7 @@ export async function updateDesktopTariffBook(
 
 export async function deleteDesktopTariffBook(tariffBookId: string): Promise<void> {
   if (!isTauriRuntime()) {
+    tariffVoiceCache.delete(tariffBookId);
     return;
   }
 
@@ -156,6 +169,11 @@ export async function listDesktopTariffVoices(
   tariffBookId: string,
   fallback: DesktopTariffVoice[],
 ): Promise<DesktopDataResult<DesktopTariffVoice[]>> {
+  const cached = tariffVoiceCache.get(tariffBookId);
+  if (cached) {
+    return { data: cached, source: "desktop" };
+  }
+
   return withInflightCache(`tariff-voices:${tariffBookId}:${fallback.length}`, () =>
     invokeWithFallback("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative"),
   );
@@ -165,15 +183,16 @@ export async function listDesktopTariffVoiceCounts(
   fallbackBooks: readonly DesktopTariffBook[],
   fallbackVoices: readonly DesktopTariffVoice[],
 ): Promise<DesktopDataResult<DesktopTariffVoiceCount[]>> {
-  const fallbackCounts = fallbackBooks.map((book) => ({
-    count: fallbackVoices.filter((voice) => voice.tariffBookId === book.id).length,
+  const counts = fallbackBooks.map((book) => ({
+    count: tariffVoiceCache.has(book.id)
+      ? (tariffVoiceCache.get(book.id)?.length ?? 0)
+      : fallbackVoices.filter((voice) => voice.tariffBookId === book.id).length,
     tariffBookId: book.id,
   }));
 
   return withInflightCache(
     `tariff-voice-counts:${fallbackBooks.length}:${fallbackVoices.length}`,
-    () =>
-      invokeWithFallback("list_tariff_voice_counts", {}, fallbackCounts, "conteggi dimostrativi"),
+    () => invokeWithFallback("list_tariff_voice_counts", {}, counts, "conteggi dimostrativi"),
   );
 }
 

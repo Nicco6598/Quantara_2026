@@ -27,6 +27,8 @@ pub struct UpdateTariffBookRequest {
     pub name: String,
     pub source_name: String,
     pub status: String,
+    #[serde(default)]
+    pub voices: Vec<TariffVoiceRecord>,
     pub year: i32,
 }
 
@@ -181,14 +183,16 @@ pub fn create_tariff_book(
 }
 
 pub fn update_tariff_book(
-    connection: &Connection,
+    connection: &mut Connection,
     tariff_book_id: &str,
     request: UpdateTariffBookRequest,
 ) -> Result<TariffBookRecord, AppError> {
     validate_tariff_book_update_request(&request)?;
     apply_migrations(connection).map_err(to_database_error)?;
 
-    let updated = connection
+    let transaction = connection.transaction().map_err(to_database_error)?;
+
+    let updated = transaction
         .execute(
             "UPDATE tariff_books
              SET name = ?1, source_name = ?2, year = ?3, status = ?4
@@ -206,6 +210,21 @@ pub fn update_tariff_book(
     if updated == 0 {
         return Err(AppError::Database("tariff book not found".into()));
     }
+
+    if !request.voices.is_empty() {
+        transaction
+            .execute(
+                "DELETE FROM tariff_voices WHERE tariff_book_id = ?1",
+                [tariff_book_id],
+            )
+            .map_err(to_database_error)?;
+
+        for voice in &request.voices {
+            insert_tariff_voice(&transaction, tariff_book_id, voice)?;
+        }
+    }
+
+    transaction.commit().map_err(to_database_error)?;
 
     get_tariff_book(connection, tariff_book_id)?
         .ok_or_else(|| AppError::Database("updated tariff book could not be reloaded".into()))
@@ -1035,9 +1054,9 @@ mod tests {
     use rusqlite::Connection;
 
     use super::{
-        CreateTariffBookRequest, TariffVoiceRecord, create_tariff_book, import_tariff_pdf_preview,
-        list_tariff_books, list_tariff_voices, parser_output_to_utf8,
-        remove_json_surrogate_escapes,
+        CreateTariffBookRequest, TariffVoiceRecord, UpdateTariffBookRequest, create_tariff_book,
+        import_tariff_pdf_preview, list_tariff_books, list_tariff_voices, parser_output_to_utf8,
+        remove_json_surrogate_escapes, update_tariff_book,
     };
 
     #[test]
@@ -1153,6 +1172,80 @@ mod tests {
         assert_eq!(voices[0].unit_price, 120.0);
         assert!(!voices[0].description.contains('\u{fffd}'));
         assert!(!voices[0].category.contains('\u{fffd}'));
+    }
+
+    #[test]
+    fn update_tariff_book_replaces_existing_tariff_voices() {
+        let mut connection = Connection::open_in_memory().expect("in-memory db");
+        let book_id = "tariff_rfi_2026";
+
+        create_tariff_book(
+            &mut connection,
+            CreateTariffBookRequest {
+                id: book_id.into(),
+                name: "RFI 2026".into(),
+                source_name: "RFI".into(),
+                status: "active".into(),
+                voices: vec![TariffVoiceRecord {
+                    category: "AC.PC.B - VOCE 3101.A".into(),
+                    description: "Descrizione iniziale".into(),
+                    id: "voice_initial".into(),
+                    labor_percentage: Some(100.0),
+                    official_code: "AC.PC.B.3101.A".into(),
+                    tariff_book_id: book_id.into(),
+                    unit_of_measure: "CAD".into(),
+                    unit_price: 100.0,
+                    categoria_desc: String::new(),
+                    gruppo_desc: String::new(),
+                    voce: String::new(),
+                    voce_desc: String::new(),
+                    warnings: Vec::new(),
+                }],
+                year: 2026,
+            },
+        )
+        .expect("initial tariff book created");
+
+        update_tariff_book(
+            &mut connection,
+            book_id,
+            UpdateTariffBookRequest {
+                name: "RFI 2026 modificato".into(),
+                source_name: "RFI aggiornato".into(),
+                status: "validated".into(),
+                voices: vec![TariffVoiceRecord {
+                    category: "AC.PC.B - VOCE 3101.A".into(),
+                    description: "Descrizione modificata".into(),
+                    id: "voice_updated".into(),
+                    labor_percentage: Some(55.0),
+                    official_code: "AC.PC.B.3101.B".into(),
+                    tariff_book_id: book_id.into(),
+                    unit_of_measure: "M".into(),
+                    unit_price: 245.75,
+                    categoria_desc: String::new(),
+                    gruppo_desc: String::new(),
+                    voce: String::new(),
+                    voce_desc: String::new(),
+                    warnings: Vec::new(),
+                }],
+                year: 2026,
+            },
+        )
+        .expect("tariff book updated with edited voices");
+
+        let books = list_tariff_books(&connection).expect("tariff books listed");
+        assert_eq!(books[0].name, "RFI 2026 modificato");
+        assert_eq!(books[0].source_name, "RFI aggiornato");
+        assert_eq!(books[0].status, "validated");
+
+        let voices = list_tariff_voices(&connection, book_id).expect("voices listed");
+        assert_eq!(voices.len(), 1);
+        assert_eq!(voices[0].id, "voice_updated");
+        assert_eq!(voices[0].description, "Descrizione modificata");
+        assert_eq!(voices[0].official_code, "AC.PC.B.3101.B");
+        assert_eq!(voices[0].unit_of_measure, "M");
+        assert_eq!(voices[0].unit_price, 245.75);
+        assert_eq!(voices[0].labor_percentage, Some(55.0));
     }
 
     #[test]
