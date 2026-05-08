@@ -1,5 +1,5 @@
-import { createDesktopVoiceKey, normalizeContractorName } from "@/lib/shared-utils";
 import type { DesktopContract, DesktopTariffBook, DesktopTariffVoice } from "@/lib/desktopData";
+import { createDesktopVoiceKey, normalizeContractorName } from "@/lib/shared-utils";
 import { isSafetyVoice } from "../domain/sal-safety";
 import type { SalProjectContext, SalTariffBookOption, SalVoiceDraft } from "../types";
 

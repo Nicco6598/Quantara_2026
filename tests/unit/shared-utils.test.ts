@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  normalizeContractorName,
   createDesktopVoiceKey,
+  normalizeContractorName,
 } from "../../apps/desktop/src/lib/shared-utils";
 
 describe("shared-utils", () => {

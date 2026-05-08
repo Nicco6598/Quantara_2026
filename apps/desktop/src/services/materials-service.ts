@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  type DesktopMaterial,
-  type CreateDesktopMaterialRequest,
-  type UpdateDesktopMaterialRequest,
-  type DesktopDataResult,
-  listDesktopMaterials,
-  createDesktopMaterial,
-  updateDesktopMaterial,
-  deleteDesktopMaterial,
   adjustDesktopMaterialStock,
+  type CreateDesktopMaterialRequest,
+  createDesktopMaterial,
+  type DesktopDataResult,
+  type DesktopMaterial,
+  deleteDesktopMaterial,
+  listDesktopMaterials,
+  type UpdateDesktopMaterialRequest,
+  updateDesktopMaterial,
 } from "@/lib/desktopData";
 
 type UseMaterialsServiceReturn = {

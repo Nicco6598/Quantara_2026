@@ -12,7 +12,7 @@ import type {
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
-import { invokeWithFallback, isTauriRuntime, formatDesktopError } from "./tauri-wrapper";
+import { formatDesktopError, invokeWithFallback, isTauriRuntime } from "./tauri-wrapper";
 
 export type DesktopMoney = Money;
 export type DesktopTariffPriority = DesktopTariffPriorityRecord;
@@ -28,6 +28,7 @@ export type { TariffWarning };
 
 import { cachedFetch } from "./fetch-cache";
 import type { DesktopDataResult } from "./tauri-wrapper";
+
 export type { DesktopDataResult };
 
 const tariffVoiceCache = new Map<string, DesktopTariffVoiceRecord[]>();

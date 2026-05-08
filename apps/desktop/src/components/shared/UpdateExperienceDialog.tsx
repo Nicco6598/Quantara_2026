@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { SOFT_EASE } from "@/components/shared/easings";
 import { ArrowUpRight, Clock3, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react";
 import { createPortal } from "react-dom";
+import { SOFT_EASE } from "@/components/shared/easings";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
 
 import { cn } from "@/lib/utils";

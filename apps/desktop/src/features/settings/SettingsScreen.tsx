@@ -15,10 +15,10 @@ import {
   Trash,
   WaveSine,
 } from "@phosphor-icons/react";
-import { SPRING_EASE } from "@/components/shared/easings";
 import { motion } from "framer-motion";
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { APP_VERSION } from "@/generated/appVersion";
 
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   type CreateDesktopContractRequest,
+  createDesktopContract,
   type DesktopContract,
   type DesktopDataResult,
-  createDesktopContract,
   deleteDesktopContract,
   listDesktopContracts,
   updateDesktopContract,

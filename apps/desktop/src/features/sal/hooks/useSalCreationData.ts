@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { readStringRecord } from "@/lib/shared-utils";
 import {
   type DesktopContract,
   type DesktopTariffBook,
@@ -7,6 +6,7 @@ import {
   listDesktopTariffBooks,
   listDesktopTariffVoices,
 } from "@/lib/desktopData";
+import { readStringRecord } from "@/lib/shared-utils";
 import {
   mapContractToSalProject,
   mapTariffBooksForContract,

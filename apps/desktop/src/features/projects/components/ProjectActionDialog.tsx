@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
-import { SPRING_EASE } from "@/components/shared/easings";
 import type { LucideIcon } from "lucide-react";
 import { ChevronRight, Pencil, Trash2, X } from "lucide-react";
 import { useEffect } from "react";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 
 import { cn } from "@/lib/utils";

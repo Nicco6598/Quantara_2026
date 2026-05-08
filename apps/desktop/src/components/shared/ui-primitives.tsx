@@ -1,8 +1,8 @@
 import { type HTMLMotionProps, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import type { StatusTone } from "@/components/shared/StatusBadge";
 import { SPRING_EASE } from "@/components/shared/easings";
+import type { StatusTone } from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 
 export function ProjectSurface({

@@ -26,8 +26,8 @@ import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useNavigate } from "@/hooks/useNavigate";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowService } from "@/services/sal-service";
+import { useAppStore } from "@/store/app-store";
 import type { SalTemplate } from "@/store/template-store";
 import { SalComparisonView } from "./components/SalComparisonView";
 import {

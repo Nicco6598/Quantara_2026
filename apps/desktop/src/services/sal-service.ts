@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import type {
   SalDocument,
   SalDocumentStatus,
@@ -7,6 +6,7 @@ import type {
   SalProject,
   SalTariffVoice,
 } from "@/features/sal/types";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 type CreateSalInput = {
   projectId: string;

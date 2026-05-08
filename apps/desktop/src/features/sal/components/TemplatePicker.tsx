@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { BookOpen, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { type SalTemplate, useTemplateStore } from "@/store/template-store";
 import { SOFT_EASE } from "@/components/shared/easings";
+import { type SalTemplate, useTemplateStore } from "@/store/template-store";
+
 type TemplatePickerProps = {
   onApply: (template: SalTemplate) => void;
   tariffBookId: string;

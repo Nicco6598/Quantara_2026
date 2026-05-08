@@ -1,7 +1,7 @@
-import { SPRING_EASE } from "@/components/shared/easings";
 import { motion } from "framer-motion";
 import { Building2, X } from "lucide-react";
 import { useState } from "react";
+import { SPRING_EASE } from "@/components/shared/easings";
 export function ContractorModal({
   contractorDraft,
   onChange,

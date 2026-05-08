@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ModernDonut, SegmentBars } from "@/components/shared/Charts";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
-import type { PortfolioProject } from "@/features/projects/ProjectsScreen";
+import type { PortfolioProject } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 

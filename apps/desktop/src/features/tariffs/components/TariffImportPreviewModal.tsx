@@ -1,5 +1,4 @@
 import { parseEuroAmount } from "@quantara/domain-utils";
-import { SPRING_EASE, BUTTER_EASE } from "@/components/shared/easings";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -14,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { BUTTER_EASE, SPRING_EASE } from "@/components/shared/easings";
 import { useToast } from "@/components/shared/ToastProvider";
 
 import { ProjectControlButton } from "@/components/shared/ui-primitives";
@@ -29,6 +29,7 @@ import {
 } from "./EditableTariffVoicesGrid";
 import { ImportMetric } from "./ImportMetric";
 import { ValidationLine } from "./ValidationLine";
+
 const DRAFT_VERSION = 1;
 type InspectorTab = "checks" | "categories" | "issues";
 

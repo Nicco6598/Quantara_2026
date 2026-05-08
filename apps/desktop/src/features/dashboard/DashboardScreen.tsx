@@ -13,11 +13,12 @@ import {
   PriorityActions,
   RightRail,
 } from "@/features/dashboard/components/DashboardSections";
-import { MetricCard } from "@/features/projects/components/workspace-ui";
-import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
-import { readStringRecord } from "@/lib/shared-utils";
+import { MetricCard } from "@/components/shared/ui-primitives";
+import { mapContractToProject } from "@/features/projects/utils/project-mappers";
+import type { PortfolioProject } from "@/features/projects/types";
 import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
+import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 

@@ -9,8 +9,9 @@ import {
   useMemo,
   useState,
 } from "react";
-import { cn } from "@/lib/utils";
 import { SPRING_EASE } from "@/components/shared/easings";
+import { cn } from "@/lib/utils";
+
 type ToastTone = "info" | "success" | "warning" | "danger";
 
 type ToastInput = {

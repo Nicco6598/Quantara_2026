@@ -1,5 +1,4 @@
 import { contractSchema } from "@quantara/validation";
-import { SPRING_EASE } from "@/components/shared/easings";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { ProjectControlButton } from "@/components/shared/ui-primitives";
 
 import type {

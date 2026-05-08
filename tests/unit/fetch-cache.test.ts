@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Inline minimal cache implementation to test without DOM dependencies
 function createCache(defaultTTL = 5000) {

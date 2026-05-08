@@ -1,23 +1,14 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { BUTTER_EASE } from "@/components/shared/easings";
 import { motion } from "framer-motion";
 import { Check, ChevronDown, Copy, Download, MoreHorizontal, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useRef, useState } from "react";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
+import { BUTTER_EASE } from "@/components/shared/easings";
 import { InlineEdit } from "@/components/shared/InlineEdit";
+import { Currency } from "@/components/shared/Currency";
+export { Currency };
 import { cn } from "@/lib/utils";
 import type { SalEconomicSummary, SalLineDraft, SalLineView, SalVerificationCheck } from "../types";
-export function Currency({ value }: { value: number }) {
-  return (
-    <span className="font-mono">
-      {value.toLocaleString("it-IT", {
-        currency: "EUR",
-        minimumFractionDigits: 2,
-        style: "currency",
-      })}
-    </span>
-  );
-}
 
 export function NumberValue({ value }: { value: number }) {
   return (

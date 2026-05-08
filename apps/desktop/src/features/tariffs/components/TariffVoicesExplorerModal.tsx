@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { SPRING_EASE } from "@/components/shared/easings";
 import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { SPRING_EASE } from "@/components/shared/easings";
 import type { DesktopTariffVoice } from "@/lib/desktopData";
 
 import { formatEuro } from "@/lib/formatters";
@@ -9,6 +9,7 @@ import { formatEuro } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 import { formatPercent } from "../utils/tariffs-validation";
+
 type TariffVoiceGroup = {
   children: DesktopTariffVoice[];
   code: string;

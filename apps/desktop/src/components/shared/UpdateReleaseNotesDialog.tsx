@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { SOFT_EASE } from "@/components/shared/easings";
 import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { createPortal } from "react-dom";
+import { SOFT_EASE } from "@/components/shared/easings";
 import type { PendingReleaseNotes } from "@/lib/updateReleaseNotes";
 
 import { cn } from "@/lib/utils";

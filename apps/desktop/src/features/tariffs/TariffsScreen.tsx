@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { BUTTER_EASE } from "@/components/shared/easings";
 import {
   ArrowUp,
   Building2,
@@ -21,8 +20,8 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
-
 import { Badge } from "@/components/shared/Badge";
+import { BUTTER_EASE } from "@/components/shared/easings";
 
 import { ScreenHero } from "@/components/shared/ScreenHero";
 
@@ -66,6 +65,7 @@ import {
 import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
 import { groupTariffVoices } from "./utils/tariff-grouping";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
+
 const TARIFF_MENU_WIDTH = 224;
 
 function getScrollableAncestor(element: HTMLElement | null) {

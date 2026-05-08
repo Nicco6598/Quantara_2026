@@ -1,5 +1,10 @@
-import type { SalLineDraft } from "../types";
-import type { SalDocument, SalLine, SalSurchargeKind, SalTariffVoice } from "../types";
+import type {
+  SalDocument,
+  SalLine,
+  SalLineDraft,
+  SalSurchargeKind,
+  SalTariffVoice,
+} from "../types";
 
 // Re-export for backward compatibility with existing imports
 export type {
@@ -10,6 +15,7 @@ export type {
   SalSurchargeKind,
   SalTariffVoice,
 } from "../types";
+
 import { buildLineViews, defaultSalEconomicRules, summarizeSalLines } from "./sal-calculations";
 import { isSafetyVoice } from "./sal-safety";
 

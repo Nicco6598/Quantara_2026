@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, Trash2, XCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import { useSelectionStore } from "@/store/selection-store";
 import { SOFT_EASE } from "@/components/shared/easings";
+import { useSelectionStore } from "@/store/selection-store";
+
 type BulkAction = {
   icon: ReactNode;
   label: string;
