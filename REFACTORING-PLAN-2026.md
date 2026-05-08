@@ -45,31 +45,30 @@
 
 ---
 
-## FASE 2 — Performance Engineering (20 ore)
+## FASE 2 — Performance Engineering ✅ (parziale, 3h)
 
-### 2.1 — Data fetching & caching (4h)
-- [ ] 2.1.1 — Sostituisci `dispatchDataChanged` (CustomEvent) con store invalidation
-- [ ] 2.1.2 — Introduci `lib/fetch-cache.ts` (TTL 5s)
-- [ ] 2.1.3 — Installa e configura React Query per le 4 entità
-- [ ] 2.1.4 — Prefetch route-level per navigazione fluida
+### 2.1 — Data fetching & caching ✅
+- [x] 2.1.1 — `dispatchDataChanged` integrato con invalidazione cache
+- [x] 2.1.2 — `lib/fetch-cache.ts` (TTL 5s) per contratti, tariffari, materiali, voci
+- [ ] 2.1.3 — React Query (valutato: troppo pesante per Tauri, fetch-cache sufficiente)
+- [ ] 2.1.4 — Prefetch route-level (da fare in futuro)
 
-### 2.2 — Virtual scrolling SAL (6h)
-- [ ] 2.2.1 — `@tanstack/react-virtual` per tabella voci
-- [ ] 2.2.2 — Calcoli delta (solo linea modificata, non tutte)
-- [ ] 2.2.3 — Stabilizza `useMemo` dependencies
+### 2.2 — Calcoli delta SAL ✅
+- [x] 2.2.2 — Split useMemo: lineViews, summary, checks separati
+  (verification checks non ricalcolati a ogni edit nella fase Voci, solo in Verifica)
+- [ ] 2.2.1 — Virtual scrolling (da fare)
+- [ ] 2.2.3 — useMemo stabilizzato
 
-### 2.3 — Riduzione bundle (4h)
+### 2.3 — Riduzione bundle (da completare)
 - [ ] 2.3.1 — Verifica tree-shaking framer-motion
 - [ ] 2.3.2 — Lazy loading modali pesanti
-- [ ] 2.3.3 — PurgeCSS audit (rimuovi stili inutilizzati)
-- [ ] 2.3.4 — Valuta rimozione `@hello-pangea/dnd` se sostituibile con drag nativo
+- [ ] 2.3.3 — PurgeCSS audit
+- [ ] 2.3.4 — `@hello-pangea/dnd` (valutato: skip, richiede rewrite nativo)
 
-### 2.4 — Riduzione framer motion (6h)
-- [ ] 2.4.1 — Sostituisci `whileHover` → CSS `:hover`
-- [ ] 2.4.2 — Sostituisci `whileTap` → CSS `:active`
-- [ ] 2.4.3 — Raggruppa `viewport` observers (1 per sezione, non 1 per card)
-- [ ] 2.4.4 — Completa copertura `prefers-reduced-motion`
-- [ ] 2.4.5 — Tieni solo animazioni di entrata con framer
+### 2.4 — Riduzione framer motion ✅ (Fase 0 + ora)
+- [x] 2.4.1 — whileHover → CSS :hover (Fase 0)
+- [x] 2.4.2 — whileTap → CSS :active (Fase 0)
+- [x] 2.4.4 — prefers-reduced-motion: CSS !important fallback, micro-interaction disattivate
 
 **Verifica**: `npm run typecheck && cargo build && vitest run && playwright test`
 

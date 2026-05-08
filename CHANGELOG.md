@@ -17,6 +17,13 @@ All notable changes to Quantara follow SemVer.
 - **Unificate funzioni duplicate** — funzioni identiche che facevano la stessa cosa in file diversi sono state centralizzate: controllo se siamo in ambiente desktop o browser, formattazione errori, arrotondamento degli importi in euro e alcune logiche di servizio nei comandi Rust. Meno codice = meno bug.
 - **Transizioni CSS unificate** — aggiunta una classe `.micro-interact` che gestisce in un solo posto tutte le micro-interazioni (hover sollevato, tap schiacciato). Applicata a oltre 50 pulsanti in tutte le schermate.
 
+### Performance
+
+- **Cache dati intelligente** — contratti, tariffari e materiali ora vengono tenuti in cache per 5 secondi. Se cambi pagina e torni indietro, i dati sono gia pronti senza ricaricarli. Quando fai una modifica, la cache si svuota automaticamente.
+- **Tabella voci SAL virtualizzata** — quando hai piu di 20 voci in SAL, vengono renderizzate solo quelle visibili sullo schermo invece di tutte. Scorrendo, le righe si caricano al volo. Per liste piccole (<20 voci) rimane il drag & drop.
+- **Calcoli SAL separati** — i controlli contabili (verifica budget, sforamento, ecc.) non vengono piu ricalcolati a ogni singola modifica di una voce, ma solo quando necessario. La tabella voci e il riepilogo economico sono separati: modifichi un valore e solo quello che serve si aggiorna.
+- **Animazioni rispettose** — se il sistema operativo ha le animazioni ridotte (accessibilita), l'app disattiva tutte le micro-interazioni e le transizioni. Niente movimento forzato.
+
 ## 0.2.41 - 2026-05-08
 
 - **Tariffari modificati** — Si possono ora salvare in bozza, eliminare e revisionare dall'import, una volta importati possono anche essere modificati dalla schermata generale (icona a 3 puntini) dei tariffari.

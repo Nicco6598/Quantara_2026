@@ -1,13 +1,11 @@
-import { motion } from "framer-motion";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { BUTTER_EASE } from "@/components/shared/easings";
+import { motion } from "framer-motion";
 import { Check, ChevronDown, Copy, Download, MoreHorizontal, Trash2 } from "lucide-react";
-import { memo, type ReactNode, useState } from "react";
+import { memo, type ReactNode, useRef, useState } from "react";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
-
 import { InlineEdit } from "@/components/shared/InlineEdit";
-
 import { cn } from "@/lib/utils";
-
 import type { SalEconomicSummary, SalLineDraft, SalLineView, SalVerificationCheck } from "../types";
 export function Currency({ value }: { value: number }) {
   return (
@@ -52,9 +50,20 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onReorder: (lines: SalLineDraft[]) => void;
   onSurcharge: (voiceId: string, percent: number) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const VIRTUAL_THRESHOLD = 20;
+  const useVirtual = lines.length > VIRTUAL_THRESHOLD;
+
+  const rowVirtualizer = useVirtualizer({
+    count: lines.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 152,
+    overscan: 5,
+  });
+
   return (
     <div className="overflow-x-auto rounded-[20px] bg-[var(--bg-muted)]/40 ring-1 ring-[var(--border-subtle)]/60">
-      <div className="max-h-[680px] overflow-y-auto">
+      <div ref={scrollRef} className="max-h-[680px] overflow-y-auto">
         <div className="min-w-[1060px] break-words">
           {/* LINE 2 header — data columns */}
           <div className="grid-col-fade sticky top-0 z-10 grid grid-cols-[72px_92px_92px_92px_112px_130px_120px_100px_130px] items-center gap-3 bg-[var(--surface-base)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)] shadow-[0_1px_0_var(--border-subtle)]">
@@ -74,6 +83,36 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
               <p className="text-[13px] font-medium text-[var(--text-secondary)]">
                 Cerca una voce tariffaria qui sopra e aggiungila alla bozza.
               </p>
+            </div>
+          ) : useVirtual ? (
+            <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: "relative" }}>
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const line = lines[virtualRow.index];
+                if (!line) return null;
+                return (
+                  <div
+                    key={line.id}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <SelectedVoiceRow
+                      index={virtualRow.index}
+                      line={line}
+                      isCopied={copiedVoiceId === line.voice.id}
+                      onCopy={() => onCopyLine(line.voice.id)}
+                      onFactorChange={onFactorChange}
+                      onNotesChange={onNotesChange}
+                      onRemove={onRemove}
+                      onSurcharge={onSurcharge}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <DragDropReorder
