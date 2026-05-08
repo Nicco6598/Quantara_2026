@@ -2,9 +2,7 @@ import { motion } from "framer-motion";
 import { BookOpen, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { type SalTemplate, useTemplateStore } from "@/store/template-store";
-
-const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
-
+import { SOFT_EASE } from "@/components/shared/easings";
 type TemplatePickerProps = {
   onApply: (template: SalTemplate) => void;
   tariffBookId: string;

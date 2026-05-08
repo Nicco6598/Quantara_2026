@@ -29,3 +29,12 @@ export type {
   UpdateDesktopTariffBookRecordRequest,
   WorkInterruptionKind,
 } from "./accounting";
+export type {
+  SalDocument,
+  SalDocumentStatus,
+  SalEconomicRules,
+  SalLine,
+  SalProject,
+  SalSurchargeKind,
+  SalTariffVoice,
+} from "./sal";

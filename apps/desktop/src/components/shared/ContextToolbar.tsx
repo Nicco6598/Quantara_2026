@@ -2,9 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Download, Trash2, XCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSelectionStore } from "@/store/selection-store";
-
-const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
-
+import { SOFT_EASE } from "@/components/shared/easings";
 type BulkAction = {
   icon: ReactNode;
   label: string;
@@ -51,8 +49,6 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
                 key={action.label}
                 onClick={action.run}
                 type="button"
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.97 }}
               >
                 {action.icon}
                 {action.label}
@@ -65,8 +61,6 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
             onClick={() => useSelectionStore.getState().clear()}
             title="Deseleziona tutto"
             type="button"
-            whileHover={{ scale: 1.05, y: -1 }}
-            whileTap={{ scale: 0.92 }}
           >
             <XCircle className="size-4" />
           </motion.button>

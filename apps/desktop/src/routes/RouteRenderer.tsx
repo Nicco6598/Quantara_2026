@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import type { QuantaraRoute } from "@/store/app-store";
 
 const AccountingScreen = lazy(() =>
@@ -46,9 +47,17 @@ function ScreenSkeleton() {
   );
 }
 
+function ScreenGuard({ children }: { children: React.ReactNode }) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<ScreenSkeleton />}>{children}</Suspense>
+    </ErrorBoundary>
+  );
+}
+
 export function RouteRenderer({ activeRoute }: RouteRendererProps) {
   return (
-    <Suspense fallback={<ScreenSkeleton />}>
+    <ScreenGuard>
       {activeRoute === "dashboard" && <DashboardScreen />}
       {activeRoute === "projects" && <ProjectsScreen />}
       {activeRoute === "project-detail" && <ProjectDetailScreen />}
@@ -67,6 +76,6 @@ export function RouteRenderer({ activeRoute }: RouteRendererProps) {
         activeRoute !== "materials" &&
         activeRoute !== "team" &&
         activeRoute !== "settings" && <PlaceholderScreen title={activeRoute} />}
-    </Suspense>
+    </ScreenGuard>
   );
 }

@@ -185,8 +185,6 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         onClick={() => onAction("tariff-import-cancel")}
         title="Torna al catalogo"
         type="button"
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.92 }}
       >
         <X size={16} weight="bold" />
       </motion.button>
@@ -325,8 +323,6 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         )}
         onClick={() => onAction("tariff-import-toggle-reviewed")}
         type="button"
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.97 }}
       >
         <span
           className={cn(
@@ -354,8 +350,6 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         onClick={() => onAction("tariff-import-save-draft")}
         title="Salva questo file come bozza"
         type="button"
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.97 }}
       >
         <span className="top-toolbar-action-mark">
           <FloppyDisk size={13} weight="bold" />
@@ -368,8 +362,6 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         onClick={() => onAction("tariff-import-delete-file")}
         title="Cancella file dalla revisione"
         type="button"
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.92 }}
       >
         <Trash size={15} weight="bold" />
       </motion.button>
@@ -381,12 +373,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         disabled={!tariffImportToolbar.canConfirm}
         onClick={() => onAction("tariff-import-confirm")}
         type="button"
-        {...(tariffImportToolbar.canConfirm
-          ? {
-              whileHover: { y: -1 },
-              whileTap: { scale: 0.97 },
-            }
-          : {})}
+        {...(tariffImportToolbar.canConfirm ? {} : {})}
       >
         <span className="top-toolbar-action-mark">
           <CheckCircle size={13} weight="bold" />
@@ -570,12 +557,7 @@ function HistoryButton({
   label: string;
   onClick: () => void;
 }) {
-  const motionProps = disabled
-    ? {}
-    : {
-        whileHover: { y: -1 },
-        whileTap: { scale: 0.92 },
-      };
+  const motionProps = disabled ? {} : {};
 
   return (
     <motion.button
@@ -628,8 +610,6 @@ function PageActions({
             key={`${action.actionId}-${action.variant}`}
             onClick={() => onAction(action.actionId)}
             type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.97 }}
           >
             <span className="top-toolbar-action-mark">
               <ActionMarkIcon mark={action.mark} size={12} />
@@ -671,8 +651,6 @@ function PageActionMenu({
         )}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.97 }}
       >
         <span className="top-toolbar-action-mark">
           <ActionMarkIcon mark={action.mark} size={12} />
@@ -774,8 +752,6 @@ function UtilityButton({
       onClick={onClick}
       title={label}
       type="button"
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.92 }}
     >
       {children}
     </motion.button>

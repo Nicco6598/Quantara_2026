@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { SPRING_EASE } from "@/components/shared/easings";
 import {
   Activity,
   CheckCircle2,
@@ -20,25 +21,34 @@ import {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
+
 import { useToast } from "@/components/shared/ToastProvider";
+
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
+
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
+
 import {
   formatDueWindow,
   formatForecastDelta,
   readStringRecord,
 } from "@/features/projects/utils/projects-helpers";
+
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+
 import { useNavigate } from "@/hooks/useNavigate";
+
 import { listDesktopContracts } from "@/lib/desktopData";
+
 import { formatMoney } from "@/lib/formatters";
+
 import { cn } from "@/lib/utils";
+
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+
 import { useSelectionStore } from "@/store/selection-store";
+
 import { ProjectTimeline } from "./components/ProjectTimeline";
-
-const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
-
 export function ProjectDetailScreen() {
   const { notify } = useToast();
   const navigate = useNavigate();
@@ -891,8 +901,6 @@ function SalCard({
           }}
           role="checkbox"
           type="button"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
         >
           {isSelected && (
             <svg

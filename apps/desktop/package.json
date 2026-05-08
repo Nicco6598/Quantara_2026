@@ -21,7 +21,6 @@
     "@quantara/validation": "workspace:*",
     "@radix-ui/react-slot": "1.2.4",
     "@tailwindcss/vite": "4.2.4",
-    "@tanstack/react-table": "8.21.3",
     "@tauri-apps/api": "2.10.1",
     "@tauri-apps/plugin-dialog": "2.7.0",
     "@tauri-apps/plugin-process": "2.3.1",

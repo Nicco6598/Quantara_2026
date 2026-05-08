@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { BUTTER_EASE } from "@/components/shared/easings";
 import {
   ArrowUp,
   Building2,
@@ -20,10 +21,15 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
+
 import { Badge } from "@/components/shared/Badge";
+
 import { ScreenHero } from "@/components/shared/ScreenHero";
+
 import { useToast } from "@/components/shared/ToastProvider";
+
 import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
+
 import {
   createDesktopTariffBook,
   type DesktopContract,
@@ -38,8 +44,11 @@ import {
   type TariffPdfMetadata,
   updateDesktopTariffBook,
 } from "@/lib/desktopData";
+
 import { cn } from "@/lib/utils";
+
 import { useAppStore } from "@/store/app-store";
+
 import { QuickAction } from "./components/QuickAction";
 import { TariffEditField } from "./components/TariffEditField";
 import { TariffImportLoadingModal } from "./components/TariffImportLoadingModal";
@@ -57,8 +66,6 @@ import {
 import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
 import { groupTariffVoices } from "./utils/tariff-grouping";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
-
-const BUTTER_EASE = [0.22, 1, 0.36, 1] as const;
 const TARIFF_MENU_WIDTH = 224;
 
 function getScrollableAncestor(element: HTMLElement | null) {
@@ -949,8 +956,6 @@ export function TariffsScreen() {
             transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
             type="button"
             title="Torna su"
-            whileHover={{ y: -2, scale: 1.03 }}
-            whileTap={{ scale: 0.92 }}
           >
             <span className="flex size-5 shrink-0 items-center justify-center">
               <ArrowUp className="size-5" />
@@ -1293,7 +1298,6 @@ function TariffBookPreviewCard({
       initial={{ opacity: 0, y: 10 }}
       transition={{ duration: 0.42, ease: BUTTER_EASE }}
       viewport={{ amount: 0.18, once: true }}
-      whileHover={{ y: -2 }}
       whileInView={{ opacity: 1, y: 0 }}
     >
       <div className="flex h-full flex-col">
@@ -1549,8 +1553,6 @@ function TariffMenuItem({
       )}
       onClick={onClick}
       type="button"
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.98 }}
       transition={{ duration: 0.32, ease: BUTTER_EASE }}
     >
       <span

@@ -1,13 +1,14 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { DesktopTariffVoice } from "@/lib/desktopData";
+
 import { formatEuro } from "@/lib/formatters";
+
 import { cn } from "@/lib/utils";
+
 import { formatPercent } from "../utils/tariffs-validation";
-
-const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
-
 type TariffVoiceGroup = {
   children: DesktopTariffVoice[];
   code: string;
@@ -98,8 +99,6 @@ export function TariffVoicesExplorerModal({
               className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"
               onClick={onClose}
               type="button"
-              whileHover={{ scale: 1.08, y: -1 }}
-              whileTap={{ scale: 0.92 }}
             >
               <X className="size-4" />
             </motion.button>
@@ -134,13 +133,6 @@ export function TariffVoicesExplorerModal({
                       className="flex size-8 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
                       onClick={() => setFocusedGroupCode(null)}
                       type="button"
-                      whileHover={{
-                        scale: 1.1,
-                        y: -1,
-                        backgroundColor:
-                          "color-mix(in srgb, var(--accent-primary) 20%, transparent)",
-                      }}
-                      whileTap={{ scale: 0.9 }}
                     >
                       <ArrowLeft className="size-4" />
                     </motion.button>

@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
+import { SOFT_EASE } from "@/components/shared/easings";
 import { Save, X } from "lucide-react";
 import { useState } from "react";
 import type { TemplateVoiceEntry } from "@/store/template-store";
+
 import { useTemplateStore } from "@/store/template-store";
+
 import type { SalEconomicRules } from "../types";
-
-const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
-
 type SaveAsTemplateDialogProps = {
   onClose: () => void;
   voiceEntries: TemplateVoiceEntry[];

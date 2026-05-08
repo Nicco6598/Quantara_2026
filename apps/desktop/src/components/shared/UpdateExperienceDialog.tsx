@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
+import { SOFT_EASE } from "@/components/shared/easings";
 import { ArrowUpRight, Clock3, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
+
 import { cn } from "@/lib/utils";
 
 type UpdateExperienceDialogProps = {
@@ -19,8 +21,6 @@ export function UpdateExperienceDialog({
 }: UpdateExperienceDialogProps) {
   const notes = normalizeNotes(update.notes);
   const isBusy = installState.phase === "installing";
-  const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
-
   return createPortal(
     <div
       aria-modal="true"
@@ -162,11 +162,10 @@ function ActionButton({
 }) {
   return (
     <motion.button
-      className="group inline-flex h-11 w-full shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
+      className="micro-interact group inline-flex h-11 w-full shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
       disabled={disabled}
       onClick={onClick}
       type="button"
-      {...(!disabled ? { whileHover: { y: -1 }, whileTap: { scale: 0.97 } } : {})}
     >
       <span>{children}</span>
       <span className="flex size-9 items-center justify-center rounded-full bg-white/16 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-105">

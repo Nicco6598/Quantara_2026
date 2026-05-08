@@ -1,13 +1,13 @@
 import { motion } from "framer-motion";
+import { SPRING_EASE } from "@/components/shared/easings";
 import type { LucideIcon } from "lucide-react";
 import { ChevronRight, Pencil, Trash2, X } from "lucide-react";
 import { useEffect } from "react";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+
 import { cn } from "@/lib/utils";
+
 import type { PortfolioProject } from "../types";
-
-const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
-
 export function ProjectActionDialog({
   mode,
   onClose,

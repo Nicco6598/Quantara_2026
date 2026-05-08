@@ -1,3 +1,5 @@
+import { roundCurrency } from "@quantara/domain-utils";
+
 import type {
   SalEconomicRules,
   SalEconomicSummary,
@@ -332,11 +334,4 @@ function buildLinkedCharges(line: SalLineDraft, grossAmount: number): SalLinkedC
 
 function normalizeQuantity(value: number) {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
-export function roundCurrency(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.round(value * 100) / 100;
 }

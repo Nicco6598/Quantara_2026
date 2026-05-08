@@ -2,6 +2,21 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.50 - 2026-05-08
+
+### App piu scattante e codice piu pulito
+
+- **Easing centralizzata** — la curva di animazione `cubic-bezier(0.22, 1, 0.36, 1)` era definita in 18 file diversi con 3 nomi diversi (BUTTER_EASE, SPRING_EASE, SOFT_EASE). Ora vive in un unico posto `components/shared/easings.ts` e tutti i file la importano da li. Coerente e facile da modificare.
+- **Tipi SAL condivisi** — i tipi principali di SAL (SalDocument, SalLine, SalProject, SalTariffVoice, SalEconomicRules) sono stati spostati in `@quantara/shared-types/src/sal.ts`, la libreria centrale dei tipi. Le funzioni di dominio continuano a funzionare grazie a re-export automatici. Aggiunto sistema di migrazione automatica per i dati salvati localmente (versione 1), pronto per evoluzioni future.
+- **Store SAL piu snello** — ridotto il numero di azioni dello store da 17 a 10. Unificate le funzioni di creazione progetto (con/senza ID), creazione SAL (vuota/con linee/con bozza) e aggiornamento linea (quantita/maggiorazione in un unica funzione).
+- **Validazione dati** — aggiunto un sistema di validazione con Zod prima delle chiamate al backend: i contratti vengono controllati prima di essere inviati al database. Se i dati non sono validi, l'errore compare subito senza arrivare al backend.
+- **Schermate protette** — ogni scherma dell'app e ora avvolta in un "cuscinetto" (ErrorBoundary): se qualcosa va storto in una pagina, le altre continuano a funzionare. Appare un messaggio chiaro con pulsante per riprovare.
+
+- **Meno animazioni pesanti** — tutte le micro-animazioni al passaggio del mouse (effetto "sollevamento" di card, pulsanti e chip) sono state sostituite da CSS leggero invece di JavaScript. L'app ora consuma meno CPU, reagisce subito, ma a video non si nota differenza. Le animazioni di ingresso delle pagine sono rimaste invariate.
+- **Rimosso codice inutile** — eliminate parti del programma che non servivano piu: moduli Rust vuoti (application/, domain/), una libreria JavaScript mai usata (`@tanstack/react-table`, risparmio ~40KB), un comando backend mai chiamato dall'interfaccia (`preview_sal_total`).
+- **Unificate funzioni duplicate** — funzioni identiche che facevano la stessa cosa in file diversi sono state centralizzate: controllo se siamo in ambiente desktop o browser, formattazione errori, arrotondamento degli importi in euro e alcune logiche di servizio nei comandi Rust. Meno codice = meno bug.
+- **Transizioni CSS unificate** — aggiunta una classe `.micro-interact` che gestisce in un solo posto tutte le micro-interazioni (hover sollevato, tap schiacciato). Applicata a oltre 50 pulsanti in tutte le schermate.
+
 ## 0.2.41 - 2026-05-08
 
 - **Tariffari modificati** — Si possono ora salvare in bozza, eliminare e revisionare dall'import, una volta importati possono anche essere modificati dalla schermata generale (icona a 3 puntini) dei tariffari.

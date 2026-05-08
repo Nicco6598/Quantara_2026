@@ -1,13 +1,16 @@
 import { motion } from "framer-motion";
+import { SOFT_EASE } from "@/components/shared/easings";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { useMemo } from "react";
 import type { PortfolioProject } from "@/features/projects/types";
-import { Currency } from "@/features/sal/components/SalCreationTables";
-import type { SalDocument } from "@/features/sal/domain/sal-workflow";
-import { cn } from "@/lib/utils";
-import { buildProjectTimeline, type TimelineEvent } from "../domain/project-timeline";
 
-const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
+import { Currency } from "@/features/sal/components/SalCreationTables";
+
+import type { SalDocument } from "@/features/sal/domain/sal-workflow";
+
+import { cn } from "@/lib/utils";
+
+import { buildProjectTimeline, type TimelineEvent } from "../domain/project-timeline";
 const STAGGER = 0.04;
 
 type ProjectTimelineProps = {

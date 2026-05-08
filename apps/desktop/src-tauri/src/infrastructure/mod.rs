@@ -2,3 +2,25 @@ pub mod contract_repository;
 pub mod local_storage;
 pub mod material_repository;
 pub mod tariff_repository;
+
+use serde::Serialize;
+
+use crate::models::app_error::AppError;
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct Money {
+    pub amount: f64,
+    pub currency: &'static str,
+}
+
+pub(crate) fn money_to_cents(amount: f64) -> i64 {
+    (amount * 100.0).round() as i64
+}
+
+pub(crate) fn cents_to_money(amount_cents: i64) -> f64 {
+    amount_cents as f64 / 100.0
+}
+
+pub(crate) fn to_database_error(error: rusqlite::Error) -> AppError {
+    AppError::Database(error.to_string())
+}

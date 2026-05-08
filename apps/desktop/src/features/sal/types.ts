@@ -1,5 +1,15 @@
 import type { DesktopContract, DesktopTariffBook, DesktopTariffVoice } from "@/lib/desktopData";
 
+export type {
+  SalDocument,
+  SalDocumentStatus,
+  SalEconomicRules,
+  SalLine,
+  SalProject,
+  SalSurchargeKind,
+  SalTariffVoice,
+} from "@quantara/shared-types";
+
 export type SalCreationStep = 1 | 2 | 3 | 4 | 5;
 
 export type SalDataSource = "desktop" | "local";
@@ -80,13 +90,6 @@ export type SalLineView = SalLineDraft & {
   netAmount: number;
   status: "complete" | "incomplete";
   totalAmount: number;
-};
-
-export type SalEconomicRules = {
-  applyDiscountToSafetyCosts: boolean;
-  discountEnabled: boolean;
-  discountPercent: number;
-  rounding: "cent";
 };
 
 export type SalEconomicSummary = {

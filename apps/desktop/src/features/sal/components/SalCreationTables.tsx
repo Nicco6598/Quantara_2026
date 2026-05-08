@@ -1,13 +1,14 @@
 import { motion } from "framer-motion";
+import { BUTTER_EASE } from "@/components/shared/easings";
 import { Check, ChevronDown, Copy, Download, MoreHorizontal, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useState } from "react";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
+
 import { InlineEdit } from "@/components/shared/InlineEdit";
+
 import { cn } from "@/lib/utils";
+
 import type { SalEconomicSummary, SalLineDraft, SalLineView, SalVerificationCheck } from "../types";
-
-const BUTTER_EASE = [0.22, 1, 0.36, 1] as const;
-
 export function Currency({ value }: { value: number }) {
   return (
     <span className="font-mono">
@@ -164,8 +165,6 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             onClick={onCopy}
             type="button"
             title={isCopied ? "Voce copiata — premi Ctrl+V per incollare" : "Copia voce (Ctrl+C)"}
-            whileHover={{ scale: 1.1, y: -1 }}
-            whileTap={{ scale: 0.92 }}
             transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             {isCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
@@ -175,8 +174,6 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             className="flex size-8 items-center justify-center rounded-[10px] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
             onClick={() => onRemove(line.voice.id)}
             type="button"
-            whileHover={{ scale: 1.1, y: -1 }}
-            whileTap={{ scale: 0.92 }}
             transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             <Trash2 className="size-4" />
@@ -381,8 +378,6 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                 className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] items-center px-3 py-3 text-left text-[13px] hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => setExpandedId(expanded ? null : line.id)}
                 type="button"
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.99 }}
                 transition={{ duration: 0.42, ease: BUTTER_EASE }}
               >
                 <ChevronDown

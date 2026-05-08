@@ -130,8 +130,8 @@ export function ProjectsScreen() {
   const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
   const salProjects = useSalWorkflowStore((state) => state.projects);
   const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
-  const updateSalLineQuantity = useSalWorkflowStore((state) => state.updateLineQuantity);
-  const updateSalLineSurcharge = useSalWorkflowStore((state) => state.updateLineSurcharge);
+  const updateSalLine = useSalWorkflowStore((state) => state.updateLine);
+
   const activeProjects = useMemo(
     () =>
       contractsState.source === "desktop" || contractsState.data.length > 0
@@ -478,8 +478,12 @@ export function ProjectsScreen() {
             onClose={() => setIsSalModalOpen(false)}
             projectIndex={projectSalIndex}
             sals={modalSals}
-            onUpdateQuantity={updateSalLineQuantity}
-            onUpdateSurcharge={updateSalLineSurcharge}
+            onUpdateQuantity={(salId, lineId, qty) =>
+              updateSalLine(salId, lineId, { quantity: qty })
+            }
+            onUpdateSurcharge={(salId, lineId, surcharge) =>
+              updateSalLine(salId, lineId, { surcharge })
+            }
           />
         ) : null}
         {contractorDeleteTarget ? (

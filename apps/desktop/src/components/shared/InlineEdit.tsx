@@ -90,8 +90,6 @@ export function InlineEdit({
         setEditing(true);
       }}
       type="button"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
     >
       {value.toLocaleString("it-IT", {
         maximumFractionDigits: 3,

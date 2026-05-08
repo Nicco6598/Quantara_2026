@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use crate::{
-    application::accounting_service::AccountingService, db::migrations::CURRENT_SCHEMA_VERSION,
-    infrastructure::local_storage::default_database_name, updater::patch_notes::PatchNotes,
+    db::migrations::CURRENT_SCHEMA_VERSION, infrastructure::local_storage::default_database_name,
+    updater::patch_notes::PatchNotes,
 };
 
 #[derive(Debug, Serialize)]
@@ -23,7 +23,7 @@ pub fn get_health_snapshot() -> HealthSnapshot {
     HealthSnapshot {
         app_version: env!("CARGO_PKG_VERSION"),
         database_name: default_database_name().to_string_lossy().to_string(),
-        default_module: AccountingService::module_name(),
+        default_module: "accounting",
         latest_patch_notes: format!("{}: {}", patch_notes.version, patch_notes.summary),
         schema_version: CURRENT_SCHEMA_VERSION,
         storage_engine: "sqlite",

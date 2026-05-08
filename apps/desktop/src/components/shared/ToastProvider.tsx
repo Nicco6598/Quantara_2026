@@ -10,9 +10,7 @@ import {
   useState,
 } from "react";
 import { cn } from "@/lib/utils";
-
-const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
-
+import { SPRING_EASE } from "@/components/shared/easings";
 type ToastTone = "info" | "success" | "warning" | "danger";
 
 type ToastInput = {

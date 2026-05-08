@@ -12,7 +12,13 @@ import type {
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
-import { invokeWithFallback } from "./tauri-wrapper";
+import { contractSchema } from "@quantara/validation";
+import {
+  invokeWithFallback,
+  invokeWithValidation,
+  isTauriRuntime,
+  formatDesktopError,
+} from "./tauri-wrapper";
 
 export type DesktopMoney = Money;
 export type DesktopTariffPriority = DesktopTariffPriorityRecord;
@@ -26,18 +32,10 @@ export type UpdateDesktopTariffBookRequest = UpdateDesktopTariffBookRecordReques
 export type TariffPdfMetadata = TariffPdfMetadataRecord;
 export type { TariffWarning };
 
-const tariffVoiceCache = new Map<string, DesktopTariffVoiceRecord[]>();
+import type { DesktopDataResult } from "./tauri-wrapper";
+export type { DesktopDataResult };
 
-export type DesktopDataResult<T> =
-  | {
-      data: T;
-      source: "desktop";
-    }
-  | {
-      data: T;
-      message: string;
-      source: "fallback";
-    };
+const tariffVoiceCache = new Map<string, DesktopTariffVoiceRecord[]>();
 
 type InflightKey =
   | "contracts"
@@ -90,7 +88,7 @@ export async function createDesktopContract(
     return contract;
   }
 
-  return invoke<DesktopContract>("create_contract", { request });
+  return invokeWithValidation("create_contract", { request }, contractSchema as never);
 }
 
 export async function updateDesktopContract(
@@ -101,7 +99,7 @@ export async function updateDesktopContract(
     return createDesktopContract(request);
   }
 
-  return invoke<DesktopContract>("update_contract", { contractId, request });
+  return invokeWithValidation("update_contract", { contractId, request }, contractSchema as never);
 }
 
 export async function deleteDesktopContract(contractId: string): Promise<void> {
@@ -341,14 +339,6 @@ function inferSourceName(value: string) {
   }
 
   return "Ente da confermare";
-}
-
-function isTauriRuntime() {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
-
-function formatDesktopError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }
 
 // ── Materials ────────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { contractSchema } from "@quantara/validation";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -14,14 +15,14 @@ import {
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
+
 import type {
   CreateDesktopContractRequest,
   DesktopContract,
   DesktopTariffBook,
 } from "@/lib/desktopData";
-import { formatMoney } from "@/lib/formatters";
 
-const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
+import { formatMoney } from "@/lib/formatters";
 
 type ProjectModalStep = 1 | 2;
 

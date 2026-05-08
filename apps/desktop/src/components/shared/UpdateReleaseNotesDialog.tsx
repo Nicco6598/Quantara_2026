@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
+import { SOFT_EASE } from "@/components/shared/easings";
 import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { PendingReleaseNotes } from "@/lib/updateReleaseNotes";
+
 import { cn } from "@/lib/utils";
 
 type UpdateReleaseNotesDialogProps = {
@@ -10,7 +12,6 @@ type UpdateReleaseNotesDialogProps = {
 };
 
 export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesDialogProps) {
-  const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
   const bodyNotes = normalizeBodyNotes(notes.body);
 
   return createPortal(
@@ -121,8 +122,6 @@ function ActionButton({ children, onClick }: { children: React.ReactNode; onClic
       className="group inline-flex h-11 shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
       onClick={onClick}
       type="button"
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.97 }}
     >
       <span>{children}</span>
       <span className="flex size-9 items-center justify-center rounded-full bg-white/16 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-105">

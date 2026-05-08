@@ -1,7 +1,5 @@
-mod application;
 mod commands;
 mod db;
-mod domain;
 mod infrastructure;
 mod models;
 mod updater;
@@ -58,7 +56,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::health::get_health_snapshot,
-            commands::accounting::preview_sal_total,
             commands::contracts::list_contracts,
             commands::contracts::get_contract,
             commands::contracts::create_contract,

@@ -1,4 +1,5 @@
 import { parseEuroAmount } from "@quantara/domain-utils";
+import { SPRING_EASE, BUTTER_EASE } from "@/components/shared/easings";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -14,8 +15,11 @@ import {
 } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
+
 import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
+
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
+
 import type { ImportValidation } from "../tariffs-types";
 import { groupEditableTariffVoices } from "../utils/tariff-grouping";
 import { getImportValidation, parseOptionalPercent } from "../utils/tariffs-validation";
@@ -25,9 +29,6 @@ import {
 } from "./EditableTariffVoicesGrid";
 import { ImportMetric } from "./ImportMetric";
 import { ValidationLine } from "./ValidationLine";
-
-const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
-const BUTTER_EASE = [0.22, 1, 0.36, 1] as const;
 const DRAFT_VERSION = 1;
 type InspectorTab = "checks" | "categories" | "issues";
 
@@ -641,8 +642,6 @@ export function TariffImportPreviewModal({
               className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
               onClick={onCancel}
               type="button"
-              whileHover={{ scale: 1.05, y: -1 }}
-              whileTap={{ scale: 0.92 }}
               transition={{ duration: 0.42, ease: BUTTER_EASE }}
             >
               <X className="size-4" />
@@ -681,8 +680,6 @@ export function TariffImportPreviewModal({
                       key={meta.name}
                       onClick={() => switchFile(i)}
                       type="button"
-                      whileHover={{ y: -1 }}
-                      whileTap={{ scale: 0.96 }}
                       transition={{ duration: 0.42, ease: BUTTER_EASE }}
                     >
                       {draftedFiles.has(i) ? (
@@ -1236,8 +1233,6 @@ function InterventionPanel({
                 key={`${row.index}-${row.field}`}
                 onClick={() => onFocusCell(row.index, row.field)}
                 type="button"
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.96 }}
                 transition={{ duration: 0.42, ease: BUTTER_EASE }}
               >
                 Riga {row.index + 1}: {row.label}

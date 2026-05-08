@@ -2,12 +2,10 @@ import { motion } from "framer-motion";
 import { ArrowRight, Minus, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { SOFT_EASE } from "@/components/shared/easings";
 import { type DiffResult, diffSalLines } from "../domain/sal-comparison";
 import type { SalLineView } from "../types";
 import { Currency } from "./SalCreationTables";
-
-const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
-
 type SalComparisonViewProps = {
   before: SalLineView[];
   after: SalLineView[];

@@ -2,7 +2,9 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::migrations::apply_migrations, domain::accounting::Money, models::app_error::AppError,
+    db::migrations::apply_migrations,
+    infrastructure::{cents_to_money, money_to_cents, to_database_error, Money},
+    models::app_error::AppError,
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -315,17 +317,7 @@ fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppE
     Ok(())
 }
 
-fn money_to_cents(amount: f64) -> i64 {
-    (amount * 100.0).round() as i64
-}
 
-fn cents_to_money(amount_cents: i64) -> f64 {
-    amount_cents as f64 / 100.0
-}
-
-fn to_database_error(error: rusqlite::Error) -> AppError {
-    AppError::Database(error.to_string())
-}
 
 #[cfg(test)]
 mod tests {

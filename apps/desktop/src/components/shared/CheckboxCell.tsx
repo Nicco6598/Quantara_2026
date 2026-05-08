@@ -24,8 +24,6 @@ export function CheckboxCell({ checked, onToggle, ariaLabel }: CheckboxCellProps
       }}
       role="checkbox"
       type="button"
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.9 }}
     >
       {checked && (
         <svg aria-label="Selezionato" className="size-3 text-white" fill="none" viewBox="0 0 12 12">

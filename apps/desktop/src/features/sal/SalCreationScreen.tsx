@@ -63,8 +63,6 @@ import type {
   SalVoiceDraft,
 } from "./types";
 
-const BUTTER_EASE = [0.22, 1, 0.36, 1] as const;
-
 const PHASE_ORDER: SalWorkflowPhase[] = ["context", "voices", "review", "confirm", "completed"];
 const DRAFT_STORAGE_KEY = "quantara.salCreationDraft.v1";
 const CREATED_FLAG_KEY = "quantara.salCreated.v1";
@@ -159,9 +157,9 @@ export function SalCreationScreen() {
   const { notify } = useToast();
   const navigate = useNavigate();
   const data = useSalCreationData();
-  const createSalProjectWithId = useSalWorkflowStore((state) => state.createProjectWithId);
+  const createSalProject = useSalWorkflowStore((state) => state.createProject);
   const closeSal = useSalWorkflowStore((state) => state.closeSal);
-  const createSalWithLines = useSalWorkflowStore((state) => state.createSalWithLines);
+  const createSal = useSalWorkflowStore((state) => state.createSal);
   const updateSalDraft = useSalWorkflowStore((state) => state.updateSalDraft);
   const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
   const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
@@ -492,7 +490,7 @@ export function SalCreationScreen() {
     }
     if (!data.project) return;
 
-    createSalProjectWithId({
+    createSalProject({
       client: data.project.contractor,
       description: `${data.project.frameworkAgreementCode} - ${data.project.applicationContractCode}`,
       id: data.project.id,
@@ -526,10 +524,10 @@ export function SalCreationScreen() {
     };
 
     if (editingDraftSalId) {
-      updateSalDraft({ ...finalSalPayload, id: editingDraftSalId });
+      updateSalDraft(editingDraftSalId, finalSalPayload);
       closeSal(editingDraftSalId);
     } else {
-      createSalWithLines(finalSalPayload);
+      createSal(finalSalPayload);
     }
 
     setCreatedSalTitle(salTitle.trim() || data.project.salTitle);
@@ -558,7 +556,7 @@ export function SalCreationScreen() {
       selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
     });
     // Also persist a draft SAL in the store so it appears in the project
-    createSalProjectWithId({
+    createSalProject({
       client: project.contractor,
       description: `${project.frameworkAgreementCode} - ${project.applicationContractCode}`,
       id: pid,
@@ -591,8 +589,8 @@ export function SalCreationScreen() {
       })),
     };
     const draftSal = editingDraftSalId
-      ? updateSalDraft({ ...draftPayload, id: editingDraftSalId })
-      : createSalWithLines(draftPayload);
+      ? updateSalDraft(editingDraftSalId, draftPayload)
+      : createSal(draftPayload);
     const draftSalId = draftSal?.id ?? editingDraftSalId;
     if (draftSalId) {
       setEditingDraftSalId(draftSalId);
@@ -628,8 +626,8 @@ export function SalCreationScreen() {
     salTitle,
     notify,
     lineViews,
-    createSalProjectWithId,
-    createSalWithLines,
+    createSalProject,
+    createSal,
     editingDraftSalId,
     updateSalDraft,
     navigate,
@@ -808,9 +806,6 @@ function SetupStep({
               className="flex w-full items-center gap-5 text-left"
               onClick={() => setProjectOpen(!projectOpen)}
               type="button"
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.99 }}
-              transition={{ duration: 0.42, ease: BUTTER_EASE }}
             >
               <span className="flex size-14 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
                 <Building2 className="size-7" />
@@ -872,9 +867,6 @@ function SetupStep({
                           setProjectOpen(false);
                         }}
                         type="button"
-                        whileHover={{ y: -1 }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={{ duration: 0.42, ease: BUTTER_EASE }}
                       >
                         <span
                           className={cn(
@@ -973,9 +965,6 @@ function SetupStep({
               className="rounded-full border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--bg-muted)]"
               onClick={() => setShowAll(!showAll)}
               type="button"
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.96 }}
-              transition={{ duration: 0.42, ease: BUTTER_EASE }}
             >
               {showAll ? "Mostra meno" : `Tutti (${tariffBooks.length})`}
             </motion.button>
@@ -1000,9 +989,6 @@ function SetupStep({
                   key={book.id}
                   onClick={() => void selectTariffBook(book.id)}
                   type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.42, ease: BUTTER_EASE }}
                 >
                   <div
                     className={cn(
@@ -1127,9 +1113,6 @@ function SetupStep({
             className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
             onClick={onSaveDraft}
             type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.96 }}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             <Save className="size-4" />
             Salva bozza
@@ -1141,9 +1124,6 @@ function SetupStep({
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.96 }}
-          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Continua <ArrowRight className="size-4" />
         </motion.button>
@@ -1313,9 +1293,6 @@ function VoicesStep({
             className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 text-[11px] font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
             onClick={onOpenTemplateDialog}
             type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.96 }}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             Salva come template
           </motion.button>
@@ -1376,9 +1353,6 @@ function VoicesStep({
             className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
             onClick={onSaveDraft}
             type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.96 }}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             <Save className="size-4" />
             Salva bozza
@@ -1411,9 +1385,6 @@ function VoicesStep({
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.96 }}
-          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Continua <ArrowRight className="size-4" />
         </motion.button>
@@ -1468,9 +1439,6 @@ function ReviewStep({
             )}
             onClick={onToggleCompare}
             type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.96 }}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
           >
             <ArrowRight className={cn("size-3.5", compareLines && "rotate-180")} />
             {compareLines ? "Nascondi confronto" : "Confronta con SAL precedente"}
@@ -1557,9 +1525,6 @@ function ReviewStep({
           className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.96 }}
-          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Continua <ArrowRight className="size-4" />
         </motion.button>
@@ -1671,9 +1636,6 @@ function ConfirmStep({
           className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.96 }}
-          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           <CheckCircle2 className="size-4" />
           Conferma SAL
@@ -1717,9 +1679,6 @@ function CompletedView({
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
           onClick={onClose}
           type="button"
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.96 }}
-          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Chiudi
         </motion.button>
@@ -1727,9 +1686,6 @@ function CompletedView({
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onNew}
           type="button"
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.96 }}
-          transition={{ duration: 0.42, ease: BUTTER_EASE }}
         >
           Nuova revisione
         </motion.button>

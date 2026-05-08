@@ -15,20 +15,27 @@ import {
   Trash,
   WaveSine,
 } from "@phosphor-icons/react";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { motion } from "framer-motion";
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { APP_VERSION } from "@/generated/appVersion";
+
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
+
 import { backupDatabase, type DatabaseInfo, getDatabaseInfo, restoreDatabase } from "@/lib/backup";
+
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
+
 import { cn } from "@/lib/utils";
+
 import {
   type MotionMode,
   type ThemeMode,
   usePreferenceState,
   useThemeState,
 } from "@/store/app-store";
+
 import { useAuditLogStore } from "@/store/audit-log-store";
 
 type UpdateViewState = { kind: "idle" } | UpdateCheckResult;
@@ -39,8 +46,6 @@ type PhosphorIcon = ComponentType<{
 }>;
 
 const updaterReady = import.meta.env.PROD;
-const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
-
 export function SettingsScreen() {
   const {
     autoCheckUpdatesOnLaunch,
@@ -497,11 +502,10 @@ function ActionButton({
 }) {
   return (
     <motion.button
-      className="group inline-flex h-12 shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
+      className="micro-interact group inline-flex h-12 shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
       disabled={disabled}
       onClick={onClick}
       type="button"
-      {...(!disabled ? { whileHover: { y: -1 }, whileTap: { scale: 0.97 } } : {})}
     >
       <span>{children}</span>
       <span className="flex size-10 items-center justify-center rounded-full bg-white/16 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-105">
@@ -573,8 +577,6 @@ function ModeSelector<TValue extends string>({
             key={option.value}
             onClick={() => onChange(option.value)}
             type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.98 }}
           >
             <span
               className={cn(
@@ -634,7 +636,6 @@ function ToggleRow({
         onClick={() => onChange(!checked)}
         role="switch"
         type="button"
-        whileTap={{ scale: 0.96 }}
       >
         <motion.span
           className="block size-5 rounded-full bg-[var(--surface-base)] shadow-[0_1px_4px_rgba(0,0,0,0.12)]"

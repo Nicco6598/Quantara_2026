@@ -1,14 +1,14 @@
 import { motion } from "framer-motion";
+import { SOFT_EASE } from "@/components/shared/easings";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, ArrowRight, Check, FileText, Save } from "lucide-react";
 import type { ReactNode } from "react";
 import { BezelSurface } from "@/features/projects/components/workspace-ui";
+
 import { cn } from "@/lib/utils";
+
 import type { SalWorkflowStage } from "../state/workflow";
 import type { SalCreationStep } from "../types";
-
-const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
-
 export function SalWorkflowTopbar({
   canGoBack,
   onBack,
@@ -33,8 +33,6 @@ export function SalWorkflowTopbar({
               className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
               onClick={onBack}
               type="button"
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.96 }}
               transition={{ duration: 0.42, ease: SOFT_EASE }}
             >
               <ArrowLeft className="size-4" />
@@ -45,8 +43,6 @@ export function SalWorkflowTopbar({
             className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
             onClick={onDraft}
             type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.96 }}
             transition={{ duration: 0.42, ease: SOFT_EASE }}
           >
             <Save className="size-4" />
@@ -57,8 +53,6 @@ export function SalWorkflowTopbar({
               className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-semibold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
               onClick={onPrimary}
               type="button"
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.96 }}
               transition={{ duration: 0.42, ease: SOFT_EASE }}
             >
               {primaryLabel}

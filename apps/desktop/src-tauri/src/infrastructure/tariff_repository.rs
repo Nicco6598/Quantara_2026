@@ -7,7 +7,11 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::{db::migrations::apply_migrations, models::app_error::AppError};
+use crate::{
+    db::migrations::apply_migrations,
+    infrastructure::{cents_to_money, money_to_cents, to_database_error},
+    models::app_error::AppError,
+};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1037,17 +1041,7 @@ fn clean_text(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn money_to_cents(amount: f64) -> i64 {
-    (amount * 100.0).round() as i64
-}
 
-fn cents_to_money(amount_cents: i64) -> f64 {
-    amount_cents as f64 / 100.0
-}
-
-fn to_database_error(error: rusqlite::Error) -> AppError {
-    AppError::Database(error.to_string())
-}
 
 #[cfg(test)]
 mod tests {

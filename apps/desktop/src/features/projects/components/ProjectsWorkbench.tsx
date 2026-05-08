@@ -286,7 +286,6 @@ function WorkbenchRow({
               toneClass,
             )}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ scale: 1.05 }}
           >
             <FolderKanban className="size-5" />
           </motion.div>
@@ -401,7 +400,6 @@ function WorkbenchRow({
               toneClass,
             )}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ scale: 1.05 }}
           >
             <FolderKanban className="size-5" />
           </motion.div>

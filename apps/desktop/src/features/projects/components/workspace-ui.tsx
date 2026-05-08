@@ -2,10 +2,8 @@ import { type HTMLMotionProps, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { cn } from "@/lib/utils";
-
-const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
-const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
 
 export function ProjectSurface({
   children,
@@ -21,7 +19,7 @@ export function ProjectSurface({
         className,
       )}
       initial={{ opacity: 0, y: 14, scale: 0.994 }}
-      transition={{ duration: 0.58, ease: SOFT_EASE }}
+      transition={{ duration: 0.58, ease: SPRING_EASE }}
       viewport={{ amount: 0.16, once: true }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
     >
@@ -44,7 +42,7 @@ export function ProjectControlButton({
   return (
     <motion.button
       className={cn(
-        "projects-control-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-[12px] font-semibold outline-none",
+        "micro-interact projects-control-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-[12px] font-semibold outline-none",
         variant === "primary" && "projects-control-button-primary text-[var(--text-inverse)]",
         variant === "neutral" && "projects-control-button-neutral text-[var(--text-primary)]",
         variant === "soft" && "projects-control-button-soft text-[var(--accent-primary)]",
@@ -53,10 +51,7 @@ export function ProjectControlButton({
           "projects-control-button-neutral size-10 px-0 text-[var(--text-secondary)]",
         className,
       )}
-      transition={{ duration: 0.42, ease: SOFT_EASE }}
       type="button"
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.96 }}
       {...props}
     >
       {Icon ? <Icon className="size-4" strokeWidth={1.8} /> : null}
@@ -213,15 +208,13 @@ export function FocusChip({
   return (
     <motion.button
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "micro-interact inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
         active
           ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-none"
           : "border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/24 hover:bg-[var(--bg-muted)]",
       )}
       onClick={onClick}
       type="button"
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.97 }}
     >
       <span>{label}</span>
       <span
