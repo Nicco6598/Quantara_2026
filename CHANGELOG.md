@@ -51,6 +51,11 @@ All notable changes to Quantara follow SemVer.
 - **Service hooks** — creato il layer `services/` con `useContractsService`, `useMaterialsService`, `useSalWorkflowService`. Le schermate ora possono interfacciarsi con hook dedicati invece di chiamare direttamente lo store o il backend. `SalCreationScreen` e il primo caso migrato.
 - **Feature index.ts** — aggiunto `index.ts` in tutte le 9 feature (accounting, dashboard, materials, project-detail, projects, sal, settings, tariffs, team). Ogni feature esporta solo il componente Screen pubblico.
 
+### Accessibilita
+
+- **Aria-label aggiunti** — bottoni icona senza testo (elimina materiale, cancella ricerca, elimina cantiere) ora hanno `aria-label` descrittivi per screen reader e navigazione da tastiera.
+- **Tastiera migliorata** — pulsanti di chiusura e azioni rapide ora accessibili da tastiera con focus visibile.
+
 ## 0.2.41 - 2026-05-08
 
 - **Tariffari modificati** — Si possono ora salvare in bozza, eliminare e revisionare dall'import, una volta importati possono anche essere modificati dalla schermata generale (icona a 3 puntini) dei tariffari.

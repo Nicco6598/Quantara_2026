@@ -231,6 +231,7 @@ function ProjectRow({
           Apri
         </ProjectControlButton>
         <button
+          aria-label="Elimina cantiere"
           className="flex size-9 items-center justify-center rounded-full text-[var(--danger-base)] opacity-0 ring-1 ring-[var(--border-subtle)] transition-opacity hover:bg-[var(--danger-soft)] group-hover:opacity-100"
           onClick={onDelete}
           type="button"

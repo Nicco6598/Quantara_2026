@@ -434,6 +434,7 @@ function MaterialTableRow({
       </td>
       <td className="px-2 py-2 text-right text-[var(--text-secondary)]">
         <button
+          aria-label={`Elimina ${material.code}`}
           className="rounded-full p-1.5 transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--danger-base)]"
           onClick={(e) => {
             e.stopPropagation();
@@ -497,6 +498,7 @@ function MobileMaterialCard({
         </div>
       </div>
       <button
+        aria-label={`Elimina ${material.code}`}
         className="shrink-0 rounded-full p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--danger-base)]"
         onClick={(e) => {
           e.stopPropagation();

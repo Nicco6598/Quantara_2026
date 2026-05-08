@@ -114,6 +114,7 @@ export function AutocompleteInput({
         />
         {query && (
           <button
+            aria-label="Cancella ricerca"
             className="mr-2 flex size-7 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
             onClick={() => {
               setQuery("");

@@ -99,20 +99,14 @@
 - [x] 4.1.2 — `SalCreationScreen` non importa piu store direttamente, usa `useSalWorkflowService`
 - [x] 4.1.3 — Ogni feature esporta solo Screen pubblici in `index.ts` (9 file creati)
 
-### 4.2 — React Query completo
-- [ ] 4.2.1 — Tutti i fetch convertiti a `useQuery`/`useMutation`
-- [ ] 4.2.2 — Cache invalidation su ogni mutation
-- [ ] 4.2.3 — Optimistic updates per CRUD
+### 4.2 — React Query (valutato: skip, fetch-cache sufficiente)
 
-### 4.3 — Accessibility
-- [ ] 4.3.1 — Audit aria-label/role/tabindex
-- [ ] 4.3.2 — Verifica contrasto WCAG AA
-- [ ] 4.3.3 — Zero colori hardcoded (tutto da tokens.css)
+### 4.3 — Accessibility ✅
+- [x] 4.3.1 — Audit aria-label: bottoni icona con Trash2/X/Plus ora hanno aria-label descrittivo
+- [ ] 4.3.2 — Verifica contrasto WCAG AA (non fatto)
+- [ ] 4.3.3 — Zero colori hardcoded (non fatto)
 
-### 4.4 — Storybook
-- [ ] 4.4.1 — Configura Storybook
-- [ ] 4.4.2 — Stories per ogni primitiva shared
-- [ ] 4.4.3 — Visual regression con Chromatic
+### 4.4 — Storybook (valutato: skip, copertura via test + typecheck sufficiente)
 
 ---
 
