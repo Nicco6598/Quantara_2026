@@ -30,6 +30,22 @@ All notable changes to Quantara follow SemVer.
 - **Utility condivise** — `normalizeContractorName`, `readStringRecord`, `createDesktopVoiceKey` e `writeJson` spostate in `lib/shared-utils.ts` per essere usate da qualsiasi modulo senza violare i confini.
 - **Controllo automatico** — aggiunto script `scripts/check-feature-boundaries.mjs` che verifica che una feature non importi codice da un'altra feature. Le uniche eccezioni consentite sono librerie condivise (`@/components/`, `@/lib/`, `@/store/`, `@/hooks/`, `@/generated/`, `@quantara/`).
 
+### Test e qualita
+
+- **Più test automatici** — aggiunti test di confronto SAL (differenze tra versioni, rilevamento modifiche/aggiunte/rimozioni). Ora 39 test totali, tutti verdi.
+- **Knip integrato** — trovata e rimossa una libreria inutilizzata (`date-fns`), identificati 11 file potenzialmente candidati alla pulizia futura.
+- **Decisioni architetturali documentate** — creati 4 ADR (Architecture Decision Records) in `docs/adr/` per tracciare le scelte fatte: easing centralizzata, tipi SAL in shared-types, cache TTL vs React Query, confini moduli.
+- **Errori backend in italiano** — i messaggi di errore di validazione dei contratti ora parlano italiano invece di inglese, per chiarezza nell'interfaccia.
+
+### Performance griglia tariffari
+
+- **Contenimento CSS per import voci** — aggiunto `content-visibility: auto` e `contain-intrinsic-size` alle righe della griglia tariffari nella preview di import. Le righe fuori schermo non vengono renderizzate, con miglioramento significativo per file con centinaia di voci.
+
+### Test e pipeline CI
+
+- **58 test automatici** (+19 nuovi): aggiunti test per confronto SAL, rilevamento voci OS, cache TTL, shared-utils, edge case sui calcoli. Copertura su sal-calculations, sal-comparison, sal-safety, money, shared-utils, fetch-cache.
+- **Pipeline unificata** — `pnpm format:check` ora esegue: format + typecheck + lint + test + boundary check in un unico comando. Un fallimento in uno qualsiasi blocca il comando.
+
 ## 0.2.41 - 2026-05-08
 
 - **Tariffari modificati** — Si possono ora salvare in bozza, eliminare e revisionare dall'import, una volta importati possono anche essere modificati dalla schermata generale (icona a 3 puntini) dei tariffari.

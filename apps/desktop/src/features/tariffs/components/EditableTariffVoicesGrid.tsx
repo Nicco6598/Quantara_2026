@@ -141,7 +141,7 @@ const VoiceRow = memo(function VoiceRow({
 }: VoiceRowProps) {
   return (
     <div
-      className={`${GRID_COLS} min-w-[900px] items-center [contain:layout_style] ${
+      className={`${GRID_COLS} min-w-[900px] items-center [contain:layout_style] [content-visibility:auto] [contain-intrinsic-size:auto_44px] ${
         isDuplicate ? "bg-[var(--warning-soft)]/25" : ""
       } ${index % 2 === 0 && !isDuplicate ? "bg-[var(--surface-base)]/55" : ""} ${
         isInvalid && !isDuplicate ? "border-l-2 border-l-[var(--warning-base)]/50" : ""

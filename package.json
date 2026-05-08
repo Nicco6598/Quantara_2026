@@ -13,7 +13,7 @@
     "build:analyze": "pnpm --filter @quantara/desktop build && node scripts/report-desktop-bundle.mjs",
     "check": "pnpm version:sync && pnpm typecheck && pnpm lint && pnpm test",
     "format": "biome format --write .",
-    "format:check": "biome format .",
+    "format:check": "echo '--- FORMAT ---' && biome format . && echo '--- TYPECHECK ---' && pnpm -r typecheck && echo '--- LINT ---' && biome lint . && echo '--- TESTS ---' && vitest run && echo '--- BOUNDARIES ---' && node scripts/check-feature-boundaries.mjs",
     "lint": "biome lint .",
     "parser:bundle": "node scripts/prepare-rfi-parser-runtime.mjs",
     "release:prep": "pnpm version:sync && pnpm parser:bundle && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build",

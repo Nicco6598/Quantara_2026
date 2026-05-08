@@ -284,13 +284,13 @@ fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppE
         || request.framework_agreement_code.trim().is_empty()
     {
         return Err(AppError::Validation(
-            "contract id, title and codes are required".into(),
+            "ID contratto, titolo e codici sono obbligatori".into(),
         ));
     }
 
     if !request.contractual_amount.is_finite() || request.contractual_amount < 0.0 {
         return Err(AppError::Validation(
-            "contractual amount must be a finite non-negative number".into(),
+            "l'importo contrattuale deve essere un numero positivo".into(),
         ));
     }
 
@@ -299,7 +299,7 @@ fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppE
         || request.tender_discount_percent > 100.0
     {
         return Err(AppError::Validation(
-            "tender discount percent must be between 0 and 100".into(),
+            "la percentuale di ribasso deve essere tra 0 e 100".into(),
         ));
     }
 
@@ -309,7 +309,7 @@ fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppE
             || priority.reason.trim().is_empty()
         {
             return Err(AppError::Validation(
-                "tariff priorities require positive priority, tariff book id and reason".into(),
+                "le priorita tariffarie richiedono priorita positiva, ID tariffario e motivo".into(),
             ));
         }
     }

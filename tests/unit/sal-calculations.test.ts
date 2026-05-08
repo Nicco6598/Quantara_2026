@@ -304,3 +304,125 @@ describe("isSafetyVoice", () => {
     ).toBe(false);
   });
 });
+
+describe("SAL edge cases - regression tests", () => {
+  it("handles empty line list gracefully", () => {
+    const views = buildLineViews([], defaultSalEconomicRules);
+    expect(views).toHaveLength(0);
+  });
+
+  it("summarizes empty line list to zeros", () => {
+    const summary = summarizeSalLines([], 1000, 0);
+    expect(summary.total).toBe(0);
+    expect(summary.discountAmount).toBe(0);
+    expect(summary.budgetResidual).toBe(1000);
+  });
+
+  it("handles very large quantities without overflow", () => {
+    const largeLine = {
+      id: "line-large",
+      factor1: 1000000,
+      factor2: 1,
+      factor3: 1,
+      notes: "",
+      quantity: 1000000,
+      surchargePercent: 0,
+      voice: {
+        category: "Opere",
+        code: "OP-LARGE",
+        description: "Grande quantita",
+        id: "voice-large",
+        isSafetyCost: false,
+        laborPercentage: 0,
+        unit: "m",
+        unitPrice: 999.99,
+      },
+    };
+    const views = buildLineViews([largeLine], defaultSalEconomicRules);
+    expect(views[0]?.grossAmount).toBe(999990000);
+    expect(views[0]?.totalAmount).toBeGreaterThan(0);
+  });
+
+  it("handles negative contract amount for budget comparison", () => {
+    const views = buildLineViews(
+      [
+        {
+          id: "line-1",
+          factor1: 1,
+          factor2: 1,
+          factor3: 1,
+          notes: "",
+          quantity: 1,
+          surchargePercent: 0,
+          voice: {
+            category: "Opere",
+            code: "OP-001",
+            description: "Test",
+            id: "voice-1",
+            isSafetyCost: false,
+            laborPercentage: 0,
+            unit: "m",
+            unitPrice: 100,
+          },
+        },
+      ],
+      defaultSalEconomicRules,
+    );
+    const summary = summarizeSalLines(views, -500, 0);
+    expect(summary.budgetResidual).toBeLessThan(0);
+  });
+
+  it("zero percent discount produces zero discount amounts", () => {
+    const views = buildLineViews(
+      [
+        {
+          id: "line-1",
+          factor1: 1,
+          factor2: 1,
+          factor3: 1,
+          notes: "",
+          quantity: 1,
+          surchargePercent: 0,
+          voice: {
+            category: "Opere",
+            code: "OP-001",
+            description: "Test",
+            id: "voice-1",
+            isSafetyCost: false,
+            laborPercentage: 0,
+            unit: "m",
+            unitPrice: 100,
+          },
+        },
+      ],
+      { ...defaultSalEconomicRules, discountPercent: 0 },
+    );
+    expect(views[0]?.discountAmount).toBe(0);
+    expect(views[0]?.totalAmount).toBe(views[0]?.netAmount);
+  });
+
+  it("surcharge without labor percentage produces zero linked charge", () => {
+    const line = {
+      id: "line-1",
+      factor1: 1,
+      factor2: 1,
+      factor3: 1,
+      notes: "",
+      quantity: 1,
+      surchargePercent: 10,
+      voice: {
+        category: "Opere",
+        code: "OP-001",
+        description: "Test",
+        id: "voice-1",
+        isSafetyCost: false,
+        laborPercentage: 0,
+        unit: "m",
+        unitPrice: 100,
+      },
+    };
+    const views = buildLineViews([line], defaultSalEconomicRules);
+    expect(views[0]?.linkedCharges).toHaveLength(1);
+    expect(views[0]?.linkedCharges[0]?.total).toBe(0);
+  });
+});
