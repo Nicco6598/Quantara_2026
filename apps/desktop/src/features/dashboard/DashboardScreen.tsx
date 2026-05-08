@@ -35,10 +35,7 @@ function timeGreeting(): string {
   return "Buonasera";
 }
 
-function buildOperationalTotals(
-  projects: PortfolioProject[],
-  views: SalDocumentView[],
-) {
+function buildOperationalTotals(projects: PortfolioProject[], views: SalDocumentView[]) {
   const budgetById = new Map(projects.map((p) => [p.id, p.budget.amount]));
   const totals = new Map<
     string,
@@ -54,13 +51,10 @@ function buildOperationalTotals(
 
     const committedAmount = current.committedAmount + view.total;
     const approvedAmount =
-      view.status === "closed"
-        ? current.approvedAmount + view.total
-        : current.approvedAmount;
+      view.status === "closed" ? current.approvedAmount + view.total : current.approvedAmount;
 
     const budget = budgetById.get(view.projectId) ?? 0;
-    const progressPercent =
-      budget > 0 ? Math.min(100, (committedAmount / budget) * 100) : 0;
+    const progressPercent = budget > 0 ? Math.min(100, (committedAmount / budget) * 100) : 0;
 
     totals.set(view.projectId, { approvedAmount, committedAmount, progressPercent });
   }
@@ -133,16 +127,13 @@ export function DashboardScreen() {
       .then((contracts) => {
         if (abort.signal.aborted) return;
         const contractors = readStringRecord("quantara.projectContractors.v1");
-        setProjects(
-          contracts.data.map((c) => mapContractToProject(c, contractors[c.id])),
-        );
+        setProjects(contracts.data.map((c) => mapContractToProject(c, contractors[c.id])));
       })
       .catch(() => {
         if (abort.signal.aborted) return;
         notify({
           title: "Caricamento fallito",
-          message:
-            "Impossibile caricare i progetti. Verifica la connessione al database locale.",
+          message: "Impossibile caricare i progetti. Verifica la connessione al database locale.",
           tone: "danger",
         });
       });
