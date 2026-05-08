@@ -28,11 +28,8 @@ import { BezelSurface, ProjectControlButton } from "@/features/projects/componen
 
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
 
-import {
-  formatDueWindow,
-  formatForecastDelta,
-  readStringRecord,
-} from "@/features/projects/utils/projects-helpers";
+import { formatDueWindow, formatForecastDelta } from "@/features/projects/utils/projects-helpers";
+import { readStringRecord } from "@/lib/shared-utils";
 
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 

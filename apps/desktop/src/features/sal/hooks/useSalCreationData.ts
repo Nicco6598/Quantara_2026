@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { readStringRecord } from "@/features/projects/utils/projects-helpers";
+import { readStringRecord } from "@/lib/shared-utils";
 import {
   type DesktopContract,
   type DesktopTariffBook,

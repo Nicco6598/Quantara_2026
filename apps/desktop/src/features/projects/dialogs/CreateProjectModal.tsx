@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
+import { ProjectControlButton } from "@/components/shared/ui-primitives";
 
 import type {
   CreateDesktopContractRequest,

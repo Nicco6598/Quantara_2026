@@ -24,6 +24,12 @@ All notable changes to Quantara follow SemVer.
 - **Calcoli SAL separati** — i controlli contabili (verifica budget, sforamento, ecc.) non vengono piu ricalcolati a ogni singola modifica di una voce, ma solo quando necessario. La tabella voci e il riepilogo economico sono separati: modifichi un valore e solo quello che serve si aggiorna.
 - **Animazioni rispettose** — se il sistema operativo ha le animazioni ridotte (accessibilita), l'app disattiva tutte le micro-interazioni e le transizioni. Niente movimento forzato.
 
+### Confini tra moduli
+
+- **Spostati componenti condivisi** — `BezelSurface`, `ProjectControlButton`, `MetricCard` e altri componenti che erano nella cartella Progetti ma usati da tutte le schermate sono stati spostati in `components/shared/ui-primitives.tsx`. Ogni scherma li importa dalla posizione condivisa, non piu dalla cartella di un'altra feature.
+- **Utility condivise** — `normalizeContractorName`, `readStringRecord`, `createDesktopVoiceKey` e `writeJson` spostate in `lib/shared-utils.ts` per essere usate da qualsiasi modulo senza violare i confini.
+- **Controllo automatico** — aggiunto script `scripts/check-feature-boundaries.mjs` che verifica che una feature non importi codice da un'altra feature. Le uniche eccezioni consentite sono librerie condivise (`@/components/`, `@/lib/`, `@/store/`, `@/hooks/`, `@/generated/`, `@quantara/`).
+
 ## 0.2.41 - 2026-05-08
 
 - **Tariffari modificati** — Si possono ora salvare in bozza, eliminare e revisionare dall'import, una volta importati possono anche essere modificati dalla schermata generale (icona a 3 puntini) dei tariffari.

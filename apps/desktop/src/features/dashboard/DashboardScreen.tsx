@@ -15,7 +15,7 @@ import {
 } from "@/features/dashboard/components/DashboardSections";
 import { MetricCard } from "@/features/projects/components/workspace-ui";
 import { mapContractToProject, type PortfolioProject } from "@/features/projects/ProjectsScreen";
-import { readStringRecord } from "@/features/projects/utils/projects-helpers";
+import { readStringRecord } from "@/lib/shared-utils";
 import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";

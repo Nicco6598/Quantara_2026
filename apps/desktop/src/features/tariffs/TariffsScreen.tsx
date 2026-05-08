@@ -28,7 +28,7 @@ import { ScreenHero } from "@/components/shared/ScreenHero";
 
 import { useToast } from "@/components/shared/ToastProvider";
 
-import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
+import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 
 import {
   createDesktopTariffBook,

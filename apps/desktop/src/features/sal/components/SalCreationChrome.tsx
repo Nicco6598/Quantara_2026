@@ -3,7 +3,7 @@ import { SOFT_EASE } from "@/components/shared/easings";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, ArrowRight, Check, FileText, Save } from "lucide-react";
 import type { ReactNode } from "react";
-import { BezelSurface } from "@/features/projects/components/workspace-ui";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 
 import { cn } from "@/lib/utils";
 

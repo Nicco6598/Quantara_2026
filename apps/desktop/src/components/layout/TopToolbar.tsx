@@ -17,7 +17,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { SaveIndicator } from "@/components/shared/SaveIndicator";
-import { BezelSurface } from "@/features/projects/components/workspace-ui";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import { cn } from "@/lib/utils";
 import { type QuantaraRoute, useNavigationState, usePreferenceState } from "@/store/app-store";
 

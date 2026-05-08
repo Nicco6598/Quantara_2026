@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BezelSurface } from "@/features/projects/components/workspace-ui";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 
 type ScreenHeroProps = {
   badge: string;

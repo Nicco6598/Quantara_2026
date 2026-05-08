@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { BezelSurface } from "@/features/projects/components/workspace-ui";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import { cn } from "@/lib/utils";
 
 export type PanelTone = "danger" | "info" | "success" | "warning";

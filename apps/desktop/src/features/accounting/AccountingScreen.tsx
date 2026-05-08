@@ -21,7 +21,7 @@ import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { SavedViewSelector } from "@/components/shared/SavedViewSelector";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
+import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { listDesktopContracts } from "@/lib/desktopData";

@@ -2,7 +2,7 @@ import { MoreVertical, Star } from "lucide-react";
 import { useRef, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
-import { BezelSurface } from "@/features/projects/components/workspace-ui";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { DesktopTariffBook } from "@/lib/desktopData";
 
 export function TariffBookRow({

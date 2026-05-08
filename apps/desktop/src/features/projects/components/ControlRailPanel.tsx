@@ -1,5 +1,5 @@
 import { Badge } from "@/components/shared/Badge";
-import { BezelSurface, EmptyState } from "@/features/projects/components/workspace-ui";
+import { BezelSurface, EmptyState } from "@/components/shared/ui-primitives";
 import type { ActivityItem, ControlSignal } from "../types";
 import { getTonePalette } from "../utils/projects-helpers";
 

@@ -9,6 +9,14 @@ export type TonePalette = {
   surface: string;
 };
 
+import {
+  createDesktopVoiceKey,
+  normalizeContractorName,
+  readStringRecord,
+  writeJson,
+} from "@/lib/shared-utils";
+export { createDesktopVoiceKey, normalizeContractorName, readStringRecord, writeJson };
+
 export function getTonePalette(tone: StatusTone): TonePalette {
   if (tone === "danger") {
     return {
@@ -145,17 +153,6 @@ export function buildManagerLoad(projects: PortfolioProject[]) {
     .slice(0, 4);
 }
 
-export function normalizeContractorName(value: string): string {
-  const normalized = value.trim();
-  const lowerValue = normalized.toLowerCase();
-  if (lowerValue.includes("rfi")) return "RFI";
-  if (lowerValue.includes("anas")) return "ANAS";
-  if (lowerValue.includes("regione marche") || lowerValue.includes("adriatica"))
-    return "Regione Marche";
-  if (lowerValue.includes("regione")) return normalized;
-  return normalized || "Appaltatore da assegnare";
-}
-
 export function isPlaceholderContractorName(value: string): boolean {
   const normalized = normalizeContractorName(value).toLowerCase();
   return (
@@ -202,36 +199,6 @@ export function readStringList(key: string): string[] {
   }
 }
 
-export function readStringRecord(key: string): Record<string, string> {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "{}");
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-        .map(([projectId, contractorName]) => [projectId, normalizeContractorName(contractorName)]),
-    );
-  } catch {
-    return {};
-  }
-}
-
-export function writeJson(key: string, value: unknown): void {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Persistence is best-effort in browser preview mode.
-  }
-}
-
-export function formatMigrationAction(action: string): string {
-  if (action === "template") return "Template in preparazione";
-  if (action === "export") return "Export in corso";
-  if (action === "import") return "Import in lettura";
-  if (action === "commit") return "Commit in corso";
-  return "Pronto";
-}
-
 export function countValidationIssues(
   validation: { issues: Array<{ severity: string }> },
   severity: "error" | "warning",
@@ -272,10 +239,6 @@ export function createMigrationId(title: string, timestamp: number, index: numbe
     .replace(/^-|-$/g, "")
     .slice(0, 36);
   return `migration_${slug || "project"}_${timestamp}_${index}`;
-}
-
-export function createDesktopVoiceKey(tariffBookId: string, voiceId: string): string {
-  return `${tariffBookId}::${voiceId}`;
 }
 
 export function mergeContracts<T extends { id: string }>(created: T[], current: T[]): T[] {

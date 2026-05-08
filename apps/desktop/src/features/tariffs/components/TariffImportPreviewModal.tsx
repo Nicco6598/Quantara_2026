@@ -16,7 +16,7 @@ import {
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
 
-import { ProjectControlButton } from "@/features/projects/components/workspace-ui";
+import { ProjectControlButton } from "@/components/shared/ui-primitives";
 
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 

@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch } from "@/components/filters";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface, ProjectControlButton } from "@/features/projects/components/workspace-ui";
+import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 import {
   type DesktopMaterial,
   deleteDesktopMaterial,
