@@ -46,6 +46,11 @@ All notable changes to Quantara follow SemVer.
 - **58 test automatici** (+19 nuovi): aggiunti test per confronto SAL, rilevamento voci OS, cache TTL, shared-utils, edge case sui calcoli. Copertura su sal-calculations, sal-comparison, sal-safety, money, shared-utils, fetch-cache.
 - **Pipeline unificata** — `pnpm format:check` ora esegue: format + typecheck + lint + test + boundary check in un unico comando. Un fallimento in uno qualsiasi blocca il comando.
 
+### Layer servizi
+
+- **Service hooks** — creato il layer `services/` con `useContractsService`, `useMaterialsService`, `useSalWorkflowService`. Le schermate ora possono interfacciarsi con hook dedicati invece di chiamare direttamente lo store o il backend. `SalCreationScreen` e il primo caso migrato.
+- **Feature index.ts** — aggiunto `index.ts` in tutte le 9 feature (accounting, dashboard, materials, project-detail, projects, sal, settings, tariffs, team). Ogni feature esporta solo il componente Screen pubblico.
+
 ## 0.2.41 - 2026-05-08
 
 - **Tariffari modificati** — Si possono ora salvare in bozza, eliminare e revisionare dall'import, una volta importati possono anche essere modificati dalla schermata generale (icona a 3 puntini) dei tariffari.

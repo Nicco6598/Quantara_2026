@@ -92,12 +92,12 @@
 
 ---
 
-## FASE 4 — Eccellenza Sistemica (da iniziare)
+## FASE 4 — Eccellenza Sistemica ✅ (parziale, 4.1 completata)
 
-### 4.1 — Port & Adapters FE
-- [ ] 4.1.1 — Service hook intermediari (`useContractsService`, ecc.)
-- [ ] 4.1.2 — Screen non importa mai store o @tauri-apps direttamente
-- [ ] 4.1.3 — Ogni feature esporta solo hook pubblici in `index.ts`
+### 4.1 — Port & Adapters FE ✅
+- [x] 4.1.1 — Service hook intermediari: `useContractsService`, `useMaterialsService`, `useSalWorkflowService`
+- [x] 4.1.2 — `SalCreationScreen` non importa piu store direttamente, usa `useSalWorkflowService`
+- [x] 4.1.3 — Ogni feature esporta solo Screen pubblici in `index.ts` (9 file creati)
 
 ### 4.2 — React Query completo
 - [ ] 4.2.1 — Tutti i fetch convertiti a `useQuery`/`useMutation`
@@ -124,14 +124,14 @@
 | **Fase 1** — Architettura | 8h | ✅ Completata | `0b07a46` |
 | **Fase 2** — Performance | 20h | ✅ Completata | `a4b63c4` |
 | **Fase 3** — Blindatura | 15h | ✅ Completata | `f6e5b58` + locale |
-| **Fase 4** — Eccellenza | 20h | ⏳ Da iniziare | — |
-| | **Totale: 66h** | **~40h fatte** | **4 commit** |
+| **Fase 4** — Eccellenza | 20h | 🔶 Parziale (4.1 fatta, 2h) | `9590d8c` |
+| | **Totale: 66h** | **~45h fatte** | **5 commit** |
 
 ### Commit effettuati
 
 | Hash | Fase | Descrizione |
 |:-----|:----:|:------------|
-| `f6e5b58` | 3 | Confini moduli, shared-utils, boundary checker |
+| `9590d8c` | 4 | Port & Adapters, service hooks, feature index.ts |
+| `c2cf4dd` | 3 | 58 test, pipeline CI unificata, ADR, errori IT |
 | `a4b63c4` | 2 | Cache dati, virtual scroll, reduced-motion |
-| `a4ed196` | 2 | Cache dati, delta calcs SAL, reduced-motion |
 | `0b07a46` | 0+1 | Dead code, tipi unificati, store ridotto, CSS transitions |

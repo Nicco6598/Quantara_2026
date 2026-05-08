@@ -27,7 +27,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { useNavigate } from "@/hooks/useNavigate";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
-import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+import { useSalWorkflowService } from "@/services/sal-service";
 import type { SalTemplate } from "@/store/template-store";
 import { SalComparisonView } from "./components/SalComparisonView";
 import {
@@ -157,12 +157,14 @@ export function SalCreationScreen() {
   const { notify } = useToast();
   const navigate = useNavigate();
   const data = useSalCreationData();
-  const createSalProject = useSalWorkflowStore((state) => state.createProject);
-  const closeSal = useSalWorkflowStore((state) => state.closeSal);
-  const createSal = useSalWorkflowStore((state) => state.createSal);
-  const updateSalDraft = useSalWorkflowStore((state) => state.updateSalDraft);
-  const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
-  const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
+  const {
+    createProject: createSalProject,
+    closeSal,
+    createSal,
+    updateSalDraft,
+    salDocuments,
+    tariffVoices,
+  } = useSalWorkflowService();
   const [phase, setPhase] = useState<SalWorkflowPhase>("context");
   const [editingDraftSalId, setEditingDraftSalId] = useState<string | null>(null);
 

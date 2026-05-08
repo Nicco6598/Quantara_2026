@@ -1,0 +1,1 @@
+export { TariffsScreen } from "./TariffsScreen";
