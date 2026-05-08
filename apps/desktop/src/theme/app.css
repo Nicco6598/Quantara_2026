@@ -41,6 +41,25 @@
   font-size: clamp(1.75rem, 2.5vw + 1rem, 2.5rem);
 }
 
+/* ── Reduced motion — rispetta preferenze utente e oscura animazioni ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .micro-interact:hover {
+    transform: none !important;
+  }
+  .micro-interact:active {
+    transform: none !important;
+  }
+  [style*="transform"] {
+    transform: none !important;
+  }
+}
+
 /* ── Micro-interactions via CSS (was framer-motion whileHover/whileTap) ── */
 .micro-interact {
   transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);

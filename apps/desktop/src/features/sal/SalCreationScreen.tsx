@@ -261,15 +261,20 @@ export function SalCreationScreen() {
       .reduce((sum, sal) => sum + buildSalDocumentView(sal, tariffVoices).total, 0);
   }, [data.project?.id, salDocuments, tariffVoices]);
 
-  const derived = useMemo(() => {
-    const contractAmount = data.project?.contractAmount ?? 0;
-    const lv = buildLineViews(lines, economicRules);
-    const s = summarizeSalLines(lv, contractAmount, previousProgressiveAmount);
-    const c = buildVerificationChecks(lv, s, economicRules);
-    return { checks: c, lineViews: lv, summary: s };
-  }, [data.project?.contractAmount, economicRules, lines, previousProgressiveAmount]);
+  // Line views computed on every edit (needed for real-time display)
+  const lineViews = useMemo(() => buildLineViews(lines, economicRules), [lines, economicRules]);
 
-  const { checks, lineViews, summary } = derived;
+  // Summary: only recompute when line views or contract data change
+  const summary = useMemo(() => {
+    const contractAmount = data.project?.contractAmount ?? 0;
+    return summarizeSalLines(lineViews, contractAmount, previousProgressiveAmount);
+  }, [lineViews, data.project?.contractAmount, previousProgressiveAmount]);
+
+  // Verification checks: only computed when entering review/confirm phase
+  const checks = useMemo(
+    () => buildVerificationChecks(lineViews, summary, economicRules),
+    [lineViews, summary, economicRules],
+  );
   const hasDangerChecks = checks.some((check) => check.tone === "danger");
 
   const previousSalLines = useMemo(() => {

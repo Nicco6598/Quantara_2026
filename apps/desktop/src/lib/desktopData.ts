@@ -32,6 +32,7 @@ export type UpdateDesktopTariffBookRequest = UpdateDesktopTariffBookRecordReques
 export type TariffPdfMetadata = TariffPdfMetadataRecord;
 export type { TariffWarning };
 
+import { cachedFetch } from "./fetch-cache";
 import type { DesktopDataResult } from "./tauri-wrapper";
 export type { DesktopDataResult };
 
@@ -63,8 +64,10 @@ function withInflightCache<T>(key: InflightKey, run: () => Promise<DesktopDataRe
 export async function listDesktopContracts(
   fallback: DesktopContract[],
 ): Promise<DesktopDataResult<DesktopContract[]>> {
-  return withInflightCache("contracts", () =>
-    invokeWithFallback("list_contracts", {}, fallback, "dati dimostrativi"),
+  return cachedFetch("contracts", () =>
+    withInflightCache("contracts", () =>
+      invokeWithFallback("list_contracts", {}, fallback, "dati dimostrativi"),
+    ),
   );
 }
 
@@ -113,8 +116,10 @@ export async function deleteDesktopContract(contractId: string): Promise<void> {
 export async function listDesktopTariffBooks(
   fallback: DesktopTariffBook[],
 ): Promise<DesktopDataResult<DesktopTariffBook[]>> {
-  return withInflightCache(`tariff-books:${fallback.length}`, () =>
-    invokeWithFallback("list_tariff_books", {}, fallback, "dati dimostrativi"),
+  return cachedFetch(`tariff-books:${fallback.length}`, () =>
+    withInflightCache(`tariff-books:${fallback.length}`, () =>
+      invokeWithFallback("list_tariff_books", {}, fallback, "dati dimostrativi"),
+    ),
   );
 }
 
@@ -169,11 +174,13 @@ export async function listDesktopTariffVoices(
 ): Promise<DesktopDataResult<DesktopTariffVoice[]>> {
   const cached = tariffVoiceCache.get(tariffBookId);
   if (cached) {
-    return { data: cached, source: "desktop" };
+    return { data: cached, source: "desktop" } as DesktopDataResult<DesktopTariffVoice[]>;
   }
 
-  return withInflightCache(`tariff-voices:${tariffBookId}:${fallback.length}`, () =>
-    invokeWithFallback("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative"),
+  return cachedFetch(`tariff-voices:${tariffBookId}`, () =>
+    withInflightCache(`tariff-voices:${tariffBookId}:${fallback.length}`, () =>
+      invokeWithFallback("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative"),
+    ),
   );
 }
 
@@ -388,8 +395,10 @@ export type DesktopMaterialTransaction = {
 export async function listDesktopMaterials(
   fallback: DesktopMaterial[],
 ): Promise<DesktopDataResult<DesktopMaterial[]>> {
-  return withInflightCache("materials", () =>
-    invokeWithFallback("list_materials", {}, fallback, "materiali dimostrativi"),
+  return cachedFetch("materials", () =>
+    withInflightCache("materials", () =>
+      invokeWithFallback("list_materials", {}, fallback, "materiali dimostrativi"),
+    ),
   );
 }
 
