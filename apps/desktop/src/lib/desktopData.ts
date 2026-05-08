@@ -12,13 +12,7 @@ import type {
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
-import { contractSchema } from "@quantara/validation";
-import {
-  invokeWithFallback,
-  invokeWithValidation,
-  isTauriRuntime,
-  formatDesktopError,
-} from "./tauri-wrapper";
+import { invokeWithFallback, isTauriRuntime, formatDesktopError } from "./tauri-wrapper";
 
 export type DesktopMoney = Money;
 export type DesktopTariffPriority = DesktopTariffPriorityRecord;
@@ -91,7 +85,7 @@ export async function createDesktopContract(
     return contract;
   }
 
-  return invokeWithValidation("create_contract", { request }, contractSchema as never);
+  return invoke<DesktopContract>("create_contract", { request });
 }
 
 export async function updateDesktopContract(
@@ -102,7 +96,7 @@ export async function updateDesktopContract(
     return createDesktopContract(request);
   }
 
-  return invokeWithValidation("update_contract", { contractId, request }, contractSchema as never);
+  return invoke<DesktopContract>("update_contract", { contractId, request });
 }
 
 export async function deleteDesktopContract(contractId: string): Promise<void> {
