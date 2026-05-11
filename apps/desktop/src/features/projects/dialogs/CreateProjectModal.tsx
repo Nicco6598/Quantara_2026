@@ -205,21 +205,21 @@ export function CreateProjectModal({
         type="button"
       />
       <motion.section
-        className="relative flex w-full max-w-5xl max-h-[92vh] flex-col overflow-hidden rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        className="relative flex w-full max-w-5xl max-h-[92vh] flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: SPRING_EASE }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-start justify-between gap-5 border-b border-[var(--border-subtle)] px-6 pb-3 pt-4 md:px-8 md:pt-5">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+              <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                 Nuovo progetto
               </div>
-              <h3 className="mt-2 max-w-3xl text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)] md:text-[30px]">
+              <h3 className="mt-2 max-w-3xl text-24px font-semibold leading-1_05 tracking-neg-0_035em text-[var(--text-primary)] md:text-30px">
                 {step === 1 ? "Dati contratto e perimetro" : "Importo e ribasso gara"}
               </h3>
-              <p className="mt-2 max-w-2xl text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+              <p className="mt-2 max-w-2xl text-13px font-medium leading-5 text-[var(--text-secondary)]">
                 {step === 1
                   ? "Definisci identita, codici contrattuali e appaltatore del progetto."
                   : "Definisci importo contrattuale e percentuale di ribasso d'asta."}
@@ -245,15 +245,15 @@ export function CreateProjectModal({
                 {step === 1 ? (
                   <section>
                     <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-14px bg-[var(--info-soft)] text-[var(--info-base)]">
                         <FileText className="size-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div>
-                          <div className="text-[17px] font-semibold text-[var(--text-primary)]">
+                          <div className="text-17px font-semibold text-[var(--text-primary)]">
                             Anagrafica progetto
                           </div>
-                          <p className="mt-1 text-[13px] leading-5 text-[var(--text-secondary)]">
+                          <p className="mt-1 text-13px leading-5 text-[var(--text-secondary)]">
                             Inserisci dati identificativi e codici contrattuali.
                           </p>
                         </div>
@@ -311,15 +311,15 @@ export function CreateProjectModal({
                 ) : (
                   <section>
                     <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-14px bg-[var(--info-soft)] text-[var(--info-base)]">
                         <WalletCards className="size-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div>
-                          <div className="text-[17px] font-semibold text-[var(--text-primary)]">
+                          <div className="text-17px font-semibold text-[var(--text-primary)]">
                             Setup economico
                           </div>
-                          <p className="mt-1 text-[13px] leading-5 text-[var(--text-secondary)]">
+                          <p className="mt-1 text-13px leading-5 text-[var(--text-secondary)]">
                             Definisci importi principali del progetto.
                           </p>
                         </div>
@@ -335,11 +335,11 @@ export function CreateProjectModal({
                         value={draft.contractualAmount}
                       />
                       <label className="block">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                        <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
                           Ribasso d'asta (%)
                         </span>
                         <input
-                          className="mt-3 h-11 w-full rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                          className="mt-3 h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                           max={100}
                           min={0}
                           onChange={(event) => {
@@ -363,7 +363,7 @@ export function CreateProjectModal({
                         />
                       </label>
                     </div>
-                    <div className="mt-5 rounded-[18px] bg-[var(--bg-muted)]/70 px-4 py-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
+                    <div className="mt-5 rounded-18px bg-[var(--bg-muted)]/70 px-4 py-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
                       Il ribasso viene applicato a tutte le voci SAL. Le voci OS (oneri sicurezza)
                       sono escluse automaticamente.
                     </div>
@@ -374,10 +374,10 @@ export function CreateProjectModal({
 
             <aside className="min-h-0 overflow-y-auto border-t border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/35 p-5 lg:border-l lg:border-t-0">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                <div className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
                   Anteprima
                 </div>
-                <div className="mt-4 rounded-[22px] bg-[var(--surface-base)] p-4 shadow-none">
+                <div className="mt-4 rounded-22px bg-[var(--surface-base)] p-4 shadow-none">
                   <div className="truncate text-lg font-semibold text-[var(--text-primary)]">
                     {draft.title.trim() || "Nuovo progetto"}
                   </div>
@@ -411,7 +411,7 @@ export function CreateProjectModal({
                 </div>
               </div>
               <div className="mt-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                <div className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
                   Controlli rapidi
                 </div>
                 <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)]">
@@ -465,7 +465,7 @@ export function CreateProjectModal({
 
 function QuickCheckRow({ isOk, label }: { isOk: boolean; label: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-[14px] bg-[var(--surface-base)] px-3 py-2">
+    <div className="flex items-center justify-between gap-2 rounded-14px bg-[var(--surface-base)] px-3 py-2">
       <span className="flex min-w-0 items-center gap-2">
         {isOk ? (
           <Check className="size-4 shrink-0 text-[var(--success-base)]" />
@@ -477,8 +477,8 @@ function QuickCheckRow({ isOk, label }: { isOk: boolean; label: string }) {
       <span
         className={
           isOk
-            ? "rounded-full bg-[var(--success-soft)] px-3 py-1 text-[11px] font-bold text-[var(--success-base)]"
-            : "rounded-full bg-[var(--warning-soft)] px-3 py-1 text-[11px] font-bold text-[var(--warning-base)]"
+            ? "rounded-full bg-[var(--success-soft)] px-3 py-1 text-11px font-bold text-[var(--success-base)]"
+            : "rounded-full bg-[var(--warning-soft)] px-3 py-1 text-11px font-bold text-[var(--warning-base)]"
         }
       >
         {isOk ? "OK" : "Check"}
@@ -576,11 +576,11 @@ function ProjectTextField({
 }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+      <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="mt-3 h-11 w-full rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+        className="mt-3 h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
@@ -604,11 +604,11 @@ function ProjectCurrencyField({
 }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+      <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
         {label}
       </span>
       <input
-        className="mt-3 h-11 w-full rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+        className="mt-3 h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         inputMode="decimal"
         onChange={(event) => onChange(sanitizeMoneyInput(event.target.value))}
         placeholder={placeholder}
@@ -621,9 +621,9 @@ function ProjectCurrencyField({
 
 function PreviewMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[16px] bg-[var(--bg-muted)]/70 p-3">
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--bg-muted)]/70 p-3">
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+        <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
           {label}
         </div>
         <div className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
@@ -663,13 +663,13 @@ function ContractorSelect({
 
   return (
     <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+      <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
         Appaltatore
       </span>
       <div className="relative mt-3" ref={ref}>
         {/* biome-ignore lint/a11y/useSemanticElements: wrapper needs a div because it contains an input */}
         <div
-          className="flex h-11 w-full cursor-pointer items-center rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus-within:border-[var(--accent-primary)] focus-within:ring-2 focus-within:ring-[var(--ring-focus)]"
+          className="flex h-11 w-full cursor-pointer items-center rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus-within:border-[var(--accent-primary)] focus-within:ring-2 focus-within:ring-[var(--ring-focus)]"
           onClick={() => setIsOpen(!isOpen)}
           onKeyDown={() => {}}
           role="button"

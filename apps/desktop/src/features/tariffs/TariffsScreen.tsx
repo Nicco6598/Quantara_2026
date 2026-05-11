@@ -870,19 +870,19 @@ export function TariffsScreen() {
           <div className="px-6 py-6">
             <section className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
               <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                   Preview importazione
                 </div>
-                <h2 className="mt-2 truncate text-[28px] font-semibold leading-tight text-[var(--text-primary)]">
+                <h2 className="mt-2 truncate text-28px font-semibold leading-tight text-[var(--text-primary)]">
                   {importPreviews[importPreviewIndex]?.name ?? "Tariffario da importare"}
                 </h2>
-                <p className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
+                <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
                   Revisiona descrizioni, codici e prezzi; i comandi principali sono nella toolbar.
                 </p>
               </div>
               <div
                 className={cn(
-                  "flex items-center gap-2 rounded-full px-3 py-2 text-[12px] font-bold ring-1",
+                  "flex items-center gap-2 rounded-full px-3 py-2 text-12px font-bold ring-1",
                   draftedImportFiles.has(importPreviewIndex)
                     ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[var(--warning-base)]/30"
                     : reviewedFiles.has(importPreviewIndex)
@@ -960,7 +960,7 @@ export function TariffsScreen() {
             <span className="flex size-5 shrink-0 items-center justify-center">
               <ArrowUp className="size-5" />
             </span>
-            <span className="whitespace-nowrap text-[12px] font-bold opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            <span className="whitespace-nowrap text-12px font-bold opacity-0 transition-opacity duration-200 group-hover:opacity-100">
               Torna in cima
             </span>
           </motion.button>
@@ -975,10 +975,10 @@ export function TariffsScreen() {
               <div>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                    <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
                       Voci nel catalogo
                     </div>
-                    <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+                    <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
                       {voicesState.data.length.toLocaleString("it-IT")}
                     </div>
                   </div>
@@ -986,14 +986,14 @@ export function TariffsScreen() {
                     <Database className="size-6" />
                   </span>
                 </div>
-                <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+                <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
                   {tariffMetrics.tariffCount} tariffari su {tariffMetrics.sourceCount} enti.
                 </p>
                 <div className="mt-4 flex items-center gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success-base)]">
                     <CheckCircle2 className="size-5" />
                   </span>
-                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">
+                  <div className="text-12px font-semibold text-[var(--text-primary)]">
                     {tariffMetrics.activeCount} aggiornati
                   </div>
                 </div>
@@ -1084,7 +1084,7 @@ export function TariffsScreen() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     className={cn(
-                      "h-9 rounded-full px-4 text-[12px] font-semibold transition-colors 2xl:h-10 2xl:text-[13px]",
+                      "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
                       activeCatalogTab === "all"
                         ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
                         : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
@@ -1093,13 +1093,13 @@ export function TariffsScreen() {
                     type="button"
                   >
                     Tutti i tariffari
-                    <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold">
+                    <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-11px font-bold">
                       {baseFilteredTariffBooks.length}
                     </span>
                   </button>
                   <button
                     className={cn(
-                      "h-9 rounded-full px-4 text-[12px] font-semibold transition-colors 2xl:h-10 2xl:text-[13px]",
+                      "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
                       activeCatalogTab === "favorites"
                         ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
                         : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
@@ -1108,7 +1108,7 @@ export function TariffsScreen() {
                     type="button"
                   >
                     I miei preferiti
-                    <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold">
+                    <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-11px font-bold">
                       {favoriteCount}
                     </span>
                   </button>
@@ -1197,10 +1197,10 @@ export function TariffsScreen() {
                       <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
                         <Database className="size-5" />
                       </div>
-                      <div className="mt-4 text-[15px] font-bold text-[var(--text-primary)]">
+                      <div className="mt-4 text-15px font-bold text-[var(--text-primary)]">
                         Nessun tariffario trovato
                       </div>
-                      <p className="mx-auto mt-2 max-w-[360px] text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+                      <p className="mx-auto mt-2 max-w-[360px] text-13px font-medium leading-5 text-[var(--text-secondary)]">
                         {activeCatalogTab === "favorites"
                           ? "I filtri correnti non includono tariffari preferiti."
                           : "Modifica i filtri o importa un nuovo PDF/JSON tariffario."}
@@ -1290,7 +1290,7 @@ function TariffBookPreviewCard({
   return (
     <motion.article
       className={cn(
-        "relative min-h-[168px] rounded-[14px] border p-4 text-left transition-colors duration-200",
+        "relative min-h-[168px] rounded-14px border p-4 text-left transition-colors duration-200",
         isSelected
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
           : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
@@ -1303,17 +1303,17 @@ function TariffBookPreviewCard({
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
           <button
-            className="flex min-w-0 flex-1 items-start gap-4 rounded-[12px] text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+            className="flex min-w-0 flex-1 items-start gap-4 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
             onClick={onSelect}
             type="button"
           >
             <div
               className={cn(
-                "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-[8px] border bg-white text-[10px] font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]",
+                "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-md border bg-white text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]",
                 isSelected ? "border-[var(--accent-primary)]" : "border-[var(--border-subtle)]",
               )}
             >
-              <span className="absolute left-[-6px] top-2 rounded-[4px] bg-[var(--danger-base)] px-1.5 py-1 text-[9px] font-black text-white">
+              <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-white">
                 PDF
               </span>
               <div className="space-y-1.5 text-slate-300">
@@ -1341,17 +1341,17 @@ function TariffBookPreviewCard({
                       ? "Validato"
                       : "Attivo"}
                 </Badge>
-                <span className="text-[12px] font-semibold text-[var(--text-secondary)]">
+                <span className="text-12px font-semibold text-[var(--text-secondary)]">
                   Anno {book.year}
                 </span>
               </div>
-              <h3 className="mt-3 truncate text-[16px] font-bold leading-tight text-[var(--text-primary)]">
+              <h3 className="mt-3 truncate text-16px font-bold leading-tight text-[var(--text-primary)]">
                 {book.name}
               </h3>
-              <p className="mt-2 truncate text-[13px] text-[var(--text-secondary)]">
+              <p className="mt-2 truncate text-13px text-[var(--text-secondary)]">
                 {book.sourceName}
               </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+              <div className="mt-3 flex flex-wrap gap-2 text-12px font-medium text-[var(--text-secondary)]">
                 <span>{displayVoiceCount} voci</span>
                 <span>·</span>
                 <span>{linkedProjectCount} progetti</span>
@@ -1385,7 +1385,7 @@ function TariffBookPreviewCard({
                         type="button"
                       />
                       <motion.div
-                        className="fixed z-[140] w-56 overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]"
+                        className="fixed z-[140] w-56 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]"
                         initial={{ opacity: 0, y: -4, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         style={menuPosition}
@@ -1435,7 +1435,7 @@ function TariffBookPreviewCard({
         </div>
 
         {editing ? (
-          <div className="mt-4 space-y-3 rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3">
+          <div className="mt-4 space-y-3 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3">
             <TariffEditField
               label="Nome"
               onChange={(value) => onEditFormChange((form) => ({ ...form, name: value }))}
@@ -1452,11 +1452,11 @@ function TariffBookPreviewCard({
                 onChange={(value) => onEditFormChange((form) => ({ ...form, year: value }))}
                 value={editForm.year}
               />
-              <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+              <label className="text-11px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
                 Stato
                 <div className="relative mt-1">
                   <select
-                    className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-[13px] font-medium normal-case tracking-normal text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                    className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-13px font-medium normal-case tracking-normal text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                     onChange={(event) =>
                       onEditFormChange((form) => ({ ...form, status: event.target.value }))
                     }
@@ -1495,12 +1495,12 @@ function TariffBookPreviewCard({
           </div>
         ) : showDetails ? (
           <motion.div
-            className="mt-4 rounded-[14px] border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/40 p-3"
+            className="mt-4 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/40 p-3"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.32, ease: BUTTER_EASE }}
           >
-            <div className="grid gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+            <div className="grid gap-2 text-12px font-medium text-[var(--text-secondary)]">
               <DetailLine label="ID" value={book.id} />
               <DetailLine label="Ente" value={book.sourceName} />
               <DetailLine label="Stato" value={book.status} />
@@ -1511,7 +1511,7 @@ function TariffBookPreviewCard({
         ) : null}
       </div>
       {isSelected ? (
-        <span className="absolute bottom-4 right-4 flex size-6 shrink-0 items-center justify-center rounded-[8px] bg-[var(--accent-primary)] text-white">
+        <span className="absolute bottom-4 right-4 flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--accent-primary)] text-white">
           <CheckCircle2 className="size-4" strokeWidth={3} />
         </span>
       ) : null}
@@ -1522,10 +1522,10 @@ function TariffBookPreviewCard({
 function DetailLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[112px_minmax(0,1fr)] items-baseline gap-3">
-      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+      <span className="text-10px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
         {label}
       </span>
-      <span className="truncate text-right text-[12px] font-semibold text-[var(--text-primary)]">
+      <span className="truncate text-right text-12px font-semibold text-[var(--text-primary)]">
         {value}
       </span>
     </div>
@@ -1546,7 +1546,7 @@ function TariffMenuItem({
   return (
     <motion.button
       className={cn(
-        "flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-semibold transition-colors",
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-13px font-semibold transition-colors",
         tone === "danger"
           ? "text-[var(--danger-base)] hover:bg-[var(--danger-soft)]/55"
           : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
@@ -1557,7 +1557,7 @@ function TariffMenuItem({
     >
       <span
         className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-[10px]",
+          "flex size-8 shrink-0 items-center justify-center rounded-10px",
           tone === "danger"
             ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
             : "bg-[var(--info-soft)] text-[var(--info-base)]",
@@ -1576,7 +1576,7 @@ function Panel({ children, className }: { children: ReactNode; className?: strin
 
 function PanelTitle({ children }: { children: string }) {
   return (
-    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+    <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
       {children}
     </div>
   );
@@ -1614,12 +1614,12 @@ function MetricCard({
         <Icon className="size-5 2xl:size-6" />
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
           {label}
         </div>
         <div
           className={cn(
-            "mt-2 text-[20px] font-bold leading-none 2xl:text-[22px]",
+            "mt-2 text-20px font-bold leading-none 2xl:text-22px",
             (!tone || tone === "blue") && "text-[var(--info-base)]",
             tone === "success" && "text-[var(--success-base)]",
             tone === "warning" && "text-[var(--warning-base)]",
@@ -1628,7 +1628,7 @@ function MetricCard({
         >
           {value}
         </div>
-        <div className="mt-2 text-[12px] font-medium text-[var(--text-secondary)]">{caption}</div>
+        <div className="mt-2 text-12px font-medium text-[var(--text-secondary)]">{caption}</div>
       </div>
     </BezelSurface>
   );

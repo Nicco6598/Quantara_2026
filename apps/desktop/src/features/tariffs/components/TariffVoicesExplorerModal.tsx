@@ -74,24 +74,24 @@ export function TariffVoicesExplorerModal({
         type="button"
       />
       <motion.div
-        className="relative flex min-h-0 max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        className="relative flex min-h-0 max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: SPRING_EASE }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
       >
-        <div className="flex min-h-0 flex-col rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+        <div className="flex min-h-0 flex-col rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
             <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+              <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                 Voci tariffarie
               </div>
-              <h3 className="mt-2 text-[21px] font-bold leading-tight text-[var(--text-primary)]">
+              <h3 className="mt-2 text-21px font-bold leading-tight text-[var(--text-primary)]">
                 Voci tariffarie complete
               </h3>
-              <p className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
+              <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
                 {tariffBookName}
               </p>
-              <div className="mt-2 text-[12px] font-semibold text-[var(--text-secondary)]">
+              <div className="mt-2 text-12px font-semibold text-[var(--text-secondary)]">
                 {visibleVoices.toLocaleString("it-IT")} di {total.toLocaleString("it-IT")} sottovoci
               </div>
             </div>
@@ -109,7 +109,7 @@ export function TariffVoicesExplorerModal({
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
               <input
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Cerca voce o sottovoce (codice, descrizione, U.M.)"
                 type="search"
@@ -138,10 +138,10 @@ export function TariffVoicesExplorerModal({
                       <ArrowLeft className="size-4" />
                     </motion.button>
                     <div className="min-w-0">
-                      <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+                      <div className="truncate text-13px font-bold text-[var(--text-primary)]">
                         {focusedGroup.code}
                       </div>
-                      <div className="truncate text-[11px] font-medium text-[var(--text-secondary)]">
+                      <div className="truncate text-11px font-medium text-[var(--text-secondary)]">
                         {focusedGroup.description || "Descrizione voce mancante"} ·{" "}
                         {focusedGroup.children.length.toLocaleString("it-IT")} sottovoci
                       </div>
@@ -149,7 +149,7 @@ export function TariffVoicesExplorerModal({
                   </div>
                   <div className="flex-1 overflow-y-auto">
                     <div className="min-w-[600px]">
-                      <div className="sticky top-0 z-10 grid grid-cols-[1fr_60px_80px_90px] gap-3 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)] px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+                      <div className="sticky top-0 z-10 grid grid-cols-[1fr_60px_80px_90px] gap-3 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)] px-5 py-2.5 text-10px font-bold uppercase tracking-widest text-[var(--text-secondary)]">
                         <span>Voce</span>
                         <span>U.M.</span>
                         <span>Manod.</span>
@@ -158,7 +158,7 @@ export function TariffVoicesExplorerModal({
                       {focusedGroup.children.map((voice, idx) => (
                         <div
                           className={cn(
-                            "grid grid-cols-[1fr_60px_80px_90px] gap-3 border-b border-[var(--border-subtle)]/50 px-5 py-3 text-[12px] transition-colors last:border-b-0 hover:bg-[var(--bg-muted)]/50",
+                            "grid grid-cols-[1fr_60px_80px_90px] gap-3 border-b border-[var(--border-subtle)]/50 px-5 py-3 text-12px transition-colors last:border-b-0 hover:bg-[var(--bg-muted)]/50",
                             idx % 2 === 1 && "bg-[var(--bg-muted)]/20",
                           )}
                           key={voice.id}
@@ -217,13 +217,13 @@ export function TariffVoicesExplorerModal({
                       type="button"
                     >
                       <div className="min-w-0">
-                        <div className="text-[13px] font-bold leading-5 text-[var(--text-primary)]">
+                        <div className="text-13px font-bold leading-5 text-[var(--text-primary)]">
                           {group.code}
                         </div>
-                        <div className="mt-1 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+                        <div className="mt-1 text-12px font-medium leading-5 text-[var(--text-secondary)]">
                           {group.description || "Descrizione voce mancante"}
                         </div>
-                        <div className="mt-1.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                        <div className="mt-1.5 text-11px font-medium text-[var(--text-secondary)]">
                           {group.children.length.toLocaleString("it-IT")} sottovoci
                         </div>
                       </div>

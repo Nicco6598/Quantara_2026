@@ -24,22 +24,22 @@ export function PriorityActions({ summary }: { summary: { critical: number; warn
   return (
     <BezelSurface innerClassName="p-4">
       <div className="flex flex-wrap items-center gap-4">
-        <span className="flex size-10 items-center justify-center rounded-[14px] bg-[var(--danger-soft)] text-[var(--danger-base)]">
-          <span className="text-[18px] font-bold">!</span>
+        <span className="flex size-10 items-center justify-center rounded-14px bg-[var(--danger-soft)] text-[var(--danger-base)]">
+          <span className="text-18px font-bold">!</span>
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold text-[var(--text-primary)]">
+          <div className="text-14px font-semibold text-[var(--text-primary)]">
             {urgentActions} azion{urgentActions === 1 ? "e" : "i"} urgent
             {urgentActions === 1 ? "e" : "i"}
           </div>
-          <div className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
+          <div className="mt-0.5 text-12px text-[var(--text-secondary)]">
             {summary.critical > 0
               ? `${summary.critical} criticita ad alta priorita · Intervento richiesto.`
               : `${summary.warning} avvisi da monitorare.`}
           </div>
         </div>
         <button
-          className="flex items-center gap-1 text-[12px] font-semibold text-[var(--accent-primary)] hover:underline"
+          className="flex items-center gap-1 text-12px font-semibold text-[var(--accent-primary)] hover:underline"
           type="button"
         >
           Vedi tutto
@@ -82,10 +82,10 @@ export function OperationalSites({
         <div className="flex items-center gap-3">
           <HardHat className="size-5 text-[var(--info-base)]" />
           <div>
-            <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+            <div className="text-13px font-semibold text-[var(--text-primary)]">
               Cantieri operativi
             </div>
-            <div className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
+            <div className="mt-0.5 text-12px text-[var(--text-secondary)]">
               {projects.length} cantier{projects.length === 1 ? "e" : "i"}
             </div>
           </div>
@@ -109,16 +109,16 @@ export function OperationalSites({
       {projects.length === 0 && (
         <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
           <Building2 className="size-8 text-[var(--text-secondary)]" />
-          <p className="text-[13px] font-medium text-[var(--text-secondary)]">
+          <p className="text-13px font-medium text-[var(--text-secondary)]">
             Nessun cantiere nel portafoglio.
           </p>
-          <p className="text-[12px] text-[var(--text-secondary)]">
+          <p className="text-12px text-[var(--text-secondary)]">
             Crea un progetto per iniziare a monitorare i lavori.
           </p>
         </div>
       )}
 
-      <div className="flex min-h-14 flex-col gap-2 border-t border-[var(--border-subtle)] px-4 py-3 text-[12px] font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <div className="flex min-h-14 flex-col gap-2 border-t border-[var(--border-subtle)] px-4 py-3 text-12px font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <span>
           Vista 1-{visibleProjects.length} di {projects.length} cantieri
         </span>
@@ -154,7 +154,7 @@ function ProjectRow({
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span
           className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-[12px]",
+            "flex size-10 shrink-0 items-center justify-center rounded-lg",
             project.tone === "danger"
               ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
               : project.tone === "warning"
@@ -165,10 +165,10 @@ function ProjectRow({
           <FolderKanban className="size-5" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+          <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
             {project.title}
           </div>
-          <div className="mt-0.5 flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+          <div className="mt-0.5 flex items-center gap-2 text-12px text-[var(--text-secondary)]">
             <span>{project.contractor}</span>
             <span className="text-[var(--border-subtle)]">·</span>
             <span>{project.location}</span>
@@ -178,13 +178,13 @@ function ProjectRow({
 
       <div className="hidden min-w-0 items-center gap-5 md:flex">
         <div className="min-w-0 text-right">
-          <div className="text-[11px] font-medium text-[var(--text-secondary)]">SAL</div>
-          <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+          <div className="text-11px font-medium text-[var(--text-secondary)]">SAL</div>
+          <div className="text-13px font-semibold text-[var(--text-primary)]">
             {formatMoney({ amount: salApprovedAmount, currency: "EUR" })}
           </div>
         </div>
         <div className="min-w-0 text-right">
-          <div className="text-[11px] font-medium text-[var(--text-secondary)]">Progr.</div>
+          <div className="text-11px font-medium text-[var(--text-secondary)]">Progr.</div>
           <div className="flex items-center gap-2">
             <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
               <div
@@ -199,14 +199,14 @@ function ProjectRow({
                 style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
               />
             </div>
-            <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+            <span className="text-12px font-semibold text-[var(--text-primary)]">
               {progressPercent.toFixed(0)}%
             </span>
           </div>
         </div>
         <div className="min-w-0 text-right">
-          <div className="text-[11px] font-medium text-[var(--text-secondary)]">Budget</div>
-          <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+          <div className="text-11px font-medium text-[var(--text-secondary)]">Budget</div>
+          <div className="text-13px font-semibold text-[var(--text-primary)]">
             {formatMoney(project.budget)}
           </div>
         </div>
@@ -214,7 +214,7 @@ function ProjectRow({
 
       <div className="flex shrink-0 items-center gap-2">
         <ProjectControlButton
-          className="h-9 px-3 text-[12px]"
+          className="h-9 px-3 text-12px"
           onClick={() => {
             try {
               window.sessionStorage.setItem(
@@ -257,23 +257,23 @@ export function Milestones({
 
   return (
     <BezelSurface innerClassName="p-4">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--info-base)]">
+      <div className="flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--info-base)]">
         <TrendingUp className="size-4" />
         Prossime milestone
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {items.slice(0, 4).map((item) => (
           <div
-            className="rounded-[14px] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-4 py-3"
+            className="rounded-14px bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-4 py-3"
             key={`${item.date}-${item.title}`}
           >
-            <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--info-base)]">
+            <div className="text-10px font-semibold uppercase tracking-widest text-[var(--info-base)]">
               {item.date}
             </div>
-            <div className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">
+            <div className="mt-1 text-13px font-semibold text-[var(--text-primary)]">
               {item.title}
             </div>
-            <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{item.place}</div>
+            <div className="mt-0.5 text-11px text-[var(--text-secondary)]">{item.place}</div>
           </div>
         ))}
       </div>
@@ -294,10 +294,10 @@ export function RightRail({
     <aside className="grid gap-4 lg:grid-cols-2 2xl:block 2xl:space-y-4">
       <BezelSurface innerClassName="p-5">
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[11px] font-bold text-[var(--info-base)]">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
             01
           </span>
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          <h3 className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
             Distribuzione stato
           </h3>
         </div>
@@ -310,7 +310,7 @@ export function RightRail({
             />
           </div>
         ) : (
-          <p className="py-4 text-center text-[12px] text-[var(--text-secondary)]">
+          <p className="py-4 text-center text-12px text-[var(--text-secondary)]">
             Nessun progetto nel portafoglio.
           </p>
         )}
@@ -318,10 +318,10 @@ export function RightRail({
 
       <BezelSurface innerClassName="p-5">
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[11px] font-bold text-[var(--info-base)]">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
             02
           </span>
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          <h3 className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
             Attivita recenti
           </h3>
         </div>
@@ -332,17 +332,15 @@ export function RightRail({
               const detail = rest.join(" · ");
               return (
                 <div className="grid grid-cols-[40px_1fr] gap-3" key={activity}>
-                  <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                  <div className="text-11px font-medium text-[var(--text-secondary)]">
                     {["17:32", "16:41", "15:28"][index] ?? "--:--"}
                   </div>
                   <div>
-                    <div className="text-[12px] font-medium leading-4 text-[var(--text-primary)]">
+                    <div className="text-12px font-medium leading-4 text-[var(--text-primary)]">
                       {label}
                     </div>
                     {detail && (
-                      <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
-                        {detail}
-                      </div>
+                      <div className="mt-0.5 text-11px text-[var(--text-secondary)]">{detail}</div>
                     )}
                   </div>
                 </div>
@@ -350,7 +348,7 @@ export function RightRail({
             })}
           </div>
         ) : (
-          <p className="py-4 text-center text-[12px] text-[var(--text-secondary)]">
+          <p className="py-4 text-center text-12px text-[var(--text-secondary)]">
             Nessuna attivita recente.
           </p>
         )}
@@ -358,10 +356,10 @@ export function RightRail({
 
       <BezelSurface innerClassName="p-5">
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[11px] font-bold text-[var(--info-base)]">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
             03
           </span>
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          <h3 className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
             Azioni rapide
           </h3>
         </div>
@@ -378,10 +376,10 @@ export function RightRail({
 function ActionButton({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
     <button
-      className="flex w-full items-center gap-3 rounded-[14px] bg-[var(--bg-muted)]/70 px-4 py-3 text-left text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+      className="flex w-full items-center gap-3 rounded-14px bg-[var(--bg-muted)]/70 px-4 py-3 text-left text-13px font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
       type="button"
     >
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[var(--info-soft)] text-[var(--info-base)]">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-10px bg-[var(--info-soft)] text-[var(--info-base)]">
         <Icon className="size-4" />
       </span>
       {label}

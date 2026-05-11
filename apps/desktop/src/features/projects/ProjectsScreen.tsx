@@ -12,6 +12,7 @@ import {
   useTransition,
 } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
 import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
 import { useProjectMigration } from "@/features/projects/hooks/useProjectMigration";
@@ -34,7 +35,7 @@ import {
   listDesktopTariffBooks,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { useAppStore, useNavigationState } from "@/store/app-store";
+import { type PendingWorkflowAction, useAppStore, useNavigationState } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { fallbackProjectTariffBook, focusOptions } from "./projects-data";
 import { mapContractToProject } from "./utils/project-mappers";
@@ -188,20 +189,34 @@ export function ProjectsScreen() {
     writeJson(projectContractorStorageKey, projectContractors);
   }, [projectContractors]);
 
-  useEffect(() => {
-    const unsub = useAppStore.subscribe((state) => {
-      if (state.pendingWorkflowAction === "new-project") {
+  const processPendingWorkflowAction = useCallback(
+    (action: PendingWorkflowAction) => {
+      if (action === "new-project") {
         setEditingProject(null);
         setIsCreateProjectModalOpen(true);
         useAppStore.getState().setPendingWorkflowAction(null);
-      } else if (state.pendingWorkflowAction === "new-sal") {
+        return;
+      }
+
+      if (action === "new-sal") {
         navigate("sal-create");
         useAppStore.getState().setPendingWorkflowAction(null);
+      }
+    },
+    [navigate],
+  );
+
+  useEffect(() => {
+    processPendingWorkflowAction(useAppStore.getState().pendingWorkflowAction);
+
+    const unsub = useAppStore.subscribe((state, prev) => {
+      if (state.pendingWorkflowAction !== prev.pendingWorkflowAction) {
+        processPendingWorkflowAction(state.pendingWorkflowAction);
       }
     });
 
     return unsub;
-  }, [navigate]);
+  }, [processPendingWorkflowAction]);
 
   useEffect(() => {
     const handleKeyboardShortcut = (event: KeyboardEvent) => {
@@ -382,50 +397,52 @@ export function ProjectsScreen() {
     portfolioMetrics;
 
   return (
-    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
+    <main className="premium-page relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] bg-[radial-gradient(ellipse_at_18%_0%,color-mix(in_srgb,var(--surface-base)_92%,transparent),transparent_42%),radial-gradient(ellipse_at_88%_10%,color-mix(in_srgb,var(--accent-primary)_8%,transparent),transparent_36%)]" />
 
-      {selectedContractor ? (
-        <ContractorDetailView
-          averageProgress={averageProgress}
-          contractor={selectedContractor}
-          criticalCount={criticalCount}
-          focus={focus}
-          focusCounts={focusCounts}
-          focusOptions={focusOptions}
-          isPending={isPending}
-          managerLoadCount={managerLoad.length}
-          onBack={handleBackFromContractor}
-          onCreateProject={handleOpenCreateProject}
-          onExport={exportMigrationWorkbook}
-          onFocusChange={(nextFocus) => startTransition(() => setFocus(nextFocus))}
-          onImport={() => fileInputRef.current?.click()}
-          onOpenProject={handleOpenProject}
-          onOpenProjectActions={handleOpenProjectActions}
-          projects={visibleProjects}
-          query={query}
-          salExposure={salExposure}
-          salWindowCount={salWindowCount}
-          selectedProjectId={selectedContractId}
-          setQuery={setQuery}
-          totalBudget={totalBudget}
-          visibleActivities={visibleActivities}
-          visibleApprovals={visibleApprovals}
-          visibleQueue={visibleQueue}
-        />
-      ) : (
-        <ContractorsWorkspace
-          activeProjectsCount={activeProjects.length}
-          folders={contractorFolders}
-          onImport={() => fileInputRef.current?.click()}
-          onDeleteContractor={setContractorDeleteTarget}
-          onOpenCreateContractor={() => setIsContractorModalOpen(true)}
-          onOpenFolder={handleOpenFolder}
-          onOpenNotifications={() => setIsSalModalOpen(true)}
-          recentSalsCount={recentSals.length}
-          totalPortfolioValue={totalPortfolioValue}
-        />
-      )}
+      <ErrorBoundary resetKey={`projects-workspace:${selectedContractorId ?? "root"}`}>
+        {selectedContractor ? (
+          <ContractorDetailView
+            averageProgress={averageProgress}
+            contractor={selectedContractor}
+            criticalCount={criticalCount}
+            focus={focus}
+            focusCounts={focusCounts}
+            focusOptions={focusOptions}
+            isPending={isPending}
+            managerLoadCount={managerLoad.length}
+            onBack={handleBackFromContractor}
+            onCreateProject={handleOpenCreateProject}
+            onExport={exportMigrationWorkbook}
+            onFocusChange={(nextFocus) => startTransition(() => setFocus(nextFocus))}
+            onImport={() => fileInputRef.current?.click()}
+            onOpenProject={handleOpenProject}
+            onOpenProjectActions={handleOpenProjectActions}
+            projects={visibleProjects}
+            query={query}
+            salExposure={salExposure}
+            salWindowCount={salWindowCount}
+            selectedProjectId={selectedContractId}
+            setQuery={setQuery}
+            totalBudget={totalBudget}
+            visibleActivities={visibleActivities}
+            visibleApprovals={visibleApprovals}
+            visibleQueue={visibleQueue}
+          />
+        ) : (
+          <ContractorsWorkspace
+            activeProjectsCount={activeProjects.length}
+            folders={contractorFolders}
+            onImport={() => fileInputRef.current?.click()}
+            onDeleteContractor={setContractorDeleteTarget}
+            onOpenCreateContractor={() => setIsContractorModalOpen(true)}
+            onOpenFolder={handleOpenFolder}
+            onOpenNotifications={() => setIsSalModalOpen(true)}
+            recentSalsCount={recentSals.length}
+            totalPortfolioValue={totalPortfolioValue}
+          />
+        )}
+      </ErrorBoundary>
 
       <input
         accept=".xlsx"
@@ -614,17 +631,17 @@ function ContractorDeleteDialog({
         onClick={onClose}
         type="button"
       />
-      <section className="relative w-full max-w-md rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
-        <div className="rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] md:p-6">
+      <section className="relative w-full max-w-md rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
+        <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] md:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+              <span className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
                 Elimina appaltatore
               </span>
-              <h3 className="mt-3 text-[20px] font-bold leading-tight text-[var(--text-primary)]">
+              <h3 className="mt-3 text-20px font-bold leading-tight text-[var(--text-primary)]">
                 {contractor.contractor}
               </h3>
-              <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+              <p className="mt-2 text-13px leading-6 text-[var(--text-secondary)]">
                 {contractor.projectCount > 0
                   ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato.`
                   : "La cartella verra rimossa dal registro appaltatori."}
@@ -632,23 +649,23 @@ function ContractorDeleteDialog({
             </div>
             <button
               aria-label="Chiudi"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+              className="flex size-9 shrink-0 items-center justify-center rounded-18px bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
               onClick={onClose}
               type="button"
             >
               <X className="size-4" />
             </button>
           </div>
-          <div className="mt-6 rounded-[18px] border border-[var(--danger-base)]/20 bg-[var(--danger-soft)]/50 p-4">
+          <div className="mt-6 rounded-22px border border-[var(--danger-base)]/20 bg-[var(--danger-soft)]/50 p-4">
             <div className="flex items-start gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-18px bg-[var(--danger-soft)] text-[var(--danger-base)]">
                 <Trash2 className="size-5" />
               </span>
               <div>
-                <div className="text-[14px] font-semibold text-[var(--danger-base)]">
+                <div className="text-14px font-semibold text-[var(--danger-base)]">
                   Confermare eliminazione?
                 </div>
-                <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+                <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
                   L'operazione aggiorna il registro locale e il menu laterale.
                 </p>
               </div>
@@ -656,14 +673,14 @@ function ContractorDeleteDialog({
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <button
-              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-[13px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+              className="inline-flex h-10 items-center justify-center rounded-18px bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
               onClick={onClose}
               type="button"
             >
               Annulla
             </button>
             <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--danger-base)] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-18px bg-[var(--danger-base)] px-5 text-13px font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
               onClick={onConfirm}
               type="button"
             >

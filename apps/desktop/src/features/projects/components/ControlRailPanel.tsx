@@ -13,10 +13,10 @@ export function ControlRailPanel({
   return (
     <BezelSurface innerClassName="p-5">
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+        <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
           Presidio trasversale
         </div>
-        <h3 className="mt-2 text-[16px] font-semibold text-[var(--text-primary)]">
+        <h3 className="mt-2 text-16px font-semibold text-[var(--text-primary)]">
           Segnali e feed operativo
         </h3>
       </div>
@@ -56,7 +56,7 @@ export function ControlRailPanel({
       <div className="mt-6 border-t border-subtle pt-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+            <div className="text-11px font-semibold uppercase tracking-uppercase text-secondary">
               Feed operativo
             </div>
             <h4 className="mt-2 text-base font-semibold text-foreground">

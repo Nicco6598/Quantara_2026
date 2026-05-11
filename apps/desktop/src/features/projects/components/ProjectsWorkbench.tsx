@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Calendar,
   FileSpreadsheet,
@@ -6,11 +6,9 @@ import {
   MapPin,
   MoreVertical,
   Plus,
-  TrendingUp,
   Upload,
-  User,
 } from "lucide-react";
-import { memo, type ReactNode, useCallback, useState } from "react";
+import { memo, type MouseEvent, type ReactNode, useCallback, useState } from "react";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
 import { formatMoney, formatPercent } from "@/lib/formatters";
@@ -29,6 +27,8 @@ type ProjectsWorkbenchProps = {
   selectedProjectId: string;
 };
 
+const spring = { damping: 30, stiffness: 260, type: "spring" as const };
+
 export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   children,
   onCreateProject,
@@ -41,151 +41,64 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   selectedProjectId,
 }: ProjectsWorkbenchProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
-  const toggleActions = useCallback(() => setActionsOpen((v) => !v), []);
+  const toggleActions = useCallback(() => setActionsOpen((value) => !value), []);
   const closeActions = useCallback(() => setActionsOpen(false), []);
+
   return (
     <BezelSurface innerClassName="overflow-hidden p-0">
-      <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4">
-        {children ? (
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-wrap items-center gap-2">{children}</div>
-            <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-4 border-b border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] p-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-2">{children}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ProjectControlButton
+              className="text-13px text-[var(--text-inverse)]"
+              icon={Plus}
+              onClick={onCreateProject}
+              variant="primary"
+            >
+              Nuovo progetto
+            </ProjectControlButton>
+            <div className="relative">
               <ProjectControlButton
-                className="text-[13px]"
-                icon={Plus}
-                onClick={onCreateProject}
-                variant="primary"
+                aria-label="Azioni"
+                icon={MoreVertical}
+                onClick={toggleActions}
+                variant="icon"
               >
-                Nuovo progetto
+                <span className="sr-only">Azioni</span>
               </ProjectControlButton>
-              <div className="relative">
-                <ProjectControlButton
-                  aria-label="Azioni"
-                  icon={MoreVertical}
-                  onClick={toggleActions}
-                  variant="icon"
-                >
-                  <span className="sr-only">Azioni</span>
-                </ProjectControlButton>
-                {actionsOpen ? (
-                  <>
-                    <button
-                      aria-label="Chiudi azioni"
-                      className="fixed inset-0 z-40 cursor-default"
-                      onClick={closeActions}
-                      type="button"
-                    />
-                    <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1 shadow-lg">
-                      <button
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-                        onClick={() => {
-                          onImport();
-                          closeActions();
-                        }}
-                        type="button"
-                      >
-                        <Upload className="size-4" />
-                        Importa
-                      </button>
-                      <button
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-                        onClick={() => {
-                          onExport();
-                          closeActions();
-                        }}
-                        type="button"
-                      >
-                        <FileSpreadsheet className="size-4" />
-                        Export
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-              </div>
+              <WorkbenchActionsMenu
+                actionsOpen={actionsOpen}
+                closeActions={closeActions}
+                onExport={onExport}
+                onImport={onImport}
+              />
             </div>
           </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <ProjectControlButton
-                className="text-[13px]"
-                icon={Plus}
-                onClick={onCreateProject}
-                variant="primary"
-              >
-                Nuovo progetto
-              </ProjectControlButton>
-              <div className="relative">
-                <ProjectControlButton
-                  aria-label="Azioni"
-                  icon={MoreVertical}
-                  onClick={toggleActions}
-                  variant="icon"
-                >
-                  <span className="sr-only">Azioni</span>
-                </ProjectControlButton>
-                {actionsOpen ? (
-                  <>
-                    <button
-                      aria-label="Chiudi azioni"
-                      className="fixed inset-0 z-40 cursor-default"
-                      onClick={closeActions}
-                      type="button"
-                    />
-                    <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1 shadow-lg">
-                      <button
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-                        onClick={() => {
-                          onImport();
-                          closeActions();
-                        }}
-                        type="button"
-                      >
-                        <Upload className="size-4" />
-                        Importa
-                      </button>
-                      <button
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-                        onClick={() => {
-                          onExport();
-                          closeActions();
-                        }}
-                        type="button"
-                      >
-                        <FileSpreadsheet className="size-4" />
-                        Export
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
 
         <div>
-          <p className="text-[13px] text-[var(--text-secondary)]">
-            Riga per riga: presidio, EAC, SAL, forecast e rischio materiale.
+          <p className="text-13px text-[var(--text-secondary)]">
+            Progetti con SAL, budget, scadenze e avanzamento leggibili al primo sguardo.
           </p>
           {query.trim().length > 0 ? (
-            <div className="mt-2 inline-flex rounded-[8px] bg-[var(--info-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-base)]">
+            <div className="mt-2 inline-flex rounded-18px bg-[var(--info-soft)] px-2.5 py-1 text-11px font-semibold text-[var(--info-base)]">
               Filtro: {query.trim()}
             </div>
           ) : null}
         </div>
       </div>
 
-      <div className="mx-3 mt-2 hidden h-7 grid-cols-[1.35fr_0.8fr_0.7fr_0.72fr_0.85fr_0.8fr_80px] items-center rounded-[--radius-2xl] border border-[var(--border-subtle)]/60 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-2.5 text-[11px] font-semibold uppercase tracking-[--tracking-wide] text-[var(--text-secondary)] xl:grid">
+      <div className="mx-4 mt-3 hidden h-9 grid-cols-[1.45fr_0.78fr_0.72fr_1fr_0.78fr_64px] items-center rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_56%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-3 text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)] xl:grid">
         <span>Progetto / contratto</span>
         <span>Stato</span>
         <span>PM</span>
-        <span>EAC</span>
-        <span>SAL</span>
+        <span>SAL operativo</span>
         <span>Progresso</span>
         <span className="text-right">Azioni</span>
       </div>
 
-      <div className="space-y-2 p-2.5 pt-3">
+      <div className="space-y-3 p-4">
         {projects.length > 0 ? (
           projects.map((project) => (
             <WorkbenchRow
@@ -209,6 +122,94 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   );
 });
 
+function WorkbenchActionsMenu({
+  actionsOpen,
+  closeActions,
+  onExport,
+  onImport,
+}: {
+  actionsOpen: boolean;
+  closeActions: () => void;
+  onExport: () => void;
+  onImport: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {actionsOpen ? (
+        <>
+          <button
+            aria-label="Chiudi azioni"
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={closeActions}
+            type="button"
+          />
+          <motion.div
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="absolute right-0 top-full z-50 mt-3 w-72 overflow-hidden rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] shadow-[0_24px_70px_color-mix(in_srgb,var(--text-primary)_14%,transparent)] backdrop-blur-md"
+            exit={{ opacity: 0, scale: 0.96, y: -10 }}
+            initial={{ opacity: 0, scale: 0.96, y: -10 }}
+            transition={{ damping: 26, stiffness: 200, type: "spring" }}
+          >
+            <div className="rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
+              <WorkbenchActionItem
+                description="Carica contratti o dati da workbook"
+                icon={Upload}
+                label="Importa"
+                onClick={() => {
+                  onImport();
+                  closeActions();
+                }}
+              />
+              <WorkbenchActionItem
+                description="Esporta il perimetro corrente"
+                icon={FileSpreadsheet}
+                label="Export"
+                onClick={() => {
+                  onExport();
+                  closeActions();
+                }}
+              />
+            </div>
+          </motion.div>
+        </>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function WorkbenchActionItem({
+  description,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  description: string;
+  icon: typeof Upload;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      animate={{ opacity: 1, x: 0 }}
+      className="flex w-full items-start gap-3 rounded-18px px-3 py-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)]"
+      initial={{ opacity: 0, x: -12 }}
+      onClick={onClick}
+      transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+      type="button"
+    >
+      <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--info-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_22%,transparent)]">
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-13px font-semibold text-[var(--text-primary)]">{label}</span>
+        <span className="mt-0.5 block text-11px leading-4 text-[var(--text-secondary)]">
+          {description}
+        </span>
+      </span>
+    </motion.button>
+  );
+}
+
 function WorkbenchRow({
   isSelected,
   onOpenProjectActions,
@@ -220,322 +221,298 @@ function WorkbenchRow({
   onOpenProject: (project: PortfolioProject) => void;
   project: PortfolioProject;
 }) {
-  const toneClass =
-    project.tone === "warning"
-      ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-      : project.tone === "danger"
-        ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-        : "bg-[var(--success-soft)] text-[var(--success-base)]";
-
-  const progressBarClass =
-    project.tone === "danger"
-      ? "bg-[var(--danger-base)]"
-      : project.tone === "warning"
-        ? "bg-[var(--warning-base)]"
-        : "bg-[var(--info-base)]";
-
-  const borderAccentClass =
-    project.tone === "danger"
-      ? "border-l-[var(--danger-base)]"
-      : project.tone === "warning"
-        ? "border-l-[var(--warning-base)]"
-        : "border-l-[var(--success-base)]";
+  const toneClass = getProjectToneClass(project);
+  const progressColor = getProgressColor(project);
+  const salProgress =
+    project.budget.amount > 0
+      ? Math.min(100, (project.salValue.amount / project.budget.amount) * 100)
+      : 0;
 
   return (
     <motion.article
+      animate={{ opacity: 1, scale: 1, y: 0 }}
       className={cn(
-        "group relative cursor-pointer rounded-[--radius-2xl] p-2.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_60%,transparent)] transition-all duration-[--duration-3xl] ease-[var(--ease-buttery)] xl:p-3",
+        "group relative cursor-pointer overflow-hidden rounded-26px p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
         isSelected
-          ? "ring-1 ring-[var(--accent-primary)]/40 bg-[color-mix(in_srgb,var(--info-soft)_28%,var(--surface-base)_72%)]"
-          : "bg-[var(--surface-base)] hover:shadow-[0_8px_28px_-12px_rgba(0,0,0,0.12)]",
+          ? "bg-[color-mix(in_srgb,var(--info-soft)_28%,var(--surface-base)_72%)]"
+          : "bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] hover:shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_8%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_14%,transparent)]",
       )}
-      initial={false}
+      exit={{ opacity: 0, scale: 0.98, y: 10 }}
+      initial={{ opacity: 0, scale: 0.985, y: 12 }}
       layout
       onClick={() => onOpenProject(project)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
           onOpenProject(project);
         }
       }}
       role="button"
       tabIndex={0}
-      {...(!isSelected
-        ? {
-            style: {
-              backgroundImage:
-                "linear-gradient(135deg, color-mix(in_srgb, var(--info-base) 3%, transparent), transparent 55%)",
-            },
-          }
-        : {})}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={spring}
+      whileHover={{ y: -2 }}
     >
-      <div
-        className={cn(
-          "pointer-events-none absolute left-0 top-3 h-[calc(100%-24px)] w-[3px] rounded-r-full transition-opacity duration-[--duration-3xl]",
-          isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-60",
-          borderAccentClass,
-        )}
-      />
-
-      <div className="hidden grid-cols-[1.35fr_0.8fr_0.7fr_0.72fr_0.85fr_0.8fr_80px] items-center gap-2 xl:grid">
-        <div className="flex min-w-0 items-center gap-3">
-          <motion.div
-            className={cn(
-              "relative flex size-10 shrink-0 items-center justify-center rounded-xl shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]",
-              toneClass,
-            )}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <FolderKanban className="size-5" />
-          </motion.div>
-          <div className="min-w-0">
-            <div className="truncate text-[14px] font-bold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
-              {project.title}
-            </div>
-            <div className="mt-1 flex min-w-0 items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
-              <MapPin className="size-3.5 shrink-0" />
-              <span className="truncate">
-                {project.lot} · {project.location}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <span
-            className={cn(
-              "inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold",
-              toneClass,
-            )}
-            title={project.healthLabel}
-          >
-            <span className="size-1.5 shrink-0 rounded-full bg-current" />
-            <span className="truncate">{project.healthLabel}</span>
-          </span>
-          <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
-            {project.phase}
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
-            {project.manager}
-          </div>
-          <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
-            {project.nextMilestone}
-          </div>
-        </div>
-
-        <WorkbenchMiniMetric
-          detail={project.variance}
-          label="EAC"
-          value={formatMoney(project.budget)}
-        />
-        <WorkbenchMiniMetric
-          detail={formatDueWindow(project.salDays)}
-          label={project.salState}
-          value={formatMoney(project.salValue)}
-        />
-
-        <div className="flex w-[72px] flex-col items-center justify-center">
-          <div className="relative flex size-10 items-center justify-center">
-            <svg
-              aria-label={`${project.progress}% completato`}
-              className="absolute inset-0 size-10 -rotate-90"
-              viewBox="0 0 40 40"
-              role="img"
-            >
-              <circle
-                className="text-[var(--bg-muted-strong)]"
-                cx="20"
-                cy="20"
-                fill="none"
-                r="16"
-                strokeWidth="4"
-                stroke="currentColor"
-              />
-              <circle
-                className={progressBarClass.replace("bg-", "text-")}
-                cx="20"
-                cy="20"
-                fill="none"
-                r="16"
-                strokeWidth="4"
-                stroke="currentColor"
-                strokeDasharray={`${(project.progress / 100) * 100.5} 100.5`}
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="text-[10px] font-bold text-[var(--text-primary)]">
-              {formatPercent(project.progress)}
-            </span>
-          </div>
-          <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[--tracking-caption] text-[var(--text-secondary)]">
-            Progresso
-          </span>
-        </div>
-
-        <div className="flex justify-end">
-          <ProjectControlButton
-            aria-label={`Azioni per ${project.title}`}
-            className="size-8"
-            icon={MoreVertical}
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onOpenProjectActions(project);
-            }}
-            variant="icon"
-          >
-            <span className="sr-only">Azioni per {project.title}</span>
-          </ProjectControlButton>
-        </div>
+      <div className="hidden grid-cols-[1.45fr_0.78fr_0.72fr_1fr_0.78fr_64px] items-center gap-3 xl:grid">
+        <ProjectIdentity project={project} toneClass={toneClass} />
+        <ProjectStatus project={project} toneClass={toneClass} />
+        <ProjectManager project={project} />
+        <SalCockpit project={project} salProgress={salProgress} />
+        <ProjectProgress progress={project.progress} progressColor={progressColor} />
+        <ProjectActionsButton onOpenProjectActions={onOpenProjectActions} project={project} />
       </div>
 
-      <div className="flex flex-col gap-2 xl:hidden">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <motion.div
-            className={cn(
-              "relative flex size-10 shrink-0 items-center justify-center rounded-xl shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]",
-              toneClass,
-            )}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <FolderKanban className="size-5" />
-          </motion.div>
-
+      <div className="flex flex-col gap-4 xl:hidden">
+        <div className="flex min-w-0 items-start gap-3">
+          <ProjectIcon toneClass={toneClass} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate text-[14px] font-bold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+              <h3 className="min-w-0 truncate text-15px font-semibold leading-tight text-[var(--text-primary)]">
                 {project.title}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                  toneClass,
-                )}
-              >
-                <span className="size-1.5 rounded-full bg-current" />
-                {project.healthLabel}
-              </span>
+              </h3>
+              <ProjectStatusPill project={project} toneClass={toneClass} />
             </div>
-
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[13px] font-medium text-[var(--text-secondary)]">
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="size-3.5" />
-                {project.lot} · {project.location}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <User className="size-3.5" />
-                {project.manager}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="size-3.5" />
-                {project.nextMilestone}
-              </span>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] font-medium text-[var(--text-secondary)] xl:hidden">
-              <WorkbenchInlineBadge
-                detail={project.variance}
-                label="EAC"
-                value={formatMoney(project.budget)}
-              />
-              <WorkbenchInlineBadge
-                detail={formatDueWindow(project.salDays)}
-                label="SAL"
-                value={formatMoney(project.salValue)}
-              />
-              <div className="flex items-center gap-2 rounded-[--radius-10px] bg-[var(--bg-muted)] px-2 py-1.5">
-                <TrendingUp className="size-3.5 text-[var(--text-secondary)]" />
-                <span className="font-semibold text-[var(--text-primary)]">
-                  {formatPercent(project.progress)}
-                </span>
-              </div>
-            </div>
+            <ProjectMeta project={project} />
           </div>
+          <ProjectActionsButton onOpenProjectActions={onOpenProjectActions} project={project} />
         </div>
 
-        <ProjectControlButton
-          aria-label={`Azioni per ${project.title}`}
-          className="self-end"
-          icon={MoreVertical}
-          onClick={(e: React.MouseEvent) => {
-            e.stopPropagation();
-            onOpenProjectActions(project);
-          }}
-          variant="icon"
-        >
-          <span className="sr-only">Azioni per {project.title}</span>
-        </ProjectControlButton>
-      </div>
+        <SalCockpit project={project} salProgress={salProgress} />
 
-      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)]/60 pt-2 text-[12px] font-medium text-[var(--text-secondary)] xl:hidden">
-        <span>{project.phase}</span>
-        <span className="text-[var(--border-subtle)]">·</span>
-        <span>{project.materialRisk}</span>
-        <span className="text-[var(--border-subtle)]">·</span>
-        <span>{project.salState}</span>
-        {project.forecastDeltaDays !== 0 ? (
-          <>
-            <span className="text-[var(--border-subtle)]">·</span>
-            <span
-              className={cn(
-                "font-semibold",
-                project.forecastDeltaDays > 0
-                  ? "text-[var(--danger-base)]"
-                  : "text-[var(--success-base)]",
-              )}
-            >
-              {project.forecastDeltaDays > 0
-                ? `+${project.forecastDeltaDays}gg`
-                : `${project.forecastDeltaDays}gg`}
-            </span>
-          </>
-        ) : null}
+        <div className="grid grid-cols-2 gap-2">
+          <InlineMetric
+            detail={project.variance}
+            label="Budget"
+            value={formatMoney(project.budget)}
+          />
+          <InlineMetric
+            detail={project.phase}
+            label="Progresso"
+            value={formatPercent(project.progress)}
+          />
+        </div>
       </div>
     </motion.article>
   );
 }
 
-function WorkbenchMiniMetric({
-  detail,
-  label,
-  value,
-}: {
-  detail: string;
-  label: string;
-  value: string;
-}) {
+function ProjectIdentity({ project, toneClass }: { project: PortfolioProject; toneClass: string }) {
   return (
-    <div className="min-w-0 text-center">
-      <div className="text-[10px] font-bold uppercase tracking-[--tracking-wide] text-[var(--text-secondary)]">
-        {label}
+    <div className="flex min-w-0 items-center gap-3">
+      <ProjectIcon toneClass={toneClass} />
+      <div className="min-w-0">
+        <div className="truncate text-15px font-semibold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+          {project.title}
+        </div>
+        <ProjectMeta project={project} />
       </div>
-      <div className="mt-0.5 text-[14px] font-bold leading-none text-[var(--text-primary)]">
-        {value}
-      </div>
-      <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">{detail}</div>
     </div>
   );
 }
 
-function WorkbenchInlineBadge({
-  detail,
-  label,
-  value,
-}: {
-  detail: string;
-  label: string;
-  value: string;
-}) {
+function ProjectIcon({ toneClass }: { toneClass: string }) {
   return (
-    <div className="rounded-[--radius-10px] bg-[var(--bg-muted)] px-2 py-1.5">
-      <div className="text-[10px] font-bold uppercase tracking-[--tracking-caption] text-[var(--text-secondary)]">
-        {label}
-      </div>
-      <div className="text-[13px] font-semibold text-[var(--text-primary)]">{value}</div>
-      <div className="text-[11px] text-[var(--text-secondary)]">{detail}</div>
+    <span
+      className={cn(
+        "relative flex size-12 shrink-0 items-center justify-center rounded-22px shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]",
+        toneClass,
+      )}
+    >
+      <FolderKanban className="size-5" />
+    </span>
+  );
+}
+
+function ProjectMeta({ project }: { project: PortfolioProject }) {
+  return (
+    <div className="mt-1 flex min-w-0 items-center gap-2 text-12px font-medium text-[var(--text-secondary)]">
+      <MapPin className="size-3.5 shrink-0" />
+      <span className="truncate">
+        {project.lot} · {project.location}
+      </span>
     </div>
   );
+}
+
+function ProjectStatus({ project, toneClass }: { project: PortfolioProject; toneClass: string }) {
+  return (
+    <div className="min-w-0">
+      <ProjectStatusPill project={project} toneClass={toneClass} />
+      <div className="mt-1 truncate text-11px font-medium text-[var(--text-secondary)]">
+        {project.phase}
+      </div>
+    </div>
+  );
+}
+
+function ProjectStatusPill({
+  project,
+  toneClass,
+}: {
+  project: PortfolioProject;
+  toneClass: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center gap-1.5 rounded-18px px-2 py-1 text-11px font-semibold",
+        toneClass,
+      )}
+      title={project.healthLabel}
+    >
+      <span className="size-1.5 shrink-0 rounded-full bg-current" />
+      <span className="truncate">{project.healthLabel}</span>
+    </span>
+  );
+}
+
+function ProjectManager({ project }: { project: PortfolioProject }) {
+  return (
+    <div className="min-w-0">
+      <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
+        {project.manager}
+      </div>
+      <div className="mt-1 flex min-w-0 items-center gap-1 text-11px font-medium text-[var(--text-secondary)]">
+        <Calendar className="size-3.5 shrink-0" />
+        <span className="truncate">{project.nextMilestone}</span>
+      </div>
+    </div>
+  );
+}
+
+function SalCockpit({ project, salProgress }: { project: PortfolioProject; salProgress: number }) {
+  return (
+    <div className="min-w-0 rounded-22px bg-[color-mix(in_srgb,var(--bg-muted)_62%,transparent)] p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_42%,transparent)]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            SAL
+          </div>
+          <div className="mt-1 truncate text-15px font-semibold leading-none text-[var(--text-primary)]">
+            {formatMoney(project.salValue)}
+          </div>
+          <div className="mt-1 truncate text-11px font-medium text-[var(--text-secondary)]">
+            {project.salState}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-12px font-semibold text-[var(--accent-primary)]">
+            {Math.round(salProgress)}%
+          </div>
+          <div className="mt-1 text-10px font-medium text-[var(--text-secondary)]">
+            {formatDueWindow(project.salDays)}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--border-subtle)_64%,transparent)]">
+        <motion.div
+          className="h-full rounded-18px bg-[var(--accent-primary)]"
+          initial={{ scaleX: 0 }}
+          style={{ originX: 0 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          viewport={{ once: true }}
+          whileInView={{ scaleX: salProgress / 100 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProjectProgress({ progress, progressColor }: { progress: number; progressColor: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center">
+      <div className="relative flex size-12 items-center justify-center">
+        <svg
+          aria-label={`${progress}% completato`}
+          className="absolute inset-0 size-12 -rotate-90"
+          role="img"
+          viewBox="0 0 48 48"
+        >
+          <circle
+            className="text-[var(--bg-muted-strong)]"
+            cx="24"
+            cy="24"
+            fill="none"
+            r="19"
+            stroke="currentColor"
+            strokeWidth="4.5"
+          />
+          <circle
+            className={progressColor}
+            cx="24"
+            cy="24"
+            fill="none"
+            r="19"
+            stroke="currentColor"
+            strokeDasharray={`${(progress / 100) * 119.4} 119.4`}
+            strokeLinecap="round"
+            strokeWidth="4.5"
+          />
+        </svg>
+        <span className="text-11px font-bold text-[var(--text-primary)]">
+          {formatPercent(progress)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ProjectActionsButton({
+  onOpenProjectActions,
+  project,
+}: {
+  onOpenProjectActions: (project: PortfolioProject) => void;
+  project: PortfolioProject;
+}) {
+  return (
+    <div className="flex justify-end">
+      <ProjectControlButton
+        aria-label={`Azioni per ${project.title}`}
+        className="size-8"
+        icon={MoreVertical}
+        onClick={(event: MouseEvent) => {
+          event.stopPropagation();
+          onOpenProjectActions(project);
+        }}
+        variant="icon"
+      >
+        <span className="sr-only">Azioni per {project.title}</span>
+      </ProjectControlButton>
+    </div>
+  );
+}
+
+function InlineMetric({ detail, label, value }: { detail: string; label: string; value: string }) {
+  return (
+    <div className="rounded-18px bg-[var(--bg-muted)] px-3 py-2">
+      <div className="text-10px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
+        {label}
+      </div>
+      <div className="text-13px font-semibold text-[var(--text-primary)]">{value}</div>
+      <div className="text-11px text-[var(--text-secondary)]">{detail}</div>
+    </div>
+  );
+}
+
+function getProjectToneClass(project: PortfolioProject) {
+  if (project.tone === "warning") {
+    return "bg-[var(--warning-soft)] text-[var(--warning-base)]";
+  }
+
+  if (project.tone === "danger") {
+    return "bg-[var(--danger-soft)] text-[var(--danger-base)]";
+  }
+
+  return "bg-[var(--success-soft)] text-[var(--success-base)]";
+}
+
+function getProgressColor(project: PortfolioProject) {
+  if (project.tone === "danger") {
+    return "text-[var(--danger-base)]";
+  }
+
+  if (project.tone === "warning") {
+    return "text-[var(--warning-base)]";
+  }
+
+  return "text-[var(--info-base)]";
 }

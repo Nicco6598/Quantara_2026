@@ -27,15 +27,15 @@ export function TariffMetric({
           <Icon className="size-4" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+          <div className="truncate text-10px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
             {label}
           </div>
-          <div className="mt-1 text-[20px] font-bold leading-none text-[var(--text-primary)]">
+          <div className="mt-1 text-20px font-bold leading-none text-[var(--text-primary)]">
             {value}
           </div>
         </div>
       </div>
-      <div className="mt-2 truncate pl-[42px] text-[11px] font-medium text-[var(--text-secondary)]">
+      <div className="mt-2 truncate pl-[42px] text-11px font-medium text-[var(--text-secondary)]">
         {detail || "Nel catalogo"}
       </div>
     </div>

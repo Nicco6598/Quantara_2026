@@ -93,24 +93,24 @@ export function ContractorDetailView({
     <div className="w-full">
       <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
         <div className="min-w-0">
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             Cartella operativa
           </span>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-[8px] border border-[var(--success-base)]/20 bg-[var(--success-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--success-base)]">
+            <span className="inline-flex items-center gap-2 rounded-md border border-[var(--success-base)]/20 bg-[var(--success-soft)] px-2.5 py-1 text-11px font-semibold text-[var(--success-base)]">
               <span className="size-1.5 rounded-full bg-current" />
               Operativo
             </span>
             {isPending ? (
-              <span className="rounded-[8px] bg-[var(--warning-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-base)]">
+              <span className="rounded-md bg-[var(--warning-soft)] px-2.5 py-1 text-11px font-semibold text-[var(--warning-base)]">
                 Filtri in aggiornamento
               </span>
             ) : null}
           </div>
-          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
+          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight text-[var(--text-primary)] md:text-56px">
             {contractor.contractor}
           </h2>
-          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
+          <p className="mt-4 max-w-2xl text-15px leading-6 text-[var(--text-secondary)]">
             Cartella operativa dell'appaltatore. Monitoraggio del portfolio e dei contratti nel
             perimetro attivo.
           </p>
@@ -156,10 +156,10 @@ export function ContractorDetailView({
         <BezelSurface className="self-start md:translate-y-2" innerClassName="p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+              <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
                 {contractor.contractor}
               </div>
-              <div className="mt-2 text-[24px] font-semibold leading-none text-[var(--text-primary)]">
+              <div className="mt-2 text-24px font-semibold leading-none text-[var(--text-primary)]">
                 {projects.length} progetti
               </div>
             </div>
@@ -167,12 +167,12 @@ export function ContractorDetailView({
               <FolderOpen className="size-6" />
             </span>
           </div>
-          <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+          <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
             {formatMoney({ amount: totalBudget, currency: "EUR" })} di contratti attivi.
           </p>
           <div className="mt-4 flex items-center gap-3">
             <ProjectControlButton
-              className="text-[12px]"
+              className="text-12px"
               icon={ArrowLeft}
               onClick={onBack}
               variant="neutral"
@@ -230,14 +230,14 @@ export function ContractorDetailView({
           </CompactRail>
           <CompactRail title="Copertura PM" value={String(managerLoadCount)}>
             <div className="flex items-center gap-3">
-              <div className="flex size-14 items-center justify-center rounded-full border-4 border-[var(--success-base)] text-[11px] font-semibold text-[var(--success-base)]">
+              <div className="flex size-14 items-center justify-center rounded-full border-4 border-[var(--success-base)] text-11px font-semibold text-[var(--success-base)]">
                 100%
               </div>
               <div>
-                <div className="text-[12px] font-semibold text-[var(--text-primary)]">
+                <div className="text-12px font-semibold text-[var(--text-primary)]">
                   Copertura completa
                 </div>
-                <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
+                <div className="mt-1 text-11px leading-4 text-[var(--text-secondary)]">
                   {projects.length} progetto con PM assegnato su {projects.length} totale.
                 </div>
               </div>

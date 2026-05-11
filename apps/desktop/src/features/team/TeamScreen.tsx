@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ScreenHero } from "@/components/shared/ScreenHero";
+import { StatusPill as SharedStatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 import { cn } from "@/lib/utils";
@@ -205,13 +206,13 @@ export function TeamScreen() {
         description="Membri, inviti e ruoli operativi del workspace con visibilita immediata su accessi e assegnazioni."
         sidePanel={
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+            <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
               Membri attivi
             </div>
-            <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+            <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
               {activeCount} / {members.length}
             </div>
-            <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+            <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
               {pendingCount > 0
                 ? `${pendingCount} invito${pendingCount === 1 ? "" : "i"} ${pendingCount === 1 ? "è" : "sono"} ancora in attesa di conferma.`
                 : "Nessun invito in attesa."}
@@ -273,8 +274,8 @@ export function TeamScreen() {
         </aside>
       </section>
 
-      <p className="flex items-start gap-2 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-        <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-[var(--info-base)] text-[10px] font-bold text-[var(--info-base)]">
+      <p className="flex items-start gap-2 text-12px font-medium leading-5 text-[var(--text-secondary)]">
+        <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-[var(--info-base)] text-10px font-bold text-[var(--info-base)]">
           i
         </span>
         I permessi sono applicati a livello di progetto. Un membro puo avere ruoli diversi su
@@ -316,13 +317,13 @@ function TeamMetricCard({
           <Icon className="size-5" />
         </div>
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+          <div className="text-11px font-bold uppercase tracking-overline text-[var(--text-secondary)]">
             {label}
           </div>
-          <div className={cn("mt-2 text-[26px] font-bold leading-none", toneClass.split(" ")[1])}>
+          <div className={cn("mt-2 text-26px font-bold leading-none", toneClass.split(" ")[1])}>
             {value}
           </div>
-          <div className="mt-2 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+          <div className="mt-2 text-12px font-medium leading-5 text-[var(--text-secondary)]">
             {detail}
           </div>
         </div>
@@ -357,7 +358,7 @@ function TeamMembersPanel({
   return (
     <BezelSurface innerClassName="overflow-hidden p-0">
       <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] p-5 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+        <h2 className="text-14px font-bold uppercase tracking-0_04em text-[var(--text-primary)]">
           Membri del team
         </h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -365,7 +366,7 @@ function TeamMembersPanel({
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
             <span className="sr-only">Cerca membro</span>
             <input
-              className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
               onChange={(e) => onQueryChange(e.target.value)}
               placeholder="Cerca membro..."
               type="search"
@@ -374,7 +375,7 @@ function TeamMembersPanel({
           </label>
           <div className="relative">
             <button
-              className="inline-flex h-10 min-w-[168px] items-center justify-between rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 text-[13px] font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              className="inline-flex h-10 min-w-[168px] items-center justify-between rounded-14px border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
               onClick={() => setRoleOpen(!roleOpen)}
               type="button"
             >
@@ -394,10 +395,10 @@ function TeamMembersPanel({
                   type="button"
                   aria-label="Chiudi"
                 />
-                <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[180px] overflow-hidden rounded-[14px] bg-[var(--surface-base)] p-1 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
+                <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[180px] overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
                   <button
                     className={cn(
-                      "flex w-full items-center rounded-[10px] px-3 py-2 text-left text-[13px] font-medium transition-colors",
+                      "flex w-full items-center rounded-10px px-3 py-2 text-left text-13px font-medium transition-colors",
                       roleFilter === "all"
                         ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
                         : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
@@ -413,7 +414,7 @@ function TeamMembersPanel({
                   {ALL_ROLES.map((role) => (
                     <button
                       className={cn(
-                        "flex w-full items-center rounded-[10px] px-3 py-2 text-left text-[13px] font-medium transition-colors",
+                        "flex w-full items-center rounded-10px px-3 py-2 text-left text-13px font-medium transition-colors",
                         roleFilter === role
                           ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
                           : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
@@ -439,7 +440,7 @@ function TeamMembersPanel({
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="bg-[var(--bg-muted)] text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+            <tr className="bg-[var(--bg-muted)] text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
               <th className="px-5 py-3.5">Membro</th>
               <th className="px-4 py-3.5">Ruolo</th>
               <th className="px-4 py-3.5 text-center">Progetti assegnati</th>
@@ -463,7 +464,7 @@ function TeamMembersPanel({
         ))}
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-[12px] font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-12px font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           Mostra {PAGE_SIZE} di {filteredCount} risult{filteredCount === 1 ? "ato" : "i"}
         </div>
@@ -480,7 +481,7 @@ function TeamMembersPanel({
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button
               className={cn(
-                "flex size-8 items-center justify-center rounded-full text-[12px] font-bold transition-colors",
+                "flex size-8 items-center justify-center rounded-full text-12px font-bold transition-colors",
                 p === page
                   ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
                   : "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted)]",
@@ -514,15 +515,15 @@ function MobileMemberCard({ member }: { member: TeamMember }) {
         <Avatar member={member} />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+            <span className="truncate text-13px font-bold text-[var(--text-primary)]">
               {member.name}
             </span>
             <StatusPill status={member.status} />
           </div>
-          <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+          <div className="mt-0.5 truncate text-12px font-medium text-[var(--text-secondary)]">
             {member.email}
           </div>
-          <div className="mt-1 flex items-center gap-3 text-[12px] text-[var(--text-secondary)]">
+          <div className="mt-1 flex items-center gap-3 text-12px text-[var(--text-secondary)]">
             <RolePill role={member.role} />
             <span>{member.projects} progetti</span>
             <span>{member.lastAccess}</span>
@@ -542,15 +543,15 @@ function MobileMemberCard({ member }: { member: TeamMember }) {
 
 function TeamMemberRow({ member }: { member: TeamMember }) {
   return (
-    <tr className="text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]/60">
+    <tr className="text-13px font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]/60">
       <td className="px-5 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <Avatar member={member} />
           <div className="min-w-0">
-            <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+            <div className="truncate text-13px font-bold text-[var(--text-primary)]">
               {member.name}
             </div>
-            <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+            <div className="mt-0.5 truncate text-12px font-medium text-[var(--text-secondary)]">
               {member.email}
             </div>
           </div>
@@ -563,7 +564,7 @@ function TeamMemberRow({ member }: { member: TeamMember }) {
       <td className="px-4 py-3">
         <StatusPill status={member.status} />
       </td>
-      <td className="whitespace-nowrap px-4 py-3 text-[13px] text-[var(--text-secondary)]">
+      <td className="whitespace-nowrap px-4 py-3 text-13px text-[var(--text-secondary)]">
         {member.lastAccess}
       </td>
       <td className="px-5 py-3 text-right">
@@ -583,10 +584,10 @@ function InviteMemberCard() {
   const { notify } = useToast();
   return (
     <BezelSurface innerClassName="p-5">
-      <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+      <h2 className="text-14px font-bold uppercase tracking-0_04em text-[var(--text-primary)]">
         Aggiungi membro
       </h2>
-      <p className="mt-1.5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+      <p className="mt-1.5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
         Invita un nuovo membro al workspace.
       </p>
       <div className="mt-5 space-y-3">
@@ -594,7 +595,7 @@ function InviteMemberCard() {
           <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)] sm:hidden" />
           <span className="sr-only">Email aziendale</span>
           <input
-            className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3.5 text-[13px] font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] sm:pl-3.5"
+            className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3.5 text-13px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] sm:pl-3.5"
             placeholder="Inserisci email aziendale"
             type="email"
           />
@@ -628,10 +629,10 @@ function RolesCard({ rolesData }: { rolesData: { role: TeamRole; count: number }
 
   return (
     <BezelSurface innerClassName="p-5">
-      <h2 className="text-[14px] font-bold uppercase tracking-[0.04em] text-[var(--text-primary)]">
+      <h2 className="text-14px font-bold uppercase tracking-0_04em text-[var(--text-primary)]">
         Ruoli e permessi
       </h2>
-      <p className="mt-1.5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+      <p className="mt-1.5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
         Gestisci ruoli e permessi del workspace.
       </p>
       <div className="mt-5 space-y-2">
@@ -641,7 +642,7 @@ function RolesCard({ rolesData }: { rolesData: { role: TeamRole; count: number }
 
           return (
             <div
-              className="flex items-center gap-3 rounded-[18px] bg-[var(--bg-muted)]/70 p-3"
+              className="flex items-center gap-3 rounded-18px bg-[var(--bg-muted)]/70 p-3"
               key={role}
             >
               <div
@@ -653,14 +654,14 @@ function RolesCard({ rolesData }: { rolesData: { role: TeamRole; count: number }
                 <Icon className="size-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+                <div className="truncate text-13px font-bold text-[var(--text-primary)]">
                   {role}
                 </div>
-                <div className="mt-0.5 truncate text-[11px] font-medium text-[var(--text-secondary)]">
+                <div className="mt-0.5 truncate text-11px font-medium text-[var(--text-secondary)]">
                   {meta.description}
                 </div>
               </div>
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-muted)] text-[12px] font-bold text-[var(--text-secondary)]">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-muted)] text-12px font-bold text-[var(--text-secondary)]">
                 {count}
               </span>
             </div>
@@ -693,7 +694,7 @@ function Avatar({ member }: { member: TeamMember }) {
     .join("");
 
   return (
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[12px] font-bold text-[var(--text-inverse)]">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-12px font-bold text-[var(--text-inverse)]">
       {initials}
     </div>
   );
@@ -705,7 +706,7 @@ function RolePill({ role }: { role: TeamRole }) {
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center rounded-lg px-2.5 py-1 text-[11px] font-bold leading-none",
+        "inline-flex max-w-full items-center rounded-lg px-2.5 py-1 text-11px font-bold leading-none",
         roleToneClass(meta.tone),
       )}
     >
@@ -714,19 +715,17 @@ function RolePill({ role }: { role: TeamRole }) {
   );
 }
 
-function StatusPill({ status }: { status: MemberStatus }) {
-  const meta = statusMeta[status];
+const statusTone: Record<MemberStatus, "success" | "danger" | "info"> = {
+  active: "success",
+  inactive: "danger",
+  invited: "info",
+};
 
+function StatusPill({ status }: { status: MemberStatus }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none",
-        meta.className,
-      )}
-    >
-      <span className="size-1.5 rounded-full bg-current" />
-      {meta.label}
-    </span>
+    <SharedStatusPill tone={statusTone[status]} dot>
+      {statusMeta[status].label}
+    </SharedStatusPill>
   );
 }
 

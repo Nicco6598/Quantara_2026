@@ -1,10 +1,12 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  AlertTriangle,
   Building2,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
+  FolderOpen,
   HardHat,
   Layers3,
   MoreVertical,
@@ -15,6 +17,7 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { memo, type ReactNode, useMemo, useState } from "react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";
@@ -34,6 +37,14 @@ type ContractorsWorkspaceProps = {
   totalPortfolioValue: number;
 };
 
+type FolderHealth = {
+  label: string;
+  score: number;
+  tone: StatusTone;
+};
+
+const spring = { damping: 30, stiffness: 260, type: "spring" as const };
+
 export const ContractorsWorkspace = memo(function ContractorsWorkspace({
   activeProjectsCount,
   folders,
@@ -50,33 +61,35 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
       folders.filter((folder) => folder.criticalCount === 0 && folder.salWindowCount === 0).length,
     [folders],
   );
+  const watchedFolders = folders.length - stableFolders;
 
   return (
-    <div>
-      <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
+    <div className="space-y-8">
+      <section className="animate-entry grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
         <div className="min-w-0">
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)]">
             Appaltatori
           </span>
-          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
-            Workspace appaltatori
+          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight tracking-[-0.03em] text-[var(--text-primary)] md:text-56px">
+            Cockpit appaltatori
           </h2>
-          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
-            Seleziona un appaltatore per accedere ai progetti, ai contratti, ai SAL e ai controlli.
+          <p className="mt-4 max-w-2xl text-15px leading-6 text-[var(--text-secondary)]">
+            Cartelle operative con budget, SAL, alert e stato di presidio leggibili al primo
+            sguardo.
           </p>
 
           <div className="mt-7 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
-              caption="Cartelle operative disponibili"
+              caption="Cartelle operative"
               icon={HardHat}
-              label="Appaltatori attivi"
+              label="Appaltatori"
               tone="info"
               value={`${folders.length}`}
             />
             <MetricCard
-              caption="Ultima attivita: 27 apr"
+              caption="Cantieri nel perimetro"
               icon={Layers3}
-              label="Progetti nel perimetro"
+              label="Progetti"
               tone="success"
               value={`${activeProjectsCount}`}
             />
@@ -88,64 +101,43 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
               value={`${recentSalsCount}`}
             />
             <MetricCard
-              caption="Valore totale contratti"
+              caption="Contratti attivi"
               icon={Building2}
-              label="Valore portfolio"
+              label="Portfolio"
               value={formatMoney({ amount: totalPortfolioValue, currency: "EUR" })}
             />
           </div>
         </div>
 
-        <BezelSurface className="self-start md:translate-y-2" innerClassName="p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="w-full">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-                Portfolio complessivo
-              </div>
-              <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
-                {formatMoney({ amount: totalPortfolioValue, currency: "EUR" })}
-              </div>
-            </div>
-            <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <Building2 className="size-6" />
-            </span>
-          </div>
-          <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
-            {folders.length} appaltatori attivi su {activeProjectsCount} progetti nel perimetro.
-          </p>
-          <div className="mt-4 flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success-base)]">
-              <CheckCircle2 className="size-5" />
-            </span>
-            <div className="text-[12px] font-semibold text-[var(--text-primary)]">
-              {stableFolders} cartelle stabili
-            </div>
-          </div>
-        </BezelSurface>
+        <PortfolioSnapshot
+          activeProjectsCount={activeProjectsCount}
+          foldersCount={folders.length}
+          stableFolders={stableFolders}
+          totalPortfolioValue={totalPortfolioValue}
+          watchedFolders={watchedFolders}
+        />
       </section>
 
-      <div className="mt-8 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0">
-          <ContractorFoldersPanel
-            folders={folders}
-            onImport={onImport}
-            onDeleteContractor={onDeleteContractor}
-            onOpenCreateContractor={onOpenCreateContractor}
-            onOpenFolder={onOpenFolder}
-          />
-        </div>
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
+        <ContractorFoldersPanel
+          folders={folders}
+          onImport={onImport}
+          onDeleteContractor={onDeleteContractor}
+          onOpenCreateContractor={onOpenCreateContractor}
+          onOpenFolder={onOpenFolder}
+        />
 
         <aside className="grid gap-4 lg:grid-cols-2 2xl:block 2xl:space-y-4">
           <WorkspaceRailCard icon={Activity} title="Attivita recenti" tone="success">
             <div className="flex min-h-[150px] flex-col items-center justify-center text-center">
-              <div className="flex size-12 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success-base)]">
+              <div className="flex size-12 items-center justify-center rounded-22px bg-[var(--success-soft)] text-[var(--success-base)]">
                 <CheckCircle2 className="size-5" />
               </div>
-              <div className="mt-5 text-[14px] font-semibold text-[var(--text-primary)]">
+              <div className="mt-5 text-14px font-semibold text-[var(--text-primary)]">
                 Nessuna attivita recente
               </div>
-              <p className="mt-2 max-w-[230px] text-[12px] leading-5 text-[var(--text-secondary)]">
-                Le ultime attivita di progetti, SAL e controlli appariranno qui.
+              <p className="mt-2 max-w-[230px] text-12px leading-5 text-[var(--text-secondary)]">
+                Progetti, SAL e controlli appariranno qui quando vengono aggiornati.
               </p>
               <ProjectControlButton
                 className="mt-5 h-9"
@@ -160,7 +152,7 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
           <WorkspaceRailCard icon={TrendingUp} title="Insight portfolio">
             <div className="space-y-4">
               <InsightRow
-                detail="L'ultimo SAL registrato e del -"
+                detail="Finestra economica dei SAL in corso"
                 icon={ClipboardList}
                 label={
                   recentSalsCount > 0 ? `${recentSalsCount} SAL recenti` : "Nessun SAL recente"
@@ -169,11 +161,15 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
               />
               <InsightRow
                 detail={
-                  folders.length - stableFolders > 0 ? "Da verificare" : "Tutto sotto controllo"
+                  watchedFolders > 0 ? "Richiede presidio operativo" : "Tutto sotto controllo"
                 }
                 icon={ShieldCheck}
-                label={folders.length - stableFolders > 0 ? "Alert aperti" : "Nessun alert aperto"}
-                tone={folders.length - stableFolders > 0 ? "warning" : "success"}
+                label={
+                  watchedFolders > 0
+                    ? `${watchedFolders} cartelle in presidio`
+                    : "Nessun alert aperto"
+                }
+                tone={watchedFolders > 0 ? "warning" : "success"}
               />
               <InsightRow
                 detail="Valore contratti attivi"
@@ -189,6 +185,88 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
   );
 });
 
+function PortfolioSnapshot({
+  activeProjectsCount,
+  foldersCount,
+  stableFolders,
+  totalPortfolioValue,
+  watchedFolders,
+}: {
+  activeProjectsCount: number;
+  foldersCount: number;
+  stableFolders: number;
+  totalPortfolioValue: number;
+  watchedFolders: number;
+}) {
+  return (
+    <BezelSurface className="self-start xl:translate-y-2" innerClassName="p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
+            Portfolio complessivo
+          </div>
+          <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
+            {formatMoney({ amount: totalPortfolioValue, currency: "EUR" })}
+          </div>
+        </div>
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-22px bg-[var(--info-soft)] text-[var(--info-base)]">
+          <Building2 className="size-6" />
+        </span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        <SnapshotCell label="Cartelle" value={`${foldersCount}`} />
+        <SnapshotCell label="Progetti" value={`${activeProjectsCount}`} />
+        <SnapshotCell
+          label="Presidio"
+          value={`${watchedFolders}`}
+          tone={watchedFolders > 0 ? "warning" : "success"}
+        />
+      </div>
+
+      <div className="mt-4 flex items-center gap-3 rounded-22px bg-[color-mix(in_srgb,var(--bg-muted)_58%,transparent)] p-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-18px bg-[var(--success-soft)] text-[var(--success-base)]">
+          <CheckCircle2 className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-12px font-semibold text-[var(--text-primary)]">
+            {stableFolders} cartelle stabili
+          </div>
+          <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
+            Nessun alert o finestra SAL aperta.
+          </div>
+        </div>
+      </div>
+    </BezelSurface>
+  );
+}
+
+function SnapshotCell({
+  label,
+  tone = "neutral",
+  value,
+}: {
+  label: string;
+  tone?: StatusTone;
+  value: string;
+}) {
+  return (
+    <div className="rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2">
+      <div
+        className={cn(
+          "text-16px font-semibold leading-none tabular-nums",
+          tone === "warning" && "text-[var(--warning-base)]",
+          tone === "success" && "text-[var(--success-base)]",
+          tone === "neutral" && "text-[var(--text-primary)]",
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-1 text-10px font-medium text-[var(--text-secondary)]">{label}</div>
+    </div>
+  );
+}
+
 function WorkspaceRailCard({
   children,
   icon: Icon,
@@ -200,19 +278,15 @@ function WorkspaceRailCard({
   title: string;
   tone?: StatusTone;
 }) {
-  const toneClass = {
-    danger: "text-[var(--danger-base)]",
-    info: "text-[var(--info-base)]",
-    neutral: "text-[var(--text-secondary)]",
-    success: "text-[var(--success-base)]",
-    warning: "text-[var(--warning-base)]",
-  }[tone];
-
   return (
     <BezelSurface innerClassName="p-5">
       <div className="mb-4 flex items-center gap-3">
-        <Icon className={cn("size-4", toneClass)} />
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+        <span
+          className={cn("flex size-8 items-center justify-center rounded-18px", toneSurface(tone))}
+        >
+          <Icon className="size-4" />
+        </span>
+        <h3 className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
           {title}
         </h3>
       </div>
@@ -232,24 +306,19 @@ function InsightRow({
   label: string;
   tone: StatusTone;
 }) {
-  const toneClass = {
-    danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-    info: "bg-[var(--info-soft)] text-[var(--info-base)]",
-    neutral: "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-    success: "bg-[var(--success-soft)] text-[var(--success-base)]",
-    warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-  }[tone];
-
   return (
     <div className="flex items-start gap-3">
       <span
-        className={cn("flex size-9 shrink-0 items-center justify-center rounded-full", toneClass)}
+        className={cn(
+          "flex size-9 shrink-0 items-center justify-center rounded-18px",
+          toneSurface(tone),
+        )}
       >
         <Icon className="size-4" />
       </span>
       <div className="min-w-0">
-        <div className="text-[13px] font-semibold text-[var(--text-primary)]">{label}</div>
-        <div className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{detail}</div>
+        <div className="text-13px font-semibold text-[var(--text-primary)]">{label}</div>
+        <div className="mt-1 text-12px leading-5 text-[var(--text-secondary)]">{detail}</div>
       </div>
     </div>
   );
@@ -268,28 +337,49 @@ function ContractorFoldersPanel({
   onOpenCreateContractor: () => void;
   onOpenFolder: (folderId: string) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const filteredFolders = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("it-IT");
+
+    if (!normalizedQuery) {
+      return folders;
+    }
+
+    return folders.filter((folder) =>
+      folder.contractor.toLocaleLowerCase("it-IT").includes(normalizedQuery),
+    );
+  }, [folders, query]);
+
   return (
     <BezelSurface innerClassName="overflow-hidden p-0">
-      <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-            Cartelle operative
-          </span>
-          <span className="rounded-full bg-[var(--bg-muted-strong)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]">
-            {folders.length}
-          </span>
+      <div className="flex flex-col gap-4 border-b border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] p-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              Cartelle operative
+            </span>
+            <span className="rounded-full bg-[var(--bg-muted-strong)] px-2 py-0.5 text-11px font-semibold text-[var(--text-secondary)]">
+              {filteredFolders.length}/{folders.length}
+            </span>
+          </div>
+          <div className="mt-1 text-12px font-medium text-[var(--text-secondary)]">
+            Vista cockpit per budget, SAL, alert e priorita appaltatore.
+          </div>
         </div>
-        <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto] xl:flex xl:flex-wrap xl:items-center">
-          <div className="relative min-w-0">
+
+        <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(220px,1fr)_auto_auto] xl:flex xl:flex-wrap xl:items-center">
+          <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
-              className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-10 pr-3 text-[13px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              className="h-10 w-full rounded-18px border border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="Cerca appaltatore..."
               type="search"
+              value={query}
             />
-          </div>
+          </label>
           <ProjectControlButton
-            className="h-10 px-3 text-[12px]"
+            className="h-10 px-3 text-12px"
             icon={Upload}
             onClick={onImport}
             variant="neutral"
@@ -297,7 +387,7 @@ function ContractorFoldersPanel({
             Importa
           </ProjectControlButton>
           <ProjectControlButton
-            className="h-10 px-3 text-[12px]"
+            className="h-10 px-3 text-12px text-[var(--text-inverse)]"
             icon={Plus}
             onClick={onOpenCreateContractor}
             variant="primary"
@@ -307,45 +397,29 @@ function ContractorFoldersPanel({
         </div>
       </div>
 
-      {folders.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {folders.map((folder) => {
-            const hasCriticalItems = folder.criticalCount > 0 || folder.salWindowCount > 0;
-            return (
+      {folders.length === 0 ? (
+        <EmptyContractorsState onOpenCreateContractor={onOpenCreateContractor} />
+      ) : filteredFolders.length === 0 ? (
+        <NoResultsState query={query} />
+      ) : (
+        <motion.div layout className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
+          <AnimatePresence initial={false}>
+            {filteredFolders.map((folder) => (
               <ContractorCard
                 key={folder.id}
                 folder={folder}
-                hasCriticalItems={hasCriticalItems}
                 onDeleteContractor={onDeleteContractor}
                 onOpenFolder={onOpenFolder}
               />
-            );
-          })}
-        </div>
-      ) : (
-        <div className="px-4 py-8 xl:px-5">
-          <button
-            type="button"
-            className="w-full rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-12 text-center transition-colors hover:bg-[var(--bg-muted)]"
-            onClick={onOpenCreateContractor}
-          >
-            <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <Building2 className="size-5" />
-            </span>
-            <span className="mt-5 block text-[15px] font-semibold text-[var(--text-primary)]">
-              Vuoi aggiungere un nuovo appaltatore?
-            </span>
-            <span className="mt-2 block text-[13px] text-[var(--text-secondary)]">
-              Crea manualmente o importa da Excel per iniziare subito.
-            </span>
-          </button>
-        </div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
       )}
 
       {folders.length > 0 ? (
-        <div className="border-t border-[var(--border-subtle)] px-4 py-4 text-center xl:px-5 xl:py-5">
-          <span className="text-[12px] font-medium text-[var(--text-secondary)]">
-            {folders.length} cartelle &middot;{" "}
+        <div className="border-t border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] px-4 py-4 text-center">
+          <span className="text-12px font-medium text-[var(--text-secondary)]">
+            {folders.length} cartelle operative ·{" "}
             <button
               className="font-semibold text-[var(--accent-primary)] hover:underline"
               onClick={onOpenCreateContractor}
@@ -362,132 +436,318 @@ function ContractorFoldersPanel({
 
 function ContractorCard({
   folder,
-  hasCriticalItems,
   onDeleteContractor,
   onOpenFolder,
 }: {
   folder: ContractorFolder;
-  hasCriticalItems: boolean;
   onDeleteContractor: (folder: ContractorFolder) => void;
   onOpenFolder: (id: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const health = getFolderHealth(folder);
+  const initials = getContractorInitials(folder.contractor);
+  const salRatio =
+    folder.projectCount > 0
+      ? Math.min(100, Math.round((folder.salCount / folder.projectCount) * 100))
+      : 0;
+  const exposureLabel = formatMoney({ amount: folder.salExposure, currency: "EUR" });
 
   return (
-    <div className="group relative rounded-2xl border-[0.5px] border-[var(--border-subtle)] bg-[var(--surface-base)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent-primary)]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
-      {/* Folder tab — effetto cartella */}
-      <div className="flex h-8 items-center justify-between rounded-t-2xl bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-4">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={cn(
-              "size-2 rounded-full",
-              hasCriticalItems ? "bg-[var(--warning-base)]" : "bg-[var(--success-base)]",
-            )}
+    <motion.article
+      layout
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      className="group relative min-h-[244px] overflow-hidden rounded-26px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[0_16px_42px_color-mix(in_srgb,var(--text-primary)_7%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_58%,transparent)]"
+      exit={{ opacity: 0, scale: 0.98, y: 10 }}
+      initial={{ opacity: 0, scale: 0.985, y: 12 }}
+      transition={spring}
+      whileHover={{ y: -3 }}
+    >
+      <div className="absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-highlight)_82%,transparent),transparent)]" />
+      <div className="absolute right-4 top-4 z-20">
+        <ContractorMenu
+          folder={folder}
+          menuOpen={menuOpen}
+          onDeleteContractor={onDeleteContractor}
+          setMenuOpen={setMenuOpen}
+        />
+      </div>
+
+      <button
+        aria-label={`Apri ${folder.contractor}`}
+        className="relative z-10 flex h-full w-full flex-col p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+        onClick={() => onOpenFolder(folder.id)}
+        type="button"
+      >
+        <div className="flex min-w-0 items-start gap-4 pr-9">
+          <ContractorAvatar initials={initials} tone={health.tone} />
+
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-18px px-2 py-1 text-10px font-semibold",
+                  toneSurface(health.tone),
+                )}
+              >
+                {health.tone === "warning" ? (
+                  <AlertTriangle className="size-3" />
+                ) : (
+                  <CheckCircle2 className="size-3" />
+                )}
+                {health.label}
+              </span>
+            </div>
+            <h3 className="mt-3 line-clamp-2 text-22px font-semibold leading-[1.05] tracking-[-0.02em] text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+              {folder.contractor}
+            </h3>
+            <p className="mt-2 text-12px font-medium text-[var(--text-secondary)]">
+              {folder.projectCount} progetti · {folder.salCount} SAL · esposizione {exposureLabel}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          <CockpitMetric
+            label="Budget"
+            value={formatMoney({ amount: folder.budget, currency: "EUR" })}
           />
-          <span className="text-[10px] font-medium text-[var(--text-secondary)]">
-            {hasCriticalItems ? "Presidio" : "Stabile"}
+          <CockpitMetric label="Progetti" value={`${folder.projectCount}`} />
+          <CockpitMetric
+            label="Alert"
+            tone={folder.criticalCount > 0 ? "warning" : "neutral"}
+            value={`${folder.criticalCount}`}
+          />
+        </div>
+
+        <div className="mt-4 rounded-22px bg-[color-mix(in_srgb,var(--bg-muted)_62%,transparent)] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                Copertura SAL
+              </div>
+              <div className="mt-1 text-13px font-semibold text-[var(--text-primary)]">
+                {folder.salCount} su {Math.max(folder.projectCount, 1)} workflow
+              </div>
+            </div>
+            <div className="text-18px font-semibold tabular-nums text-[var(--text-primary)]">
+              {salRatio}%
+            </div>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+            <motion.div
+              className="h-full rounded-18px bg-[var(--accent-primary)]"
+              initial={{ scaleX: 0 }}
+              style={{ originX: 0 }}
+              transition={{ delay: 0.08, duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
+              viewport={{ once: true }}
+              whileInView={{ scaleX: salRatio / 100 }}
+            />
+          </div>
+        </div>
+
+        <div className="mt-auto flex items-center justify-between pt-4">
+          <div className="flex items-center gap-2 text-12px font-semibold text-[var(--text-secondary)]">
+            <FolderOpen className="size-4" />
+            Cartella appaltatore
+          </div>
+          <span className="inline-flex items-center gap-1 text-12px font-semibold text-[var(--accent-primary)] opacity-0 transition-[opacity,transform] duration-200 ease-out will-change-transform -translate-x-1 group-hover:translate-x-0 group-hover:opacity-100">
+            Apri <ChevronRight className="size-3.5" />
           </span>
         </div>
-        <div className="relative z-10">
-          <button
-            aria-label={`Azioni ${folder.contractor}`}
-            className="flex size-7 items-center justify-center rounded-full text-[var(--text-secondary)] opacity-0 transition-all hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)] group-hover:opacity-100"
-            onClick={(event) => {
-              event.stopPropagation();
-              setMenuOpen((open) => !open);
-            }}
-            type="button"
-          >
-            <MoreVertical className="size-3.5" />
-          </button>
-          {menuOpen ? (
-            <>
-              <button
-                aria-label="Chiudi menu appaltatore"
-                className="fixed inset-0 z-40 cursor-default"
-                onClick={() => setMenuOpen(false)}
-                type="button"
-              />
-              <div className="absolute right-0 top-full z-50 mt-1.5 w-48 overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]/70">
-                <button
-                  className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
+      </button>
+    </motion.article>
+  );
+}
+
+function ContractorAvatar({ initials, tone }: { initials: string; tone: StatusTone }) {
+  return (
+    <span
+      className={cn(
+        "relative flex size-20 shrink-0 items-center justify-center rounded-26px text-24px font-semibold tracking-[-0.03em] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]",
+        toneSurface(tone),
+      )}
+    >
+      {initials}
+      <span className="absolute -right-1 -top-1 flex size-7 items-center justify-center rounded-18px bg-[var(--surface-base)] shadow-[0_6px_16px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]">
+        <HardHat className="size-3.5 text-[var(--accent-primary)]" />
+      </span>
+    </span>
+  );
+}
+
+function ContractorMenu({
+  folder,
+  menuOpen,
+  onDeleteContractor,
+  setMenuOpen,
+}: {
+  folder: ContractorFolder;
+  menuOpen: boolean;
+  onDeleteContractor: (folder: ContractorFolder) => void;
+  setMenuOpen: (open: boolean | ((open: boolean) => boolean)) => void;
+}) {
+  return (
+    <div className="relative">
+      <button
+        aria-label={`Azioni ${folder.contractor}`}
+        className="flex size-8 items-center justify-center rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_72%,transparent)] text-[var(--text-secondary)] opacity-0 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_54%,transparent)] backdrop-blur-md transition-[opacity,background-color,color] duration-200 hover:bg-[var(--surface-base)] hover:text-[var(--text-primary)] group-hover:opacity-100"
+        onClick={(event) => {
+          event.stopPropagation();
+          setMenuOpen((open) => !open);
+        }}
+        type="button"
+      >
+        <MoreVertical className="size-4" />
+      </button>
+      <AnimatePresence>
+        {menuOpen ? (
+          <>
+            <button
+              aria-label="Chiudi menu appaltatore"
+              className="fixed inset-0 z-40 cursor-default"
+              onClick={() => setMenuOpen(false)}
+              type="button"
+            />
+            <motion.div
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="absolute right-0 top-full z-50 mt-3 w-64 overflow-hidden rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] shadow-[0_24px_70px_color-mix(in_srgb,var(--text-primary)_14%,transparent)] backdrop-blur-md"
+              exit={{ opacity: 0, scale: 0.96, y: -6 }}
+              initial={{ opacity: 0, scale: 0.96, y: -6 }}
+              transition={{ damping: 26, stiffness: 200, type: "spring" }}
+            >
+              <div className="rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
+                <motion.button
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex w-full items-start gap-3 rounded-18px px-3 py-3 text-left transition-colors hover:bg-[var(--danger-soft)]"
+                  initial={{ opacity: 0, x: -12 }}
                   onClick={(event) => {
                     event.stopPropagation();
                     setMenuOpen(false);
                     onDeleteContractor(folder);
                   }}
+                  transition={{ delay: 0.02, duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
                   type="button"
                 >
-                  <Trash2 className="size-4" />
-                  Elimina appaltatore
-                </button>
+                  <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--danger-soft)] text-[var(--danger-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_22%,transparent)]">
+                    <Trash2 className="size-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-13px font-semibold text-[var(--text-primary)]">
+                      Elimina appaltatore
+                    </span>
+                    <span className="mt-0.5 block text-11px leading-4 text-[var(--text-secondary)]">
+                      Rimuove la cartella dal registro locale
+                    </span>
+                  </span>
+                </motion.button>
               </div>
-            </>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Corpo della card — cliccabile */}
-      <button
-        aria-label={`Apri ${folder.contractor}`}
-        className="w-full px-4 pb-4 pt-3 text-left"
-        onClick={() => onOpenFolder(folder.id)}
-        type="button"
-      >
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--accent-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]">
-            <HardHat className="size-5" />
-          </span>
-          <span className="min-w-0 break-words text-[15px] font-bold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
-            {folder.contractor}
-          </span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border-subtle)]/60 overflow-hidden rounded-xl border-[0.5px] border-[var(--border-subtle)]/50">
-          <CardMetric
-            label="Valore"
-            value={formatMoney({ amount: folder.budget, currency: "EUR" })}
-          />
-          <CardMetric label="Progetti" value={`${folder.projectCount}`} />
-          <CardMetric
-            label="Alert"
-            value={`${folder.criticalCount}`}
-            highlight={folder.criticalCount > 0}
-          />
-        </div>
-
-        <div className="mt-4 flex items-center justify-end">
-          <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent-primary)] opacity-0 transition-all duration-200 -translate-x-1 group-hover:translate-x-0 group-hover:opacity-100">
-            Apri workspace <ChevronRight className="size-3.5" />
-          </span>
-        </div>
-      </button>
+            </motion.div>
+          </>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
 
-function CardMetric({
+function CockpitMetric({
   label,
+  tone = "neutral",
   value,
-  highlight = false,
 }: {
   label: string;
+  tone?: StatusTone;
   value: string;
-  highlight?: boolean;
 }) {
   return (
-    <div className="min-w-0 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-2 py-2.5 text-center">
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+    <div className="min-w-0 rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] px-3 py-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)]">
+      <dt className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
         {label}
       </dt>
       <dd
         className={cn(
-          "mt-0.5 truncate text-[14px] font-bold",
-          highlight ? "text-[var(--warning-base)]" : "text-[var(--text-primary)]",
+          "mt-1 truncate text-15px font-semibold tabular-nums",
+          tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--text-primary)]",
         )}
       >
         {value}
       </dd>
     </div>
   );
+}
+
+function EmptyContractorsState({ onOpenCreateContractor }: { onOpenCreateContractor: () => void }) {
+  return (
+    <div className="px-4 py-8 xl:px-5">
+      <button
+        className="w-full rounded-26px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_70%,transparent)] px-6 py-12 text-center transition-colors hover:bg-[var(--surface-base)]"
+        onClick={onOpenCreateContractor}
+        type="button"
+      >
+        <span className="mx-auto flex size-14 items-center justify-center rounded-22px bg-[var(--info-soft)] text-[var(--info-base)]">
+          <Building2 className="size-6" />
+        </span>
+        <span className="mt-5 block text-15px font-semibold text-[var(--text-primary)]">
+          Vuoi aggiungere un nuovo appaltatore?
+        </span>
+        <span className="mt-2 block text-13px text-[var(--text-secondary)]">
+          Crea manualmente o importa da Excel per iniziare subito.
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function NoResultsState({ query }: { query: string }) {
+  return (
+    <div className="px-4 py-10 text-center">
+      <div className="mx-auto flex size-12 items-center justify-center rounded-22px bg-[var(--bg-muted)] text-[var(--text-secondary)]">
+        <Search className="size-5" />
+      </div>
+      <div className="mt-4 text-14px font-semibold text-[var(--text-primary)]">
+        Nessuna cartella trovata
+      </div>
+      <p className="mt-2 text-12px text-[var(--text-secondary)]">
+        Nessun appaltatore corrisponde a “{query}”.
+      </p>
+    </div>
+  );
+}
+
+function getFolderHealth(folder: ContractorFolder): FolderHealth {
+  if (folder.criticalCount > 0 || folder.salWindowCount > 0) {
+    return { label: "Presidio", score: 62, tone: "warning" };
+  }
+
+  if (folder.projectCount === 0) {
+    return { label: "Da attivare", score: 48, tone: "neutral" };
+  }
+
+  return { label: "Stabile", score: 92, tone: "success" };
+}
+
+function getContractorInitials(contractor: string) {
+  const words = contractor
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length === 0) {
+    return "AP";
+  }
+
+  const first = words[0] ?? "A";
+  const second = words[1] ?? first.slice(1, 2) ?? "P";
+  const initials = `${first.slice(0, 1)}${second.slice(0, 1)}`;
+  return initials.toLocaleUpperCase("it-IT");
+}
+
+function toneSurface(tone: StatusTone) {
+  return {
+    danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
+    info: "bg-[var(--info-soft)] text-[var(--info-base)]",
+    neutral: "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+    success: "bg-[var(--success-soft)] text-[var(--success-base)]",
+    warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+  }[tone];
 }

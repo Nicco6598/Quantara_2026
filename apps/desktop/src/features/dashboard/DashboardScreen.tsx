@@ -81,10 +81,10 @@ function BudgetBadge({
     <div>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+          <p className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
             Budget totale
           </p>
-          <p className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+          <p className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
             {totalBudget.toLocaleString("it-IT", {
               style: "currency",
               currency: "EUR",
@@ -96,7 +96,7 @@ function BudgetBadge({
           <Calculator className="size-6" />
         </span>
       </div>
-      <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+      <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
         {projectCount} cantier{projectCount === 1 ? "e" : "i"} ·{" "}
         {totalSal.toLocaleString("it-IT", {
           style: "currency",

@@ -20,6 +20,8 @@ import {
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { SavedViewSelector } from "@/components/shared/SavedViewSelector";
 import { ScreenHero } from "@/components/shared/ScreenHero";
+import { StatusPill } from "@/components/shared/StatusPill";
+import { SeverityBar, severityToneForPercentage } from "@/components/shared/SeverityBar";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
@@ -235,12 +237,12 @@ export function AccountingScreen() {
             <div>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                  <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
                     {selectedSalIds.size > 0
                       ? `${selectedSalIds.size} selezionati`
                       : `${selection.length} nel filtro`}
                   </div>
-                  <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--text-primary)]">
+                  <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
                     {formatMoney({ amount: metrics.total, currency: "EUR" })}
                   </div>
                 </div>
@@ -248,7 +250,7 @@ export function AccountingScreen() {
                   <Calculator className="size-6" />
                 </span>
               </div>
-              <p className="mt-5 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+              <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
                 {metrics.closedCount} chiusi · {metrics.draftCount} bozze · su {contracts.length}{" "}
                 contratti
               </p>
@@ -327,12 +329,12 @@ export function AccountingScreen() {
                 <div className="flex items-center justify-between px-2 pt-2">
                   <div className="flex items-center gap-3">
                     <ReceiptText className="size-5 text-[var(--info-base)]" />
-                    <h3 className="text-[16px] font-bold text-[var(--text-primary)] 2xl:text-[18px]">
+                    <h3 className="text-16px font-bold text-[var(--text-primary)] 2xl:text-18px">
                       SAL da includere
                     </h3>
                   </div>
                   <button
-                    className="text-[12px] font-semibold text-[var(--accent-primary)] hover:underline"
+                    className="text-12px font-semibold text-[var(--accent-primary)] hover:underline"
                     onClick={toggleAll}
                     type="button"
                   >
@@ -375,7 +377,7 @@ export function AccountingScreen() {
                 />
 
                 {filteredData.length > 0 ? (
-                  <div className="mt-4 overflow-hidden rounded-[14px] border-[0.5px] border-[var(--border-subtle)]">
+                  <div className="mt-4 overflow-hidden rounded-14px border-[0.5px] border-[var(--border-subtle)]">
                     {filteredData.map(({ doc, view }) => {
                       if (!view) return null;
                       const selected = selectedSalIds.has(doc.id);
@@ -385,7 +387,7 @@ export function AccountingScreen() {
                           className={cn(
                             "flex w-full items-center justify-between gap-4 border-b border-[var(--border-subtle)] px-4 py-4 text-left last:border-b-0 2xl:px-5 2xl:py-5",
                             selected
-                              ? "bg-[var(--info-soft)]/35"
+                              ? "bg-[var(--selection-bg)]"
                               : "transition-colors hover:bg-[var(--bg-muted)]",
                           )}
                           key={doc.id}
@@ -404,17 +406,17 @@ export function AccountingScreen() {
                               {selected ? <CheckCircle2 className="size-3.5" /> : null}
                             </span>
                             <div>
-                              <div className="text-[14px] font-semibold text-[var(--text-primary)]">
+                              <div className="text-14px font-semibold text-[var(--text-primary)]">
                                 {doc.title}
                               </div>
-                              <div className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
+                              <div className="mt-0.5 text-12px text-[var(--text-secondary)]">
                                 {projectMap.get(doc.projectId) ?? "Sconosciuto"} · {doc.date}
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-3 text-right">
                             <div>
-                              <div className="text-[14px] font-bold text-[var(--text-primary)]">
+                              <div className="text-14px font-bold text-[var(--text-primary)]">
                                 {formatMoney({ amount: view.total, currency: "EUR" })}
                               </div>
                               <StatusPill
@@ -439,17 +441,17 @@ export function AccountingScreen() {
                     })}
                   </div>
                 ) : (
-                  <div className="mt-8 text-center text-[14px] text-[var(--text-secondary)]">
+                  <div className="mt-8 text-center text-14px text-[var(--text-secondary)]">
                     Nessun SAL corrisponde ai filtri attivi.
                   </div>
                 )}
               </div>
 
-              <div className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden rounded-[22px] bg-[var(--info-soft)]/35 p-5 text-center 2xl:min-h-[420px] 2xl:p-7">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+              <div className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden rounded-22px bg-[var(--info-soft)]/35 p-5 text-center 2xl:min-h-[420px] 2xl:p-7">
+                <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
                   {selectedSalIds.size > 0 ? "Totale selezionato" : "Nessuna selezione"}
                 </div>
-                <div className="mt-5 text-[38px] font-bold leading-none tracking-[-0.04em] text-[var(--text-primary)] 2xl:mt-7 2xl:text-[50px]">
+                <div className="mt-5 text-38px font-bold leading-none tracking-tight text-[var(--text-primary)] 2xl:mt-7 2xl:text-50px">
                   {formatMoney({ amount: metrics.total, currency: "EUR" })}
                 </div>
                 {selectedSalIds.size > 0 ? (
@@ -458,7 +460,7 @@ export function AccountingScreen() {
                     <div className="mt-7 flex size-16 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
                       <FileBadge className="size-8" />
                     </div>
-                    <p className="mt-7 max-w-[260px] text-[14px] font-medium leading-6 text-[var(--text-secondary)]">
+                    <p className="mt-7 max-w-[260px] text-14px font-medium leading-6 text-[var(--text-secondary)]">
                       {selectedSalIds.size} SAL pronti per il report contabile.
                     </p>
                     <ProjectControlButton
@@ -479,7 +481,7 @@ export function AccountingScreen() {
                     </ProjectControlButton>
                   </>
                 ) : (
-                  <p className="mt-6 max-w-[260px] text-[14px] font-medium leading-6 text-[var(--text-secondary)]">
+                  <p className="mt-6 max-w-[260px] text-14px font-medium leading-6 text-[var(--text-secondary)]">
                     Seleziona i SAL da includere nel report per generare il documento contabile.
                   </p>
                 )}
@@ -494,7 +496,7 @@ export function AccountingScreen() {
           <Panel>
             <div className="flex items-center gap-3">
               <Coins className="size-5 text-[var(--info-base)]" />
-              <h3 className="text-[16px] font-bold text-[var(--text-primary)]">
+              <h3 className="text-16px font-bold text-[var(--text-primary)]">
                 Riepilogo selezione
               </h3>
             </div>
@@ -548,13 +550,13 @@ export function AccountingScreen() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <ShieldCheck className="size-5 text-[var(--text-secondary)]" />
-                <h3 className="text-[16px] font-bold text-[var(--text-primary)]">
+                <h3 className="text-16px font-bold text-[var(--text-primary)]">
                   Progetti coinvolti
                 </h3>
               </div>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-[14px] border-[0.5px] border-[var(--border-subtle)]">
+            <div className="mt-4 overflow-hidden rounded-14px border-[0.5px] border-[var(--border-subtle)]">
               {contracts.filter((c) => selection.some(({ doc }) => doc.projectId === c.id)).length >
               0 ? (
                 contracts
@@ -575,33 +577,25 @@ export function AccountingScreen() {
                         key={c.id}
                       >
                         <div className="min-w-0">
-                          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                          <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
                             {c.title}
                           </div>
                           <div className="mt-1 flex items-center gap-2">
-                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-                              <div
-                                className={cn(
-                                  "h-full rounded-full",
-                                  pct > 90
-                                    ? "bg-[var(--danger-base)]"
-                                    : pct > 70
-                                      ? "bg-[var(--warning-base)]"
-                                      : "bg-[var(--success-base)]",
-                                )}
-                                style={{ width: `${Math.min(pct, 100)}%` }}
-                              />
-                            </div>
-                            <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+                            <SeverityBar
+                              percentage={pct}
+                              tone={severityToneForPercentage(pct)}
+                              className="h-1.5 w-16"
+                            />
+                            <span className="text-11px font-medium text-[var(--text-secondary)]">
                               {pct}%
                             </span>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-[12px] font-semibold text-[var(--text-primary)]">
+                          <div className="text-12px font-semibold text-[var(--text-primary)]">
                             {formatMoney({ amount: totalForProject, currency: "EUR" })}
                           </div>
-                          <div className="text-[11px] text-[var(--text-secondary)]">
+                          <div className="text-11px text-[var(--text-secondary)]">
                             {selForProject.length} SAL
                           </div>
                         </div>
@@ -609,7 +603,7 @@ export function AccountingScreen() {
                     );
                   })
               ) : (
-                <div className="px-4 py-6 text-center text-[13px] text-[var(--text-secondary)]">
+                <div className="px-4 py-6 text-center text-13px text-[var(--text-secondary)]">
                   Seleziona dei SAL per vedere i progetti coinvolti
                 </div>
               )}
@@ -627,30 +621,9 @@ function Panel({ children, className }: { children: ReactNode; className?: strin
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 text-[13px] last:border-b-0 last:pb-0">
+    <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 text-13px last:border-b-0 last:pb-0">
       <span className="font-medium text-[var(--text-secondary)]">{label}</span>
       <span className="font-semibold text-[var(--text-primary)]">{value}</span>
     </div>
-  );
-}
-
-function StatusPill({
-  children,
-  tone,
-}: {
-  children: string;
-  tone: "info" | "success" | "warning";
-}) {
-  return (
-    <span
-      className={cn(
-        "shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold",
-        tone === "info" && "bg-[var(--info-soft)] text-[var(--info-base)]",
-        tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-        tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-      )}
-    >
-      {children}
-    </span>
   );
 }

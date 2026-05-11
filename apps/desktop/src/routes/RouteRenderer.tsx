@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import type { QuantaraRoute } from "@/store/app-store";
+import type { PendingWorkflowAction, QuantaraRoute } from "@/store/app-store";
 
 const AccountingScreen = lazy(() =>
   import("@/features/accounting/AccountingScreen").then((m) => ({ default: m.AccountingScreen })),
@@ -37,6 +37,7 @@ const PlaceholderScreen = lazy(() =>
 
 type RouteRendererProps = {
   activeRoute: QuantaraRoute;
+  pendingWorkflowAction: PendingWorkflowAction;
 };
 
 function ScreenSkeleton() {
@@ -47,17 +48,17 @@ function ScreenSkeleton() {
   );
 }
 
-function ScreenGuard({ children }: { children: React.ReactNode }) {
+function ScreenGuard({ children, resetKey }: { children: React.ReactNode; resetKey: string }) {
   return (
-    <ErrorBoundary>
+    <ErrorBoundary key={resetKey} resetKey={resetKey}>
       <Suspense fallback={<ScreenSkeleton />}>{children}</Suspense>
     </ErrorBoundary>
   );
 }
 
-export function RouteRenderer({ activeRoute }: RouteRendererProps) {
+export function RouteRenderer({ activeRoute, pendingWorkflowAction }: RouteRendererProps) {
   return (
-    <ScreenGuard>
+    <ScreenGuard resetKey={`${activeRoute}:${pendingWorkflowAction ?? "idle"}`}>
       {activeRoute === "dashboard" && <DashboardScreen />}
       {activeRoute === "projects" && <ProjectsScreen />}
       {activeRoute === "project-detail" && <ProjectDetailScreen />}

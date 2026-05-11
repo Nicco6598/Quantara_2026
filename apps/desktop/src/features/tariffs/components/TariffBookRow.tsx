@@ -59,14 +59,14 @@ export function TariffBookRow({
                   }`}
                 />
               </button>
-              <span className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+              <span className="truncate text-13px font-bold text-[var(--text-primary)]">
                 {book.name}
               </span>
             </div>
-            <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
+            <div className="mt-1 truncate text-11px font-medium text-[var(--text-secondary)]">
               {book.sourceName} · {book.year}
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-12px font-medium text-[var(--text-secondary)]">
               <Badge variant={isActive ? "success" : "warning"}>{book.status}</Badge>
               <span>{linkedProjectCount} progetti</span>
               <span>{voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT")} voci</span>
@@ -90,7 +90,7 @@ export function TariffBookRow({
               onClick={() => setIsOpen(false)}
               type="button"
             />
-            <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-[14px] border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] py-1 shadow-none">
+            <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-14px border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] py-1 shadow-none">
               <button
                 className="w-full px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
                 onClick={() => {
@@ -138,24 +138,22 @@ export function TariffBookRow({
           />
         </button>
         <button className="min-w-0 text-left" onClick={onSelect} type="button">
-          <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
-            {book.name}
-          </div>
-          <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-secondary)]">
+          <div className="truncate text-13px font-bold text-[var(--text-primary)]">{book.name}</div>
+          <div className="mt-1 truncate text-11px font-medium text-[var(--text-secondary)]">
             ID: {book.id}
           </div>
         </button>
-        <div className="min-w-0 text-[12px] font-medium text-[var(--text-secondary)]">
+        <div className="min-w-0 text-12px font-medium text-[var(--text-secondary)]">
           <div className="truncate">{book.sourceName}</div>
         </div>
-        <div className="text-[13px] font-semibold text-[var(--text-primary)]">{book.year}</div>
+        <div className="text-13px font-semibold text-[var(--text-primary)]">{book.year}</div>
         <div>
           <Badge variant={isActive ? "success" : "warning"}>{book.status}</Badge>
         </div>
-        <div className="text-center text-[13px] font-semibold text-[var(--text-primary)]">
+        <div className="text-center text-13px font-semibold text-[var(--text-primary)]">
           {linkedProjectCount}
         </div>
-        <div className="text-right text-[13px] font-semibold text-[var(--text-primary)]">
+        <div className="text-right text-13px font-semibold text-[var(--text-primary)]">
           {voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT")}
         </div>
         <div className="justify-self-end">
@@ -191,7 +189,7 @@ export function TariffBookRow({
                 }
               >
                 <button
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-13px font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
                   onClick={() => {
                     onEdit();
                     setIsOpen(false);
@@ -201,7 +199,7 @@ export function TariffBookRow({
                   Modifica
                 </button>
                 <button
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--bg-muted)]"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-13px font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--bg-muted)]"
                   onClick={() => {
                     onDelete();
                     setIsOpen(false);

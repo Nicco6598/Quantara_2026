@@ -6,7 +6,7 @@ import type { VoiceGroup } from "../utils/tariff-grouping";
 import { formatEditablePercent } from "../utils/tariffs-validation";
 
 const CELL_BASE =
-  "h-8 min-w-0 flex-1 rounded-[8px] border bg-transparent px-2 text-[12px] font-semibold text-[var(--text-primary)] outline-none transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
+  "h-8 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-12px font-semibold text-[var(--text-primary)] outline-none transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
 const CELL_EDIT = "border-transparent hover:border-[var(--border-subtle)]";
 const GRID_COLS = "grid grid-cols-[160px_minmax(360px,1fr)_80px_100px_110px_36px] gap-3 px-5 py-2";
 
@@ -53,7 +53,7 @@ function ImportCell({
             <Info className="size-3.5" />
           </button>
           {showWarnings ? (
-            <div className="absolute bottom-full left-0 z-50 mb-2 w-72 rounded-[14px] bg-[var(--surface-base)] p-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)] ring-1 ring-[var(--border-subtle)]">
+            <div className="absolute bottom-full left-0 z-50 mb-2 w-72 rounded-14px bg-[var(--surface-base)] p-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)] ring-1 ring-[var(--border-subtle)]">
               <button
                 className="absolute right-2 top-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 onClick={() => setShowWarnings(false)}
@@ -64,10 +64,10 @@ function ImportCell({
               <div className="max-h-48 space-y-3 overflow-y-auto pr-2">
                 {warnings.map((w) => (
                   <div key={w.id} className="space-y-1">
-                    <div className="text-[11px] font-bold text-[var(--warning-base)]">
+                    <div className="text-11px font-bold text-[var(--warning-base)]">
                       #{w.id} {w.title}
                     </div>
-                    <div className="text-[11px] font-medium leading-[1.5] text-[var(--text-secondary)]">
+                    <div className="text-11px font-medium leading-normal text-[var(--text-secondary)]">
                       {w.body}
                     </div>
                   </div>
@@ -109,7 +109,7 @@ function DescriptionCell({
 
   return (
     <textarea
-      className="min-h-[34px] w-full resize-none rounded-[8px] border border-transparent bg-transparent px-2.5 py-2 text-[12px] font-semibold leading-[1.45] text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--border-subtle)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+      className="min-h-[34px] w-full resize-none rounded-md border border-transparent bg-transparent px-2.5 py-2 text-12px font-semibold leading-1_45 text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--border-subtle)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
       id={`import-cell-${index}-${field}`}
       onChange={(event) => {
         fitContent();
@@ -185,7 +185,7 @@ const VoiceRow = memo(function VoiceRow({
       />
       <button
         aria-label={`Elimina voce ${voice.officialCode || index + 1}`}
-        className="flex size-9 items-center justify-center rounded-[10px] text-[var(--danger-base,var(--warning-base))] transition-colors hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+        className="flex size-9 items-center justify-center rounded-10px text-[var(--danger-base,var(--warning-base))] transition-colors hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
         onClick={() => onDelete(index)}
         title="Elimina voce"
         type="button"
@@ -297,7 +297,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   return (
     <div className="space-y-6">
       {sections.length === 0 ? (
-        <div className="rounded-[20px] bg-[var(--bg-muted)]/50 p-6 text-center text-[13px] font-medium text-[var(--text-secondary)]">
+        <div className="rounded-2xl bg-[var(--bg-muted)]/50 p-6 text-center text-13px font-medium text-[var(--text-secondary)]">
           Nessuna voce da importare.
         </div>
       ) : (
@@ -309,10 +309,10 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
             key={section.categoria}
           >
             <div className="flex items-center gap-3 pt-1">
-              <h4 className="text-[18px] font-bold tracking-[-0.03em] text-[var(--text-primary)]">
+              <h4 className="text-18px font-bold tracking-neg-0_03em text-[var(--text-primary)]">
                 Categorie {section.categoria || "Altre"}
               </h4>
-              <span className="rounded-full bg-[var(--bg-muted-strong)] px-3 py-1 text-[12px] font-bold text-[var(--text-secondary)]">
+              <span className="rounded-full bg-[var(--bg-muted-strong)] px-3 py-1 text-12px font-bold text-[var(--text-secondary)]">
                 {section.groups.reduce(
                   (s, g) => s + g.voci.reduce((ss, v) => ss + v.children.length, 0),
                   0,
@@ -329,16 +329,16 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
 
               return (
                 <div
-                  className="overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_18%,transparent)] [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+                  className="overflow-hidden rounded-18px bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_18%,transparent)] [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
                   key={grp.gruppo}
                 >
                   <div className="flex items-center justify-between border-b border-[var(--border-subtle)]/55 bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
-                      <span className="rounded-[8px] bg-[var(--info-soft)] px-2 py-1 text-[12px] font-bold text-[var(--info-base)]">
+                      <span className="rounded-md bg-[var(--info-soft)] px-2 py-1 text-12px font-bold text-[var(--info-base)]">
                         {grp.gruppo}
                       </span>
                       {grp.gruppoDesc ? (
-                        <span className="text-[13px] font-bold text-[var(--text-secondary)]">
+                        <span className="text-13px font-bold text-[var(--text-secondary)]">
                           {grp.gruppoDesc}
                         </span>
                       ) : null}
@@ -348,7 +348,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                         </span>
                       ) : null}
                     </div>
-                    <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                    <span className="text-11px font-semibold text-[var(--text-secondary)]">
                       {grp.voci.length} voci · {totalSubVoices} sottovoci
                     </span>
                   </div>
@@ -358,15 +358,15 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                       <div key={voiceGroup.code}>
                         {voiceGroup.voce || voiceGroup.voceDesc ? (
                           <div className="flex items-center gap-3 bg-[var(--bg-muted)]/45 px-5 py-3">
-                            <span className="rounded-[8px] bg-[var(--warning-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent-primary)]">
+                            <span className="rounded-md bg-[var(--warning-soft)] px-2.5 py-1 text-11px font-bold text-[var(--accent-primary)]">
                               VOCE {voiceGroup.voce}
                             </span>
                             {voiceGroup.voceDesc ? (
-                              <span className="min-w-0 flex-1 text-[12px] font-semibold leading-normal text-[var(--text-secondary)]">
+                              <span className="min-w-0 flex-1 text-12px font-semibold leading-normal text-[var(--text-secondary)]">
                                 {voiceGroup.voceDesc}
                               </span>
                             ) : null}
-                            <span className="ml-auto shrink-0 text-[11px] font-medium text-[var(--text-secondary)]">
+                            <span className="ml-auto shrink-0 text-11px font-medium text-[var(--text-secondary)]">
                               {voiceGroup.children.length} righe
                             </span>
                           </div>
@@ -374,7 +374,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
 
                         <div>
                           <div
-                            className={`${GRID_COLS} min-w-[900px] border-b border-[var(--border-subtle)]/35 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]`}
+                            className={`${GRID_COLS} min-w-[900px] border-b border-[var(--border-subtle)]/35 text-10px font-bold uppercase tracking-0_08em text-[var(--text-secondary)]`}
                           >
                             <span>Codice</span>
                             <span>Descrizione</span>
@@ -419,7 +419,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
         ))
       )}
 
-      <div className="rounded-[16px] border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/40 px-5 py-3 text-[12px] font-medium text-[var(--text-secondary)]">
+      <div className="rounded-xl border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/40 px-5 py-3 text-12px font-medium text-[var(--text-secondary)]">
         {totalVoices.toLocaleString("it-IT")} sottovoci in {groups.length.toLocaleString("it-IT")}{" "}
         voci
       </div>

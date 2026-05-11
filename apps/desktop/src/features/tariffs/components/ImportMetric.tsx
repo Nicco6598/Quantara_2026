@@ -31,23 +31,23 @@ export function ImportMetric({
           : "bg-[var(--bg-muted)] text-[var(--accent-primary)]";
 
   return (
-    <div className="flex min-h-[112px] items-center gap-4 rounded-[18px] bg-[var(--surface-base)] p-4 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_22%,transparent)]">
+    <div className="flex min-h-[112px] items-center gap-4 rounded-18px bg-[var(--surface-base)] p-4 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_22%,transparent)]">
       {Icon ? (
         <div
-          className={`flex size-12 shrink-0 items-center justify-center rounded-[14px] ${iconTone}`}
+          className={`flex size-12 shrink-0 items-center justify-center rounded-14px ${iconTone}`}
         >
           <Icon className="size-5" strokeWidth={1.9} />
         </div>
       ) : null}
       <div className="min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+        <div className="text-10px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
           {label}
         </div>
-        <div className={`mt-2 text-[25px] font-bold leading-none tracking-[-0.03em] ${color}`}>
+        <div className={`mt-2 text-25px font-bold leading-none tracking-neg-0_03em ${color}`}>
           {value}
         </div>
         {caption ? (
-          <div className="mt-2 truncate text-[12px] font-semibold text-[var(--text-secondary)]">
+          <div className="mt-2 truncate text-12px font-semibold text-[var(--text-secondary)]">
             {caption}
           </div>
         ) : null}

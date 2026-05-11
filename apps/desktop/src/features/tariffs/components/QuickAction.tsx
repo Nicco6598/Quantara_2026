@@ -30,10 +30,10 @@ export function QuickAction({
         <Icon className="size-4" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[13px] font-bold text-[var(--text-primary)]">
+        <span className="block truncate text-13px font-bold text-[var(--text-primary)]">
           {label}
         </span>
-        <span className="block truncate text-[11px] font-medium text-[var(--text-secondary)]">
+        <span className="block truncate text-11px font-medium text-[var(--text-secondary)]">
           {detail}
         </span>
       </span>

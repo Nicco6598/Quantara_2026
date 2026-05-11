@@ -76,11 +76,11 @@ export function SalModal({
         onClick={onClose}
         type="button"
       />
-      <section className="relative max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
-        <div className="rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+      <section className="relative max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
+        <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+              <div className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
                 Registro SAL
               </div>
               <h3 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
@@ -133,7 +133,7 @@ export function SalModal({
                     <div
                       key={sal.id}
                       className={cn(
-                        "rounded-[18px] border p-4 transition-colors",
+                        "rounded-18px border p-4 transition-colors",
                         isDeleting
                           ? "border-danger/25 bg-danger/10"
                           : "border-subtle bg-muted/35 hover:bg-muted",
@@ -196,7 +196,7 @@ export function SalModal({
                             </div>
                             <div className="flex gap-1">
                               <button
-                                className="flex size-8 items-center justify-center rounded-[12px] text-secondary hover:bg-muted hover:text-foreground"
+                                className="flex size-8 items-center justify-center rounded-lg text-secondary hover:bg-muted hover:text-foreground"
                                 onClick={() => setEditingSal(sal.id)}
                                 title="Modifica"
                                 type="button"
@@ -204,7 +204,7 @@ export function SalModal({
                                 <Pencil className="size-4" />
                               </button>
                               <button
-                                className="flex size-8 items-center justify-center rounded-[12px] text-secondary hover:bg-muted hover:text-danger"
+                                className="flex size-8 items-center justify-center rounded-lg text-secondary hover:bg-muted hover:text-danger"
                                 onClick={() => setDeletingSal(sal.id)}
                                 title="Elimina"
                                 type="button"
@@ -214,7 +214,7 @@ export function SalModal({
                             </div>
                           </div>
                           {isEditing || sal.status === "draft" ? (
-                            <div className="mt-4 overflow-hidden rounded-[14px] border border-subtle bg-card">
+                            <div className="mt-4 overflow-hidden rounded-14px border border-subtle bg-card">
                               {sal.lines.length > 0 ? (
                                 sal.lines.map((line) => {
                                   const voice = voiceIndex.get(line.voiceId);
@@ -233,7 +233,7 @@ export function SalModal({
                                         </div>
                                       </div>
                                       <input
-                                        className="h-10 rounded-[12px] border border-subtle bg-card px-3 text-sm"
+                                        className="h-10 rounded-lg border border-subtle bg-card px-3 text-sm"
                                         min={0}
                                         onChange={(event) =>
                                           onUpdateQuantity(
@@ -246,7 +246,7 @@ export function SalModal({
                                         value={line.quantity}
                                       />
                                       <select
-                                        className="h-10 rounded-[12px] border border-subtle bg-card px-3 text-sm"
+                                        className="h-10 rounded-lg border border-subtle bg-card px-3 text-sm"
                                         onChange={(event) =>
                                           onUpdateSurcharge(
                                             sal.id,

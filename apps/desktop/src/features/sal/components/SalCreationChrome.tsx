@@ -30,7 +30,7 @@ export function SalWorkflowTopbar({
         <div className="flex flex-wrap items-center justify-end gap-2">
           {canGoBack ? (
             <motion.button
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-12px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
               onClick={onBack}
               type="button"
               transition={{ duration: 0.42, ease: SOFT_EASE }}
@@ -40,7 +40,7 @@ export function SalWorkflowTopbar({
             </motion.button>
           ) : null}
           <motion.button
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-12px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
             onClick={onDraft}
             type="button"
             transition={{ duration: 0.42, ease: SOFT_EASE }}
@@ -50,7 +50,7 @@ export function SalWorkflowTopbar({
           </motion.button>
           {showPrimary ? (
             <motion.button
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-semibold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-semibold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
               onClick={onPrimary}
               type="button"
               transition={{ duration: 0.42, ease: SOFT_EASE }}
@@ -89,40 +89,38 @@ export function SalHero({
           <span className="flex size-8 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
             <Icon className="size-4" />
           </span>
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-2.5 py-0.5 text-9px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             Passo {step} di 5
           </span>
         </div>
-        <h2 className="mt-3 text-[24px] font-semibold leading-[1.05] text-[var(--text-primary)] md:text-[32px]">
+        <h2 className="mt-3 text-24px font-semibold leading-1_05 text-[var(--text-primary)] md:text-32px">
           {title}
         </h2>
-        <p className="mt-2 max-w-xl text-[13px] leading-5 text-[var(--text-secondary)]">
-          {subtitle}
-        </p>
+        <p className="mt-2 max-w-xl text-13px leading-5 text-[var(--text-secondary)]">{subtitle}</p>
       </div>
       <BezelSurface className="self-start md:translate-y-1" innerClassName="p-0">
         <div className="grid min-w-0 grid-cols-3 divide-x divide-[var(--border-subtle)]/60">
           <div className="flex flex-col items-center gap-0.5 px-3 py-3">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+            <span className="text-9px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
               Progetto
             </span>
-            <span className="truncate text-[12px] font-semibold text-[var(--text-primary)]">
+            <span className="truncate text-12px font-semibold text-[var(--text-primary)]">
               {projectTitle ?? "-"}
             </span>
           </div>
           <div className="flex flex-col items-center gap-0.5 px-3 py-3">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+            <span className="text-9px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
               Anno
             </span>
-            <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+            <span className="text-12px font-semibold text-[var(--text-primary)]">
               {tariffYear ?? "-"}
             </span>
           </div>
           <div className="flex flex-col items-center gap-0.5 px-3 py-3">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+            <span className="text-9px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
               Stato
             </span>
-            <span className="inline-flex rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--info-base)]">
+            <span className="inline-flex rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-10px font-semibold text-[var(--info-base)]">
               {statusLabel}
             </span>
           </div>
@@ -217,14 +215,14 @@ export function SalStepper({
                       <Check className="size-5" strokeWidth={2.5} />
                     </motion.div>
                   ) : (
-                    <span className="text-[13px] font-bold">{index + 1}</span>
+                    <span className="text-13px font-bold">{index + 1}</span>
                   )}
                 </motion.div>
               </div>
               <div className="mt-3 flex flex-col items-center gap-0.5 text-center">
                 <motion.span
                   className={cn(
-                    "text-[12px] font-semibold",
+                    "text-12px font-semibold",
                     isCompleted && "text-[var(--accent-primary)]",
                     isCurrent && "text-[var(--text-primary)]",
                     isBlocked && "text-[var(--warning-base)]",
@@ -236,7 +234,7 @@ export function SalStepper({
                 >
                   {stage.label}
                 </motion.span>
-                <span className="hidden max-w-[120px] text-[10px] font-medium text-[var(--text-secondary)] md:block">
+                <span className="hidden max-w-[120px] text-10px font-medium text-[var(--text-secondary)] md:block">
                   {stage.description}
                 </span>
               </div>
@@ -262,10 +260,10 @@ export function SalCard({
   return (
     <BezelSurface innerClassName={cn("p-3 md:p-4", className)}>
       <div className="mb-3 flex items-center gap-2">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[var(--info-soft)] text-[var(--info-base)]">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-10px bg-[var(--info-soft)] text-[var(--info-base)]">
           <Icon className="size-4" />
         </div>
-        <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h2>
+        <h2 className="text-14px font-semibold text-[var(--text-primary)]">{title}</h2>
       </div>
       {children}
     </BezelSurface>

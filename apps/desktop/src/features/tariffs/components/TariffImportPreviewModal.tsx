@@ -586,7 +586,7 @@ export function TariffImportPreviewModal({
         </div>
 
         {!hasVoices ? (
-          <div className="mt-4 rounded-[20px] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
+          <div className="mt-4 rounded-2xl bg-[var(--warning-soft)] px-4 py-3 text-13px font-semibold text-[var(--warning-base)]">
             Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento contenga
             codici, unita di misura e prezzi leggibili.
           </div>
@@ -618,23 +618,23 @@ export function TariffImportPreviewModal({
         exit={{ opacity: 0 }}
       />
       <motion.div
-        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: SPRING_EASE }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
       >
-        <div className="flex min-h-0 flex-col rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+        <div className="flex min-h-0 flex-col rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
             <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+              <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                 Preview importazione
               </div>
-              <h3 className="mt-2 text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)] md:text-[30px]">
+              <h3 className="mt-2 text-24px font-semibold leading-1_05 tracking-neg-0_035em text-[var(--text-primary)] md:text-30px">
                 {metadatas.length > 1
                   ? `${metadatas.length} tariffari da importare`
                   : (activeMetadata?.name ?? "Preview importazione")}
               </h3>
-              <p className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
+              <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
                 Controlla i dati estratti prima di confermarli nel catalogo.
               </p>
             </div>
@@ -652,10 +652,10 @@ export function TariffImportPreviewModal({
           {metadatas.length > 1 ? (
             <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/25 px-5 py-3">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                <div className="text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
                   File import
                 </div>
-                <div className="text-[12px] font-semibold text-[var(--text-secondary)]">
+                <div className="text-12px font-semibold text-[var(--text-secondary)]">
                   {metadatas.length}/{metadatas.length} in revisione
                 </div>
               </div>
@@ -669,7 +669,7 @@ export function TariffImportPreviewModal({
                   return (
                     <motion.button
                       className={cn(
-                        "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[12px] font-semibold transition-all duration-200",
+                        "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-12px font-semibold transition-all duration-200",
                         i === localActiveIndex
                           ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
                           : draftedFiles.has(i)
@@ -694,11 +694,11 @@ export function TariffImportPreviewModal({
                       ) : null}
                       <span className="min-w-0 truncate">{meta.name}</span>
                       {draftedFiles.has(i) ? (
-                        <span className="shrink-0 rounded-full bg-[var(--warning-base)]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--warning-base)]">
+                        <span className="shrink-0 rounded-full bg-[var(--warning-base)]/15 px-1.5 py-0.5 text-9px font-bold uppercase tracking-wider text-[var(--warning-base)]">
                           Bozza
                         </span>
                       ) : isReviewed ? (
-                        <span className="shrink-0 rounded-full bg-[var(--success-base)]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--success-base)]">
+                        <span className="shrink-0 rounded-full bg-[var(--success-base)]/15 px-1.5 py-0.5 text-9px font-bold uppercase tracking-wider text-[var(--success-base)]">
                           Rev.
                         </span>
                       ) : null}
@@ -754,7 +754,7 @@ export function TariffImportPreviewModal({
               </div>
 
               {!hasVoices ? (
-                <div className="mt-4 rounded-[20px] bg-[var(--warning-soft)] px-4 py-3 text-[13px] font-semibold text-[var(--warning-base)]">
+                <div className="mt-4 rounded-2xl bg-[var(--warning-soft)] px-4 py-3 text-13px font-semibold text-[var(--warning-base)]">
                   Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento
                   contenga codici, unita di misura e prezzi leggibili.
                 </div>
@@ -808,7 +808,7 @@ export function TariffImportPreviewModal({
                 </ProjectControlButton>
               ) : null}
               {metadatas.length > 1 && (modalReviewedFiles.size > 0 || draftedFiles.size > 0) ? (
-                <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+                <span className="text-12px font-medium text-[var(--text-secondary)]">
                   <span className="text-[var(--success-base)]">{modalReviewedFiles.size}</span>/
                   {metadatas.length} revisionati{" "}
                   <span className="text-[var(--warning-base)]">{draftedFiles.size}</span>/
@@ -887,7 +887,7 @@ function TariffImportReviewInspector({
   if (variant === "page") {
     return (
       <aside className="fixed inset-x-4 bottom-4 z-20 xl:bottom-auto xl:left-auto xl:right-8 xl:top-[300px] xl:w-[336px]">
-        <div className="max-h-[58dvh] overflow-y-auto rounded-[22px] xl:max-h-[calc(100dvh-324px)]">
+        <div className="max-h-[58dvh] overflow-y-auto rounded-22px xl:max-h-[calc(100dvh-324px)]">
           {body}
         </div>
       </aside>
@@ -931,8 +931,8 @@ function InspectorContent({
   sections: TariffGridSectionSummary[];
 }) {
   return (
-    <div className="rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_16%,transparent)]">
-      <div className="rounded-[18px] bg-[var(--surface-base)] p-3">
+    <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_16%,transparent)]">
+      <div className="rounded-18px bg-[var(--surface-base)] p-3">
         <InspectorHeader
           completionPercent={completionPercent}
           isReviewReady={isReviewReady}
@@ -944,7 +944,7 @@ function InspectorContent({
           onTabChange={onTabChange}
           sectionsCount={sections.length}
         />
-        <div className="mt-3 text-[12px] font-semibold text-[var(--text-primary)]">
+        <div className="mt-3 text-12px font-semibold text-[var(--text-primary)]">
           {activeTab === "checks"
             ? "Stato import e controlli"
             : activeTab === "categories"
@@ -992,16 +992,16 @@ function InspectorHeader({
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+        <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
           Revisione import
         </div>
-        <div className="mt-1 truncate text-[14px] font-bold text-[var(--text-primary)]">
+        <div className="mt-1 truncate text-14px font-bold text-[var(--text-primary)]">
           {isReviewReady ? "Import pronto" : `${issueCount.toLocaleString("it-IT")} interventi`}
         </div>
       </div>
       <span
         className={cn(
-          "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold",
+          "shrink-0 rounded-full px-2.5 py-1 text-11px font-bold",
           isReviewReady
             ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
             : "bg-[var(--warning-base)] text-[var(--text-inverse)]",
@@ -1025,7 +1025,7 @@ function InspectorTabs({
   sectionsCount: number;
 }) {
   return (
-    <div className="mt-3 grid grid-cols-3 gap-1 rounded-[14px] bg-[var(--bg-muted)] p-1">
+    <div className="mt-3 grid grid-cols-3 gap-1 rounded-14px bg-[var(--bg-muted)] p-1">
       <InspectorTabButton
         active={activeTab === "checks"}
         count={undefined}
@@ -1067,7 +1067,7 @@ function InspectorTabButton({
   return (
     <button
       className={cn(
-        "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-[11px] px-2 text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
+        "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-11px px-2 text-11px font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
         active
           ? "bg-[var(--surface-base)] text-[var(--text-primary)] shadow-sm"
           : "text-[var(--text-secondary)] hover:bg-[var(--surface-base)]/65",
@@ -1078,7 +1078,7 @@ function InspectorTabButton({
       <Icon className="size-3.5 shrink-0" />
       <span className="truncate">{label}</span>
       {typeof count === "number" ? (
-        <span className="rounded-full bg-[var(--bg-muted-strong)] px-1.5 py-0.5 text-[10px] tabular-nums">
+        <span className="rounded-full bg-[var(--bg-muted-strong)] px-1.5 py-0.5 text-10px tabular-nums">
           {count.toLocaleString("it-IT")}
         </span>
       ) : null}
@@ -1098,35 +1098,35 @@ function CategoryJumpPanel({
   return (
     <div
       className={cn(
-        "rounded-[18px] bg-[var(--surface-base)] p-3 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
+        "rounded-18px bg-[var(--surface-base)] p-3 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
         !compact &&
           "shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_16%,transparent)]",
       )}
     >
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+        <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
           Indice categorie
         </div>
-        <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
+        <span className="text-11px font-semibold text-[var(--text-secondary)]">
           {sections.length}
         </span>
       </div>
       <div className={cn("space-y-1 overflow-y-auto pr-1", compact ? "max-h-[34dvh]" : "max-h-56")}>
         {sections.map((section) => (
           <button
-            className="flex w-full items-center gap-2 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
             key={section.id}
             onClick={() => document.getElementById(section.id)?.scrollIntoView({ block: "start" })}
             type="button"
           >
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-[11px] font-bold text-[var(--accent-primary)]">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-11px font-bold text-[var(--accent-primary)]">
               {section.categoria || "-"}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12px] font-bold text-[var(--text-primary)]">
+              <span className="block truncate text-12px font-bold text-[var(--text-primary)]">
                 Categoria {section.categoria || "Altre"}
               </span>
-              <span className="block text-[11px] font-medium text-[var(--text-secondary)]">
+              <span className="block text-11px font-medium text-[var(--text-secondary)]">
                 {section.groupsCount} gruppi · {section.rowsCount.toLocaleString("it-IT")} righe
               </span>
             </span>
@@ -1167,7 +1167,7 @@ function InterventionPanel({
   return (
     <div
       className={cn(
-        "rounded-[18px] p-4 text-[12px] font-medium leading-5 ring-1",
+        "rounded-18px p-4 text-12px font-medium leading-5 ring-1",
         !compact &&
           "shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_12%,transparent)]",
         hasBlockingIssues
@@ -1184,7 +1184,7 @@ function InterventionPanel({
           )}
           Gestione anomalie
         </div>
-        <span className="rounded-full bg-[var(--surface-base)]/70 px-2 py-0.5 text-[11px] font-bold tabular-nums">
+        <span className="rounded-full bg-[var(--surface-base)]/70 px-2 py-0.5 text-11px font-bold tabular-nums">
           {activeValidation.warningCount}
         </span>
       </div>
@@ -1214,8 +1214,8 @@ function InterventionPanel({
       </div>
 
       {activeValidation.duplicateExamples.length > 0 ? (
-        <div className="mt-3 rounded-[12px] bg-[var(--surface-base)]/65 px-3 py-2">
-          <div className="text-[10px] font-bold uppercase tracking-[0.12em] opacity-75">
+        <div className="mt-3 rounded-lg bg-[var(--surface-base)]/65 px-3 py-2">
+          <div className="text-10px font-bold uppercase tracking-caption opacity-75">
             Duplicati principali
           </div>
           <div className="mt-1 font-bold">{activeValidation.duplicateExamples.join(", ")}</div>
@@ -1224,13 +1224,13 @@ function InterventionPanel({
 
       {invalidRows.length > 0 ? (
         <div className="mt-3">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] opacity-75">
+          <div className="mb-2 text-10px font-bold uppercase tracking-caption opacity-75">
             Vai alla correzione
           </div>
           <div className="flex flex-wrap gap-2">
             {invalidRows.map((row) => (
               <motion.button
-                className="rounded-full bg-[var(--warning-base)]/15 px-3 py-1 text-[11px] font-bold transition-colors hover:bg-[var(--warning-base)]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+                className="rounded-full bg-[var(--warning-base)]/15 px-3 py-1 text-11px font-bold transition-colors hover:bg-[var(--warning-base)]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
                 key={`${row.index}-${row.field}`}
                 onClick={() => onFocusCell(row.index, row.field)}
                 type="button"
@@ -1248,7 +1248,7 @@ function InterventionPanel({
 
 function IssueLine({ count, label, ok }: { count: number; label: string; ok: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[12px] bg-[var(--surface-base)]/55 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-base)]/55 px-3 py-2">
       <span className="flex min-w-0 items-center gap-2">
         {ok ? (
           <CheckCircle2 className="size-3.5 shrink-0" />
@@ -1282,7 +1282,7 @@ function ControlPanel({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
+        "overflow-hidden rounded-18px bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
         !compact &&
           "shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_16%,transparent)]",
       )}
@@ -1297,17 +1297,17 @@ function ControlPanel({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+            <div className="flex items-center gap-2 text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
               <ListChecks className="size-3.5" />
               Centro controllo
             </div>
-            <div className="mt-2 text-[15px] font-bold leading-tight text-[var(--text-primary)]">
+            <div className="mt-2 text-15px font-bold leading-tight text-[var(--text-primary)]">
               {isReviewReady ? "Import pronto" : "Verifiche richieste"}
             </div>
           </div>
           <span
             className={cn(
-              "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold",
+              "shrink-0 rounded-full px-2.5 py-1 text-11px font-bold",
               isReviewReady
                 ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
                 : "bg-[var(--warning-base)] text-[var(--text-inverse)]",
@@ -1336,7 +1336,7 @@ function ControlPanel({
         />
       </div>
       <div className="space-y-4 p-4">
-        <div className="space-y-2 text-[12px] font-medium text-[var(--text-secondary)]">
+        <div className="space-y-2 text-12px font-medium text-[var(--text-secondary)]">
           <ValidationLine ok={hasVoices} text="Voci prezzo rilevate" />
           <ValidationLine
             ok={activeValidation.invalidCount === 0}
@@ -1379,16 +1379,16 @@ function DeleteVoiceDialog({
         onClick={onCancel}
         type="button"
       />
-      <div className="relative w-full max-w-md rounded-[22px] bg-[var(--surface-base)] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] ring-1 ring-[var(--border-subtle)]">
+      <div className="relative w-full max-w-md rounded-22px bg-[var(--surface-base)] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] ring-1 ring-[var(--border-subtle)]">
         <div className="flex items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
             <Trash2 className="size-5" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-[18px] font-bold leading-tight text-[var(--text-primary)]">
+            <h3 className="text-18px font-bold leading-tight text-[var(--text-primary)]">
               Eliminare questa voce?
             </h3>
-            <p className="mt-2 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+            <p className="mt-2 text-13px font-medium leading-5 text-[var(--text-secondary)]">
               {code}
               {description ? ` - ${description}` : ""}
             </p>
@@ -1418,12 +1418,12 @@ function ControlStat({
 }) {
   return (
     <div className="px-3 py-3">
-      <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+      <div className="text-9px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
         {label}
       </div>
       <div
         className={cn(
-          "mt-1 text-[18px] font-bold leading-none tabular-nums",
+          "mt-1 text-18px font-bold leading-none tabular-nums",
           tone === "success" && "text-[var(--success-base)]",
           tone === "warning" && "text-[var(--warning-base)]",
           tone === "neutral" && "text-[var(--text-primary)]",

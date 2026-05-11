@@ -10,10 +10,10 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
 
   return (
     <div className="fixed inset-0 z-[82] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
-      <div className="relative w-full max-w-lg rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
-        <div className="rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-6 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+      <div className="relative w-full max-w-lg rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
+        <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-6 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-start gap-4">
-            <div className="relative flex size-14 shrink-0 items-center justify-center rounded-[18px] bg-[var(--info-soft)] text-[var(--info-base)]">
+            <div className="relative flex size-14 shrink-0 items-center justify-center rounded-18px bg-[var(--info-soft)] text-[var(--info-base)]">
               <FileText className="size-6" />
               <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-[var(--surface-base)] text-[var(--accent-primary)]">
                 <ScanLine className="size-3 animate-pulse" />
@@ -21,14 +21,14 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-3">
-                <h3 className="text-[24px] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--text-primary)]">
+                <h3 className="text-24px font-semibold leading-1_05 tracking-neg-0_035em text-[var(--text-primary)]">
                   Importazione tariffari
                 </h3>
-                <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-[var(--accent-primary)]/10 px-3 text-[12px] font-bold text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]/20">
+                <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-[var(--accent-primary)]/10 px-3 text-12px font-bold text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]/20">
                   {completedCount}/{total}
                 </span>
               </div>
-              <p className="mt-1.5 text-[13px] font-medium leading-5 text-[var(--text-secondary)]">
+              <p className="mt-1.5 text-13px font-medium leading-5 text-[var(--text-secondary)]">
                 {total === 0
                   ? "In attesa dei file PDF..."
                   : processingCount > 0
@@ -43,7 +43,7 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
           <div className="mt-6 max-h-[50vh] space-y-2 overflow-y-auto pr-1">
             {files.map((file) => (
               <div
-                className="flex items-center gap-3 rounded-[14px] bg-[var(--bg-muted)]/60 px-4 py-3"
+                className="flex items-center gap-3 rounded-14px bg-[var(--bg-muted)]/60 px-4 py-3"
                 key={file.index}
               >
                 {file.status === "processing" ? (
@@ -56,15 +56,15 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
                   <div className="size-5 shrink-0 rounded-full border-2 border-[var(--border-subtle)]" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                  <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
                     {file.fileName}
                   </div>
                   {file.status === "error" && file.error ? (
-                    <div className="mt-0.5 truncate text-[11px] font-medium text-[var(--danger-base)]">
+                    <div className="mt-0.5 truncate text-11px font-medium text-[var(--danger-base)]">
                       {file.error}
                     </div>
                   ) : (
-                    <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                    <div className="mt-0.5 text-11px font-medium text-[var(--text-secondary)]">
                       {file.status === "pending"
                         ? "In attesa"
                         : file.status === "processing"

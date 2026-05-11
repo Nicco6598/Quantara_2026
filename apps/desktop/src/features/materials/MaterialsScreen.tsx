@@ -1,8 +1,10 @@
+import { motion } from "framer-motion";
 import {
   AlertTriangle,
   Bell,
   type LucideIcon,
   Package,
+  PackagePlus,
   Plus,
   ShieldCheck,
   ShoppingCart,
@@ -12,8 +14,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch } from "@/components/filters";
+import { BUTTER_EASE } from "@/components/shared/easings";
 import { ScreenHero } from "@/components/shared/ScreenHero";
+import { StatusPill } from "@/components/shared/StatusPill";
+import { SeverityBar } from "@/components/shared/SeverityBar";
 import { useToast } from "@/components/shared/ToastProvider";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 import {
   type DesktopMaterial,
@@ -33,6 +39,15 @@ const categoryColorMap: Record<string, CategoryTone> = {
   Impianti: "green",
 };
 
+const categoryToneLabel: Record<CategoryTone, string> = {
+  blue: "bg-[var(--info-soft)] text-[var(--info-base)]",
+  green: "bg-[var(--success-soft)] text-[var(--success-base)]",
+  orange: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+  purple: "bg-[var(--bg-muted-strong)] text-[var(--accent-secondary)]",
+};
+
+const CATEGORIES = ["Armamento", "Sottofondo", "Opere civili", "Impianti"];
+
 function toneForQuantity(quantity: number, minQuantity: number): StockTone {
   if (quantity === 0) return "danger";
   if (quantity < minQuantity) return "warning";
@@ -51,6 +66,7 @@ export function MaterialsScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -139,19 +155,26 @@ export function MaterialsScreen() {
   const handleDelete = useCallback(
     async (materialId: string) => {
       try {
+        const mat = materials.find((m) => m.id === materialId);
         await deleteDesktopMaterial(materialId);
         dispatchDataChanged();
         setSelectedMaterialId((current) => (current === materialId ? null : current));
-        notify({ message: "Materiale eliminato.", title: "Eliminato", tone: "success" });
+        notify({
+          message: `${mat?.description ?? "Materiale"} eliminato.`,
+          title: "Eliminato",
+          tone: "success",
+        });
       } catch (error) {
         notify({
           message: error instanceof Error ? error.message : String(error),
           title: "Eliminazione non riuscita",
           tone: "danger",
         });
+      } finally {
+        setDeleteConfirmId(null);
       }
     },
-    [notify],
+    [materials, notify],
   );
 
   return (
@@ -165,16 +188,18 @@ export function MaterialsScreen() {
         sidePanel={
           <div>
             <div className="flex items-center justify-between">
-              <PanelTitle>Categorie</PanelTitle>
+              <span className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
+                Categorie
+              </span>
             </div>
             <div className="mt-3 space-y-1.5">
               {categories.names.map((cat) => {
                 const count =
                   cat === "Tutti" ? materials.length : (categories.counts.get(cat) ?? 0);
                 return (
-                  <button
+                  <motion.button
                     className={cn(
-                      "flex w-full items-center justify-between rounded-[12px] px-3 py-2 text-left text-[13px] font-semibold transition-colors",
+                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-13px font-semibold transition-colors",
                       selectedCategory === cat || (!selectedCategory && cat === "Tutti")
                         ? "bg-[var(--info-soft)] text-[var(--info-base)]"
                         : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
@@ -182,12 +207,13 @@ export function MaterialsScreen() {
                     key={cat}
                     onClick={() => setSelectedCategory(cat === "Tutti" ? null : cat)}
                     type="button"
+                    whileTap={{ scale: 0.98 }}
                   >
                     <span>{cat}</span>
-                    <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+                    <span className="text-11px font-medium text-[var(--text-secondary)]">
                       {count}
                     </span>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -197,7 +223,6 @@ export function MaterialsScreen() {
         <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             caption="Quantità totale in magazzino"
-            delta={`${materials.length} materiali`}
             icon={Warehouse}
             label="Valore stock"
             tone="blue"
@@ -205,7 +230,6 @@ export function MaterialsScreen() {
           />
           <MetricCard
             caption="Sotto la soglia minima"
-            delta={`${metrics.zero} esauriti`}
             icon={AlertTriangle}
             label="Critici"
             tone="danger"
@@ -228,9 +252,113 @@ export function MaterialsScreen() {
         </div>
       </ScreenHero>
 
-      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Panel className="min-w-0 p-0">
+      <section className="mt-8 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="space-y-4 xl:self-start">
+          <Panel>
+            <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              Azioni rapide
+            </span>
+            <div className="mt-4 space-y-3">
+              <QuickAction
+                detail="Aggiungi un nuovo materiale al catalogo"
+                icon={PackagePlus}
+                label="Carica materiale"
+                onClick={() => setIsCreateModalOpen(true)}
+                tone="info"
+              />
+              <QuickAction
+                detail="Crea un ordine per i materiali selezionati"
+                icon={ShoppingCart}
+                label="Crea ordine"
+                onClick={() =>
+                  notify({
+                    message: "La creazione ordini sarà disponibile in un prossimo aggiornamento.",
+                    title: "In arrivo",
+                    tone: "info",
+                  })
+                }
+                tone="success"
+              />
+              <QuickAction
+                detail={`${String(metrics.critical)} materiali sotto soglia minima`}
+                icon={AlertTriangle}
+                label="Revisiona critici"
+                onClick={() => setSelectedCategory(null)}
+                tone="warning"
+              />
+            </div>
+          </Panel>
+
+          {selectedMaterial ? (
+            <MaterialDetail material={selectedMaterial} />
+          ) : (
+            <Panel>
+              <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                Dettaglio materiale
+              </span>
+              <div className="mt-6 text-center text-13px font-medium text-[var(--text-secondary)]">
+                Seleziona un materiale per vedere dettagli e movimenti
+              </div>
+            </Panel>
+          )}
+        </aside>
+
+        <Panel className="min-w-0 overflow-visible p-0">
           <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className={cn(
+                  "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
+                  !selectedCategory
+                    ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                    : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                )}
+                onClick={() => setSelectedCategory(null)}
+                type="button"
+              >
+                Tutti i materiali
+                <span
+                  className={cn(
+                    "ml-2 rounded-full px-2 py-0.5 text-11px font-bold",
+                    !selectedCategory
+                      ? "bg-white/20"
+                      : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
+                  )}
+                >
+                  {materials.length}
+                </span>
+              </button>
+              {CATEGORIES.map((cat) => {
+                const count = categories.counts.get(cat) ?? 0;
+                if (count === 0) return null;
+                return (
+                  <button
+                    className={cn(
+                      "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
+                      selectedCategory === cat
+                        ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                        : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                    )}
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    type="button"
+                  >
+                    {cat}
+                    <span
+                      className={cn(
+                        "ml-2 rounded-full px-2 py-0.5 text-11px font-bold",
+                        selectedCategory === cat
+                          ? "bg-white/20"
+                          : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <FilterSearch
                 onChange={setSearchQuery}
@@ -245,112 +373,58 @@ export function MaterialsScreen() {
                   }}
                 />
               ) : null}
+              <ProjectControlButton
+                icon={Plus}
+                onClick={() => setIsCreateModalOpen(true)}
+                variant="primary"
+              >
+                Nuovo materiale
+              </ProjectControlButton>
             </div>
-
-            <ProjectControlButton
-              icon={Plus}
-              onClick={() => setIsCreateModalOpen(true)}
-              variant="primary"
-            >
-              Nuovo materiale
-            </ProjectControlButton>
           </div>
 
-          {/* --- Desktop table view --- */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full border-collapse text-left text-[12px]">
-              <thead className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                <tr className="border-b border-[var(--border-subtle)]">
-                  <th className="px-3 py-2 text-[10px]">Materiale</th>
-                  <th className="px-3 py-2 text-[10px]">Categoria</th>
-                  <th className="px-3 py-2 text-[10px]">Stock</th>
-                  <th className="px-3 py-2 text-[10px]">Soglia min</th>
-                  <th className="px-3 py-2 text-[10px]">Cop.</th>
-                  <th className="px-3 py-2 text-[10px]">Stato</th>
-                  <th className="w-8 px-2 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMaterials.map((mat) => (
-                  <MaterialTableRow
-                    isSelected={mat.id === selectedMaterialId}
-                    key={mat.id}
-                    material={mat}
-                    onDelete={handleDelete}
-                    onSelect={() =>
-                      setSelectedMaterialId(mat.id === selectedMaterialId ? null : mat.id)
-                    }
-                  />
-                ))}
-                {filteredMaterials.length === 0 && (
-                  <tr>
-                    <td
-                      className="px-3 py-8 text-center text-[13px] text-[var(--text-secondary)]"
-                      colSpan={7}
-                    >
-                      Nessun materiale trovato
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* --- Mobile card view --- */}
-          <div className="divide-y divide-[var(--border-subtle)] sm:hidden">
-            {filteredMaterials.map((mat) => (
-              <MobileMaterialCard
-                key={mat.id}
-                material={mat}
-                onDelete={handleDelete}
-                onSelect={() =>
-                  setSelectedMaterialId(mat.id === selectedMaterialId ? null : mat.id)
-                }
-                isSelected={mat.id === selectedMaterialId}
-              />
-            ))}
-            {filteredMaterials.length === 0 && (
-              <div className="px-3 py-8 text-center text-[13px] text-[var(--text-secondary)]">
-                Nessun materiale trovato
+          {/* Compact list */}
+          <div className="space-y-3 p-4">
+            {filteredMaterials.length > 0 ? (
+              filteredMaterials.map((mat) => (
+                <MaterialCard
+                  key={mat.id}
+                  isSelected={mat.id === selectedMaterialId}
+                  material={mat}
+                  onDelete={() => setDeleteConfirmId(mat.id)}
+                  onSelect={() =>
+                    setSelectedMaterialId(mat.id === selectedMaterialId ? null : mat.id)
+                  }
+                />
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 p-8 text-center">
+                <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+                  <Package className="size-4" />
+                </div>
+                <div className="mt-3 text-14px font-bold text-[var(--text-primary)]">
+                  Nessun materiale trovato
+                </div>
+                <p className="mx-auto mt-1 max-w-[320px] text-12px font-medium text-[var(--text-secondary)]">
+                  Modifica i filtri o{" "}
+                  <button
+                    className="font-semibold text-[var(--accent-primary)] underline underline-offset-2 hover:no-underline"
+                    onClick={() => setIsCreateModalOpen(true)}
+                    type="button"
+                  >
+                    crea un nuovo materiale
+                  </button>
+                </p>
               </div>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] px-3 py-2">
-            <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+          <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-3">
+            <span className="text-11px font-medium text-[var(--text-secondary)]">
               {filteredMaterials.length} di {materials.length} materiali
             </span>
           </div>
         </Panel>
-
-        <aside className="space-y-4">
-          {selectedMaterial ? (
-            <MaterialDetail material={selectedMaterial} />
-          ) : (
-            <Panel>
-              <PanelTitle>Dettaglio materiale</PanelTitle>
-              <div className="mt-6 text-center text-[13px] text-[var(--text-secondary)]">
-                Seleziona un materiale per vedere dettagli e movimenti
-              </div>
-            </Panel>
-          )}
-
-          <Panel>
-            <PanelTitle>Azioni rapide</PanelTitle>
-            <div className="mt-4 grid gap-2">
-              <ProjectControlButton
-                icon={Plus}
-                onClick={() => setIsCreateModalOpen(true)}
-                variant="neutral"
-              >
-                Carica nuovo materiale
-              </ProjectControlButton>
-              <ProjectControlButton icon={ShoppingCart} variant="primary">
-                Crea ordine materiale
-              </ProjectControlButton>
-            </div>
-          </Panel>
-        </aside>
       </section>
 
       <AddMaterialModal
@@ -358,11 +432,23 @@ export function MaterialsScreen() {
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={loadMaterials}
       />
+
+      <ConfirmDialog
+        confirmLabel="Elimina"
+        isOpen={deleteConfirmId !== null}
+        onCancel={() => setDeleteConfirmId(null)}
+        onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+        title="Eliminare questo materiale?"
+        tone="danger"
+      >
+        Questa azione è irreversibile. Il materiale verrà rimosso dal catalogo e non sarà più
+        disponibile per nuovi utilizzi.
+      </ConfirmDialog>
     </main>
   );
 }
 
-function MaterialTableRow({
+function MaterialCard({
   isSelected,
   material,
   onDelete,
@@ -378,137 +464,124 @@ function MaterialTableRow({
     material.minQuantity > 0
       ? Math.min(100, Math.round((material.quantity / material.minQuantity) * 100))
       : 100;
+  const catTone = categoryColorMap[material.category] ?? "blue";
 
   return (
-    <tr
+    <motion.article
       className={cn(
-        "border-b border-[var(--border-subtle)] text-[13px] transition-colors hover:bg-[var(--bg-muted)] cursor-pointer",
-        isSelected && "bg-[var(--info-soft)]/45",
+        "relative rounded-10px border px-3 py-2.5 text-left transition-colors duration-200",
+        isSelected
+          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_8px_24px_-20px_var(--accent-primary)]"
+          : "border-[var(--border-subtle)]/60 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
       )}
-      onClick={onSelect}
+      initial={{ opacity: 0, y: 6 }}
+      transition={{ duration: 0.32, ease: BUTTER_EASE }}
+      viewport={{ amount: 0.18, once: true }}
+      whileInView={{ opacity: 1, y: 0 }}
     >
-      <td className="px-3 py-2">
-        <div className="flex min-w-0 items-center gap-3">
-          <MaterialIcon tone={categoryColorMap[material.category] ?? "blue"} />
-          <div className="min-w-0">
-            <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+      <button
+        className="flex w-full items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+        onClick={onSelect}
+        type="button"
+      >
+        <MaterialIcon tone={catTone} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-13px font-bold text-[var(--text-primary)]">
               {material.code}
-            </div>
-            <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+            </span>
+            <span className="shrink-0 text-11px font-medium text-[var(--text-secondary)]">
               {material.description}
-            </div>
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-11px font-medium text-[var(--text-secondary)]">
+            <span className="inline-flex items-center gap-1">
+              <span className="text-10px text-[var(--text-tertiary)]">Stock</span>
+              <span
+                className={cn(
+                  "font-semibold",
+                  tone === "danger"
+                    ? "text-[var(--danger-base)]"
+                    : tone === "warning"
+                      ? "text-[var(--warning-base)]"
+                      : "text-[var(--text-primary)]",
+                )}
+              >
+                {formatQuantity(material.quantity, material.unit)}
+              </span>
+            </span>
+            <span className="text-[var(--border-subtle)]">|</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="text-10px text-[var(--text-tertiary)]">Soglia</span>
+              <span className="font-semibold text-[var(--text-primary)]">
+                {formatQuantity(material.minQuantity, material.unit)}
+              </span>
+            </span>
+            <span className="text-[var(--border-subtle)]">|</span>
+            <span className="rounded-sm bg-[var(--bg-muted)] px-1.5 py-0.5 text-10px font-bold text-[var(--text-secondary)]">
+              {material.category}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1 w-10 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
+                <span
+                  className={cn(
+                    "block h-full rounded-full",
+                    tone === "danger"
+                      ? "bg-[var(--danger-base)]"
+                      : tone === "warning"
+                        ? "bg-[var(--warning-base)]"
+                        : "bg-[var(--success-base)]",
+                  )}
+                  style={{ width: `${coverage}%` }}
+                />
+              </span>
+              <span
+                className={cn(
+                  "text-10px font-bold tabular-nums",
+                  tone === "danger"
+                    ? "text-[var(--danger-base)]"
+                    : tone === "warning"
+                      ? "text-[var(--warning-base)]"
+                      : "text-[var(--success-base)]",
+                )}
+              >
+                {coverage}%
+              </span>
+            </span>
           </div>
         </div>
-      </td>
-      <td className="px-3 py-2">
-        <CategoryPill category={material.category} />
-      </td>
-      <td className="px-3 py-2">
-        <div className="text-[13px] font-semibold text-[var(--text-primary)]">
-          {formatQuantity(material.quantity, material.unit)}
-        </div>
-        <div
-          className={cn(
-            "mt-1 text-[11px] font-bold",
-            tone === "danger" ? "text-[var(--danger-base)]" : "text-[var(--success-base)]",
-          )}
-        >
-          {material.quantity === 0
-            ? "Esaurito"
-            : material.quantity < material.minQuantity
-              ? "Sotto soglia"
-              : "Disponibile"}
-        </div>
-      </td>
-      <td className="px-3 py-2 text-[12px] font-medium text-[var(--text-primary)]">
-        {formatQuantity(material.minQuantity, material.unit)}
-      </td>
-      <td className="px-3 py-2">
-        <div className="text-[13px] font-semibold text-[var(--text-primary)]">{coverage}%</div>
-        <CoverageBar coverage={coverage} tone={tone} />
-      </td>
-      <td className="px-3 py-2">
-        <StatusPill tone={tone}>
-          {tone === "danger" ? "Critico" : tone === "warning" ? "Attenzione" : "OK"}
-        </StatusPill>
-      </td>
-      <td className="px-2 py-2 text-right text-[var(--text-secondary)]">
-        <button
-          aria-label={`Elimina ${material.code}`}
-          className="rounded-full p-1.5 transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--danger-base)]"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(material.id);
-          }}
-          type="button"
-        >
-          <Trash2 className="size-4" />
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-function MobileMaterialCard({
-  isSelected,
-  material,
-  onDelete,
-  onSelect,
-}: {
-  isSelected: boolean;
-  material: DesktopMaterial;
-  onDelete: (id: string) => void;
-  onSelect: () => void;
-}) {
-  const tone = toneForQuantity(material.quantity, material.minQuantity);
-  const coverage =
-    material.minQuantity > 0
-      ? Math.min(100, Math.round((material.quantity / material.minQuantity) * 100))
-      : 100;
-
-  return (
-    <button
-      type="button"
-      className={cn(
-        "flex w-full items-center gap-3 px-3 py-3 text-left transition-colors",
-        isSelected && "bg-[var(--info-soft)]/45",
-      )}
-      onClick={onSelect}
-    >
-      <MaterialIcon tone={categoryColorMap[material.category] ?? "blue"} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
-            {material.code}
-          </span>
+        <div className="flex shrink-0 items-center gap-1.5">
           <StatusPill tone={tone}>
             {tone === "danger" ? "Critico" : tone === "warning" ? "Attenzione" : "OK"}
           </StatusPill>
+          <button
+            aria-label={`Elimina ${material.code}`}
+            className="flex size-7 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-all hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(material.id);
+            }}
+            type="button"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
         </div>
-        <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
-          {material.description}
-        </div>
-        <div className="mt-1 flex items-center gap-3 text-[12px] text-[var(--text-secondary)]">
-          <span>{formatQuantity(material.quantity, material.unit)}</span>
-          <span>Soglia {formatQuantity(material.minQuantity, material.unit)}</span>
-          <span>{coverage}% cop.</span>
-        </div>
-        <div className="mt-1.5">
-          <CoverageBar coverage={coverage} tone={tone} />
-        </div>
-      </div>
-      <button
-        aria-label={`Elimina ${material.code}`}
-        className="shrink-0 rounded-full p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--danger-base)]"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(material.id);
-        }}
-        type="button"
-      >
-        <Trash2 className="size-4" />
       </button>
-    </button>
+      {isSelected ? (
+        <span className="absolute bottom-2 right-3 flex size-4 shrink-0 items-center justify-center rounded-[3px] bg-[var(--accent-primary)] text-white">
+          <svg
+            aria-hidden={true}
+            className="size-3"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={4}
+          >
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        </span>
+      ) : null}
+    </motion.article>
   );
 }
 
@@ -518,22 +591,23 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
     material.minQuantity > 0
       ? Math.min(100, Math.round((material.quantity / material.minQuantity) * 100))
       : 100;
+  const catTone = categoryColorMap[material.category] ?? "blue";
 
   return (
     <Panel>
-      <div className="flex items-center justify-between">
-        <PanelTitle>Focus materiale</PanelTitle>
-      </div>
+      <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+        Focus materiale
+      </span>
 
-      <div className="mt-4 rounded-[14px] border-[0.5px] border-[var(--border-subtle)] p-4">
+      <div className="mt-4 rounded-14px border-[0.5px] border-[var(--border-subtle)] p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <MaterialIcon tone={categoryColorMap[material.category] ?? "blue"} />
+            <MaterialIcon tone={catTone} />
             <div className="min-w-0">
-              <div className="truncate text-[16px] font-bold text-[var(--text-primary)]">
+              <div className="truncate text-16px font-bold text-[var(--text-primary)]">
                 {material.code}
               </div>
-              <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+              <div className="mt-1 truncate text-12px font-medium text-[var(--text-secondary)]">
                 {material.description}
               </div>
             </div>
@@ -557,9 +631,9 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
         </dl>
 
         <div className="mt-3">
-          <div className="flex items-center justify-between text-[13px]">
+          <div className="flex items-center justify-between text-13px">
             <span className="font-medium text-[var(--text-secondary)]">Copertura</span>
-            <span className="text-[13px] font-bold text-[var(--text-primary)]">{coverage}%</span>
+            <span className="text-13px font-bold text-[var(--text-primary)]">{coverage}%</span>
           </div>
           <CoverageBar coverage={coverage} tone={tone} />
         </div>
@@ -629,15 +703,14 @@ function AddMaterialModal({
     }
   };
 
-  const categories = ["Armamento", "Sottofondo", "Opere civili", "Impianti"];
   const units = ["m", "m2", "m3", "cad", "t", "kg", "set", "lt"];
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
-        <div className="rounded-[22px] bg-[var(--surface-base)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
+        <div className="rounded-22px bg-[var(--surface-base)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-center justify-between">
-            <h3 className="text-[16px] font-bold text-[var(--text-primary)]">Nuovo materiale</h3>
+            <h3 className="text-16px font-bold text-[var(--text-primary)]">Nuovo materiale</h3>
             <button
               className="flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
               onClick={onClose}
@@ -651,7 +724,7 @@ function AddMaterialModal({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Codice">
                 <input
-                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="Es. BIN-60E1"
                   type="text"
@@ -661,7 +734,7 @@ function AddMaterialModal({
               <Field label="Unità">
                 <div className="relative">
                   <select
-                    className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                    className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                     onChange={(e) => setUnit(e.target.value)}
                     value={unit}
                   >
@@ -687,7 +760,7 @@ function AddMaterialModal({
 
             <Field label="Descrizione">
               <input
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Descrizione del materiale"
                 type="text"
@@ -698,11 +771,11 @@ function AddMaterialModal({
             <Field label="Categoria">
               <div className="relative">
                 <select
-                  className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   onChange={(e) => setCategory(e.target.value)}
                   value={category}
                 >
-                  {categories.map((c) => (
+                  {CATEGORIES.map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>
@@ -724,7 +797,7 @@ function AddMaterialModal({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Quantità iniziale">
                 <input
-                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   min="0"
                   onChange={(e) => setQuantity(e.target.value)}
                   step="any"
@@ -734,7 +807,7 @@ function AddMaterialModal({
               </Field>
               <Field label="Soglia minima">
                 <input
-                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   min="0"
                   onChange={(e) => setMinQuantity(e.target.value)}
                   step="any"
@@ -763,27 +836,19 @@ function AddMaterialModal({
   );
 }
 
+/* ── Shared sub-components ── */
+
 function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
   return <BezelSurface innerClassName={cn("p-4", className)}>{children}</BezelSurface>;
 }
 
-function PanelTitle({ children }: { children: string }) {
-  return (
-    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-      {children}
-    </div>
-  );
-}
-
 function MetricCard({
-  delta,
   icon: Icon,
   label,
   tone,
   value,
 }: {
   caption: string;
-  delta?: string;
   icon: LucideIcon;
   label: string;
   tone: "blue" | StockTone;
@@ -803,12 +868,12 @@ function MetricCard({
         <Icon className="size-5 2xl:size-6" />
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
           {label}
         </div>
         <div
           className={cn(
-            "mt-2 text-[20px] font-bold leading-none 2xl:text-[22px]",
+            "mt-2 text-20px font-bold leading-none 2xl:text-22px",
             tone === "blue" && "text-[var(--info-base)]",
             tone === "danger" && "text-[var(--danger-base)]",
             tone === "warning" && "text-[var(--warning-base)]",
@@ -817,35 +882,49 @@ function MetricCard({
         >
           {value}
         </div>
-        {delta ? (
-          <div
-            className={cn(
-              "mt-3 text-[11px] font-bold",
-              tone === "danger" ? "text-[var(--danger-base)]" : "text-[var(--success-base)]",
-            )}
-          >
-            {delta}
-          </div>
-        ) : null}
       </div>
     </BezelSurface>
   );
 }
 
-function CategoryPill({ category }: { category: string }) {
-  const color = categoryColorMap[category] ?? "blue";
+function QuickAction({
+  detail,
+  icon: Icon,
+  label,
+  onClick,
+  tone,
+}: {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  tone: "info" | "success" | "warning";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+      : tone === "warning"
+        ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+        : "bg-[var(--info-soft)] text-[var(--info-base)]";
+
   return (
-    <span
-      className={cn(
-        "inline-block rounded-full px-2.5 py-1 text-[11px] font-bold",
-        color === "blue" && "bg-[var(--info-soft)] text-[var(--info-base)]",
-        color === "green" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-        color === "orange" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-        color === "purple" && "bg-[var(--bg-muted-strong)] text-[var(--accent-secondary)]",
-      )}
+    <button
+      className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-[var(--bg-muted)]"
+      onClick={onClick}
+      type="button"
     >
-      {category}
-    </span>
+      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${toneClass}`}>
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-13px font-bold text-[var(--text-primary)]">
+          {label}
+        </span>
+        <span className="block truncate text-11px font-medium text-[var(--text-secondary)]">
+          {detail}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -854,10 +933,7 @@ function MaterialIcon({ tone }: { tone: CategoryTone }) {
     <span
       className={cn(
         "flex size-9 shrink-0 items-center justify-center rounded-lg",
-        tone === "blue" && "bg-[var(--info-soft)] text-[var(--info-base)]",
-        tone === "green" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-        tone === "orange" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-        tone === "purple" && "bg-[var(--bg-muted-strong)] text-[var(--accent-secondary)]",
+        categoryToneLabel[tone],
       )}
     >
       <Package className="size-5" />
@@ -866,41 +942,14 @@ function MaterialIcon({ tone }: { tone: CategoryTone }) {
 }
 
 function CoverageBar({ coverage, tone }: { coverage: number; tone: StockTone }) {
-  return (
-    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-      <div
-        className={cn(
-          "h-full rounded-full",
-          tone === "success" && "bg-[var(--success-base)]",
-          tone === "warning" && "bg-[var(--warning-base)]",
-          tone === "danger" && "bg-[var(--danger-base)]",
-        )}
-        style={{ width: `${Math.min(coverage, 100)}%` }}
-      />
-    </div>
-  );
-}
-
-function StatusPill({ children, tone }: { children: string; tone: StockTone }) {
-  return (
-    <span
-      className={cn(
-        "rounded-full px-2.5 py-1 text-[11px] font-bold",
-        tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-        tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-        tone === "danger" && "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-      )}
-    >
-      {children}
-    </span>
-  );
+  return <SeverityBar percentage={coverage} tone={tone} />;
 }
 
 function DetailLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2.5">
-      <dt className="text-[13px] font-medium text-[var(--text-secondary)]">{label}</dt>
-      <dd className="text-right text-[13px] font-bold text-[var(--text-primary)]">{value}</dd>
+      <dt className="text-13px font-medium text-[var(--text-secondary)]">{label}</dt>
+      <dd className="text-right text-13px font-bold text-[var(--text-primary)]">{value}</dd>
     </div>
   );
 }
@@ -908,7 +957,7 @@ function DetailLine({ label, value }: { label: string; value: string }) {
 function Field({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="block">
-      <div className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">{label}</div>
+      <div className="mb-1.5 text-12px font-semibold text-[var(--text-secondary)]">{label}</div>
       {children}
     </div>
   );

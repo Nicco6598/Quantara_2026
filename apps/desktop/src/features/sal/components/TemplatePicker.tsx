@@ -32,7 +32,7 @@ export function TemplatePicker({ onApply, tariffBookId }: TemplatePickerProps) {
   return (
     <div className="relative">
       <button
-        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 text-[11px] font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 text-11px font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
@@ -50,14 +50,14 @@ export function TemplatePicker({ onApply, tariffBookId }: TemplatePickerProps) {
           />
           <motion.div
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-[18px] bg-[var(--surface-base)] p-1.5 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]"
+            className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]"
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             initial={{ opacity: 0, y: -8, scale: 0.96 }}
             transition={{ duration: 0.18, ease: SOFT_EASE }}
           >
             {filtered.map((template) => (
               <div
-                className="group flex items-center gap-2 rounded-[14px] px-3 py-2.5 transition-colors hover:bg-[var(--bg-muted)]"
+                className="group flex items-center gap-2 rounded-14px px-3 py-2.5 transition-colors hover:bg-[var(--bg-muted)]"
                 key={template.id}
               >
                 <button
@@ -65,10 +65,10 @@ export function TemplatePicker({ onApply, tariffBookId }: TemplatePickerProps) {
                   onClick={() => handleApply(template)}
                   type="button"
                 >
-                  <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                  <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
                     {template.name}
                   </div>
-                  <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                  <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
                     {template.voiceEntries.length} voci · ribasso dal contratto
                   </div>
                 </button>

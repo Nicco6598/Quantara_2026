@@ -31,6 +31,15 @@ export type TariffImportToolbarState = {
   totalVoices: number;
 };
 
+export type SalToolbarState = {
+  budgetResidual: number;
+  discountAmount: number;
+  lineCount: number;
+  salTitle: string;
+  total: number;
+  voicesCount: number;
+};
+
 type NavEntry = {
   route: QuantaraRoute;
   context?: string;
@@ -47,7 +56,9 @@ type NavigationSlice = {
   pendingWorkflowAction: WorkflowAction;
   routeHistory: NavEntry[];
   routeHistoryIndex: number;
+  salToolbar: SalToolbarState;
   salPendingStep: number | null;
+  setSalToolbar: (state: SalToolbarState) => void;
   setTariffImportToolbar: (state: TariffImportToolbarState) => void;
   setActiveRoute: (route: QuantaraRoute, context?: string, replace?: boolean) => void;
   setPendingWorkflowAction: (action: WorkflowAction) => void;
@@ -137,6 +148,14 @@ export const useAppStore = create<AppStore>()(
         }),
       pendingWorkflowAction: null,
       salPendingStep: null,
+      salToolbar: {
+        budgetResidual: 0,
+        discountAmount: 0,
+        lineCount: 0,
+        salTitle: "Nuovo SAL",
+        total: 0,
+        voicesCount: 0,
+      },
       tariffImportToolbar: {
         activeIndex: 0,
         activeDrafted: false,
@@ -179,6 +198,10 @@ export const useAppStore = create<AppStore>()(
       setSalPendingStep: (salPendingStep) =>
         set({
           salPendingStep,
+        }),
+      setSalToolbar: (salToolbar) =>
+        set({
+          salToolbar,
         }),
       setTariffImportToolbar: (tariffImportToolbar) =>
         set({
@@ -252,6 +275,8 @@ export function useNavigationState() {
       routeHistoryIndex: state.routeHistoryIndex,
       setActiveRoute: state.setActiveRoute,
       setPendingWorkflowAction: state.setPendingWorkflowAction,
+      salToolbar: state.salToolbar,
+      setSalToolbar: state.setSalToolbar,
       setTariffImportToolbar: state.setTariffImportToolbar,
       tariffImportToolbar: state.tariffImportToolbar,
     })),

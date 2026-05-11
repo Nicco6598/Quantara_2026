@@ -23,6 +23,7 @@ import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { SPRING_EASE } from "@/components/shared/easings";
 
 import { useToast } from "@/components/shared/ToastProvider";
+import { StatusPill } from "@/components/shared/StatusPill";
 
 import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 
@@ -280,13 +281,13 @@ export function ProjectDetailScreen() {
 
       <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
         <div className="min-w-0">
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             Dossier {detail.lot}
           </span>
-          <h2 className="mt-5 max-w-4xl text-[38px] font-semibold leading-[0.98] text-[var(--text-primary)] md:text-[56px]">
+          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight text-[var(--text-primary)] md:text-56px">
             {detail.name}
           </h2>
-          <p className="mt-4 max-w-2xl text-[15px] leading-6 text-[var(--text-secondary)]">
+          <p className="mt-4 max-w-2xl text-15px leading-6 text-[var(--text-secondary)]">
             {detail.lot} &middot; {detail.location}. Presidio economico, SAL e segnali di
             avanzamento in un solo dossier operativo.
           </p>
@@ -298,14 +299,14 @@ export function ProjectDetailScreen() {
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <ProjectControlButton
-              className="h-10 px-4 text-[13px]"
+              className="h-10 px-4 text-13px"
               icon={Plus}
               onClick={handleCreateSal}
               variant="primary"
             >
               Nuova SAL
             </ProjectControlButton>
-            <ProjectControlButton className="h-10 px-4 text-[13px]" variant="neutral">
+            <ProjectControlButton className="h-10 px-4 text-13px" variant="neutral">
               Presidio economico
             </ProjectControlButton>
           </div>
@@ -322,17 +323,17 @@ export function ProjectDetailScreen() {
               }}
             />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.08),rgba(2,6,23,0.56))]" />
-            <div className="absolute inset-x-4 bottom-4 rounded-[18px] bg-[rgba(255,255,255,0.86)] p-4 text-slate-950 shadow-[0_18px_38px_rgba(15,23,42,0.16)]">
+            <div className="absolute inset-x-4 bottom-4 rounded-18px bg-[rgba(255,255,255,0.86)] p-4 text-slate-950 shadow-[0_18px_38px_rgba(15,23,42,0.16)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <div className="text-10px font-semibold uppercase tracking-0_2em text-slate-500">
                     Avanzamento dossier
                   </div>
-                  <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.04em]">
+                  <div className="mt-2 text-28px font-semibold leading-none tracking-tight">
                     {detail.progress}%
                   </div>
                 </div>
-                <div className="text-right text-[11px] font-semibold leading-5 text-slate-600">
+                <div className="text-right text-11px font-semibold leading-5 text-slate-600">
                   {detail.manager}
                   <br />
                   27 Apr 2025 &middot; 17:40
@@ -352,7 +353,7 @@ export function ProjectDetailScreen() {
       <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">
           <Panel>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+            <h3 className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
               Milestone
             </h3>
             <div className="mt-4 grid gap-3 lg:grid-cols-4">
@@ -367,12 +368,12 @@ export function ProjectDetailScreen() {
           </Panel>
 
           <Panel>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+            <h3 className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
               Economico ed esecuzione
             </h3>
             <div className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <div className="rounded-[18px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+              <div className="rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4">
+                <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                   Quadro economico
                 </div>
                 <dl className="mt-3 divide-y divide-[var(--border-subtle)]/70">
@@ -391,18 +392,18 @@ export function ProjectDetailScreen() {
                 </dl>
               </div>
 
-              <div className="grid rounded-[18px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4 md:grid-cols-2">
+              <div className="grid rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4 md:grid-cols-2">
                 <div className="border-b border-[var(--border-subtle)]/70 pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                  <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                     Forecast
                   </div>
                   <InfoBlock label="Fine prevista" value={detail.endDate} />
                   <InfoBlock label="CPI" value={detail.cpi} note="Sotto budget rispetto al piano" />
                 </div>
                 <div className="pt-4 md:pl-4 md:pt-0">
-                  <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                  <div className="flex items-center justify-between text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                     <span>Impatto</span>
-                    <span className="text-[14px] tracking-normal text-[var(--danger-base)]">
+                    <span className="text-14px tracking-normal text-[var(--danger-base)]">
                       {detail.forecastImpact}
                     </span>
                   </div>
@@ -416,14 +417,14 @@ export function ProjectDetailScreen() {
 
           <Panel>
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+              <div className="flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
                 <FileText className="size-4 text-[var(--info-base)]" />
                 Registro SAL
               </div>
               <ProjectControlButton
                 icon={Plus}
                 onClick={handleCreateSal}
-                className="h-9 px-3 text-[13px]"
+                className="h-9 px-3 text-13px"
                 variant="primary"
               >
                 Nuova SAL
@@ -467,7 +468,7 @@ export function ProjectDetailScreen() {
                 {["Tutti", "Bozza", "In revisione", "Approvata"].map((s) => (
                   <button
                     className={cn(
-                      "rounded-full px-3 py-1 text-[11px] font-semibold transition-colors",
+                      "rounded-full px-3 py-1 text-11px font-semibold transition-colors",
                       filterSalStatus === s
                         ? s === "Bozza"
                           ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
@@ -526,9 +527,9 @@ export function ProjectDetailScreen() {
                 />
               ))}
               {filteredSalRows.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 rounded-[16px] border-[0.5px] border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-4 py-8 text-center">
+                <div className="flex flex-col items-center gap-3 rounded-xl border-[0.5px] border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-4 py-8 text-center">
                   <FileText className="size-8 text-[var(--text-secondary)]" />
-                  <p className="text-[13px] font-medium text-[var(--text-secondary)]">
+                  <p className="text-13px font-medium text-[var(--text-secondary)]">
                     Nessuna SAL registrata per questo progetto.
                   </p>
                 </div>
@@ -561,17 +562,17 @@ export function ProjectDetailScreen() {
             <div className="mt-4 space-y-2.5">
               {projectTeam.map((member) => (
                 <div
-                  className="flex items-center gap-3 rounded-[16px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2.5"
+                  className="flex items-center gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2.5"
                   key={member.initials}
                 >
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-[13px] bg-[var(--accent-primary)] text-[12px] font-bold text-[var(--text-inverse)]">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-13px bg-[var(--accent-primary)] text-12px font-bold text-[var(--text-inverse)]">
                     {member.initials}
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                    <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
                       {member.name}
                     </div>
-                    <div className="truncate text-[12px] font-medium text-[var(--text-secondary)]">
+                    <div className="truncate text-12px font-medium text-[var(--text-secondary)]">
                       {member.role}
                     </div>
                   </div>
@@ -585,21 +586,21 @@ export function ProjectDetailScreen() {
             <div className="mt-4 space-y-3">
               {recentActivities.slice(0, 1).map((activity) => (
                 <div
-                  className="flex items-start gap-3 rounded-[16px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-3"
+                  className="flex items-start gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-3"
                   key={activity.text}
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[12px] bg-[var(--surface-base)] text-[var(--text-secondary)]">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-base)] text-[var(--text-secondary)]">
                     <ReceiptText className="size-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                    <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
                       {activity.text}
                     </div>
-                    <div className="mt-0.5 text-[12px] font-medium text-[var(--text-secondary)]">
+                    <div className="mt-0.5 text-12px font-medium text-[var(--text-secondary)]">
                       Operazione in attesa
                     </div>
                   </div>
-                  <div className="shrink-0 text-right text-[12px] font-medium text-[var(--text-secondary)]">
+                  <div className="shrink-0 text-right text-12px font-medium text-[var(--text-secondary)]">
                     Oggi
                     <br />
                     17:40
@@ -624,21 +625,21 @@ export function ProjectDetailScreen() {
             type="button"
           />
           <motion.div
-            className="relative w-full max-w-sm rounded-[28px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+            className="relative w-full max-w-sm rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             transition={{ duration: 0.5, ease: SPRING_EASE }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
           >
-            <div className="rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+            <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
               <div className="flex items-start gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
                   <Trash2 className="size-5" />
                 </span>
                 <div>
-                  <div className="text-[14px] font-semibold text-[var(--text-primary)]">
+                  <div className="text-14px font-semibold text-[var(--text-primary)]">
                     Eliminare questa SAL?
                   </div>
-                  <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+                  <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
                     L'operazione rimuove definitivamente il documento. I dati non possono essere
                     recuperati.
                   </p>
@@ -646,14 +647,14 @@ export function ProjectDetailScreen() {
               </div>
               <div className="mt-5 flex justify-end gap-2">
                 <button
-                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-[13px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
                   onClick={() => setDeleteTargetId(null)}
                   type="button"
                 >
                   Annulla
                 </button>
                 <button
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--danger-base)] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--danger-base)] px-5 text-13px font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
                   onClick={() => handleDeleteSal(deleteTargetId)}
                   type="button"
                 >
@@ -675,7 +676,7 @@ function Panel({ children, className }: { children: ReactNode; className?: strin
 
 function PanelTitle({ children, icon: Icon }: { children: string; icon: typeof Radio }) {
   return (
-    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+    <div className="flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
       <Icon className="size-4 text-[var(--info-base)]" />
       {children}
     </div>
@@ -704,7 +705,7 @@ function MetricCard({
     >
       <div
         className={cn(
-          "flex size-12 shrink-0 items-center justify-center rounded-[16px] 2xl:size-14",
+          "flex size-12 shrink-0 items-center justify-center rounded-xl 2xl:size-14",
           (!tone || tone === "blue" || tone === "info") &&
             "bg-[var(--info-soft)] text-[var(--info-base)]",
           tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
@@ -714,12 +715,12 @@ function MetricCard({
         <Icon className="size-6" />
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
           {label}
         </div>
         <div
           className={cn(
-            "mt-2 truncate text-[20px] font-bold leading-none md:text-[22px]",
+            "mt-2 truncate text-20px font-bold leading-none md:text-22px",
             (!tone || tone === "blue" || tone === "info") && "text-[var(--info-base)]",
             tone === "success" && "text-[var(--success-base)]",
             tone === "warning" && "text-[var(--warning-base)]",
@@ -727,7 +728,7 @@ function MetricCard({
         >
           {value}
         </div>
-        <div className="mt-2 text-[12px] font-medium text-[var(--text-secondary)]">{caption}</div>
+        <div className="mt-2 text-12px font-medium text-[var(--text-secondary)]">{caption}</div>
       </div>
     </BezelSurface>
   );
@@ -736,33 +737,11 @@ function MetricCard({
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
-      <span className="text-[12px] font-medium text-[var(--text-secondary)]">{label}</span>
-      <span className="max-w-[58%] text-right text-[13px] font-semibold text-[var(--text-primary)]">
+      <span className="text-12px font-medium text-[var(--text-secondary)]">{label}</span>
+      <span className="max-w-[58%] text-right text-13px font-semibold text-[var(--text-primary)]">
         {value}
       </span>
     </div>
-  );
-}
-
-function StatusPill({
-  children,
-  tone,
-}: {
-  children: string;
-  tone: "danger" | "info" | "success" | "warning";
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex rounded-full px-3 py-1 text-[11px] font-semibold",
-        tone === "danger" && "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-        tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-        tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-        tone === "info" && "bg-[var(--info-soft)] text-[var(--info-base)]",
-      )}
-    >
-      {children}
-    </span>
   );
 }
 
@@ -795,10 +774,10 @@ function MilestoneItem({
         )}
       </div>
       <div className="min-w-0">
-        <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+        <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
           {row.label}
         </div>
-        <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+        <div className="mt-1 truncate text-12px font-medium text-[var(--text-secondary)]">
           {row.date}
         </div>
       </div>
@@ -812,10 +791,10 @@ function MilestoneItem({
 function InfoBlock({ label, note, value }: { label: string; note?: string; value: string }) {
   return (
     <div className="mt-4">
-      <div className="text-[12px] font-medium text-[var(--text-secondary)]">{label}</div>
-      <div className="mt-1 text-[15px] font-semibold text-[var(--text-primary)]">{value}</div>
+      <div className="text-12px font-medium text-[var(--text-secondary)]">{label}</div>
+      <div className="mt-1 text-15px font-semibold text-[var(--text-primary)]">{value}</div>
       {note ? (
-        <div className="mt-1 text-[11px] font-semibold text-[var(--danger-base)]">{note}</div>
+        <div className="mt-1 text-11px font-semibold text-[var(--danger-base)]">{note}</div>
       ) : null}
     </div>
   );
@@ -860,14 +839,14 @@ function SalCard({
   return (
     <div
       className={cn(
-        "group relative flex items-center justify-between gap-3 rounded-[16px] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-3 py-3 ring-1 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--bg-muted)_84%,var(--surface-base)_16%)]",
+        "group relative flex items-center justify-between gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-3 py-3 ring-1 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--bg-muted)_84%,var(--surface-base)_16%)]",
         isSelected
-          ? "ring-[var(--accent-primary)]/50 bg-[color-mix(in_srgb,var(--info-soft)_30%,var(--surface-base)_70%)]"
+          ? "ring-[var(--accent-primary)]/50 bg-[var(--selection-bg)]"
           : "ring-[var(--border-subtle)]/60 hover:ring-[var(--border-subtle)]",
       )}
     >
       <button
-        className="absolute inset-0 cursor-pointer rounded-[16px]"
+        className="absolute inset-0 cursor-pointer rounded-xl"
         onClick={() => useSelectionStore.getState().toggle(id)}
         tabIndex={0}
         onKeyDown={(e) => {
@@ -884,7 +863,7 @@ function SalCard({
         <motion.button
           aria-checked={isSelected}
           className={cn(
-            "flex size-[20px] shrink-0 items-center justify-center rounded-[5px] border transition-all",
+            "flex size-[20px] shrink-0 items-center justify-center rounded-5px border transition-all",
             isSelected
               ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] opacity-100"
               : "border-[var(--border-subtle)] bg-[var(--surface-base)] opacity-0 group-hover:opacity-100",
@@ -916,7 +895,7 @@ function SalCard({
 
         <span
           className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-[12px]",
+            "flex size-10 shrink-0 items-center justify-center rounded-lg",
             isClosed
               ? "bg-[var(--success-soft)] text-[var(--success-base)]"
               : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
@@ -926,22 +905,22 @@ function SalCard({
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+            <span className="truncate text-13px font-semibold text-[var(--text-primary)]">
               {sal}
             </span>
             <StatusPill tone={tone}>{status}</StatusPill>
           </div>
-          <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+          <div className="mt-0.5 truncate text-12px font-medium text-[var(--text-secondary)]">
             {period} &middot; {value}
           </div>
-          <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">{date}</div>
+          <div className="mt-0.5 text-11px font-medium text-[var(--text-secondary)]">{date}</div>
         </div>
       </div>
 
       <div className="pointer-events-auto relative z-10 flex shrink-0 items-center gap-1">
         {isDraft ? (
           <button
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--accent-primary)] px-3.5 text-[11px] font-bold text-white shadow-sm transition-all hover:bg-[var(--accent-primary)]/90"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--accent-primary)] px-3.5 text-11px font-bold text-white shadow-sm transition-all hover:bg-[var(--accent-primary)]/90"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onContinue?.();
@@ -953,7 +932,7 @@ function SalCard({
           </button>
         ) : isReview ? (
           <button
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-3.5 text-[11px] font-bold text-[var(--info-base)] ring-1 ring-[var(--info-base)]/30 transition-all hover:bg-[var(--info-soft)]/80"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-3.5 text-11px font-bold text-[var(--info-base)] ring-1 ring-[var(--info-base)]/30 transition-all hover:bg-[var(--info-soft)]/80"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onClose();
@@ -966,7 +945,7 @@ function SalCard({
         ) : isClosed || isApproved ? (
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold",
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-11px font-semibold",
               "bg-[var(--success-soft)] text-[var(--success-base)]",
             )}
           >
@@ -1004,12 +983,12 @@ function SalCard({
                 type="button"
               />
               <div
-                className="fixed z-[9999] w-52 overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1 shadow-[0_18px_44px_-18px_rgba(15,23,42,0.35)] ring-1 ring-[var(--border-subtle)]/70"
+                className="fixed z-[9999] w-52 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1 shadow-[0_18px_44px_-18px_rgba(15,23,42,0.35)] ring-1 ring-[var(--border-subtle)]/70"
                 style={{ top: menuPos.top, right: menuPos.right }}
               >
                 {isDraft ? (
                   <button
-                    className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-13px font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
                     onClick={(e) => {
                       e.stopPropagation();
                       setMenuOpen(false);
@@ -1023,7 +1002,7 @@ function SalCard({
                 ) : null}
                 {isDraft || isReview ? (
                   <button
-                    className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-13px font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
                     onClick={(e) => {
                       e.stopPropagation();
                       setMenuOpen(false);
@@ -1036,7 +1015,7 @@ function SalCard({
                   </button>
                 ) : null}
                 <button
-                  className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-[13px] font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-13px font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
                   onClick={(e) => {
                     e.stopPropagation();
                     setMenuOpen(false);

@@ -34,24 +34,24 @@ export function SalComparisonView({
   return (
     <div className="space-y-3">
       {/* Totals comparison bar */}
-      <div className="rounded-[14px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+      <div className="rounded-14px bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
               <div className="min-w-0">
-                <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                <div className="text-10px font-medium uppercase tracking-caption text-[var(--text-secondary)]">
                   {beforeLabel}
                 </div>
-                <div className="mt-0.5 text-[18px] font-semibold text-[var(--text-primary)]">
+                <div className="mt-0.5 text-18px font-semibold text-[var(--text-primary)]">
                   <Currency value={totals.oldTotal} />
                 </div>
               </div>
               <ArrowRight className="size-5 shrink-0 text-[var(--text-tertiary)]" />
               <div className="min-w-0">
-                <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                <div className="text-10px font-medium uppercase tracking-caption text-[var(--text-secondary)]">
                   {afterLabel}
                 </div>
-                <div className="mt-0.5 text-[18px] font-semibold text-[var(--text-primary)]">
+                <div className="mt-0.5 text-18px font-semibold text-[var(--text-primary)]">
                   <Currency value={totals.newTotal} />
                 </div>
               </div>
@@ -59,18 +59,18 @@ export function SalComparisonView({
           </div>
           <div
             className={cn(
-              "shrink-0 rounded-[10px] px-3 py-2 text-center",
+              "shrink-0 rounded-10px px-3 py-2 text-center",
               totals.diff > 0 && "bg-[var(--warning-soft)]",
               totals.diff < 0 && "bg-[var(--success-soft)]",
               totals.diff === 0 && "bg-[var(--bg-muted)]",
             )}
           >
-            <div className="text-[9px] font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+            <div className="text-9px font-medium uppercase tracking-caption text-[var(--text-secondary)]">
               Differenza
             </div>
             <div
               className={cn(
-                "mt-0.5 text-[16px] font-bold tabular-nums leading-none",
+                "mt-0.5 text-16px font-bold tabular-nums leading-none",
                 totals.diff > 0 && "text-[var(--danger-base)]",
                 totals.diff < 0 && "text-[var(--success-base)]",
                 totals.diff === 0 && "text-[var(--text-tertiary)]",
@@ -83,26 +83,26 @@ export function SalComparisonView({
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)]/40 pt-3">
-          <span className="text-[11px] font-medium text-[var(--text-secondary)]">
+          <span className="text-11px font-medium text-[var(--text-secondary)]">
             {totals.oldCount} voci → {totals.newCount} voci
           </span>
           {hasChanges && (
             <>
               <span className="text-[var(--border-subtle)]">·</span>
               {totals.addedCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--success-base)]">
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-10px font-semibold text-[var(--success-base)]">
                   <Plus className="size-3" />
                   {totals.addedCount} aggiunte
                 </span>
               )}
               {totals.removedCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--danger-base)]">
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-10px font-semibold text-[var(--danger-base)]">
                   <Minus className="size-3" />
                   {totals.removedCount} rimosse
                 </span>
               )}
               {totals.modifiedCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning-base)]">
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-semibold text-[var(--warning-base)]">
                   ~{totals.modifiedCount} modificate
                 </span>
               )}
@@ -110,7 +110,7 @@ export function SalComparisonView({
           )}
           {unchangedCount > 0 && (
             <button
-              className="ml-auto inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]"
+              className="ml-auto inline-flex items-center gap-1 text-10px font-medium text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]"
               onClick={() => setShowUnchanged(!showUnchanged)}
               type="button"
             >
@@ -133,12 +133,12 @@ export function SalComparisonView({
 function BeforeColumn({ diffs, label }: { diffs: DiffResult[]; label: string }) {
   const items = diffs.filter((d) => d.status !== "added");
   return (
-    <div className="rounded-[12px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
+    <div className="rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
       <div className="border-b border-[var(--border-subtle)]/40 px-4 py-3">
-        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--info-base)]">
+        <div className="text-10px font-medium uppercase tracking-0_14em text-[var(--info-base)]">
           {label}
         </div>
-        <div className="mt-0.5 text-[11px] font-medium text-[var(--text-tertiary)]">
+        <div className="mt-0.5 text-11px font-medium text-[var(--text-tertiary)]">
           {items.length} voci
         </div>
       </div>
@@ -147,7 +147,7 @@ function BeforeColumn({ diffs, label }: { diffs: DiffResult[]; label: string }) 
           <DiffRow key={`${d.voiceId}-b`} diff={d} side="before" />
         ))}
         {items.length === 0 && (
-          <div className="px-4 py-8 text-center text-[12px] text-[var(--text-tertiary)]">
+          <div className="px-4 py-8 text-center text-12px text-[var(--text-tertiary)]">
             Nessuna voce
           </div>
         )}
@@ -159,12 +159,12 @@ function BeforeColumn({ diffs, label }: { diffs: DiffResult[]; label: string }) 
 function AfterColumn({ diffs, label }: { diffs: DiffResult[]; label: string }) {
   const items = diffs.filter((d) => d.status !== "removed");
   return (
-    <div className="rounded-[12px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
+    <div className="rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
       <div className="border-b border-[var(--border-subtle)]/40 px-4 py-3">
-        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--accent-primary)]">
+        <div className="text-10px font-medium uppercase tracking-0_14em text-[var(--accent-primary)]">
           {label}
         </div>
-        <div className="mt-0.5 text-[11px] font-medium text-[var(--text-tertiary)]">
+        <div className="mt-0.5 text-11px font-medium text-[var(--text-tertiary)]">
           {items.length} voci
         </div>
       </div>
@@ -173,7 +173,7 @@ function AfterColumn({ diffs, label }: { diffs: DiffResult[]; label: string }) {
           <DiffRow key={`${d.voiceId}-a`} diff={d} side="after" />
         ))}
         {items.length === 0 && (
-          <div className="px-4 py-8 text-center text-[12px] text-[var(--text-tertiary)]">
+          <div className="px-4 py-8 text-center text-12px text-[var(--text-tertiary)]">
             Nessuna voce
           </div>
         )}
@@ -205,7 +205,7 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
   return (
     <motion.div
       animate={{ opacity: 1, x: 0 }}
-      className={cn("px-4 py-3 text-[12px]", bgClass)}
+      className={cn("px-4 py-3 text-12px", bgClass)}
       exit={{ opacity: 0, x: -12 }}
       initial={{ opacity: 0, x: -8 }}
       transition={{ duration: 0.2, ease: SOFT_EASE }}
@@ -224,7 +224,7 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
               </span>
             )}
             {isChanged && diff.status === "modified" && (
-              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--warning-base)] text-white text-[9px] font-bold leading-none">
+              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--warning-base)] text-white text-9px font-bold leading-none">
                 ~
               </span>
             )}
@@ -254,7 +254,7 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
         <div className="shrink-0 text-right">
           <div
             className={cn(
-              "font-mono text-[13px]",
+              "font-mono text-13px",
               isChanged
                 ? "font-semibold text-[var(--text-primary)]"
                 : "font-medium text-[var(--text-tertiary)]",
@@ -266,8 +266,8 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
             className={cn(
               "font-mono",
               isChanged
-                ? "text-[12px] font-semibold text-[var(--accent-primary)]"
-                : "text-[11px] text-[var(--text-tertiary)]",
+                ? "text-12px font-semibold text-[var(--accent-primary)]"
+                : "text-11px text-[var(--text-tertiary)]",
             )}
           >
             <Currency value={total} />
@@ -280,7 +280,7 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
           {diff.qtyDiff !== 0 && (
             <span
               className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold font-mono",
+                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-10px font-semibold font-mono",
                 diff.qtyDiff > 0
                   ? "bg-[var(--success-soft)] text-[var(--success-base)]"
                   : "bg-[var(--danger-soft)] text-[var(--danger-base)]",
@@ -293,7 +293,7 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
           {diff.totalDiff !== 0 && (
             <span
               className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold font-mono",
+                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-10px font-semibold font-mono",
                 diff.totalDiff > 0
                   ? "bg-[var(--success-soft)] text-[var(--success-base)]"
                   : "bg-[var(--danger-soft)] text-[var(--danger-base)]",
@@ -304,12 +304,12 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
             </span>
           )}
           {diff.unitPriceDiff !== 0 && (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold font-mono text-[var(--info-base)]">
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-10px font-semibold font-mono text-[var(--info-base)]">
               prezzo unit. cambiato
             </span>
           )}
           {diff.surchargeChanged && (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning-base)]">
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-semibold text-[var(--warning-base)]">
               magg. cambiata
             </span>
           )}

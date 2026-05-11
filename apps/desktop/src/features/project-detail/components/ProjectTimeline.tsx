@@ -27,15 +27,15 @@ export function ProjectTimeline({ project, salDocuments }: ProjectTimelineProps)
 
   if (events.length === 0) {
     return (
-      <div className="rounded-[12px] bg-[var(--surface-base)] p-5 text-center text-[13px] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/60">
+      <div className="rounded-lg bg-[var(--surface-base)] p-5 text-center text-13px text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/60">
         Nessun evento disponibile per questo progetto.
       </div>
     );
   }
 
   return (
-    <div className="rounded-[12px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+    <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+      <div className="text-11px font-semibold uppercase tracking-widest text-[var(--text-secondary)]">
         Timeline progetto
       </div>
       <div className="relative mt-4 ml-2">
@@ -98,24 +98,24 @@ function TimelineDot({ event, index }: { event: TimelineEvent; index: number }) 
       {/* Content */}
       <div className="min-w-0 flex-1 pb-0.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+          <span className="truncate text-13px font-semibold text-[var(--text-primary)]">
             {event.title}
           </span>
           {event.type === "sal" && event.value != null && (
-            <span className="shrink-0 text-[12px] font-semibold text-[var(--accent-primary)]">
+            <span className="shrink-0 text-12px font-semibold text-[var(--accent-primary)]">
               <Currency value={event.value} />
             </span>
           )}
         </div>
         <div className="mt-0.5 flex items-center gap-2">
-          <span className="text-[12px] text-[var(--text-secondary)]">{event.description}</span>
+          <span className="text-12px text-[var(--text-secondary)]">{event.description}</span>
           {event.status === "overdue" && (
-            <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--danger-base)]">
+            <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-10px font-semibold text-[var(--danger-base)]">
               In ritardo
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+        <div className="mt-0.5 text-11px font-medium text-[var(--text-secondary)]">
           {event.date}
         </div>
       </div>
