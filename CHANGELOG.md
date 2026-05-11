@@ -2,6 +2,32 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.60 - 2026-05-11
+
+### Ricerca globale potenziata
+
+- **Cerca ovunque** — la Command Palette (Ctrl+K) non cerca piu solo comandi. Ora cerca anche tra progetti, materiali e tariffari con risultati raggruppati per categoria. Basta iniziare a digitare per trovare tutto in un colpo solo.
+- **Bottoni titlebar non si bloccano piu** — quando la Command Palette era aperta, cliccare sui bottoni della titlebar (sidebar, tema, aggiornamenti) richiedeva due click: uno per chiudere la palette e uno per l'azione. Ora funziona al primo colpo: la palette si chiude e l'azione parte insieme.
+- **Menu sezione si chiude da solo** — quando apri la Command Palette, il menu "Cambia sezione" nella titlebar si chiude automaticamente.
+
+### Cerca voci SAL — dropdown piu ricco
+
+- **Niente piu limite di 12 risultati** — la ricerca voci nella creazione SAL mostra tutte le corrispondenze trovate, senza taglio. Il dropdown arriva fino a 500px di altezza con scorrimento.
+- **Dropdown fuori dai contenitori** — il menu dei risultati non viene piu tagliato dal bordo della sezione. Ora usa un overlay fisso ben posizionato sotto il campo di ricerca, sempre completamente visibile.
+- **Tooltip con dettagli completi nel menu cerca** — passando col mouse su una riga, un tooltip mostra codice, descrizione completa e metadati.
+- **Badge laterale col codice** — ogni risultato ha un badge colorato con le prime lettere del codice voce, per riconoscere subito il tipo.
+
+### Tabella voci SAL — righe piu leggibili
+
+- **Manodopera in evidenza** — la percentuale di manodopera non e piu un numerino grigio perso tra i metadati. Ora e un badge colorato ben visibile nella riga, con pallino e colore accent.
+- **Note che crescono** — il campo note non e piu una riga singola che scrolla in orizzontale. Ora e una textarea che parte da 4 righe, va a capo da sola e la card si espande automaticamente quando scrivi.
+- **Ogni riga e indipendente** — se aggiungi la stessa voce due volte, cancellarne una non cancella piu tutte le copie. Modificare fattori, note o maggiorazioni di una riga non tocca le altre con la stessa voce.
+- **Niente "(copia)" negli incolli** — quando copi e incolli una riga, il codice voce non viene piu modificato con "(copia)". Le note non vengono piu copiate.
+
+### Marchio allineato
+
+- **Logo aggiornato** — il logo Quantara e le icone dell'app sono passati dal vecchio arancione al blu brand `#3b7dd8`, lo stesso della palette ufficiale. Ora il colore del marchio è coerente in tutta l'app: sidebar, titlebar, icona applicazione e installer. Anche l'icona nel menu Start, nel Dock macOS e nella home del telefono (Android/iOS) ha il nuovo colore.
+
 ## 0.2.50 - 2026-05-08
 
 ### App piu scattante e codice piu pulito
