@@ -13,7 +13,7 @@ export function CheckboxCell({ checked, onToggle, ariaLabel }: CheckboxCellProps
       aria-checked={checked}
       aria-label={ariaLabel ?? "Seleziona riga"}
       className={cn(
-        "flex size-[22px] items-center justify-center rounded-[6px] border transition-colors",
+        "flex size-[22px] items-center justify-center rounded-sm border transition-colors",
         checked
           ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]"
           : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:border-[var(--accent-primary)]/50",

@@ -4,6 +4,7 @@ type ErrorBoundaryProps = {
   children: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  resetKey?: string;
 };
 
 type ErrorBoundaryState = {
@@ -21,7 +22,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Quantara route render failed", error, errorInfo);
     this.props.onError?.(error, errorInfo);
+  }
+
+  override componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ error: null });
+    }
   }
 
   override render() {
@@ -39,6 +47,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <p className="mt-2 text-sm text-[var(--text-secondary)]">
               Ricarica la pagina o riprova piu tardi. Se il problema persiste, contatta il supporto.
             </p>
+            {import.meta.env.DEV ? (
+              <pre className="mt-4 max-h-40 overflow-auto rounded-2xl bg-[var(--bg-muted)] p-3 text-left text-xs text-[var(--danger-base)]">
+                {this.state.error.message}
+              </pre>
+            ) : null}
             <button
               className="mt-6 rounded-full bg-[var(--accent-primary)] px-6 py-2 text-sm font-semibold text-white"
               onClick={() => this.setState({ error: null })}

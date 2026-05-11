@@ -15,7 +15,7 @@ export function ProjectSurface({
   return (
     <motion.section
       className={cn(
-        "projects-surface rounded-[24px] border-[0.5px] border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-none",
+        "projects-surface rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
         className,
       )}
       initial={{ opacity: 0, y: 14, scale: 0.994 }}
@@ -42,7 +42,7 @@ export function ProjectControlButton({
   return (
     <motion.button
       className={cn(
-        "micro-interact projects-control-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-[12px] font-semibold outline-none",
+        "micro-interact projects-control-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-12px font-semibold outline-none",
         variant === "primary" && "projects-control-button-primary text-[var(--text-inverse)]",
         variant === "neutral" && "projects-control-button-neutral text-[var(--text-primary)]",
         variant === "soft" && "projects-control-button-soft text-[var(--accent-primary)]",
@@ -72,7 +72,7 @@ export function BezelSurface({
   return (
     <motion.section
       className={cn(
-        "min-w-0 rounded-[30px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_40%,transparent)]",
+        "min-w-0 rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
         className,
       )}
       initial={{ opacity: 0, y: 18, scale: 0.992 }}
@@ -80,12 +80,7 @@ export function BezelSurface({
       viewport={{ amount: 0.18, once: true }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
     >
-      <div
-        className={cn(
-          "h-full rounded-[24px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]",
-          innerClassName,
-        )}
-      >
+      <div className={cn("h-full rounded-22px bg-[var(--surface-base)]", innerClassName)}>
         {children}
       </div>
     </motion.section>
@@ -125,12 +120,12 @@ export function MetricCard({
         <Icon className="size-5 2xl:size-6" />
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
           {label}
         </div>
         <div
           className={cn(
-            "mt-2 text-[20px] font-bold leading-none 2xl:text-[22px]",
+            "mt-2 text-20px font-bold leading-none 2xl:text-22px",
             (!tone || tone === "blue" || tone === "info") && "text-[var(--info-base)]",
             tone === "success" && "text-[var(--success-base)]",
             tone === "warning" && "text-[var(--warning-base)]",
@@ -139,7 +134,7 @@ export function MetricCard({
         >
           {value}
         </div>
-        <div className="mt-2 text-[12px] font-medium text-[var(--text-secondary)]">{caption}</div>
+        <div className="mt-2 text-12px font-medium text-[var(--text-secondary)]">{caption}</div>
       </div>
     </BezelSurface>
   );
@@ -177,14 +172,14 @@ export function PortfolioMetric({
           </div>
         ) : null}
         <div className="min-w-0">
-          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          <div className="text-11px font-medium uppercase tracking-0_18em text-[var(--text-secondary)]">
             {label}
           </div>
-          <div className="mt-2 text-[22px] font-semibold leading-none tracking-[-0.03em] text-[var(--text-primary)]">
+          <div className="mt-2 text-22px font-semibold leading-none tracking-neg-0_03em text-[var(--text-primary)]">
             {value}
           </div>
           {detail ? (
-            <div className="mt-3 text-[12px] font-medium leading-5 text-[var(--text-secondary)]">
+            <div className="mt-3 text-12px font-medium leading-5 text-[var(--text-secondary)]">
               {detail}
             </div>
           ) : null}
@@ -208,7 +203,7 @@ export function FocusChip({
   return (
     <motion.button
       className={cn(
-        "micro-interact inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "micro-interact inline-flex items-center gap-2 rounded-full border px-4 py-2 text-13px font-medium outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
         active
           ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-none"
           : "border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/24 hover:bg-[var(--bg-muted)]",
@@ -219,7 +214,7 @@ export function FocusChip({
       <span>{label}</span>
       <span
         className={cn(
-          "inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
+          "inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-11px font-semibold",
           active
             ? "bg-white/16 text-white"
             : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
@@ -243,8 +238,8 @@ export function CompactRail({
   return (
     <BezelSurface innerClassName="p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[12px] font-semibold text-[var(--text-primary)]">{title}</h3>
-        <span className="rounded-[8px] bg-[var(--bg-muted-strong)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+        <h3 className="text-12px font-semibold text-[var(--text-primary)]">{title}</h3>
+        <span className="rounded-md bg-[var(--bg-muted-strong)] px-2 py-1 text-11px font-semibold text-[var(--text-secondary)]">
           {value}
         </span>
       </div>
@@ -255,9 +250,9 @@ export function CompactRail({
 
 export function EmptyState({ description, title }: { description: string; title: string }) {
   return (
-    <div className="rounded-[18px] border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] p-4">
-      <div className="text-[13px] font-semibold text-[var(--text-primary)]">{title}</div>
-      <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p>
+    <div className="rounded-18px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] p-4">
+      <div className="text-13px font-semibold text-[var(--text-primary)]">{title}</div>
+      <p className="mt-1 text-12px leading-5 text-[var(--text-secondary)]">{description}</p>
     </div>
   );
 }

@@ -25,7 +25,7 @@ export function FilterDateInput({
 
   return (
     <label
-      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-12px font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
       onClick={handleClick}
       onKeyDown={handleKeyDown}
     >
@@ -33,7 +33,7 @@ export function FilterDateInput({
       <span className="whitespace-nowrap">{label}</span>
       <input
         ref={inputRef}
-        className="date-input-native w-[110px] cursor-pointer bg-transparent text-[12px] text-[var(--text-primary)] outline-none"
+        className="date-input-native w-[110px] cursor-pointer bg-transparent text-12px text-[var(--text-primary)] outline-none"
         onChange={(e) => onChange(e.target.value)}
         type="date"
         value={value}

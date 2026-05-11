@@ -206,7 +206,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <motion.div
               className={cn(
-                "pointer-events-auto rounded-[18px] bg-[var(--surface-base)] p-3.5 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.15),inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 backdrop-blur-md",
+                "pointer-events-auto rounded-18px bg-[var(--surface-base)] p-3.5 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.15),inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 backdrop-blur-md",
                 toneBorder[toast.tone],
               )}
               initial={{ opacity: 0, y: 20, scale: 0.94 }}
@@ -219,7 +219,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <div className="flex items-start gap-3">
                 <span
                   className={cn(
-                    "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-[12px]",
+                    "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
                     toneBg[toast.tone],
                   )}
                 >
@@ -227,16 +227,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   {toast.title ? (
-                    <div className="text-[13px] font-semibold text-[var(--text-primary)]">
+                    <div className="text-13px font-semibold text-[var(--text-primary)]">
                       {toast.title}
                     </div>
                   ) : null}
-                  <div className="text-[13px] leading-5 text-[var(--text-secondary)]">
+                  <div className="text-13px leading-5 text-[var(--text-secondary)]">
                     {toast.message}
                   </div>
                   {toast.onAction ? (
                     <button
-                      className="mt-2 text-[12px] font-semibold text-[var(--accent-primary)] hover:underline"
+                      className="mt-2 text-12px font-semibold text-[var(--accent-primary)] hover:underline"
                       onClick={() => {
                         toast.onAction?.();
                         dismiss(toast.id);
@@ -249,7 +249,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 </div>
                 <button
                   aria-label="Chiudi notifica"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-10px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
                   onClick={() => dismiss(toast.id)}
                   type="button"
                 >

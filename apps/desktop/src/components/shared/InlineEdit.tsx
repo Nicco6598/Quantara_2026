@@ -65,7 +65,7 @@ export function InlineEdit({
         ref={inputRef}
         aria-label={ariaLabel}
         className={cn(
-          "h-8 w-full min-w-0 rounded-[8px] border border-[var(--accent-primary)] bg-[var(--surface-base)] px-2 text-right text-[13px] outline-none ring-2 ring-[var(--ring-focus)]",
+          "h-8 w-full min-w-0 rounded-md border border-[var(--accent-primary)] bg-[var(--surface-base)] px-2 text-right text-13px outline-none ring-2 ring-[var(--ring-focus)]",
           className,
         )}
         min={min}
@@ -82,7 +82,7 @@ export function InlineEdit({
   return (
     <motion.button
       className={cn(
-        "h-8 w-full min-w-0 rounded-[8px] border border-transparent px-2 text-right text-[13px] transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)]",
+        "h-8 w-full min-w-0 rounded-md border border-transparent px-2 text-right text-13px transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)]",
         className,
       )}
       onClick={() => {

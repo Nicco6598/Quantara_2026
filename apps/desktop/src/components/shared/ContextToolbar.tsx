@@ -24,13 +24,13 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
       {count > 0 && (
         <motion.div
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="flex items-center gap-3 rounded-[20px] bg-[var(--surface-base)] px-3.5 py-2.5 shadow-[0_8px_28px_-12px_rgba(0,0,0,0.12)] ring-1 ring-[var(--border-subtle)]"
+          className="flex items-center gap-3 rounded-2xl bg-[var(--surface-base)] px-3.5 py-2.5 shadow-[0_8px_28px_-12px_rgba(0,0,0,0.12)] ring-1 ring-[var(--border-subtle)]"
           exit={{ opacity: 0, y: -6, scale: 0.98 }}
           initial={{ opacity: 0, y: -6, scale: 0.98 }}
           transition={{ duration: 0.22, ease: SOFT_EASE }}
         >
-          <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--text-primary)]">
-            <span className="flex size-6 items-center justify-center rounded-[8px] bg-[var(--accent-primary)] text-[11px] font-bold text-white">
+          <span className="inline-flex items-center gap-1.5 text-13px font-semibold text-[var(--text-primary)]">
+            <span className="flex size-6 items-center justify-center rounded-md bg-[var(--accent-primary)] text-11px font-bold text-white">
               {count}
             </span>
             {entityLabel} selezionat{count === 1 ? (entityLabel.endsWith("a") ? "a" : "o") : "i"}
@@ -42,7 +42,7 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
             {actions.map((action) => (
               <motion.button
                 className={
-                  "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold ring-1 transition-colors focus-visible:outline-2 focus-visible:outline-[var(--ring-focus)] focus-visible:outline-offset-2 " +
+                  "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-12px font-bold ring-1 transition-colors focus-visible:outline-2 focus-visible:outline-[var(--ring-focus)] focus-visible:outline-offset-2 " +
                   (action.tone === "danger"
                     ? "bg-[var(--danger-soft)] text-[var(--danger-base)] ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
                     : "bg-[var(--bg-muted)] text-[var(--text-primary)] ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]")

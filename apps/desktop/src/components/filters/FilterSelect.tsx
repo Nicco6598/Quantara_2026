@@ -33,12 +33,12 @@ export function FilterSelect({
   return (
     <div className="relative" ref={ref}>
       <button
-        className="flex items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+        className="flex items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-12px font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
         <span className="whitespace-nowrap">{label}:</span>
-        <span className="max-w-[140px] truncate text-[12px] font-semibold text-[var(--text-primary)]">
+        <span className="max-w-[140px] truncate text-12px font-semibold text-[var(--text-primary)]">
           {displayValue}
         </span>
         <ChevronDown
@@ -47,14 +47,14 @@ export function FilterSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-max min-w-full overflow-hidden rounded-[14px] bg-[var(--surface-base)] p-1 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
+        <div className="absolute left-0 top-full z-50 mt-1 w-max min-w-full overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
           {options.map((opt) => {
             const displayOpt = displayMap?.get(opt) ?? opt;
             const isSelected = opt === value;
             return (
               <button
                 className={cn(
-                  "flex w-full items-center rounded-[10px] px-3 py-2 text-left text-[12px] font-medium transition-colors",
+                  "flex w-full items-center rounded-10px px-3 py-2 text-left text-12px font-medium transition-colors",
                   isSelected
                     ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
                     : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",

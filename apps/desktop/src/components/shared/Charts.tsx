@@ -62,10 +62,10 @@ export function ModernDonut({
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="animate-num text-[26px] font-bold leading-none tabular-nums text-[var(--text-primary)]">
+        <span className="animate-num text-26px font-bold leading-none tabular-nums text-[var(--text-primary)]">
           {total}
         </span>
-        <span className="mt-1 animate-[fade-in_0.4s_ease-out_0.6s_both] text-[10px] font-medium text-[var(--text-secondary)]">
+        <span className="mt-1 animate-[fade-in_0.4s_ease-out_0.6s_both] text-10px font-medium text-[var(--text-secondary)]">
           totale
         </span>
       </div>
@@ -85,13 +85,13 @@ export function SegmentBars({ segments, className }: { segments: Segment[]; clas
         return (
           <div key={seg.label}>
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+              <span className="flex items-center gap-2 text-12px font-medium text-[var(--text-secondary)]">
                 <span className="size-2 rounded-full" style={{ backgroundColor: seg.color }} />
                 {seg.label}
               </span>
-              <span className="text-[13px] font-bold tabular-nums text-[var(--text-primary)]">
+              <span className="text-13px font-bold tabular-nums text-[var(--text-primary)]">
                 {seg.value}
-                <span className="ml-1 text-[11px] font-medium text-[var(--text-secondary)]">
+                <span className="ml-1 text-11px font-medium text-[var(--text-secondary)]">
                   {Math.round(pct)}%
                 </span>
               </span>
@@ -207,7 +207,7 @@ export function AnimatedBarChart({
                 }}
               />
               <text
-                className="fill-[var(--text-secondary)] text-[9px] font-medium"
+                className="fill-[var(--text-secondary)] text-9px font-medium"
                 textAnchor="middle"
                 x={x + barWidth / 2}
                 y={height + 16}
@@ -239,7 +239,7 @@ export function AnimatedHorizontalBars({
 
         return (
           <div key={item.label}>
-            <div className="mb-1.5 flex items-center justify-between text-[12px]">
+            <div className="mb-1.5 flex items-center justify-between text-12px">
               <span className="font-medium text-[var(--text-secondary)]">{item.label}</span>
               <span className="font-semibold text-[var(--text-primary)]">
                 {item.value.toLocaleString("it-IT")}

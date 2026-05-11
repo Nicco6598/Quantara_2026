@@ -20,7 +20,7 @@ export function CommandPanel({
   return (
     <section
       className={cn(
-        "screen-panel relative overflow-hidden rounded-[28px] border border-subtle p-6 shadow-soft",
+        "screen-panel relative overflow-hidden rounded-4xl border border-subtle p-6 shadow-soft",
         variant === "projects" && "projects-command-surface",
         variant === "settings" && "settings-command-surface",
         className,
@@ -38,7 +38,7 @@ export function SectionPanel({
 }: ComponentPropsWithoutRef<"section">) {
   return (
     <section
-      className={cn("screen-panel rounded-[28px] border border-subtle p-5 shadow-soft", className)}
+      className={cn("screen-panel rounded-4xl border border-subtle p-5 shadow-soft", className)}
       {...props}
     >
       {children}
@@ -60,7 +60,7 @@ export function SectionHeading({
       {Icon ? <Icon className="size-4 text-info" /> : null}
       <div>
         {kicker ? (
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary">
+          <div className="text-11px font-semibold uppercase tracking-0_18em text-secondary">
             {kicker}
           </div>
         ) : null}
@@ -84,8 +84,8 @@ export function MetricTile({
   value: string;
 }) {
   return (
-    <div className="metric-tile rounded-[22px] border border-subtle bg-muted/35 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+    <div className="metric-tile rounded-22px border border-subtle bg-muted/35 p-4">
+      <div className="text-11px font-semibold uppercase tracking-overline text-secondary">
         {label}
       </div>
       <div className={cn("mt-3 text-2xl font-semibold", toneClass(tone))}>{value}</div>

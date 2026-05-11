@@ -74,7 +74,7 @@ export function SavedViewSelector({
   return (
     <div className="relative">
       <button
-        className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-4 text-[12px] font-semibold text-[var(--info-base)] ring-1 ring-[var(--info-base)]/25 transition-colors hover:bg-[var(--info-soft)]/80 hover:ring-[var(--info-base)]/40"
+        className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-4 text-12px font-semibold text-[var(--info-base)] ring-1 ring-[var(--info-base)]/25 transition-colors hover:bg-[var(--info-soft)]/80 hover:ring-[var(--info-base)]/40"
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
@@ -93,9 +93,9 @@ export function SavedViewSelector({
             }}
             type="button"
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-[18px] bg-[var(--surface-base)] p-1.5 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
+          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+              <span className="text-12px font-semibold text-[var(--text-primary)]">
                 Viste salvate
               </span>
               <button
@@ -114,7 +114,7 @@ export function SavedViewSelector({
             {isSaving ? (
               <div className="px-3 pb-3">
                 <input
-                  className="mt-1 h-9 w-full rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-muted)]/50 px-3 text-[13px] font-medium outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  className="mt-1 h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)]/50 px-3 text-13px font-medium outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   onChange={(e) => setViewName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleSave();
@@ -124,14 +124,14 @@ export function SavedViewSelector({
                 />
                 <div className="mt-2 flex justify-end gap-1.5">
                   <button
-                    className="inline-flex h-8 items-center rounded-full bg-[var(--bg-muted)] px-3 text-[11px] font-semibold text-[var(--text-secondary)]"
+                    className="inline-flex h-8 items-center rounded-full bg-[var(--bg-muted)] px-3 text-11px font-semibold text-[var(--text-secondary)]"
                     onClick={() => setIsSaving(false)}
                     type="button"
                   >
                     Annulla
                   </button>
                   <button
-                    className="inline-flex h-8 items-center rounded-full bg-[var(--accent-primary)] px-3 text-[11px] font-bold text-white disabled:opacity-50"
+                    className="inline-flex h-8 items-center rounded-full bg-[var(--accent-primary)] px-3 text-11px font-bold text-white disabled:opacity-50"
                     disabled={viewName.trim().length < 2}
                     onClick={handleSave}
                     type="button"
@@ -145,13 +145,13 @@ export function SavedViewSelector({
               <>
                 <div className="max-h-[260px] overflow-y-auto">
                   {views.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-[12px] text-[var(--text-secondary)]">
+                    <div className="px-3 py-6 text-center text-12px text-[var(--text-secondary)]">
                       Nessuna vista salvata.
                     </div>
                   ) : (
                     views.map((view) => (
                       <div
-                        className="group flex items-center gap-2 rounded-[14px] px-3 py-2.5 transition-colors hover:bg-[var(--bg-muted)]"
+                        className="group flex items-center gap-2 rounded-14px px-3 py-2.5 transition-colors hover:bg-[var(--bg-muted)]"
                         key={view.id}
                       >
                         <button
@@ -162,10 +162,10 @@ export function SavedViewSelector({
                           }}
                           type="button"
                         >
-                          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                          <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
                             {view.name}
                           </div>
-                          <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">
+                          <div className="mt-0.5 truncate text-11px text-[var(--text-secondary)]">
                             {Object.entries(view.filters)
                               .filter(([, v]) => v && v !== "all" && v !== "Tutti")
                               .map(([k, v]) => `${k}: ${v}`)
@@ -186,7 +186,7 @@ export function SavedViewSelector({
                 </div>
                 <div className="border-t border-[var(--border-subtle)]/50 px-3 py-2">
                   <button
-                    className="flex w-full items-center gap-2 rounded-[12px] px-2 py-2 text-[12px] font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--info-soft)]/30"
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-12px font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--info-soft)]/30"
                     onClick={() => setIsSaving(true)}
                     type="button"
                   >

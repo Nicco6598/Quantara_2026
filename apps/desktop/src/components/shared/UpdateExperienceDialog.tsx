@@ -24,7 +24,7 @@ export function UpdateExperienceDialog({
   return createPortal(
     <div
       aria-modal="true"
-      className="fixed inset-0 z-[210] flex min-h-0 items-center justify-center overflow-hidden bg-black/45 p-3 backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-[210] flex min-h-0 items-center justify-center overflow-hidden bg-[var(--overlay-bg)] p-3 backdrop-blur-sm sm:p-4"
       role="dialog"
     >
       <button
@@ -35,24 +35,24 @@ export function UpdateExperienceDialog({
         type="button"
       />
       <motion.div
-        className="relative flex max-h-[calc(100dvh-24px)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-[26px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] sm:max-h-[calc(100dvh-32px)] sm:rounded-[30px] sm:p-1.5"
+        className="relative flex max-h-[calc(100dvh-24px)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-26px bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] sm:max-h-[calc(100dvh-32px)] sm:rounded-5xl sm:p-1.5"
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: SOFT_EASE }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
       >
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-[22px] bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] sm:rounded-[24px]">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-22px bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] sm:rounded-3xl">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3 sm:gap-4 sm:px-5 sm:py-4">
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+              <div className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
                 Aggiornamento disponibile
               </div>
-              <h3 className="mt-1 truncate text-[17px] font-semibold text-[var(--text-primary)] sm:text-[18px]">
+              <h3 className="mt-1 truncate text-17px font-semibold text-[var(--text-primary)] sm:text-18px">
                 Da v{update.currentVersion} a v{update.version}
               </h3>
             </div>
             <button
               aria-label="Chiudi updater"
-              className="flex size-9 items-center justify-center rounded-[14px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex size-9 items-center justify-center rounded-14px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isBusy}
               onClick={onClose}
               type="button"
@@ -63,14 +63,14 @@ export function UpdateExperienceDialog({
 
           <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_260px]">
             <div className="flex min-h-0 flex-col p-4 sm:p-5">
-              <span className="inline-flex items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
                 <Sparkles className="size-3" />
                 Nuova versione pronta
               </span>
-              <h2 className="mt-4 text-[20px] font-semibold leading-tight text-[var(--text-primary)] sm:text-[22px]">
+              <h2 className="mt-4 text-20px font-semibold leading-tight text-[var(--text-primary)] sm:text-22px">
                 Cosa cambia in v{update.version}
               </h2>
-              <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)] sm:leading-6">
+              <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)] sm:leading-6">
                 Quantara scaricherà la patch, applicherà l'update e riaprirà l'app sulla nuova
                 versione.
               </p>
@@ -79,7 +79,7 @@ export function UpdateExperienceDialog({
                 {notes.length > 0 ? (
                   notes.map((note, i) => (
                     <div
-                      className="flex min-w-0 items-start gap-3 rounded-[14px] bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)] sm:px-4 sm:py-3"
+                      className="flex min-w-0 items-start gap-3 rounded-14px bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)] sm:px-4 sm:py-3"
                       key={note.key}
                     >
                       <span
@@ -92,13 +92,13 @@ export function UpdateExperienceDialog({
                               : "bg-[var(--accent-primary)]",
                         )}
                       />
-                      <span className="min-w-0 break-words text-[13px] leading-5 text-[var(--text-primary)]">
+                      <span className="min-w-0 break-words text-13px leading-5 text-[var(--text-primary)]">
                         {note.text}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-[14px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 py-4 text-center text-[13px] text-[var(--text-secondary)]">
+                  <div className="rounded-14px border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 py-4 text-center text-13px text-[var(--text-secondary)]">
                     Nessuna nota release disponibile per questa build.
                   </div>
                 )}
@@ -117,7 +117,7 @@ export function UpdateExperienceDialog({
               </div>
 
               {installState.phase === "error" ? (
-                <div className="mt-4 rounded-[14px] bg-[var(--danger-soft)] px-4 py-3 text-[13px] font-medium text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)]">
+                <div className="mt-4 rounded-14px bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)]">
                   {installState.message}
                 </div>
               ) : null}
@@ -134,7 +134,7 @@ export function UpdateExperienceDialog({
                   )}
                 </ActionButton>
                 <button
-                  className="group inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-5 text-[13px] font-semibold text-[var(--text-primary)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="group inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={isBusy}
                   onClick={onClose}
                   type="button"
@@ -162,7 +162,7 @@ function ActionButton({
 }) {
   return (
     <motion.button
-      className="micro-interact group inline-flex h-11 w-full shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-[13px] font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
+      className="micro-interact group inline-flex h-11 w-full shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-13px font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -189,14 +189,14 @@ function MetricPill({
   value: string;
 }) {
   return (
-    <div className="rounded-[16px] bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+    <div className="rounded-xl bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
       <div className="flex items-center gap-3">
         <Icon className="size-4 text-[var(--info-base)]" />
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+          <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
             {label}
           </div>
-          <div className="mt-0.5 text-[13px] font-semibold text-[var(--text-primary)]">{value}</div>
+          <div className="mt-0.5 text-13px font-semibold text-[var(--text-primary)]">{value}</div>
         </div>
       </div>
     </div>

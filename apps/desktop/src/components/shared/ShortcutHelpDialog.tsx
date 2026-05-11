@@ -23,7 +23,7 @@ export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/35 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[85] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
       <button
         aria-label="Chiudi guida scorciatoie"
         className="absolute inset-0 cursor-default"
@@ -32,11 +32,11 @@ export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
       />
       <section
         aria-label="Scorciatoie tastiera"
-        className="relative w-full max-w-lg rounded-[24px] border border-subtle bg-card p-5 shadow-panel"
+        className="relative w-full max-w-lg rounded-3xl border border-subtle bg-card p-5 shadow-panel"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-[16px] bg-primary text-white">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-white">
               <Keyboard className="size-5" />
             </span>
             <div>
@@ -46,7 +46,7 @@ export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
           </div>
           <button
             aria-label="Chiudi"
-            className="flex size-9 items-center justify-center rounded-[14px] text-secondary hover:bg-muted hover:text-foreground"
+            className="flex size-9 items-center justify-center rounded-14px text-secondary hover:bg-muted hover:text-foreground"
             onClick={onClose}
             type="button"
           >
@@ -56,11 +56,11 @@ export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
         <div className="mt-5 space-y-2">
           {shortcuts.map((shortcut) => (
             <div
-              className="flex items-center justify-between gap-4 rounded-[16px] border border-subtle bg-muted/35 px-3 py-2.5"
+              className="flex items-center justify-between gap-4 rounded-xl border border-subtle bg-muted/35 px-3 py-2.5"
               key={shortcut.keys}
             >
               <span className="text-sm text-foreground">{shortcut.label}</span>
-              <kbd className="shrink-0 rounded-[10px] border border-subtle bg-card px-2.5 py-1 text-xs font-semibold text-secondary">
+              <kbd className="shrink-0 rounded-10px border border-subtle bg-card px-2.5 py-1 text-xs font-semibold text-secondary">
                 {shortcut.keys}
               </kbd>
             </div>

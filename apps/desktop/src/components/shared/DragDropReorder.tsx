@@ -45,7 +45,7 @@ function DragDropReorderInner<T>({
                   >
                     <div
                       className={cn(
-                        "group flex items-stretch rounded-[12px]",
+                        "group flex items-stretch rounded-lg",
                         snapshot.isDragging &&
                           "shadow-[0_8px_28px_-6px_rgba(0,0,0,0.15),0_0_0_1px_var(--border-subtle)]",
                         snapshot.dropAnimation &&

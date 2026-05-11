@@ -65,7 +65,7 @@ export function SaveIndicator({ status, lastSavedAt, className }: SaveIndicatorP
         />
         <span
           className={cn(
-            "text-[11px] font-bold transition-colors",
+            "text-11px font-bold transition-colors",
             status === "saved" && "text-[var(--success-base)]",
             status === "saving" && "text-[var(--info-base)]",
             status === "dirty" && "text-[var(--warning-base)]",
@@ -74,7 +74,7 @@ export function SaveIndicator({ status, lastSavedAt, className }: SaveIndicatorP
           {meta.label}
         </span>
         {status === "saved" && timeLabel && (
-          <span className="text-[10px] text-[var(--text-secondary)]">alle {timeLabel}</span>
+          <span className="text-10px text-[var(--text-secondary)]">alle {timeLabel}</span>
         )}
       </motion.div>
     </AnimatePresence>

@@ -17,7 +17,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { SaveIndicator } from "@/components/shared/SaveIndicator";
-import { BezelSurface } from "@/components/shared/ui-primitives";
 import { cn } from "@/lib/utils";
 import { type QuantaraRoute, useNavigationState, usePreferenceState } from "@/store/app-store";
 
@@ -47,6 +46,14 @@ function todayLabel(): string {
   const day = now.toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
   const time = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
   return `${day} · Aggiornato alle ${time}`;
+}
+
+function formatToolbarMoney(value: number): string {
+  return value.toLocaleString("it-IT", {
+    currency: "EUR",
+    maximumFractionDigits: 0,
+    style: "currency",
+  });
 }
 
 const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
@@ -108,7 +115,7 @@ function ActionMarkIcon({ mark, size = 12 }: { mark: string; size?: number }) {
   const Icon = markIconMap[mark];
 
   if (!Icon) {
-    return <span className="text-[10px] font-black">{mark}</span>;
+    return <span className="text-10px font-black">{mark}</span>;
   }
 
   return <Icon size={size} weight="bold" />;
@@ -126,10 +133,7 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
 
   return (
     <header className="top-toolbar-shell relative z-30 shrink-0 px-3 py-2 md:px-4">
-      <BezelSurface
-        className="top-toolbar-bezel"
-        innerClassName="top-toolbar-core flex min-h-[52px] items-center justify-between gap-3 py-2 pl-[58px] pr-3 md:pr-4"
-      >
+      <div className="flex min-h-[52px] items-center justify-between gap-3 py-2 pl-[58px] pr-3 md:pr-4">
         <HistoryNavigator />
 
         <div className="flex min-w-0 items-center gap-3">
@@ -138,11 +142,11 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
           </div>
 
           <div className="min-w-0 border-l border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] pl-3">
-            <h1 className="truncate text-[18px] font-semibold leading-5 text-[var(--text-primary)] md:text-[20px]">
+            <h1 className="truncate text-18px font-semibold leading-5 text-[var(--text-primary)] md:text-20px">
               {meta.title}
             </h1>
             <div className="mt-0.5 hidden items-center gap-2 lg:flex">
-              <span className="truncate text-[10px] font-semibold text-[var(--text-secondary)]">
+              <span className="truncate text-10px font-semibold text-[var(--text-secondary)]">
                 {todayLabel()}
               </span>
               <SaveIndicator status="saved" lastSavedAt={null} />
@@ -154,7 +158,7 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
           {isTariffPreview ? (
             <TariffImportControls onAction={onPageAction} />
           ) : activeRoute === "sal-create" ? (
-            <SalStepNav onAction={onPageAction} />
+            <SalToolbarControls onAction={onPageAction} />
           ) : (
             <>
               <div className="top-toolbar-divider" />
@@ -164,7 +168,7 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
           <div className="top-toolbar-divider" />
           <UtilityButtons onAction={onPageAction} />
         </div>
-      </BezelSurface>
+      </div>
     </header>
   );
 }
@@ -203,7 +207,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         </button>
         <button
           aria-expanded={isFileMenuOpen}
-          className="flex h-8 min-w-[164px] max-w-[220px] items-center justify-between gap-2 rounded-full bg-[var(--bg-muted)] px-2.5 text-left text-[10px] font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+          className="flex h-8 min-w-[164px] max-w-[220px] items-center justify-between gap-2 rounded-full bg-[var(--bg-muted)] px-2.5 text-left text-10px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
           onClick={() => setIsFileMenuOpen((current) => !current)}
           title={activeLabel}
           type="button"
@@ -241,18 +245,18 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
               />
               <motion.div
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="absolute right-0 top-full z-50 mt-3 w-[360px] overflow-hidden rounded-[22px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_72%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
+                className="absolute right-0 top-full z-50 mt-3 w-[360px] overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--bg-muted-strong)_72%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
                 exit={{ opacity: 0, scale: 0.96, y: -8 }}
                 initial={{ opacity: 0, scale: 0.96, y: -8 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               >
-                <div className="max-h-[360px] overflow-y-auto rounded-[17px] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] p-1">
+                <div className="max-h-[360px] overflow-y-auto rounded-17px bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] p-1">
                   {tariffImportToolbar.fileLabels.map((label, index) => {
                     const isActive = index === tariffImportToolbar.activeIndex;
                     return (
                       <button
                         className={cn(
-                          "flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition-colors",
+                          "flex w-full items-center gap-3 rounded-14px px-3 py-2.5 text-left transition-colors",
                           isActive
                             ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
                             : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
@@ -264,10 +268,10 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
                         }}
                         type="button"
                       >
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-current/10 text-[10px] font-black">
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-current/10 text-10px font-black">
                           {index + 1}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">
+                        <span className="min-w-0 flex-1 truncate text-12px font-semibold">
                           {label}
                         </span>
                       </button>
@@ -279,11 +283,11 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
           ) : null}
         </AnimatePresence>
       </div>
-      <div className="hidden min-h-9 items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3 py-1 text-[10px] font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)] 2xl:flex">
+      <div className="hidden min-h-9 items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3 py-1 text-10px font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)] 2xl:flex">
         <div className="flex flex-col justify-center gap-0.5 leading-none">
           <span
             className={cn(
-              "text-[11px]",
+              "text-11px",
               tariffImportToolbar.reviewedCount === fileCount && fileCount > 0
                 ? "text-[var(--success-base)]"
                 : tariffImportToolbar.reviewedCount > 0
@@ -291,32 +295,32 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
                   : "text-[var(--text-secondary)]",
             )}
           >
-            <span className="text-[10px] font-semibold text-[var(--text-secondary)]">Rev.</span>{" "}
+            <span className="text-10px font-semibold text-[var(--text-secondary)]">Rev.</span>{" "}
             {tariffImportToolbar.reviewedCount}/{fileCount}
           </span>
           <span
             className={cn(
-              "text-[11px]",
+              "text-11px",
               tariffImportToolbar.draftedCount > 0
                 ? "text-[var(--warning-base)]"
                 : "text-[var(--text-secondary)]",
             )}
           >
-            <span className="text-[10px] font-semibold text-[var(--text-secondary)]">Bozza</span>{" "}
+            <span className="text-10px font-semibold text-[var(--text-secondary)]">Bozza</span>{" "}
             {tariffImportToolbar.draftedCount}/{fileCount}
           </span>
         </div>
         <div className="h-8 w-px bg-[var(--border-subtle)]/60" />
         <div className="flex flex-col items-center">
-          <span className="text-[15px] font-black tabular-nums leading-none text-[var(--text-primary)]">
+          <span className="text-15px font-black tabular-nums leading-none text-[var(--text-primary)]">
             {fileCount}
           </span>
-          <span className="text-[9px] font-semibold text-[var(--text-secondary)]">totali</span>
+          <span className="text-9px font-semibold text-[var(--text-secondary)]">totali</span>
         </div>
       </div>
       <motion.button
         className={cn(
-          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold transition-colors",
+          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold transition-colors",
           tariffImportToolbar.activeReviewed
             ? "bg-[color-mix(in_srgb,var(--success-base)_14%,var(--surface-base))] text-[color-mix(in_srgb,var(--success-base)_74%,var(--text-primary))] ring-1 ring-[color-mix(in_srgb,var(--success-base)_42%,var(--border-subtle))] shadow-[inset_0_1px_0_color-mix(in_srgb,white_58%,transparent)]"
             : "top-toolbar-action-outline text-[var(--text-primary)]",
@@ -342,7 +346,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
       </motion.button>
       <motion.button
         className={cn(
-          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold transition-colors",
+          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold transition-colors",
           tariffImportToolbar.activeDrafted
             ? "bg-[color-mix(in_srgb,var(--warning-base)_14%,var(--surface-base))] text-[color-mix(in_srgb,var(--warning-base)_76%,var(--text-primary))] ring-1 ring-[color-mix(in_srgb,var(--warning-base)_42%,var(--border-subtle))]"
             : "top-toolbar-action-outline text-[var(--text-primary)]",
@@ -367,7 +371,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
       </motion.button>
       <motion.button
         className={cn(
-          "top-toolbar-action top-toolbar-action-primary group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold text-[var(--text-inverse)]",
+          "top-toolbar-action top-toolbar-action-primary group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold text-[var(--text-inverse)]",
           !tariffImportToolbar.canConfirm && "cursor-not-allowed opacity-45",
         )}
         disabled={!tariffImportToolbar.canConfirm}
@@ -380,6 +384,76 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         </span>
         <span>Approva import</span>
       </motion.button>
+    </div>
+  );
+}
+
+function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void }) {
+  const { salToolbar } = useNavigationState();
+
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <SalStepNav onAction={onAction} />
+      <div className="top-toolbar-divider hidden xl:block" />
+      <div className="hidden min-h-9 items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3 py-1 text-10px font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)] xl:flex">
+        <ToolbarMetric label="Totale" tone="accent" value={formatToolbarMoney(salToolbar.total)} />
+        <div className="h-8 w-px bg-[var(--border-subtle)]/60" />
+        <ToolbarMetric label="Voci" value={`${salToolbar.lineCount}/${salToolbar.voicesCount}`} />
+        <div className="h-8 w-px bg-[var(--border-subtle)]/60" />
+        <ToolbarMetric
+          label="Residuo"
+          tone={salToolbar.budgetResidual < 0 ? "danger" : "success"}
+          value={formatToolbarMoney(salToolbar.budgetResidual)}
+        />
+        {salToolbar.discountAmount > 0 ? (
+          <>
+            <div className="h-8 w-px bg-[var(--border-subtle)]/60" />
+            <ToolbarMetric
+              label="Ribasso"
+              tone="danger"
+              value={`-${formatToolbarMoney(salToolbar.discountAmount)}`}
+            />
+          </>
+        ) : null}
+      </div>
+      <motion.button
+        className="top-toolbar-action top-toolbar-action-outline group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold text-[var(--text-primary)]"
+        onClick={() => onAction("sal-save-draft")}
+        title="Salva bozza SAL"
+        type="button"
+      >
+        <span className="top-toolbar-action-mark">
+          <FloppyDisk size={13} weight="bold" />
+        </span>
+        <span>Salva bozza</span>
+      </motion.button>
+    </div>
+  );
+}
+
+function ToolbarMetric({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone?: "accent" | "danger" | "success";
+  value: string;
+}) {
+  return (
+    <div className="flex flex-col justify-center gap-0.5 leading-none">
+      <span className="text-9px font-semibold text-[var(--text-secondary)]">{label}</span>
+      <span
+        className={cn(
+          "max-w-[112px] truncate text-11px font-black tabular-nums text-[var(--text-primary)]",
+          tone === "accent" && "text-[var(--accent-primary)]",
+          tone === "danger" && "text-[var(--danger-base)]",
+          tone === "success" && "text-[var(--success-base)]",
+        )}
+        title={value}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -414,7 +488,7 @@ function SalStepNav({ onAction }: { onAction?: (actionId: string) => void }) {
             )}
             <button
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold whitespace-nowrap transition-all duration-200",
+                "inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-10px font-bold whitespace-nowrap transition-all duration-200",
                 isCurrent && "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm",
                 isCompleted && "bg-[var(--success-soft)] text-[var(--success-base)]",
                 !isCurrent &&
@@ -428,7 +502,7 @@ function SalStepNav({ onAction }: { onAction?: (actionId: string) => void }) {
               }}
               type="button"
             >
-              <span className="text-[10px]">{step.icon}</span>
+              <span className="text-10px">{step.icon}</span>
               <span>{step.label}</span>
             </button>
           </div>
@@ -483,7 +557,7 @@ function HistoryNavigator() {
             />
             <motion.div
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="top-toolbar-history-menu absolute left-0 top-full z-50 mt-2 w-[260px] overflow-hidden rounded-[18px] p-1.5"
+              className="top-toolbar-history-menu absolute left-0 top-full z-50 mt-2 w-[260px] overflow-hidden rounded-18px p-1.5"
               exit={{ opacity: 0, scale: 0.97, y: -6 }}
               initial={{ opacity: 0, scale: 0.97, y: -6 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
@@ -499,7 +573,7 @@ function HistoryNavigator() {
                 >
                   <CaretRight size={14} weight="bold" />
                 </HistoryButton>
-                <span className="ml-auto px-2 text-[10px] font-semibold text-[var(--text-secondary)]">
+                <span className="ml-auto px-2 text-10px font-semibold text-[var(--text-secondary)]">
                   {routeHistoryIndex + 1}/{routeHistory.length}
                 </span>
               </div>
@@ -510,7 +584,7 @@ function HistoryNavigator() {
                   return (
                     <button
                       className={cn(
-                        "top-toolbar-history-item flex w-full items-center gap-2 rounded-[12px] px-2.5 py-2 text-left",
+                        "top-toolbar-history-item flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left",
                         isActive && "top-toolbar-history-item-active",
                       )}
                       disabled={isActive}
@@ -525,11 +599,11 @@ function HistoryNavigator() {
                         {String(entry.index + 1).padStart(2, "0")}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-semibold text-[var(--text-primary)]">
+                        <span className="block truncate text-12px font-semibold text-[var(--text-primary)]">
                           {routeMetaMap[entry.route].title}
                         </span>
                         {entry.context ? (
-                          <span className="mt-0.5 block truncate text-[10px] font-medium text-[var(--text-secondary)]">
+                          <span className="mt-0.5 block truncate text-10px font-medium text-[var(--text-secondary)]">
                             {entry.context}
                           </span>
                         ) : null}
@@ -602,7 +676,7 @@ function PageActions({
         return (
           <motion.button
             className={cn(
-              "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold",
+              "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold",
               action.variant === "outline"
                 ? "top-toolbar-action-outline text-[var(--text-primary)]"
                 : "top-toolbar-action-primary text-[var(--text-inverse)]",
@@ -644,7 +718,7 @@ function PageActionMenu({
       <motion.button
         aria-expanded={isOpen}
         className={cn(
-          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold",
+          "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold",
           isPrimary
             ? "top-toolbar-action-primary text-[var(--text-inverse)]"
             : "top-toolbar-action-outline text-[var(--text-primary)]",
@@ -676,7 +750,7 @@ function PageActionMenu({
             />
             <motion.div
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-[24px] bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
+              className="absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
               exit={{ opacity: 0, scale: 0.96, y: -10 }}
               initial={{ opacity: 0, scale: 0.96, y: -10 }}
               transition={{
@@ -685,12 +759,12 @@ function PageActionMenu({
                 damping: 26,
               }}
             >
-              <div className="rounded-[18px] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
+              <div className="rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
                 {action.menuItems?.map((item, index) => {
                   return (
                     <motion.button
                       animate={{ opacity: 1, x: 0 }}
-                      className="flex w-full items-start gap-3 rounded-[18px] px-3 py-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)]"
+                      className="flex w-full items-start gap-3 rounded-18px px-3 py-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)]"
                       initial={{ opacity: 0, x: -12 }}
                       key={item.actionId}
                       onClick={() => {
@@ -704,14 +778,14 @@ function PageActionMenu({
                       }}
                       type="button"
                     >
-                      <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-[16px] bg-[var(--info-soft)] text-[var(--info-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_22%,transparent)]">
+                      <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--info-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_22%,transparent)]">
                         <ActionMarkIcon mark={item.mark} size={18} />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-[13px] font-semibold text-[var(--text-primary)]">
+                        <span className="block text-13px font-semibold text-[var(--text-primary)]">
                           {item.label}
                         </span>
-                        <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-secondary)]">
+                        <span className="mt-0.5 block text-11px leading-4 text-[var(--text-secondary)]">
                           {item.description}
                         </span>
                       </span>
