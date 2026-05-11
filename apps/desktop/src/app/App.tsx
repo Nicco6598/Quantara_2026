@@ -70,6 +70,7 @@ function ThemeApplier() {
 
 function WindowTitleBar({
   activeRoute,
+  isCommandPaletteOpen,
   isFullscreen,
   isSidebarCollapsed,
   isMacOs,
@@ -79,6 +80,7 @@ function WindowTitleBar({
   onToggleSidebar,
 }: {
   activeRoute: QuantaraRoute;
+  isCommandPaletteOpen: boolean;
   isFullscreen: boolean;
   isSidebarCollapsed: boolean;
   isMacOs: boolean;
@@ -88,6 +90,12 @@ function WindowTitleBar({
   onToggleSidebar: () => void;
 }) {
   const [isRouteMenuOpen, setIsRouteMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (isCommandPaletteOpen) {
+      setIsRouteMenuOpen(false);
+    }
+  }, [isCommandPaletteOpen]);
   const commandButtonRef = useRef<HTMLButtonElement>(null);
   const { themeMode, toggleTheme } = useThemeState();
   const activeRouteItem =
@@ -337,8 +345,14 @@ export function App() {
 function AppShell() {
   useAutomaticUpdater();
 
-  const { activeRoute, canGoBack, canGoForward, navigateBack, navigateForward } =
-    useNavigationState();
+  const {
+    activeRoute,
+    canGoBack,
+    canGoForward,
+    navigateBack,
+    navigateForward,
+    pendingWorkflowAction,
+  } = useNavigationState();
   const navigate = useNavigate();
   const { notify } = useToast();
   const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();
@@ -365,10 +379,8 @@ function AppShell() {
   const handleTopbarAction = useCallback(
     (actionId: string) => {
       if (actionId === "new-project") {
+        useAppStore.getState().setPendingWorkflowAction("new-project");
         navigate("projects");
-        window.setTimeout(() => {
-          useAppStore.getState().setPendingWorkflowAction("new-project");
-        }, 0);
         notify({
           message: "Aperta la creazione guidata del progetto.",
           title: "Nuovo progetto",
@@ -378,12 +390,8 @@ function AppShell() {
       }
 
       if (actionId === "new-sal") {
-        if (activeRoute !== "projects") {
-          navigate("projects");
-        }
-        window.setTimeout(() => {
-          useAppStore.getState().setPendingWorkflowAction("new-sal");
-        }, 0);
+        useAppStore.getState().setPendingWorkflowAction("new-sal");
+        navigate("sal-create");
         notify({
           message: "Aperta la creazione guidata del SAL.",
           title: "Nuovo SAL",
@@ -393,10 +401,8 @@ function AppShell() {
       }
 
       if (actionId === "import-tariff") {
+        useAppStore.getState().setPendingWorkflowAction("import-tariff");
         navigate("tariffs");
-        window.setTimeout(() => {
-          useAppStore.getState().setPendingWorkflowAction("import-tariff");
-        }, 0);
         notify({
           message: "Pronta la schermata di importazione tariffario.",
           title: "Import tariffario",
@@ -419,6 +425,11 @@ function AppShell() {
         if (step >= 1 && step <= 4) {
           useAppStore.getState().setSalPendingStep(step);
         }
+        return;
+      }
+
+      if (actionId === "sal-save-draft") {
+        window.dispatchEvent(new CustomEvent("sal-create-action", { detail: actionId }));
         return;
       }
 
@@ -457,7 +468,7 @@ function AppShell() {
         return;
       }
     },
-    [activeRoute, navigate, notify],
+    [navigate, notify],
   );
 
   useEffect(() => {
@@ -684,6 +695,7 @@ function AppShell() {
     >
       <WindowTitleBar
         activeRoute={activeRoute}
+        isCommandPaletteOpen={isCommandPaletteOpen}
         isFullscreen={isFullscreen}
         isSidebarCollapsed={isSidebarCollapsed}
         isMacOs={isMacOs}
@@ -736,7 +748,10 @@ function AppShell() {
             <TopToolbar onPageAction={handleTopbarAction} />
 
             <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-              <RouteRenderer activeRoute={activeRoute} />
+              <RouteRenderer
+                activeRoute={activeRoute}
+                pendingWorkflowAction={pendingWorkflowAction}
+              />
             </div>
           </div>
         </section>
