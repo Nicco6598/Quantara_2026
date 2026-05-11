@@ -1,6 +1,6 @@
-import { motion } from "framer-motion";
 import { Search, XCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type AutocompleteOption = {
@@ -14,33 +14,35 @@ type AutocompleteInputProps = {
   options: AutocompleteOption[];
   onSelect: (option: AutocompleteOption) => void;
   placeholder?: string;
-  maxResults?: number;
 };
+
+const RESULTS_MAX_HEIGHT = 520;
+
+type DropdownPos = { left: number; top: number; width: number };
 
 export function AutocompleteInput({
   options,
   onSelect,
   placeholder = "Cerca per codice o descrizione...",
-  maxResults = 12,
 }: AutocompleteInputProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [floating, setFloating] = useState<DropdownPos | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [] as AutocompleteOption[];
-    return options
-      .filter(
-        (opt) =>
-          opt.value.toLowerCase().includes(q) ||
-          opt.label.toLowerCase().includes(q) ||
-          opt.keywords?.toLowerCase().includes(q),
-      )
-      .slice(0, maxResults);
-  }, [options, query, maxResults]);
+    return options.filter(
+      (opt) =>
+        opt.value.toLowerCase().includes(q) ||
+        opt.label.toLowerCase().includes(q) ||
+        opt.keywords?.toLowerCase().includes(q),
+    );
+  }, [options, query]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -50,8 +52,36 @@ export function AutocompleteInput({
     onSelect(option);
     setQuery("");
     setIsOpen(false);
+    setFloating(null);
     inputRef.current?.focus();
   }
+
+  const measure = useCallback(() => {
+    if (!containerRef.current) return;
+    const inputField = containerRef.current.querySelector<HTMLElement>(".autocomplete-input-field");
+    const el = inputField ?? containerRef.current;
+    const rect = el.getBoundingClientRect();
+    const viewportW = window.innerWidth;
+    const w = Math.min(rect.width, viewportW - 24);
+    const l = Math.min(Math.max(rect.left, 12), viewportW - w - 12);
+    setFloating({ left: l, top: rect.bottom + 8, width: w });
+  }, []);
+
+  const showResults = isOpen && filtered.length > 0;
+
+  useEffect(() => {
+    if (!showResults) {
+      setFloating(null);
+      return;
+    }
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [showResults, measure]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (isOpen && filtered.length > 0) {
@@ -76,7 +106,6 @@ export function AutocompleteInput({
         return;
       }
     }
-    // Enter without dropdown: match exact code
     if (!isOpen && e.key === "Enter" && query.trim()) {
       const match = options.find((o) => o.value.toLowerCase() === query.trim().toLowerCase());
       if (match) {
@@ -86,22 +115,29 @@ export function AutocompleteInput({
     }
   }
 
-  const showDropdown = isOpen && filtered.length > 0;
+  useEffect(() => {
+    if (!listRef.current) return;
+    const active = listRef.current.querySelector<HTMLButtonElement>(
+      `[data-index="${activeIndex}"]`,
+    );
+    active?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
 
   return (
-    <div className="relative">
-      <div className="relative flex h-10 items-center rounded-full border border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/65">
+    <div ref={containerRef} className="w-full">
+      <div className="autocomplete-input-field relative flex h-10 w-full items-center rounded-full border border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/65">
         <Search className="ml-3 size-4 shrink-0 text-[var(--text-secondary)]" />
         <input
           ref={inputRef}
           aria-autocomplete="list"
-          aria-expanded={showDropdown}
+          aria-expanded={showResults}
           aria-label={placeholder}
           autoComplete="off"
-          className="h-full min-w-0 flex-1 bg-transparent px-3 text-[13px] outline-none"
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-13px outline-none"
           onBlur={() => setTimeout(() => setIsOpen(false), 180)}
           onChange={(e) => {
             setQuery(e.target.value);
+            setActiveIndex(0);
             setIsOpen(true);
           }}
           onFocus={() => {
@@ -128,43 +164,59 @@ export function AutocompleteInput({
         )}
       </div>
 
-      {showDropdown && (
-        <motion.div
-          ref={listRef}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[320px] overflow-hidden rounded-[18px] bg-[var(--surface-base)] p-1.5 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]"
-          exit={{ opacity: 0, y: -8, scale: 0.98 }}
-          initial={{ opacity: 0, y: -8, scale: 0.98 }}
-          role="listbox"
-          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {filtered.map((option, index) => (
-            <button
-              className={cn(
-                "flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[13px] transition-colors",
-                index === activeIndex ? "bg-[var(--bg-muted)]" : "hover:bg-[var(--bg-muted)]",
-              )}
-              key={option.value}
-              onClick={() => handleSelect(option)}
-              onMouseEnter={() => setActiveIndex(index)}
-              role="option"
-              type="button"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold text-[var(--text-primary)]">
-                  <span className="font-mono text-[var(--accent-primary)]">{option.value}</span>{" "}
-                  {option.label}
-                </span>
-                {option.metadata && (
-                  <span className="mt-0.5 block truncate text-[11px] text-[var(--text-secondary)]">
-                    {option.metadata}
-                  </span>
-                )}
-              </span>
-            </button>
-          ))}
-        </motion.div>
-      )}
+      {floating &&
+        showResults &&
+        createPortal(
+          <div
+            className="overflow-hidden rounded-18px bg-[var(--surface-base)] shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]"
+            style={{
+              position: "fixed",
+              left: floating.left,
+              top: floating.top,
+              width: floating.width,
+              maxHeight: RESULTS_MAX_HEIGHT,
+              zIndex: 9999,
+            }}
+          >
+            <div className="overflow-y-auto" style={{ maxHeight: RESULTS_MAX_HEIGHT }}>
+              <div ref={listRef} className="p-1.5" role="listbox">
+                {filtered.map((option, index) => (
+                  <button
+                    className={cn(
+                      "flex w-full items-start gap-3 rounded-14px px-3 py-3 text-left text-13px transition-colors duration-[180ms]",
+                      index === activeIndex ? "bg-[var(--bg-muted)]" : "hover:bg-[var(--bg-muted)]",
+                    )}
+                    data-index={index}
+                    key={option.value}
+                    onClick={() => handleSelect(option)}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    role="option"
+                    title={`${option.value} — ${option.label}${option.metadata ? `\n${option.metadata}` : ""}`}
+                    type="button"
+                  >
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-14px bg-[var(--bg-muted-strong)] font-mono text-11px font-bold text-[var(--accent-primary)]">
+                      {option.value.slice(0, 4)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold leading-snug text-[var(--text-primary)]">
+                        <span className="font-mono text-[var(--accent-primary)]">
+                          {option.value}
+                        </span>{" "}
+                        {option.label}
+                      </span>
+                      {option.metadata && (
+                        <span className="mt-1 block text-11px leading-snug text-[var(--text-secondary)]">
+                          {option.metadata}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
