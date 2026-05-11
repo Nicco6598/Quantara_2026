@@ -9,7 +9,6 @@ import {
   FileSpreadsheet,
   FileText,
   Printer,
-  Save,
   Wallet,
 } from "lucide-react";
 import {
@@ -346,17 +345,17 @@ export function SalCreationScreen() {
     [lines, notify],
   );
 
-  const setSurcharge = useCallback((voiceId: string, pct: number) => {
+  const setSurcharge = useCallback((lineId: string, pct: number) => {
     setLines((current) =>
-      current.map((l) => (l.voice.id === voiceId ? { ...l, surchargePercent: pct } : l)),
+      current.map((l) => (l.id === lineId ? { ...l, surchargePercent: pct } : l)),
     );
   }, []);
 
   const setFactor = useCallback(
-    (voiceId: string, field: "factor1" | "factor2" | "factor3", value: number) => {
+    (lineId: string, field: "factor1" | "factor2" | "factor3", value: number) => {
       setLines((current) =>
         current.map((l) =>
-          l.voice.id === voiceId
+          l.id === lineId
             ? {
                 ...l,
                 [field]: Number.isFinite(value) && value >= 0 ? value : 0,
@@ -375,9 +374,9 @@ export function SalCreationScreen() {
   );
 
   const removeLine = useCallback(
-    (voiceId: string) => {
-      const line = lines.find((l) => l.voice.id === voiceId);
-      setLines((current) => current.filter((l) => l.voice.id !== voiceId));
+    (lineId: string) => {
+      const line = lines.find((l) => l.id === lineId);
+      setLines((current) => current.filter((l) => l.id !== lineId));
       if (line)
         notify({
           message: `${line.voice.code} eliminata dalla bozza.`,
@@ -388,8 +387,8 @@ export function SalCreationScreen() {
     [lines, notify],
   );
 
-  const setNotes = useCallback((voiceId: string, notes: string) => {
-    setLines((current) => current.map((l) => (l.voice.id === voiceId ? { ...l, notes } : l)));
+  const setNotes = useCallback((lineId: string, notes: string) => {
+    setLines((current) => current.map((l) => (l.id === lineId ? { ...l, notes } : l)));
   }, []);
 
   const handlePasteLine = useCallback(
@@ -641,6 +640,37 @@ export function SalCreationScreen() {
     summary.total,
   ]);
 
+  useEffect(() => {
+    useAppStore.getState().setSalToolbar({
+      budgetResidual: summary.budgetResidual,
+      discountAmount: summary.discountAmount,
+      lineCount: lineViews.length,
+      salTitle: salTitle.trim() || data.project?.salTitle || "Nuovo SAL",
+      total: summary.total,
+      voicesCount: data.voices.length,
+    });
+  }, [
+    data.project?.salTitle,
+    data.voices.length,
+    lineViews.length,
+    salTitle,
+    summary.budgetResidual,
+    summary.discountAmount,
+    summary.total,
+  ]);
+
+  useEffect(() => {
+    const handleSalToolbarAction = (event: Event) => {
+      const actionId = (event as CustomEvent<string>).detail;
+      if (actionId === "sal-save-draft") {
+        handleSaveDraft();
+      }
+    };
+
+    window.addEventListener("sal-create-action", handleSalToolbarAction);
+    return () => window.removeEventListener("sal-create-action", handleSalToolbarAction);
+  }, [handleSaveDraft]);
+
   return (
     <main className="relative w-full max-w-full overflow-x-hidden px-3 pb-6 pt-1 md:px-4">
       <div className="mt-2 space-y-3">
@@ -673,7 +703,6 @@ export function SalCreationScreen() {
               <SetupStep
                 contracts={data.contracts}
                 economicRules={economicRules}
-                onSaveDraft={handleSaveDraft}
                 onSelectContract={data.setContract}
                 project={data.project}
                 salTitle={salTitle}
@@ -698,7 +727,6 @@ export function SalCreationScreen() {
             ) : null}
             {phase === "voices" ? (
               <VoicesStep
-                economicRules={economicRules}
                 lineViews={lineViews}
                 lines={lines}
                 onFactorChange={setFactor}
@@ -707,12 +735,10 @@ export function SalCreationScreen() {
                 onPrimary={goPrimary}
                 onReorder={setLines}
                 onRemove={removeLine}
-                onSaveDraft={handleSaveDraft}
                 onSurcharge={setSurcharge}
                 onToggle={upsertLine}
                 summary={summary}
                 voices={data.voices}
-                dataProject={data.project}
                 onApplyTemplate={handleApplyTemplate}
                 onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
                 tariffBookId={data.selectedTariffBook?.id ?? ""}
@@ -768,7 +794,6 @@ function SetupStep({
   tariffBooks,
   voicesCount,
   onPrimary,
-  onSaveDraft,
   onSelectContract,
 }: {
   contracts: { id: string; title: string; contractor?: string }[];
@@ -783,19 +808,18 @@ function SetupStep({
   tariffBooks: SalTariffBookOption[];
   voicesCount: number;
   onPrimary: () => void;
-  onSaveDraft?: (() => void) | undefined;
   onSelectContract?: ((id: string) => void) | undefined;
 }) {
   const [showAll, setShowAll] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   if (!project) {
     return (
-      <div className="rounded-[16px] border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-12 text-center">
+      <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-12 text-center">
         <Building2 className="mx-auto size-8 text-[var(--text-secondary)]" />
-        <p className="mt-3 text-[14px] font-semibold text-[var(--text-primary)]">
+        <p className="mt-3 text-14px font-semibold text-[var(--text-primary)]">
           Nessun contratto disponibile
         </p>
-        <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
+        <p className="mt-1 text-13px text-[var(--text-secondary)]">
           Crea o apri un progetto prima di generare una SAL.
         </p>
       </div>
@@ -805,8 +829,8 @@ function SetupStep({
   const showContractSelector = contracts.length > 1 && onSelectContract;
 
   return (
-    <div className="space-y-6 rounded-[20px] bg-[var(--surface-base)]/80 p-4 ring-1 ring-[var(--border-subtle)]/70 md:p-6">
-      <div className="rounded-[16px] bg-[var(--surface-base)] px-5 py-5 ring-1 ring-[var(--border-subtle)]/70">
+    <div className="space-y-6 rounded-2xl bg-[var(--surface-base)]/80 p-4 ring-1 ring-[var(--border-subtle)]/70 md:p-6">
+      <div className="rounded-xl bg-[var(--surface-base)] px-5 py-5 ring-1 ring-[var(--border-subtle)]/70">
         {showContractSelector ? (
           <div className="relative">
             <motion.button
@@ -814,30 +838,26 @@ function SetupStep({
               onClick={() => setProjectOpen(!projectOpen)}
               type="button"
             >
-              <span className="flex size-14 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
+              <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
                 <Building2 className="size-7" />
               </span>
               <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <div className="min-w-0 border-b border-[var(--border-subtle)]/70 pb-3 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-6">
-                  <div className="text-[12px] font-medium text-[var(--text-secondary)]">
-                    Progetto
-                  </div>
-                  <div className="mt-1 truncate text-[15px] font-bold text-[var(--text-primary)]">
+                  <div className="text-12px font-medium text-[var(--text-secondary)]">Progetto</div>
+                  <div className="mt-1 truncate text-15px font-bold text-[var(--text-primary)]">
                     {project.title}
                   </div>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[12px] font-medium text-[var(--text-secondary)]">
-                    Cliente
-                  </div>
-                  <div className="mt-1 truncate text-[15px] font-bold text-[var(--text-primary)]">
+                  <div className="text-12px font-medium text-[var(--text-secondary)]">Cliente</div>
+                  <div className="mt-1 truncate text-15px font-bold text-[var(--text-primary)]">
                     {project.contractor}
                   </div>
                 </div>
               </div>
               <span
                 className={cn(
-                  "flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[12px] font-bold transition-colors",
+                  "flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-12px font-bold transition-colors",
                   projectOpen
                     ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
                     : "border-[var(--border-subtle)] text-[var(--accent-primary)] hover:bg-[var(--bg-muted)]",
@@ -857,13 +877,13 @@ function SetupStep({
                   type="button"
                   aria-label="Chiudi"
                 />
-                <div className="absolute left-0 top-full z-50 mt-1.5 w-full min-w-[300px] overflow-hidden rounded-[16px] bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]">
+                <div className="absolute left-0 top-full z-50 mt-1.5 w-full min-w-[300px] overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]">
                   {contracts.map((c) => {
                     const isActive = c.id === project.id;
                     return (
                       <motion.button
                         className={cn(
-                          "flex w-full items-center gap-3 rounded-[12px] px-3 py-3 text-left transition-all",
+                          "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-all",
                           isActive
                             ? "bg-[var(--accent-primary)]/10 ring-1 ring-[var(--accent-primary)]/30"
                             : "hover:bg-[var(--bg-muted)]",
@@ -877,7 +897,7 @@ function SetupStep({
                       >
                         <span
                           className={cn(
-                            "flex size-9 shrink-0 items-center justify-center rounded-[10px]",
+                            "flex size-9 shrink-0 items-center justify-center rounded-10px",
                             isActive
                               ? "bg-[var(--accent-primary)] text-white"
                               : "bg-[var(--info-soft)] text-[var(--info-base)]",
@@ -886,10 +906,10 @@ function SetupStep({
                           <Building2 className="size-4" />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+                          <div className="truncate text-13px font-bold text-[var(--text-primary)]">
                             {c.title}
                           </div>
-                          <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">
+                          <div className="mt-0.5 truncate text-11px text-[var(--text-secondary)]">
                             {c.contractor ?? "—"}
                           </div>
                         </div>
@@ -907,19 +927,19 @@ function SetupStep({
           </div>
         ) : (
           <div className="flex items-center gap-5">
-            <span className="flex size-14 shrink-0 items-center justify-center rounded-[14px] bg-[var(--info-soft)] text-[var(--info-base)]">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
               <Building2 className="size-7" />
             </span>
             <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <div className="min-w-0 border-b border-[var(--border-subtle)]/70 pb-3 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-6">
-                <div className="text-[12px] font-medium text-[var(--text-secondary)]">Progetto</div>
-                <div className="mt-1 truncate text-[15px] font-bold text-[var(--text-primary)]">
+                <div className="text-12px font-medium text-[var(--text-secondary)]">Progetto</div>
+                <div className="mt-1 truncate text-15px font-bold text-[var(--text-primary)]">
                   {project.title}
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-[12px] font-medium text-[var(--text-secondary)]">Cliente</div>
-                <div className="mt-1 truncate text-[15px] font-bold text-[var(--text-primary)]">
+                <div className="text-12px font-medium text-[var(--text-secondary)]">Cliente</div>
+                <div className="mt-1 truncate text-15px font-bold text-[var(--text-primary)]">
                   {project.contractor}
                 </div>
               </div>
@@ -930,13 +950,13 @@ function SetupStep({
 
       <div>
         <label
-          className="text-[13px] font-semibold text-[var(--text-primary)]"
+          className="text-13px font-semibold text-[var(--text-primary)]"
           htmlFor="sal-title-input"
         >
           Nome SAL
         </label>
         <input
-          className="mt-2 h-11 w-full rounded-[10px] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-[14px] font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+          className="mt-2 h-11 w-full rounded-10px border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
           id="sal-title-input"
           onChange={(e) => setSalTitle(e.target.value)}
           placeholder={project.salTitle}
@@ -947,10 +967,10 @@ function SetupStep({
       <div className="border-t border-[var(--border-subtle)]/70 pt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-[17px] font-bold text-[var(--text-primary)]">
+            <h3 className="text-17px font-bold text-[var(--text-primary)]">
               Tariffari disponibili
             </h3>
-            <div className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+            <div className="mt-1 flex items-center gap-1.5 text-12px text-[var(--text-secondary)]">
               {selectedTariffBooks.length > 0 ? (
                 <>
                   <CheckCircle2 className="size-4 text-[var(--success-base)]" />
@@ -969,7 +989,7 @@ function SetupStep({
           </div>
           {tariffBooks.length > 3 ? (
             <motion.button
-              className="rounded-full border border-[var(--border-subtle)] px-3 py-2 text-[12px] font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--bg-muted)]"
+              className="rounded-full border border-[var(--border-subtle)] px-3 py-2 text-12px font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--bg-muted)]"
               onClick={() => setShowAll(!showAll)}
               type="button"
             >
@@ -978,9 +998,7 @@ function SetupStep({
           ) : null}
         </div>
         {tariffBooks.length === 0 ? (
-          <p className="mt-2 text-[12px] text-[var(--text-secondary)]">
-            Nessun tariffario caricato.
-          </p>
+          <p className="mt-2 text-12px text-[var(--text-secondary)]">Nessun tariffario caricato.</p>
         ) : (
           <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {(showAll ? tariffBooks : tariffBooks.slice(0, 3)).map((book) => {
@@ -988,7 +1006,7 @@ function SetupStep({
               return (
                 <motion.button
                   className={cn(
-                    "relative flex min-h-[148px] items-center gap-5 rounded-[14px] border p-5 text-left transition-all duration-200",
+                    "relative flex min-h-[148px] items-center gap-5 rounded-lg border p-5 text-left transition-all duration-200",
                     isSelected
                       ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
                       : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
@@ -999,13 +1017,13 @@ function SetupStep({
                 >
                   <div
                     className={cn(
-                      "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-[8px] border bg-white text-[10px] font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]",
+                      "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-md border bg-white text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]",
                       isSelected
                         ? "border-[var(--accent-primary)]"
                         : "border-[var(--border-subtle)]",
                     )}
                   >
-                    <span className="absolute left-[-6px] top-2 rounded-[4px] bg-[var(--danger-base)] px-1.5 py-1 text-[9px] font-black text-white">
+                    <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-white">
                       PDF
                     </span>
                     <div className="space-y-1.5 text-slate-300">
@@ -1019,23 +1037,23 @@ function SetupStep({
                   <div className="min-w-0 flex-1">
                     <div
                       className={cn(
-                        "truncate text-[16px] font-bold leading-tight",
+                        "truncate text-16px font-bold leading-tight",
                         isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-primary)]",
                       )}
                     >
                       {book.name}
                     </div>
-                    <div className="mt-3 text-[13px] text-[var(--text-secondary)]">
+                    <div className="mt-3 text-13px text-[var(--text-secondary)]">
                       Anno {book.year}
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+                    <div className="mt-3 flex flex-wrap gap-2 text-12px font-medium text-[var(--text-secondary)]">
                       <span>PDF</span>
                       <span>·</span>
                       <span>{voicesCount} voci</span>
                     </div>
                   </div>
                   {isSelected ? (
-                    <span className="absolute right-4 top-4 flex size-6 shrink-0 items-center justify-center rounded-[8px] bg-[var(--accent-primary)] text-white">
+                    <span className="absolute right-4 top-4 flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--accent-primary)] text-white">
                       <Check className="size-4" strokeWidth={3} />
                     </span>
                   ) : (
@@ -1050,63 +1068,63 @@ function SetupStep({
 
       <div className="border-t border-[var(--border-subtle)]/70 pt-5">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[14px] bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <span className="flex size-11 items-center justify-center rounded-[12px] bg-[var(--success-soft)] text-[var(--success-base)]">
+          <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
+            <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
               <Wallet className="size-5" />
             </span>
-            <div className="mt-4 text-[12px] font-medium text-[var(--text-secondary)]">
+            <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
               Budget totale
             </div>
-            <div className="mt-1 text-[18px] font-black text-[var(--text-primary)]">
+            <div className="mt-1 text-18px font-black text-[var(--text-primary)]">
               <Currency value={project.contractAmount} />
             </div>
           </div>
-          <div className="rounded-[14px] bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <span className="flex size-11 items-center justify-center rounded-[12px] bg-[var(--success-soft)] text-[var(--success-base)]">
+          <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
+            <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
               <Calculator className="size-5" />
             </span>
-            <div className="mt-4 text-[12px] font-medium text-[var(--text-secondary)]">
+            <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
               Residuo stimato
             </div>
-            <div className="mt-1 text-[18px] font-black text-[var(--success-base)]">
+            <div className="mt-1 text-18px font-black text-[var(--success-base)]">
               <Currency value={summary.budgetResidual} />
             </div>
           </div>
-          <div className="rounded-[14px] bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <span className="flex size-11 items-center justify-center rounded-[12px] bg-[var(--info-soft)] text-[var(--accent-primary)]">
+          <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
+            <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--accent-primary)]">
               <Calculator className="size-5" />
             </span>
-            <div className="mt-4 text-[12px] font-medium text-[var(--text-secondary)]">
+            <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
               Ribasso gara
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-[18px] font-black text-[var(--text-primary)]">
+              <span className="text-18px font-black text-[var(--text-primary)]">
                 {economicRules.discountPercent.toLocaleString("it-IT")}%
               </span>
               {!economicRules.discountEnabled && (
-                <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--warning-base)]">
+                <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-bold text-[var(--warning-base)]">
                   Disattivato
                 </span>
               )}
             </div>
             {economicRules.discountEnabled && (
-              <div className="mt-3 text-[12px] font-medium text-[var(--danger-base)]">
+              <div className="mt-3 text-12px font-medium text-[var(--danger-base)]">
                 Sconto: -<Currency value={summary.discountAmount} />
               </div>
             )}
-            <div className="mt-2 text-[11px] text-[var(--text-secondary)]">
+            <div className="mt-2 text-11px text-[var(--text-secondary)]">
               Dal contratto · non modificabile in SAL
             </div>
           </div>
-          <div className="rounded-[14px] bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <span className="flex size-11 items-center justify-center rounded-[12px] bg-[var(--info-soft)] text-[var(--info-base)]">
+          <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
+            <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
               <FileText className="size-5" />
             </span>
-            <div className="mt-4 text-[12px] font-medium text-[var(--text-secondary)]">
+            <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
               Voci disponibili
             </div>
-            <div className="mt-1 text-[18px] font-black text-[var(--info-base)]">{voicesCount}</div>
-            <div className="mt-2 text-[11px] text-[var(--text-secondary)]">
+            <div className="mt-1 text-18px font-black text-[var(--info-base)]">{voicesCount}</div>
+            <div className="mt-2 text-11px text-[var(--text-secondary)]">
               nel tariffario selezionato
             </div>
           </div>
@@ -1114,21 +1132,9 @@ function SetupStep({
         <EconomicEquation className="mt-4" summary={summary} />
       </div>
 
-      <div className="flex items-center justify-between">
-        {onSaveDraft ? (
-          <motion.button
-            className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-            onClick={onSaveDraft}
-            type="button"
-          >
-            <Save className="size-4" />
-            Salva bozza
-          </motion.button>
-        ) : (
-          <div />
-        )}
+      <div className="flex items-center justify-end">
         <motion.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
@@ -1155,7 +1161,6 @@ function disabledReason(
 
 /* ── Voices ── */
 function VoicesStep({
-  economicRules,
   lineViews,
   lines,
   onFactorChange,
@@ -1168,34 +1173,28 @@ function VoicesStep({
   onToggle,
   summary,
   voices,
-  dataProject,
   onApplyTemplate,
   onOpenTemplateDialog,
-  onSaveDraft,
   tariffBookId,
 }: {
-  economicRules: SalEconomicRules;
   lineViews: SalLineView[];
   lines: SalLineDraft[];
-  onFactorChange: (vid: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
-  onNotesChange: (vid: string, notes: string) => void;
+  onFactorChange: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
+  onNotesChange: (lineId: string, notes: string) => void;
   onPasteLine: (line: SalLineDraft) => void;
   onPrimary: () => void;
   onReorder: (l: SalLineDraft[]) => void;
-  onRemove: (vid: string) => void;
-  onSurcharge: (vid: string, p: number) => void;
+  onRemove: (lineId: string) => void;
+  onSurcharge: (lineId: string, p: number) => void;
   onToggle: (v: SalVoiceDraft) => void;
   summary: SalEconomicSummary;
   voices: SalVoiceDraft[];
-  dataProject: SalProjectContext | null;
   onApplyTemplate: (t: SalTemplate) => void;
   onOpenTemplateDialog: () => void;
-  onSaveDraft?: () => void;
   tariffBookId: string;
 }) {
   const totalQty = lineViews.reduce((s, l) => s + l.quantity, 0);
   const linked = lineViews.reduce((s, l) => s + l.linkedCharges.length, 0);
-  const contractAmount = dataProject?.contractAmount ?? 0;
   const autocompleteOptions = useMemo(
     () =>
       voices.map((v) => ({
@@ -1210,15 +1209,15 @@ function VoicesStep({
   const lastInteractedRef = useRef<string | null>(null);
 
   const handleCopyLine = useCallback(
-    (voiceId: string) => {
-      const line = lineViews.find((l) => l.voice.id === voiceId);
+    (lineId: string) => {
+      const line = lineViews.find((l) => l.id === lineId);
       if (!line) return;
       setCopiedLine({
         id: line.id,
         factor1: line.factor1,
         factor2: line.factor2,
         factor3: line.factor3,
-        notes: line.notes,
+        notes: "",
         quantity: line.quantity,
         surchargePercent: line.surchargePercent,
         voice: line.voice,
@@ -1229,12 +1228,20 @@ function VoicesStep({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl?.tagName === "INPUT" ||
+        activeEl?.tagName === "TEXTAREA" ||
+        (activeEl as HTMLElement | null)?.isContentEditable;
+
+      if (isInput) return;
+
       const key = e.key.toLowerCase();
       const mod = e.ctrlKey || e.metaKey;
 
       if (mod && key === "c" && lastInteractedRef.current) {
-        const voiceId = lastInteractedRef.current;
-        const line = lineViews.find((l) => l.voice.id === voiceId);
+        const lineId = lastInteractedRef.current;
+        const line = lineViews.find((l) => l.id === lineId);
         if (line) {
           e.preventDefault();
           setCopiedLine({
@@ -1242,7 +1249,7 @@ function VoicesStep({
             factor1: line.factor1,
             factor2: line.factor2,
             factor3: line.factor3,
-            notes: line.notes,
+            notes: "",
             quantity: line.quantity,
             surchargePercent: line.surchargePercent,
             voice: line.voice,
@@ -1255,12 +1262,12 @@ function VoicesStep({
         const uniqueVoice = {
           ...copiedLine.voice,
           id: `${copiedLine.voice.id}-copy-${Date.now()}`,
-          code: `${copiedLine.voice.code} (copia)`,
         };
         const pastedLine: SalLineDraft = {
           ...copiedLine,
           id: `draft-${uniqueVoice.id}`,
           voice: uniqueVoice,
+          notes: "",
           quantity: copiedLine.factor1 * copiedLine.factor2 * copiedLine.factor3,
         };
         onPasteLine(pastedLine);
@@ -1276,98 +1283,92 @@ function VoicesStep({
       role="none"
       className="space-y-3"
       onClick={(e) => {
-        const row = (e.target as HTMLElement).closest("[data-voice-id]");
+        const row = (e.target as HTMLElement).closest("[data-line-id]");
         if (row) {
-          lastInteractedRef.current = row.getAttribute("data-voice-id");
+          lastInteractedRef.current = row.getAttribute("data-line-id");
         }
       }}
       onKeyDown={() => {}}
     >
-      <div className="flex items-center gap-2 rounded-[12px] bg-[var(--surface-base)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]/60">
-        <div className="min-w-0 flex-1">
-          <AutocompleteInput
-            options={autocompleteOptions}
-            onSelect={(o) => {
-              const v = voices.find((x) => x.code === o.value);
-              if (v) onToggle(v);
-            }}
-            placeholder={`Cerca voce (${voices.length} disponibili)...`}
-          />
-        </div>
-        <TemplatePicker onApply={onApplyTemplate} tariffBookId={tariffBookId} />
-        {lines.length > 0 && (
-          <motion.button
-            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 text-[11px] font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
-            onClick={onOpenTemplateDialog}
-            type="button"
-          >
-            Salva come template
-          </motion.button>
-        )}
-      </div>
-      <SelectedVoicesPanel
-        lines={lineViews}
-        copiedVoiceId={copiedLine?.voice.id ?? null}
-        onCopyLine={handleCopyLine}
-        onFactorChange={onFactorChange}
-        onNotesChange={onNotesChange}
-        onRemove={onRemove}
-        onReorder={onReorder}
-        onSurcharge={onSurcharge}
-      />
-      {/* Dashboard strip — SAL corrente + Sconto */}
-      <div
-        className="responsive-grid-elastic gap-2"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))" }}
-      >
-        <div className="rounded-[12px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
-            SAL corrente
+      <section className="overflow-hidden rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/70">
+        <div className="grid gap-3 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_58%,var(--surface-base)_42%)] p-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+          <div className="min-w-0">
+            <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              Misure
+            </div>
+            <div className="mt-1 text-15px font-bold text-[var(--text-primary)]">
+              Inserisci le voci come in un foglio di calcolo
+            </div>
           </div>
-          <div className="mt-1 text-[24px] font-bold text-[var(--accent-primary)]">
-            <Currency value={summary.total} />
-          </div>
-          <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
-            <Currency value={contractAmount} /> budget
-          </div>
-        </div>
-        <div className="rounded-[12px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
-            Ribasso gara
-          </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-[24px] font-bold text-[var(--text-primary)]">
-              {economicRules.discountPercent.toLocaleString("it-IT")}%
-            </span>
-            {!economicRules.discountEnabled && (
-              <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--warning-base)]">
-                Disattivato
-              </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <TemplatePicker onApply={onApplyTemplate} tariffBookId={tariffBookId} />
+            {lines.length > 0 && (
+              <motion.button
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--surface-base)] px-3 text-11px font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                onClick={onOpenTemplateDialog}
+                type="button"
+              >
+                Salva template
+              </motion.button>
             )}
           </div>
-          {economicRules.discountEnabled && (
-            <div className="mt-0.5 text-[13px] font-bold text-[var(--danger-base)]">
-              -<Currency value={summary.discountAmount} />
-            </div>
-          )}
         </div>
-      </div>
-      <EconomicEquation summary={summary} />
-      {/* Total + continue */}
-      <div className="flex items-center justify-between rounded-[12px] bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/60">
-        {onSaveDraft ? (
-          <motion.button
-            className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-            onClick={onSaveDraft}
-            type="button"
-          >
-            <Save className="size-4" />
-            Salva bozza
-          </motion.button>
-        ) : (
-          <div />
-        )}
-        <div className="flex flex-wrap items-center gap-3 text-[12px]">
+
+        <div className="grid gap-3 p-3">
+          <div className="min-w-0 space-y-3">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+              <AutocompleteInput
+                options={autocompleteOptions}
+                onSelect={(o) => {
+                  const v = voices.find((x) => x.code === o.value);
+                  if (v) {
+                    const exists = lines.some((l) => l.voice.id === v.id);
+                    if (exists) {
+                      onPasteLine({
+                        id: `draft-${v.id}-${Date.now()}`,
+                        factor1: 1,
+                        factor2: 1,
+                        factor3: 1,
+                        notes: "",
+                        quantity: 1,
+                        surchargePercent: 0,
+                        voice: v,
+                      });
+                    } else {
+                      onToggle(v);
+                    }
+                  }
+                }}
+                placeholder={`Cerca codice, descrizione o categoria (${voices.length} voci)...`}
+              />
+              <div className="flex items-center gap-2 text-11px font-semibold text-[var(--text-secondary)]">
+                <span className="rounded-md bg-[var(--bg-muted)] px-2 py-1">Invio seleziona</span>
+                <span className="rounded-md bg-[var(--bg-muted)] px-2 py-1">Tab tra celle</span>
+              </div>
+            </div>
+            <SelectedVoicesPanel
+              lines={lineViews}
+              copiedVoiceId={copiedLine?.id ?? null}
+              onCopyLine={handleCopyLine}
+              onFactorChange={onFactorChange}
+              onNotesChange={onNotesChange}
+              onRemove={onRemove}
+              onReorder={onReorder}
+              onSurcharge={onSurcharge}
+            />
+          </div>
+
+          <EconomicEquation summary={summary} />
+        </div>
+      </section>
+
+      <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_94%,transparent)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/70 backdrop-blur-md">
+        <div />
+        <div className="hidden flex-wrap items-center gap-3 text-12px lg:flex">
+          <span className="font-semibold text-[var(--accent-primary)]">
+            Totale: <Currency value={summary.total} />
+          </span>
+          <span className="text-[var(--border-subtle)]">·</span>
           <span className="font-medium text-[var(--text-secondary)]">{lines.length} voci</span>
           <span className="text-[var(--border-subtle)]">·</span>
           <span className="text-[var(--text-secondary)]">
@@ -1389,7 +1390,7 @@ function VoicesStep({
           )}
         </div>
         <motion.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-5 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
@@ -1424,12 +1425,12 @@ function ReviewStep({
   return (
     <div className="space-y-3">
       {/* Checks + compare button */}
-      <div className="flex flex-wrap items-center gap-2 rounded-[12px] bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/50">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/50">
         <div className="flex flex-1 flex-wrap items-center gap-1.5">
           {checks.map((c) => (
             <span
               key={c.id}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${c.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success-base)]" : c.tone === "warning" ? "bg-[var(--warning-soft)] text-[var(--warning-base)]" : "bg-[var(--danger-soft)] text-[var(--danger-base)]"}`}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-11px font-medium ${c.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success-base)]" : c.tone === "warning" ? "bg-[var(--warning-soft)] text-[var(--warning-base)]" : "bg-[var(--danger-soft)] text-[var(--danger-base)]"}`}
               title={c.detail}
             >
               {c.result}
@@ -1439,7 +1440,7 @@ function ReviewStep({
         {previousSalLines.length > 0 && (
           <motion.button
             className={cn(
-              "shrink-0 inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-[12px] font-semibold ring-1 transition-colors",
+              "shrink-0 inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-12px font-semibold ring-1 transition-colors",
               compareLines
                 ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] ring-[var(--accent-primary)]/30 hover:bg-[var(--accent-primary)]/20"
                 : "bg-[var(--accent-primary)] text-white ring-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90 shadow-sm",
@@ -1456,15 +1457,15 @@ function ReviewStep({
       {compareLines && <SalComparisonView before={previousSalLines} after={lineViews} />}
 
       <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
-        <div className="overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
+        <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
           <div className="bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-5 py-4">
-            <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+            <div className="text-10px font-medium uppercase tracking-overline text-[var(--text-secondary)]">
               Verifica economica
             </div>
-            <div className="mt-2 text-[24px] font-bold leading-none tracking-[-0.025em] text-[var(--text-primary)]">
+            <div className="mt-2 text-24px font-bold leading-none tracking-neg-0_025em text-[var(--text-primary)]">
               <Currency value={summary.total} />
             </div>
-            <div className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">
+            <div className="mt-1 text-12px font-medium text-[var(--text-secondary)]">
               Totale attuale SAL
             </div>
           </div>
@@ -1499,17 +1500,17 @@ function ReviewStep({
             </dl>
           </div>
         </div>
-        <div className="overflow-hidden rounded-[18px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
+        <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
           <div className="flex items-center justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-5 py-4">
             <div>
-              <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+              <div className="text-10px font-medium uppercase tracking-overline text-[var(--text-secondary)]">
                 Anteprima verifica
               </div>
-              <div className="mt-1 text-[13px] font-medium text-[var(--text-primary)]">
+              <div className="mt-1 text-13px font-medium text-[var(--text-primary)]">
                 Libretto con ribasso evidenziato
               </div>
             </div>
-            <span className="rounded-full bg-[var(--success-soft)] px-3 py-1 text-[10px] font-semibold text-[var(--success-base)]">
+            <span className="rounded-full bg-[var(--success-soft)] px-3 py-1 text-10px font-semibold text-[var(--success-base)]">
               Netto calcolato
             </span>
           </div>
@@ -1518,8 +1519,8 @@ function ReviewStep({
           </div>
         </div>
       </div>
-      <details className="rounded-[14px] bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
-        <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
+      <details className="rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
+        <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-12px font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
           <ChevronDown className="size-3.5 transition-transform [details[open]_&]:rotate-180" />
           Dettaglio voci ({lineViews.length})
         </summary>
@@ -1529,7 +1530,7 @@ function ReviewStep({
       </details>
       <div className="flex justify-end">
         <motion.button
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
@@ -1558,21 +1559,21 @@ function ConfirmStep({
         tone="success"
       />
       <div className="responsive-grid-elastic gap-3">
-        <div className="rounded-[12px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+        <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+          <div className="text-10px font-semibold uppercase tracking-caption text-[var(--text-secondary)]">
             Totale SAL
           </div>
-          <div className="mt-1 text-[26px] font-bold text-[var(--accent-primary)]">
+          <div className="mt-1 text-26px font-bold text-[var(--accent-primary)]">
             <Currency value={summary.total} />
           </div>
         </div>
-        <div className="rounded-[12px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+        <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+          <div className="text-10px font-semibold uppercase tracking-caption text-[var(--text-secondary)]">
             Budget residuo
           </div>
           <div
             className={cn(
-              "mt-1 text-[26px] font-bold",
+              "mt-1 text-26px font-bold",
               summary.budgetResidual < 0
                 ? "text-[var(--danger-base)]"
                 : "text-[var(--success-base)]",
@@ -1580,23 +1581,23 @@ function ConfirmStep({
           >
             <Currency value={summary.budgetResidual} />
           </div>
-          <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+          <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
             Impegnato <Currency value={summary.previousProgressiveAmount} />
           </div>
         </div>
-        <div className="rounded-[12px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+        <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+          <div className="text-10px font-semibold uppercase tracking-caption text-[var(--text-secondary)]">
             Voci / quantità
           </div>
-          <div className="mt-1 text-[26px] font-bold text-[var(--info-base)]">
+          <div className="mt-1 text-26px font-bold text-[var(--info-base)]">
             {summary.voiceCount}
           </div>
-          <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+          <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
             Importo lordo <Currency value={summary.grossAmount} />
           </div>
         </div>
       </div>
-      <div className="rounded-[12px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+      <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
         <EconomicEquation className="mb-5" summary={summary} />
         <dl className="space-y-2">
           <SummaryLine
@@ -1640,7 +1641,7 @@ function ConfirmStep({
       </div>
       <div className="flex justify-end">
         <motion.button
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
@@ -1683,14 +1684,14 @@ function CompletedView({
       </div>
       <div className="flex justify-end gap-2">
         <motion.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-[12px] font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-12px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
           onClick={onClose}
           type="button"
         >
           Chiudi
         </motion.button>
         <motion.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onNew}
           type="button"
         >
@@ -1712,7 +1713,7 @@ function EconomicEquation({
   return (
     <div
       className={cn(
-        "grid gap-2 rounded-[14px] bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-3 ring-1 ring-[var(--border-subtle)]/60 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center",
+        "grid gap-2 rounded-lg bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-3 ring-1 ring-[var(--border-subtle)]/60 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center",
         className,
       )}
     >
@@ -1730,7 +1731,7 @@ function EconomicEquation({
         value={<Currency value={summary.total} />}
       />
       {summary.linkedChargeAmount > 0 ? (
-        <div className="md:col-span-5 rounded-[10px] bg-[var(--surface-base)]/70 px-3 py-2 text-[11px] font-semibold text-[var(--text-secondary)]">
+        <div className="md:col-span-5 rounded-10px bg-[var(--surface-base)]/70 px-3 py-2 text-11px font-semibold text-[var(--text-secondary)]">
           Maggiorazioni incluse nel totale attuale: <Currency value={summary.linkedChargeAmount} />
         </div>
       ) : null}
@@ -1748,11 +1749,11 @@ function EquationAmount({
   value: ReactNode;
 }) {
   return (
-    <div className="min-w-0 rounded-[11px] bg-[var(--surface-base)] px-3 py-3">
-      <div className="text-[11px] font-semibold text-[var(--text-secondary)]">{label}</div>
+    <div className="min-w-0 rounded-11px bg-[var(--surface-base)] px-3 py-3">
+      <div className="text-11px font-semibold text-[var(--text-secondary)]">{label}</div>
       <div
         className={cn(
-          "mt-1 truncate text-[18px] font-black",
+          "mt-1 truncate text-18px font-black",
           tone === "danger" && "text-[var(--danger-base)]",
           tone === "info" && "text-[var(--accent-primary)]",
           !tone && "text-[var(--text-primary)]",
@@ -1766,7 +1767,7 @@ function EquationAmount({
 
 function EquationOperator({ children }: { children: ReactNode }) {
   return (
-    <div className="hidden size-9 items-center justify-center rounded-full bg-[var(--surface-base)] text-[18px] font-black text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/70 md:flex">
+    <div className="hidden size-9 items-center justify-center rounded-full bg-[var(--surface-base)] text-18px font-black text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/70 md:flex">
       {children}
     </div>
   );
@@ -1784,13 +1785,13 @@ function StepMetric({
   value: ReactNode;
 }) {
   return (
-    <div className="rounded-[12px] bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+    <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+      <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
         {label}
       </div>
       <div
         className={cn(
-          "mt-1 text-[22px] font-bold",
+          "mt-1 text-22px font-bold",
           danger && "text-[var(--danger-base)]",
           accent && !danger && "text-[var(--accent-primary)]",
           !accent && !danger && "text-[var(--info-base)]",
@@ -1818,14 +1819,14 @@ function SummaryLine({
       <span
         className={cn(
           "font-medium text-[var(--text-secondary)]",
-          large ? "text-[14px]" : "text-[13px]",
+          large ? "text-14px" : "text-13px",
         )}
       >
         {label}
       </span>
       <strong
         className={cn(
-          large ? "text-[16px]" : "text-[13px]",
+          large ? "text-16px" : "text-13px",
           "font-semibold",
           tone === "accent" && "text-[var(--accent-primary)]",
           tone === "danger" && "text-[var(--danger-base)]",
@@ -1852,10 +1853,10 @@ function FeedbackBanner({
 }) {
   return (
     <div
-      className={`rounded-[12px] border px-4 py-3 ${tone === "danger" ? "border-[var(--danger-base)]/25 bg-[var(--danger-soft)] text-[var(--danger-base)]" : tone === "success" ? "border-[var(--success-base)]/25 bg-[var(--success-soft)] text-[var(--success-base)]" : "border-[var(--info-base)]/25 bg-[var(--info-soft)] text-[var(--info-base)]"}`}
+      className={`rounded-lg border px-4 py-3 ${tone === "danger" ? "border-[var(--danger-base)]/25 bg-[var(--danger-soft)] text-[var(--danger-base)]" : tone === "success" ? "border-[var(--success-base)]/25 bg-[var(--success-soft)] text-[var(--success-base)]" : "border-[var(--info-base)]/25 bg-[var(--info-soft)] text-[var(--info-base)]"}`}
     >
       <div className="flex items-center gap-2.5">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-current/10">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-current/10">
           {tone === "success" ? (
             <CheckCircle2 className="size-4" />
           ) : (
@@ -1863,8 +1864,8 @@ function FeedbackBanner({
           )}
         </span>
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold">{title}</div>
-          <div className="mt-0.5 text-[12px] opacity-80">{message}</div>
+          <div className="text-13px font-semibold">{title}</div>
+          <div className="mt-0.5 text-12px opacity-80">{message}</div>
         </div>
       </div>
     </div>
