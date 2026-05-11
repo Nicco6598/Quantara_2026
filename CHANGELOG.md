@@ -30,7 +30,7 @@ All notable changes to Quantara follow SemVer.
 
 ### Dashboard con dati veri
 
-- La timeline Gantt mostra le date reali delle SAL (prima e ultima SAL registrata per ogni progetto). Barre colorate per stato, percentuale di progresso e tooltip con intervallo date.
+- La timeline Gantt mostra le date reali delle SAL (prima e ultima SAL registrata per ogni progetto). Barre colorate per stato, percentuale di progresso e tooltip con intervallo date (ANCORA IN TEST).
 - Le card dei cantieri ora hanno lo stesso design della lista progetti dentro un appaltatore.
 - La sezione "Attivita recenti" mostra le operazioni realmente registrate, non orari fissi di esempio.
 - Il pulsante "Apri" sui cantieri funziona davvero e porta al dettaglio progetto.
