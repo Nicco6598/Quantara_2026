@@ -1,6 +1,6 @@
 {
   "name": "@quantara/shared-types",
-  "version": "0.2.50",
+  "version": "0.2.60",
   "private": true,
   "type": "module",
   "exports": {
