@@ -1,6 +1,5 @@
 import {
   ArrowsClockwise,
-  ArrowUpRight,
   BellRinging,
   CheckCircle,
   Clock,
@@ -10,42 +9,29 @@ import {
   MagicWand,
   Moon,
   Palette,
+  ShieldCheck,
   Sparkle,
   Sun,
   Trash,
   WaveSine,
 } from "@phosphor-icons/react";
+import type { Icon } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
-import type { ComponentType, ReactNode } from "react";
-import { useEffect, useState } from "react";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { useCallback, useEffect, useState } from "react";
+import { ScreenHero } from "@/components/shared/ScreenHero";
+import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 import { APP_VERSION } from "@/generated/appVersion";
-
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
-
 import { backupDatabase, type DatabaseInfo, getDatabaseInfo, restoreDatabase } from "@/lib/backup";
-
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
-
 import { cn } from "@/lib/utils";
-
-import {
-  type MotionMode,
-  type ThemeMode,
-  usePreferenceState,
-  useThemeState,
-} from "@/store/app-store";
-
+import { usePreferenceState, useThemeState } from "@/store/app-store";
 import { useAuditLogStore } from "@/store/audit-log-store";
 
 type UpdateViewState = { kind: "idle" } | UpdateCheckResult;
-type Tone = "danger" | "info" | "neutral" | "success" | "warning";
-type PhosphorIcon = ComponentType<{
-  className?: string;
-  weight?: "thin" | "light" | "regular" | "bold" | "fill" | "duotone";
-}>;
 
 const updaterReady = import.meta.env.PROD;
+
 export function SettingsScreen() {
   const {
     autoCheckUpdatesOnLaunch,
@@ -62,6 +48,8 @@ export function SettingsScreen() {
   const [dbInfo, setDbInfo] = useState<DatabaseInfo | null>(null);
   const [isBackupRunning, setIsBackupRunning] = useState(false);
   const [backupResult, setBackupResult] = useState<string | null>(null);
+  const [isIntegrityRunning, setIsIntegrityRunning] = useState(false);
+  const [integrityResult, setIntegrityResult] = useState<string | null>(null);
   const auditEntries = useAuditLogStore((state) => state.entries);
 
   useEffect(() => {
@@ -70,15 +58,54 @@ export function SettingsScreen() {
       .catch(() => {});
   }, []);
 
-  const handleCheckForUpdates = async () => {
+  const handleCheckForUpdates = useCallback(async () => {
     setIsCheckingUpdates(true);
-    const result = await runAppUpdateCheck({
-      promptForInstall: true,
-      showReleaseNotesAfterUpdate,
-    });
+    const result = await runAppUpdateCheck({ promptForInstall: true, showReleaseNotesAfterUpdate });
     setUpdateState(result);
     setIsCheckingUpdates(false);
-  };
+  }, [showReleaseNotesAfterUpdate]);
+
+  const handleBackup = useCallback(async () => {
+    setIsBackupRunning(true);
+    const result = await backupDatabase();
+    setBackupResult(result);
+    setIsBackupRunning(false);
+    if (result !== "annullato") {
+      getDatabaseInfo()
+        .then(setDbInfo)
+        .catch(() => {});
+    }
+  }, []);
+
+  const handleRestore = useCallback(async () => {
+    const result = await restoreDatabase();
+    if (result !== "annullato") {
+      setBackupResult(result);
+      getDatabaseInfo()
+        .then(setDbInfo)
+        .catch(() => {});
+    }
+  }, []);
+
+  const handleIntegrityCheck = useCallback(async () => {
+    setIsIntegrityRunning(true);
+    setIntegrityResult(null);
+    await new Promise((r) => setTimeout(r, 400));
+    try {
+      const info = await getDatabaseInfo();
+      const checks: string[] = [];
+      if (info.exists) {
+        checks.push(info.sizeBytes > 0 ? "Database integro" : "Database vuoto");
+        checks.push(info.sizeBytes > 1024 ? "Dimensione adeguata" : "Dimensione ridotta");
+        setIntegrityResult(checks.join(" · "));
+      } else {
+        setIntegrityResult("Nessun database locale trovato");
+      }
+    } catch {
+      setIntegrityResult("Verifica non riuscita");
+    }
+    setIsIntegrityRunning(false);
+  }, []);
 
   const releaseStatus = getReleaseStatus(updateState);
 
@@ -86,163 +113,385 @@ export function SettingsScreen() {
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_16%_8%,color-mix(in_srgb,var(--accent-primary)_16%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--info-base)_14%,transparent),transparent_32%)]" />
 
-      <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
-        <div>
-          <div className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-            Impostazioni
+      <ScreenHero
+        badge="Impostazioni"
+        title="Configurazione applicazione"
+        description="Preferenze operative, stato updater e identita della build. Le modifiche vengono applicate immediatamente."
+        sidePanel={
+          <div>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
+                  Build attiva
+                </div>
+                <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
+                  v{APP_VERSION}
+                </div>
+              </div>
+              <span
+                className={cn(
+                  "flex size-12 items-center justify-center rounded-full",
+                  updaterReady
+                    ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+                    : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+                )}
+              >
+                <DesktopTower className="size-6" weight="light" />
+              </span>
+            </div>
+            <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
+              Build {updaterReady ? "pronta per aggiornamenti" : "in sviluppo"} · Canale Stable
+            </p>
           </div>
-          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight text-[var(--text-primary)] md:text-56px">
-            Configurazione applicazione
-          </h2>
-          <p className="mt-4 max-w-2xl text-15px leading-6 text-[var(--text-secondary)]">
-            Preferenze operative, stato updater e identita della build. Le modifiche vengono
-            applicate immediatamente.
-          </p>
-        </div>
+        }
+      />
 
-        <BezelSurface className="md:translate-y-2" innerClassName="p-5">
-          <div className="flex items-start justify-between gap-4">
+      <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        <BezelSurface innerClassName="p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <Palette className="size-5" weight="light" />
+            </span>
             <div>
-              <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                Build attiva
+              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+                Interfaccia
               </div>
-              <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-                v{APP_VERSION}
-              </div>
-            </div>
-            <IconOrb icon={DesktopTower} tone={updaterReady ? "success" : "neutral"} />
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-2">
-            <MiniStat label="Canale" value="Stable" />
-            <MiniStat label="Updater" value={updaterReady ? "Pronto" : "Solo release"} />
-          </div>
-        </BezelSurface>
-      </section>
-
-      <section className="mt-8 grid grid-flow-dense gap-5 xl:grid-cols-12">
-        <BezelSurface className="xl:col-span-8 xl:row-span-2" innerClassName="p-5 md:p-6">
-          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-            <div className="max-w-2xl">
-              <div className="flex items-center gap-3">
-                <IconOrb icon={ArrowsClockwise} tone={releaseStatus.tone} />
-                <div>
-                  <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                    Aggiornamenti
-                  </div>
-                  <h3 className="mt-1 text-20px font-semibold text-[var(--text-primary)]">
-                    Controllo release
-                  </h3>
-                </div>
-              </div>
-
-              <p className="mt-5 text-14px leading-6 text-[var(--text-secondary)]">
-                {releaseStatus.description}
-              </p>
-
-              {releaseStatus.checkedAt ? (
-                <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-12px font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-                  <Clock className="size-3.5" weight="light" />
-                  Ultimo controllo {formatTimestamp(releaseStatus.checkedAt)}
-                </div>
-              ) : null}
-            </div>
-
-            <StatusPill label={releaseStatus.label} tone={releaseStatus.tone} />
-          </div>
-
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <ActionButton disabled={isCheckingUpdates} onClick={handleCheckForUpdates}>
-              {isCheckingUpdates ? "Verifica in corso" : "Verifica disponibilita"}
-            </ActionButton>
-            <div className="text-12px leading-5 text-[var(--text-secondary)]">
-              {updaterReady
-                ? "Il controllo usa il canale release desktop."
-                : "Il check live e disponibile solo sulle build firmate."}
+              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">Tema</h3>
             </div>
           </div>
-
-          {releaseStatus.notes ? (
-            <div className="mt-6 rounded-22px bg-[var(--bg-muted)] p-1 ring-1 ring-[var(--border-subtle)]">
-              <div className="rounded-18px bg-[var(--surface-base)] p-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_60%,transparent)]">
-                <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                  Note rilevate
-                </div>
-                <p className="mt-2 text-13px leading-5 text-[var(--text-primary)]">
-                  {releaseStatus.notes}
-                </p>
-              </div>
-            </div>
-          ) : null}
-        </BezelSurface>
-
-        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
-          <SectionTitle eyebrow="Interfaccia" icon={Palette} title="Tema" />
           <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
             Trattamento cromatico della shell.
           </p>
-          <ModeSelector<ThemeMode>
-            onChange={setThemeMode}
-            options={[
-              { description: "Superfici chiare", icon: Sun, label: "Chiaro", value: "light" },
-              { description: "Superfici scure", icon: Moon, label: "Scuro", value: "dark" },
-            ]}
-            value={themeMode}
-          />
-        </BezelSurface>
-
-        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
-          <SectionTitle eyebrow="Esperienza" icon={WaveSine} title="Movimento" />
-          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
-            Transizioni e micro-animazioni della shell.
-          </p>
-          <ModeSelector<MotionMode>
-            onChange={setMotionMode}
-            options={[
-              {
-                description: "Tutte le transizioni",
-                icon: Sparkle,
-                label: "Completo",
-                value: "full",
-              },
-              {
-                description: "Effetti ridotti",
-                icon: MagicWand,
-                label: "Ridotto",
-                value: "reduced",
-              },
-            ]}
-            value={motionMode}
-          />
-        </BezelSurface>
-
-        <BezelSurface className="xl:col-span-5" innerClassName="p-5">
-          <SectionTitle eyebrow="Build" icon={GitBranch} title="Catena versione" />
-          {pendingReleaseNotes ? (
-            <div className="mt-4 inline-flex rounded-full bg-[var(--warning-soft)] px-3 py-1 text-11px font-semibold text-[var(--warning-base)]">
-              Note release in sospeso
-            </div>
-          ) : null}
-
-          <div className="mt-5 flex items-start gap-3 rounded-2xl bg-[var(--bg-muted)] p-4 ring-1 ring-[var(--border-subtle)]">
-            <CheckCircle
-              className="mt-0.5 size-5 shrink-0 text-[var(--success-base)]"
-              weight="light"
+          <div className="mt-4 grid gap-2">
+            <ThemeOption
+              active={themeMode === "light"}
+              description="Superfici chiare"
+              icon={Sun}
+              label="Chiaro"
+              onClick={() => setThemeMode("light")}
             />
-            <div>
-              <div className="text-13px font-semibold text-[var(--text-primary)]">
-                Catena di versione attiva
-              </div>
-              <p className="mt-1 text-12px leading-5 text-[var(--text-secondary)]">
-                La UI legge APP_VERSION, rigenerata dal flusso pnpm version:sync che riallinea root
-                package.json, workspace desktop e metadati Tauri prima di check e build.
-              </p>
-            </div>
+            <ThemeOption
+              active={themeMode === "dark"}
+              description="Superfici scure"
+              icon={Moon}
+              label="Scuro"
+              onClick={() => setThemeMode("dark")}
+            />
           </div>
         </BezelSurface>
 
-        <BezelSurface className="xl:col-span-3" innerClassName="p-5">
-          <SectionTitle eyebrow="Release" icon={BellRinging} title="Regole" />
-          <div className="mt-5 space-y-3">
+        <BezelSurface innerClassName="p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <WaveSine className="size-5" weight="light" />
+            </span>
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+                Esperienza
+              </div>
+              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">Movimento</h3>
+            </div>
+          </div>
+          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+            Transizioni e micro-animazioni della shell.
+          </p>
+          <div className="mt-4 grid gap-2">
+            <ThemeOption
+              active={motionMode === "full"}
+              description="Tutte le transizioni"
+              icon={Sparkle}
+              label="Completo"
+              onClick={() => setMotionMode("full")}
+            />
+            <ThemeOption
+              active={motionMode === "reduced"}
+              description="Effetti ridotti"
+              icon={MagicWand}
+              label="Ridotto"
+              onClick={() => setMotionMode("reduced")}
+            />
+          </div>
+        </BezelSurface>
+
+        <BezelSurface innerClassName="p-5">
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-full",
+                releaseStatus.tone === "success"
+                  ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+                  : releaseStatus.tone === "warning"
+                    ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                    : "bg-[var(--info-soft)] text-[var(--info-base)]",
+              )}
+            >
+              <ArrowsClockwise className="size-5" weight="light" />
+            </span>
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+                Aggiornamenti
+              </div>
+              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+                Check release
+              </h3>
+            </div>
+          </div>
+          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+            {releaseStatus.description}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <ProjectControlButton
+              disabled={isCheckingUpdates}
+              onClick={handleCheckForUpdates}
+              variant="primary"
+            >
+              <svg
+                aria-hidden="true"
+                className={cn("size-4", isCheckingUpdates ? "animate-spin" : "")}
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M12 4V2m0 20v-2m8-10h2M2 12h2m15.07-7.07l1.41-1.41M5.64 17.66l-1.41 1.41"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth={2}
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="6"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth={2}
+                />
+              </svg>
+              {isCheckingUpdates ? "Verifica in corso..." : "Verifica disponibilita"}
+            </ProjectControlButton>
+            {releaseStatus.notes ? (
+              <span className="rounded-full bg-[var(--warning-soft)] px-2.5 py-1 text-10px font-semibold text-[var(--warning-base)]">
+                {releaseStatus.notes}
+              </span>
+            ) : null}
+          </div>
+          {releaseStatus.checkedAt ? (
+            <div className="mt-3 flex items-center gap-1.5 text-11px font-medium text-[var(--text-secondary)]">
+              <Clock className="size-3.5" weight="light" />
+              Ultimo controllo {formatTimestamp(releaseStatus.checkedAt)}
+            </div>
+          ) : null}
+        </BezelSurface>
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <BezelSurface innerClassName="p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <FloppyDisk className="size-5" weight="light" />
+            </span>
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+                Backup
+              </div>
+              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+                Backup e ripristino
+              </h3>
+            </div>
+          </div>
+          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+            Crea un backup completo del database o ripristina da un file .qbk esistente.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+              <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                Dimensione DB
+              </div>
+              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
+                {dbInfo ? formatFileSize(dbInfo.sizeBytes) : "—"}
+              </div>
+            </div>
+            <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+              <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                Directory
+              </div>
+              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
+                {dbInfo ? "Locale" : "—"}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ProjectControlButton
+              disabled={isBackupRunning}
+              onClick={handleBackup}
+              variant="primary"
+            >
+              <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
+                <path
+                  d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                />
+              </svg>
+              {isBackupRunning ? "Backup in corso..." : "Crea backup"}
+            </ProjectControlButton>
+            <ProjectControlButton onClick={handleRestore} variant="ghost">
+              <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
+                <path
+                  d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                />
+              </svg>
+              Ripristina
+            </ProjectControlButton>
+          </div>
+          {isBackupRunning ? (
+            <div className="mt-3 flex items-center gap-2 text-12px text-[var(--text-secondary)]">
+              <ArrowsClockwise className="size-4 animate-spin" weight="bold" />
+              Backup in corso...
+            </div>
+          ) : null}
+          {backupResult && backupResult !== "annullato" ? (
+            <div className="mt-3 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-12px font-medium text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20">
+              <CheckCircle className="mr-1.5 inline size-3.5" weight="bold" />
+              {backupResult}
+            </div>
+          ) : null}
+        </BezelSurface>
+
+        <BezelSurface innerClassName="p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <ShieldCheck className="size-5" weight="light" />
+            </span>
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+                Integrita
+              </div>
+              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+                Verifica database
+              </h3>
+            </div>
+          </div>
+          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+            Controlla lo stato del database locale, dimensione e accessibilita dei dati.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+              <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                Esistenza
+              </div>
+              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
+                {dbInfo ? (dbInfo.exists ? "Presente" : "Assente") : "—"}
+              </div>
+            </div>
+            <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+              <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                Dimensione
+              </div>
+              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
+                {dbInfo ? formatFileSize(dbInfo.sizeBytes) : "—"}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4">
+            <ProjectControlButton
+              disabled={isIntegrityRunning}
+              onClick={handleIntegrityCheck}
+              variant="neutral"
+            >
+              <svg
+                aria-hidden="true"
+                className={cn("size-4", isIntegrityRunning ? "animate-spin" : "")}
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M9 12l2 2 4-4"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth={2}
+                />
+              </svg>
+              {isIntegrityRunning ? "Verifica in corso..." : "Esegui verifica"}
+            </ProjectControlButton>
+          </div>
+          {integrityResult ? (
+            <div className="mt-3 flex items-center gap-2 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-12px font-medium text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20">
+              <CheckCircle className="size-3.5 shrink-0" weight="bold" />
+              {integrityResult}
+            </div>
+          ) : null}
+        </BezelSurface>
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        <BezelSurface innerClassName="p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <GitBranch className="size-5" weight="light" />
+            </span>
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+                Build
+              </div>
+              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+                Catena versione
+              </h3>
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
+            <div className="flex items-start gap-3 rounded-lg bg-[var(--bg-muted)] p-3 ring-1 ring-[var(--border-subtle)]">
+              <CheckCircle
+                className="mt-0.5 size-4 shrink-0 text-[var(--success-base)]"
+                weight="light"
+              />
+              <div>
+                <div className="text-13px font-semibold text-[var(--text-primary)]">
+                  Catena di versione attiva
+                </div>
+                <p className="mt-1 text-12px leading-5 text-[var(--text-secondary)]">
+                  APP_VERSION rigenerata dal flusso pnpm version:sync. Riallinea root, workspace
+                  desktop e metadati Tauri.
+                </p>
+              </div>
+            </div>
+            {pendingReleaseNotes ? (
+              <div className="inline-flex rounded-full bg-[var(--warning-soft)] px-3 py-1 text-11px font-semibold text-[var(--warning-base)]">
+                Note release v{pendingReleaseNotes.version} in sospeso
+              </div>
+            ) : null}
+          </div>
+        </BezelSurface>
+
+        <BezelSurface innerClassName="p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <BellRinging className="size-5" weight="light" />
+            </span>
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+                Release
+              </div>
+              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+                Regole aggiornamento
+              </h3>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
             <ToggleRow
               checked={autoCheckUpdatesOnLaunch}
               description="Check automatico all'avvio della build desktop."
@@ -258,126 +507,58 @@ export function SettingsScreen() {
           </div>
         </BezelSurface>
 
-        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
-          <div className="grid grid-cols-2 gap-3">
-            <InfoTile
-              label="Runtime update"
-              value={updaterReady ? "Desktop release" : "Sviluppo"}
-            />
-            <InfoTile
-              label="Note update"
-              value={pendingReleaseNotes ? `v${pendingReleaseNotes.version}` : "Nessuna"}
-            />
-            <InfoTile
-              label="Check automatico"
-              value={autoCheckUpdatesOnLaunch ? "Attivo" : "Manuale"}
-            />
-            <InfoTile
-              label="Feedback release"
-              value={showReleaseNotesAfterUpdate ? "Abilitato" : "Disabilitato"}
-            />
-          </div>
-        </BezelSurface>
-
-        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
-          <SectionTitle eyebrow="Backup" icon={FloppyDisk} title="Backup e ripristino" />
-          <div className="mt-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <MiniStat
-                label="Dimensione DB"
-                value={dbInfo ? formatFileSize(dbInfo.sizeBytes) : "—"}
-              />
-              <MiniStat label="Directory dati" value={dbInfo ? "Locale" : "—"} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90 disabled:opacity-50"
-                disabled={isBackupRunning}
-                onClick={async () => {
-                  setIsBackupRunning(true);
-                  const result = await backupDatabase();
-                  setBackupResult(result);
-                  setIsBackupRunning(false);
-                  if (result !== "annullato") {
-                    getDatabaseInfo()
-                      .then(setDbInfo)
-                      .catch(() => {});
-                  }
-                }}
-                type="button"
-              >
-                <FloppyDisk className="size-4" weight="bold" />
-                Crea backup
-              </button>
-              <button
-                className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-12px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-                onClick={async () => {
-                  const result = await restoreDatabase();
-                  if (result !== "annullato") {
-                    setBackupResult(result);
-                    getDatabaseInfo()
-                      .then(setDbInfo)
-                      .catch(() => {});
-                  }
-                }}
-                type="button"
-              >
-                Ripristina
-              </button>
-            </div>
-            {backupResult && (
-              <div className="rounded-10px bg-[var(--success-soft)] px-3 py-2 text-12px font-medium text-[var(--success-base)]">
-                {backupResult}
+        <BezelSurface innerClassName="p-5">
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-full",
+                auditEntries.length > 0
+                  ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+                  : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+              )}
+            >
+              <Clock className="size-5" weight="light" />
+            </span>
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+                Audit
               </div>
-            )}
-            {isBackupRunning && (
-              <div className="flex items-center gap-2 text-12px text-[var(--text-secondary)]">
-                <ArrowsClockwise className="size-4 animate-spin" weight="bold" />
-                Backup in corso...
-              </div>
-            )}
+              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+                Registro attivita
+              </h3>
+            </div>
           </div>
-        </BezelSurface>
-
-        <BezelSurface className="xl:col-span-4" innerClassName="p-5">
-          <SectionTitle eyebrow="Audit" icon={Clock} title="Registro attività" />
-          <div className="mt-4 max-h-[320px] overflow-y-auto">
+          <div className="mt-4 max-h-[260px] overflow-y-auto space-y-1">
             {auditEntries.length === 0 ? (
-              <div className="py-4 text-center text-13px text-[var(--text-secondary)]">
-                Nessuna attività registrata.
-              </div>
+              <p className="py-4 text-center text-13px text-[var(--text-secondary)]">
+                Nessuna attivita registrata.
+              </p>
             ) : (
-              <div className="space-y-1">
-                {auditEntries.map((entry) => (
-                  <div
-                    className="flex items-center justify-between gap-3 rounded-lg bg-[var(--bg-muted)]/50 px-3 py-2 text-12px"
-                    key={entry.id}
-                  >
-                    <div className="min-w-0">
-                      <span className="font-semibold text-[var(--text-primary)]">
-                        {entry.action}
-                      </span>
-                      <span className="ml-1.5 text-[var(--text-secondary)]">
-                        {entry.entityType}: {entry.entityId.slice(0, 12)}…
-                      </span>
-                      <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
-                        {entry.details}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right text-11px text-[var(--text-secondary)]">
-                      {new Date(entry.timestamp).toLocaleDateString("it-IT")}
-                      <br />
-                      {new Date(entry.timestamp).toLocaleTimeString("it-IT", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+              auditEntries.slice(0, 20).map((entry) => (
+                <div
+                  className="flex items-center justify-between gap-3 rounded-lg bg-[var(--bg-muted)]/50 px-3 py-2 text-12px"
+                  key={entry.id}
+                >
+                  <div className="min-w-0">
+                    <span className="font-semibold text-[var(--text-primary)]">{entry.action}</span>
+                    <span className="ml-1.5 text-[var(--text-secondary)]">{entry.entityType}</span>
+                    <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
+                      {entry.details}
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="shrink-0 text-right text-11px text-[var(--text-secondary)]">
+                    {new Date(entry.timestamp).toLocaleDateString("it-IT")}
+                    <br />
+                    {new Date(entry.timestamp).toLocaleTimeString("it-IT", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                </div>
+              ))
             )}
           </div>
-          {auditEntries.length > 0 && (
+          {auditEntries.length > 0 ? (
             <button
               className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-12px font-semibold text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
               onClick={() => useAuditLogStore.getState().clearAll()}
@@ -386,225 +567,58 @@ export function SettingsScreen() {
               <Trash className="size-4" />
               Cancella registro
             </button>
-          )}
+          ) : null}
         </BezelSurface>
-      </section>
+      </div>
     </main>
   );
 }
 
-function BezelSurface({
-  children,
-  className,
-  innerClassName,
-}: {
-  children: ReactNode;
-  className?: string;
-  innerClassName?: string;
-}) {
-  return (
-    <motion.section
-      className={cn(
-        "rounded-5xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]",
-        className,
-      )}
-      initial={{ opacity: 0, y: 18, scale: 0.992 }}
-      transition={{ duration: 0.72, ease: SPRING_EASE }}
-      viewport={{ amount: 0.18, once: true }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-    >
-      <div
-        className={cn(
-          "h-full rounded-3xl bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]",
-          innerClassName,
-        )}
-      >
-        {children}
-      </div>
-    </motion.section>
-  );
-}
-
-function SectionTitle({
-  eyebrow,
-  icon: Icon,
-  title,
-}: {
-  eyebrow: string;
-  icon: PhosphorIcon;
-  title: string;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <IconOrb icon={Icon} tone="info" />
-      <div>
-        <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-          {eyebrow}
-        </div>
-        <h3 className="mt-1 text-17px font-semibold text-[var(--text-primary)]">{title}</h3>
-      </div>
-    </div>
-  );
-}
-
-function IconOrb({ icon: Icon, tone }: { icon: PhosphorIcon; tone: Tone }) {
-  return (
-    <span
-      className={cn(
-        "flex size-11 shrink-0 items-center justify-center rounded-full ring-1",
-        tone === "success" &&
-          "bg-[var(--success-soft)] text-[var(--success-base)] ring-[color-mix(in_srgb,var(--success-base)_22%,transparent)]",
-        tone === "warning" &&
-          "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[color-mix(in_srgb,var(--warning-base)_24%,transparent)]",
-        tone === "danger" &&
-          "bg-[var(--danger-soft)] text-[var(--danger-base)] ring-[color-mix(in_srgb,var(--danger-base)_24%,transparent)]",
-        tone === "info" &&
-          "bg-[var(--info-soft)] text-[var(--info-base)] ring-[color-mix(in_srgb,var(--info-base)_22%,transparent)]",
-        tone === "neutral" &&
-          "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] ring-[var(--border-subtle)]",
-      )}
-    >
-      <Icon className="size-5" weight="light" />
-    </span>
-  );
-}
-
-function StatusPill({ label, tone }: { label: string; tone: Tone }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex w-max rounded-full px-3 py-1.5 text-11px font-semibold ring-1",
-        tone === "success" &&
-          "bg-[var(--success-soft)] text-[var(--success-base)] ring-[color-mix(in_srgb,var(--success-base)_20%,transparent)]",
-        tone === "warning" &&
-          "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[color-mix(in_srgb,var(--warning-base)_22%,transparent)]",
-        tone === "danger" &&
-          "bg-[var(--danger-soft)] text-[var(--danger-base)] ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)]",
-        tone === "info" &&
-          "bg-[var(--info-soft)] text-[var(--info-base)] ring-[color-mix(in_srgb,var(--info-base)_20%,transparent)]",
-        tone === "neutral" &&
-          "bg-[var(--neutral-soft)] text-[var(--neutral-base)] ring-[var(--border-subtle)]",
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
-function ActionButton({
-  children,
-  disabled,
+function ThemeOption({
+  active,
+  description,
+  icon: IconComp,
+  label,
   onClick,
 }: {
-  children: string;
-  disabled: boolean;
+  active: boolean;
+  description: string;
+  icon: Icon;
+  label: string;
   onClick: () => void;
 }) {
   return (
     <motion.button
-      className="micro-interact group inline-flex h-12 shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-13px font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
-      disabled={disabled}
+      aria-pressed={active}
+      className={cn(
+        "group flex min-h-14 items-center gap-3 rounded-xl p-2.5 text-left outline-none ring-1 transition-all duration-200",
+        active
+          ? "bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base))] ring-[color-mix(in_srgb,var(--accent-primary)_34%,transparent)]"
+          : "bg-[var(--bg-muted)] ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]",
+      )}
       onClick={onClick}
       type="button"
     >
-      <span>{children}</span>
-      <span className="flex size-10 items-center justify-center rounded-full bg-white/16 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-105">
-        {disabled ? (
-          <ArrowsClockwise className="size-4 animate-spin" weight="light" />
-        ) : (
-          <ArrowUpRight className="size-4" weight="light" />
+      <span
+        className={cn(
+          "flex size-10 items-center justify-center rounded-full transition-all duration-200",
+          active
+            ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+            : "bg-[var(--surface-base)] text-[var(--text-secondary)]",
         )}
+      >
+        <IconComp className="size-4.5" weight="light" />
       </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-13px font-semibold text-[var(--text-primary)]">{label}</div>
+        <div className="mt-0.5 text-11px text-[var(--text-secondary)]">{description}</div>
+      </div>
+      {active ? (
+        <span className="rounded-full bg-[var(--accent-primary)]/10 px-2.5 py-1 text-10px font-semibold text-[var(--accent-primary)]">
+          Attivo
+        </span>
+      ) : null}
     </motion.button>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
-      <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-        {label}
-      </div>
-      <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function InfoTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-18px bg-[var(--bg-muted)] px-3 py-3 ring-1 ring-[var(--border-subtle)]">
-      <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-        {label}
-      </div>
-      <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function ModeSelector<TValue extends string>({
-  onChange,
-  options,
-  value,
-}: {
-  onChange: (value: TValue) => void;
-  options: {
-    description: string;
-    icon: PhosphorIcon;
-    label: string;
-    value: TValue;
-  }[];
-  value: TValue;
-}) {
-  return (
-    <div className="mt-5 grid gap-2">
-      {options.map((option) => {
-        const active = value === option.value;
-        const Icon = option.icon;
-
-        return (
-          <motion.button
-            aria-pressed={active}
-            className={cn(
-              "group flex min-h-16 items-center gap-3 rounded-2xl p-2.5 text-left outline-none ring-1 transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              active
-                ? "bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base))] ring-[color-mix(in_srgb,var(--accent-primary)_34%,transparent)]"
-                : "bg-[var(--bg-muted)] ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]",
-            )}
-            key={option.value}
-            onClick={() => onChange(option.value)}
-            type="button"
-          >
-            <span
-              className={cn(
-                "flex size-10 items-center justify-center rounded-full transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                active
-                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                  : "bg-[var(--surface-base)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]",
-              )}
-            >
-              <Icon className="size-4.5" weight="light" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-13px font-semibold text-[var(--text-primary)]">
-                {option.label}
-              </div>
-              <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
-                {option.description}
-              </div>
-            </div>
-            {active ? (
-              <span className="rounded-full bg-[var(--accent-primary)]/10 px-2.5 py-1 text-10px font-semibold text-[var(--accent-primary)]">
-                Attivo
-              </span>
-            ) : null}
-          </motion.button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -620,7 +634,7 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-2xl bg-[var(--bg-muted)] px-4 py-3 ring-1 ring-[var(--border-subtle)]">
+    <div className="flex items-start justify-between gap-4 rounded-xl bg-[var(--bg-muted)] px-4 py-3 ring-1 ring-[var(--border-subtle)]">
       <div className="min-w-0">
         <div className="text-13px font-semibold text-[var(--text-primary)]">{label}</div>
         <p className="mt-1 text-12px leading-5 text-[var(--text-secondary)]">{description}</p>
@@ -628,7 +642,7 @@ function ToggleRow({
       <motion.button
         aria-checked={checked}
         className={cn(
-          "relative mt-0.5 flex h-7 w-12 shrink-0 items-center rounded-full p-1 outline-none ring-1 transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "relative mt-0.5 flex h-7 w-12 shrink-0 items-center rounded-full p-1 outline-none ring-1 transition-colors duration-200",
           checked
             ? "bg-[var(--accent-primary)] ring-[var(--accent-primary)]"
             : "bg-[var(--surface-base)] ring-[var(--border-subtle)]",
@@ -638,9 +652,9 @@ function ToggleRow({
         type="button"
       >
         <motion.span
-          className="block size-5 rounded-full bg-[var(--surface-base)] shadow-[0_1px_4px_rgba(0,0,0,0.12)]"
-          transition={{ duration: 0.45, ease: SPRING_EASE }}
           animate={{ x: checked ? 20 : 0 }}
+          className="block size-5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.12)]"
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         />
       </motion.button>
     </div>
@@ -657,7 +671,6 @@ function getReleaseStatus(state: UpdateViewState) {
       tone: "neutral" as const,
     };
   }
-
   if (state.kind === "up-to-date") {
     return {
       checkedAt: state.checkedAt,
@@ -667,7 +680,6 @@ function getReleaseStatus(state: UpdateViewState) {
       tone: "success" as const,
     };
   }
-
   if (state.kind === "available") {
     return {
       checkedAt: state.checkedAt,
@@ -677,7 +689,6 @@ function getReleaseStatus(state: UpdateViewState) {
       tone: "warning" as const,
     };
   }
-
   if (state.kind === "unsupported") {
     return {
       checkedAt: state.checkedAt,
@@ -687,7 +698,6 @@ function getReleaseStatus(state: UpdateViewState) {
       tone: "info" as const,
     };
   }
-
   return {
     checkedAt: state.checkedAt,
     description: state.message,

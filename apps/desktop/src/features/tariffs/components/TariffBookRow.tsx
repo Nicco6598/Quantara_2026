@@ -1,8 +1,8 @@
-import { MoreVertical, Star } from "lucide-react";
+import { MoreVertical, Pencil, Star, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
-import { BezelSurface } from "@/components/shared/ui-primitives";
+import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 import type { DesktopTariffBook } from "@/lib/desktopData";
 
 export function TariffBookRow({
@@ -27,7 +27,8 @@ export function TariffBookRow({
   voiceCount: number | undefined;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const buttonRef = useRef<HTMLDivElement>(null);
+  const mobileRef = useRef<HTMLDivElement>(null);
+  const desktopRef = useRef<HTMLDivElement>(null);
   const isActive = book.status === "active" || book.status === "validated";
 
   return (
@@ -72,48 +73,36 @@ export function TariffBookRow({
               <span>{voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT")} voci</span>
             </div>
           </button>
-          <Button
-            aria-expanded={isOpen}
-            aria-label={`Azioni per ${book.name}`}
-            onClick={() => setIsOpen(!isOpen)}
-            size="icon"
-            variant="ghost"
-          >
-            <MoreVertical className="size-4" />
-          </Button>
-        </div>
-        {isOpen && (
-          <>
-            <button
-              aria-label="Chiudi menu azioni"
-              className="fixed inset-0 z-40 cursor-default"
-              onClick={() => setIsOpen(false)}
-              type="button"
+          <div ref={mobileRef}>
+            <ProjectControlButton
+              aria-label={`Azioni per ${book.name}`}
+              onClick={() => setIsOpen(!isOpen)}
+              variant="icon"
+            >
+              <MoreVertical className="size-4" />
+            </ProjectControlButton>
+          </div>
+          <DropdownMenu isOpen={isOpen} onClose={() => setIsOpen(false)} triggerRef={mobileRef}>
+            <DropdownItem
+              icon={Pencil}
+              label="Modifica"
+              onClick={() => {
+                onEdit();
+                setIsOpen(false);
+              }}
             />
-            <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-14px border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] py-1 shadow-none">
-              <button
-                className="w-full px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
-                onClick={() => {
-                  onEdit();
-                  setIsOpen(false);
-                }}
-                type="button"
-              >
-                Modifica
-              </button>
-              <button
-                className="w-full px-3 py-2 text-left text-sm text-[var(--danger-base)] hover:bg-[var(--bg-muted)]"
-                onClick={() => {
-                  onDelete();
-                  setIsOpen(false);
-                }}
-                type="button"
-              >
-                Elimina
-              </button>
-            </div>
-          </>
-        )}
+            <DropdownDivider />
+            <DropdownItem
+              icon={Trash2}
+              label="Elimina"
+              onClick={() => {
+                onDelete();
+                setIsOpen(false);
+              }}
+              tone="danger"
+            />
+          </DropdownMenu>
+        </div>
       </BezelSurface>
 
       {/* Desktop grid row (2xl+) */}
@@ -157,60 +146,35 @@ export function TariffBookRow({
           {voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT")}
         </div>
         <div className="justify-self-end">
-          <div ref={buttonRef}>
-            <Button
-              aria-expanded={isOpen}
+          <div ref={desktopRef}>
+            <ProjectControlButton
               aria-label={`Azioni per ${book.name}`}
               onClick={() => setIsOpen(!isOpen)}
-              size="icon"
-              variant="ghost"
+              variant="icon"
             >
               <MoreVertical className="size-4" />
-            </Button>
+            </ProjectControlButton>
           </div>
-          {isOpen ? (
-            <>
-              <button
-                aria-label="Chiudi menu azioni"
-                className="fixed inset-0 z-40 cursor-default"
-                onClick={() => setIsOpen(false)}
-                type="button"
-              />
-              <div
-                className="fixed z-50 w-36 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg"
-                style={
-                  buttonRef.current
-                    ? {
-                        right:
-                          window.innerWidth - buttonRef.current.getBoundingClientRect().right + 4,
-                        top: buttonRef.current.getBoundingClientRect().bottom + 4,
-                      }
-                    : { right: 16, top: 16 }
-                }
-              >
-                <button
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-13px font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-                  onClick={() => {
-                    onEdit();
-                    setIsOpen(false);
-                  }}
-                  type="button"
-                >
-                  Modifica
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-13px font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--bg-muted)]"
-                  onClick={() => {
-                    onDelete();
-                    setIsOpen(false);
-                  }}
-                  type="button"
-                >
-                  Elimina
-                </button>
-              </div>
-            </>
-          ) : null}
+          <DropdownMenu isOpen={isOpen} onClose={() => setIsOpen(false)} triggerRef={desktopRef}>
+            <DropdownItem
+              icon={Pencil}
+              label="Modifica"
+              onClick={() => {
+                onEdit();
+                setIsOpen(false);
+              }}
+            />
+            <DropdownDivider />
+            <DropdownItem
+              icon={Trash2}
+              label="Elimina"
+              onClick={() => {
+                onDelete();
+                setIsOpen(false);
+              }}
+              tone="danger"
+            />
+          </DropdownMenu>
         </div>
       </div>
     </div>

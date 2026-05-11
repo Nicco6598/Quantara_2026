@@ -1,19 +1,20 @@
-import { Calculator } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Calculator, TrendingUp } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
+import { BezelSurface, MetricCard } from "@/components/shared/ui-primitives";
 import {
-  buildActionSummary,
   buildActivityRows,
   buildFocusRows,
-  buildMilestones,
+  buildGanttBars,
   buildOverviewMetrics,
-  Milestones,
+  buildPriorityActions,
+  buildSalTimeline,
   OperationalSites,
   PriorityActions,
   RightRail,
+  TimelineGantt,
 } from "@/features/dashboard/components/DashboardSections";
-import { MetricCard } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { PortfolioProject } from "@/features/projects/types";
 import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
@@ -21,11 +22,9 @@ import type { SalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { useNavigate } from "@/hooks/useNavigate";
+import { useAuditLogStore } from "@/store/audit-log-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function timeGreeting(): string {
   const hour = new Date().getHours();
@@ -48,77 +47,36 @@ function buildOperationalTotals(projects: PortfolioProject[], views: SalDocument
       committedAmount: 0,
       progressPercent: 0,
     };
-
     const committedAmount = current.committedAmount + view.total;
     const approvedAmount =
       view.status === "closed" ? current.approvedAmount + view.total : current.approvedAmount;
-
     const budget = budgetById.get(view.projectId) ?? 0;
     const progressPercent = budget > 0 ? Math.min(100, (committedAmount / budget) * 100) : 0;
-
     totals.set(view.projectId, { approvedAmount, committedAmount, progressPercent });
   }
 
   return totals;
 }
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function BudgetBadge({
-  totalBudget,
-  totalSal,
-  projectCount,
-  escalationCount,
-}: {
-  totalBudget: number;
-  totalSal: number;
-  projectCount: number;
-  escalationCount: number;
-}) {
-  return (
-    <div>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-            Budget totale
-          </p>
-          <p className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-            {totalBudget.toLocaleString("it-IT", {
-              style: "currency",
-              currency: "EUR",
-              minimumFractionDigits: 0,
-            })}
-          </p>
-        </div>
-        <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-          <Calculator className="size-6" />
-        </span>
-      </div>
-      <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
-        {projectCount} cantier{projectCount === 1 ? "e" : "i"} ·{" "}
-        {totalSal.toLocaleString("it-IT", {
-          style: "currency",
-          currency: "EUR",
-          minimumFractionDigits: 0,
-        })}{" "}
-        SAL
-        {escalationCount > 0 ? ` · ${escalationCount} criticita` : ""}
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Dashboard screen
-// ---------------------------------------------------------------------------
-
 export function DashboardScreen() {
+  const navigate = useNavigate();
   const { notify } = useToast();
   const [projects, setProjects] = useState<PortfolioProject[]>([]);
   const salDocuments = useSalWorkflowStore((s) => s.salDocuments);
   const tariffVoices = useSalWorkflowStore((s) => s.tariffVoices);
+  const auditEntries = useAuditLogStore((s) => s.entries);
+
+  const handleOpenProject = useCallback(
+    (project: PortfolioProject) => {
+      try {
+        window.sessionStorage.setItem("quantara.selectedProjectDetail.v1", JSON.stringify(project));
+      } catch {
+        /* no-op */
+      }
+      navigate("project-detail");
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     const abort = new AbortController();
@@ -143,19 +101,21 @@ export function DashboardScreen() {
 
   const derived = useMemo(() => {
     const views = buildSalDocumentViews(salDocuments, tariffVoices);
+    const salTimeline = buildSalTimeline(projects, views);
 
     return {
       metrics: buildOverviewMetrics(projects),
       distribution: buildFocusRows(projects),
-      activities: buildActivityRows(projects),
-      priorityActions: buildActionSummary(projects),
-      milestones: buildMilestones(projects),
+      activities: buildActivityRows(auditEntries),
+      priorityActions: buildPriorityActions(projects),
+      ganttBars: buildGanttBars(projects, salTimeline),
       totalBudget: projects.reduce((s, p) => s + p.budget.amount, 0),
       totalSal: views.reduce((sum, v) => sum + v.total, 0),
       escalationCount: projects.filter((p) => p.tone === "danger").length,
       operationalTotals: buildOperationalTotals(projects, views),
+      salTimeline,
     };
-  }, [projects, salDocuments, tariffVoices]);
+  }, [projects, salDocuments, tariffVoices, auditEntries]);
 
   async function handleDeleteProject(projectId: string) {
     try {
@@ -177,7 +137,7 @@ export function DashboardScreen() {
   }
 
   return (
-    <main className="relative w-full max-w-full overflow-x-hidden px-6 pb-12 pt-6 md:px-8">
+    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
 
       <div className="grid min-w-0 gap-8 lg:gap-10 2xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -187,12 +147,35 @@ export function DashboardScreen() {
             title="Portafoglio lavori"
             description="Monitora avanzamento, SAL e segnali di rischio dei cantieri attivi."
             sidePanel={
-              <BudgetBadge
-                escalationCount={derived.escalationCount}
-                projectCount={projects.length}
-                totalBudget={derived.totalBudget}
-                totalSal={derived.totalSal}
-              />
+              <div>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
+                      Budget totale
+                    </p>
+                    <p className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
+                      {derived.totalBudget.toLocaleString("it-IT", {
+                        style: "currency",
+                        currency: "EUR",
+                        minimumFractionDigits: 0,
+                      })}
+                    </p>
+                  </div>
+                  <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+                    <Calculator className="size-6" />
+                  </span>
+                </div>
+                <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
+                  {projects.length} cantier{projects.length === 1 ? "e" : "i"} ·{" "}
+                  {derived.totalSal.toLocaleString("it-IT", {
+                    style: "currency",
+                    currency: "EUR",
+                    minimumFractionDigits: 0,
+                  })}{" "}
+                  SAL
+                  {derived.escalationCount > 0 ? ` · ${derived.escalationCount} criticita` : ""}
+                </p>
+              </div>
             }
           />
 
@@ -202,15 +185,28 @@ export function DashboardScreen() {
             ))}
           </div>
 
-          <PriorityActions summary={derived.priorityActions} />
+          <PriorityActions items={derived.priorityActions} />
+
+          <BezelSurface innerClassName="p-4">
+            <div className="mb-4 flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--info-base)]">
+              <TrendingUp className="size-4" />
+              Timeline cantieri
+            </div>
+            {derived.ganttBars.length > 0 ? (
+              <TimelineGantt bars={derived.ganttBars} />
+            ) : (
+              <p className="py-6 text-center text-13px text-[var(--text-secondary)]">
+                Nessun cantiere con SAL registrate.
+              </p>
+            )}
+          </BezelSurface>
 
           <OperationalSites
             onDeleteProject={handleDeleteProject}
+            onOpenProject={handleOpenProject}
             operationalByProjectId={derived.operationalTotals}
             projects={projects}
           />
-
-          <Milestones items={derived.milestones} />
         </div>
 
         <RightRail

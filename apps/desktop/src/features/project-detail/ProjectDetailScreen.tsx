@@ -20,6 +20,7 @@ import {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
+import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { SPRING_EASE } from "@/components/shared/easings";
 
 import { useToast } from "@/components/shared/ToastProvider";
@@ -833,8 +834,7 @@ function SalCard({
 }) {
   const isSelected = useSelectionStore((state) => state.ids.has(id));
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuBtnRef = useRef<HTMLButtonElement>(null);
-  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
+  const menuBtnRef = useRef<HTMLDivElement>(null);
 
   return (
     <div
@@ -954,81 +954,52 @@ function SalCard({
           </span>
         ) : null}
 
-        <div className="relative">
-          <button
-            ref={menuBtnRef}
+        <div ref={menuBtnRef}>
+          <ProjectControlButton
             aria-label="Azioni SAL"
-            className="projects-control-button-neutral flex size-9 shrink-0 items-center justify-center gap-2 rounded-full text-[var(--text-secondary)] outline-none projects-control-button"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
-              if (!menuOpen && menuBtnRef.current) {
-                const rect = menuBtnRef.current.getBoundingClientRect();
-                setMenuPos({
-                  top: rect.bottom + 6,
-                  right: document.documentElement.clientWidth - rect.right,
-                });
-              }
               setMenuOpen((v) => !v);
             }}
-            type="button"
+            variant="icon"
           >
             <MoreVertical className="size-4" />
-          </button>
-          {menuOpen ? (
-            <>
-              <button
-                aria-label="Chiudi menu"
-                className="fixed inset-0 z-[9998] cursor-default"
-                onClick={() => setMenuOpen(false)}
-                type="button"
+          </ProjectControlButton>
+          <DropdownMenu
+            isOpen={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            triggerRef={menuBtnRef}
+          >
+            {isDraft ? (
+              <DropdownItem
+                icon={Play}
+                label="Continua bozza"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onContinue?.();
+                }}
               />
-              <div
-                className="fixed z-[9999] w-52 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1 shadow-[0_18px_44px_-18px_rgba(15,23,42,0.35)] ring-1 ring-[var(--border-subtle)]/70"
-                style={{ top: menuPos.top, right: menuPos.right }}
-              >
-                {isDraft ? (
-                  <button
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-13px font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuOpen(false);
-                      onContinue?.();
-                    }}
-                    type="button"
-                  >
-                    <Play className="size-4 text-[var(--info-base)]" />
-                    Continua bozza
-                  </button>
-                ) : null}
-                {isDraft || isReview ? (
-                  <button
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-13px font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuOpen(false);
-                      onClose();
-                    }}
-                    type="button"
-                  >
-                    <ThumbsUp className="size-4 text-[var(--info-base)]" />
-                    {isDraft ? "Invia in revisione" : "Approva"}
-                  </button>
-                ) : null}
-                <button
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-13px font-medium text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(false);
-                    onDelete();
-                  }}
-                  type="button"
-                >
-                  <Trash2 className="size-4" />
-                  Elimina
-                </button>
-              </div>
-            </>
-          ) : null}
+            ) : null}
+            {isDraft || isReview ? (
+              <DropdownItem
+                icon={ThumbsUp}
+                label={isDraft ? "Invia in revisione" : "Approva"}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onClose();
+                }}
+              />
+            ) : null}
+            <DropdownItem
+              icon={Trash2}
+              label="Elimina"
+              onClick={() => {
+                setMenuOpen(false);
+                onDelete();
+              }}
+              tone="danger"
+            />
+          </DropdownMenu>
         </div>
       </div>
     </div>

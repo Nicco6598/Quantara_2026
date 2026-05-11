@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Trash2, X } from "lucide-react";
 import {
   type ChangeEvent,
@@ -11,8 +12,11 @@ import {
   useState,
   useTransition,
 } from "react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { BUTTER_EASE } from "@/components/shared/easings";
+import { ProjectControlButton } from "@/components/shared/ui-primitives";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
 import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
 import { useProjectMigration } from "@/features/projects/hooks/useProjectMigration";
@@ -23,7 +27,6 @@ import type {
   MigrationAction,
   PortfolioFocus,
   PortfolioProject,
-  ProjectActionDialogState,
   ProjectEditState,
 } from "@/features/projects/types";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
@@ -60,11 +63,6 @@ const ContractorModal = lazy(() =>
     default: m.ContractorModal,
   })),
 );
-const ProjectActionDialog = lazy(() =>
-  import("@/features/projects/components/ProjectActionDialog").then((m) => ({
-    default: m.ProjectActionDialog,
-  })),
-);
 const SalModal = lazy(() =>
   import("@/features/projects/components/SalModal").then((m) => ({ default: m.SalModal })),
 );
@@ -86,9 +84,6 @@ export function ProjectsScreen() {
   });
   const [editingProject, setEditingProject] = useState<ProjectEditState | null>(null);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
-  const [projectActionDialog, setProjectActionDialog] = useState<ProjectActionDialogState | null>(
-    null,
-  );
   const [contractorDraft, setContractorDraft] = useState("");
   const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
   const [contractorDeleteTarget, setContractorDeleteTarget] = useState<ContractorFolder | null>(
@@ -102,6 +97,7 @@ export function ProjectsScreen() {
   );
   const [selectedContractorId, setSelectedContractorId] = useState<string | null>(null);
   const [selectedContractId, setSelectedContractId] = useState("");
+  const [projectDeleteTarget, setProjectDeleteTarget] = useState<string | null>(null);
   const [tariffBooksState, setTariffBooksState] = useState([fallbackProjectTariffBook]);
   const [focus, setFocus] = useState<PortfolioFocus>("all");
   const [, setMigrationAction] = useState<MigrationAction>("idle");
@@ -247,10 +243,6 @@ export function ProjectsScreen() {
     navigate("project-detail");
   }
 
-  function handleOpenProjectActions(project: PortfolioProject) {
-    setProjectActionDialog({ mode: "actions", project });
-  }
-
   function handleCreateContractor(name?: string) {
     const contractorName = normalizeContractorName(name ?? contractorDraft);
 
@@ -270,13 +262,21 @@ export function ProjectsScreen() {
     });
   }
 
-  function handleConfirmDeleteContractor() {
+  async function handleConfirmDeleteContractor() {
     if (!contractorDeleteTarget) {
       return;
     }
 
     const deletedId = contractorDeleteTarget.id;
     const deletedName = contractorDeleteTarget.contractor;
+
+    const projectIdsToDelete = Object.entries(projectContractors)
+      .filter(([, contractor]) => createContractorId(contractor) === deletedId)
+      .map(([projectId]) => projectId);
+
+    for (const projectId of projectIdsToDelete) {
+      await deleteProject(projectId);
+    }
 
     setContractorRegistry((current) =>
       current.filter((contractor) => createContractorId(contractor) !== deletedId),
@@ -294,27 +294,10 @@ export function ProjectsScreen() {
     setContractorDeleteTarget(null);
     dispatchDataChanged();
     notify({
-      message:
-        contractorDeleteTarget.projectCount > 0
-          ? `${deletedName} eliminato. I progetti collegati restano nel registro senza appaltatore assegnato.`
-          : `${deletedName} eliminato dal registro appaltatori.`,
+      message: `${deletedName} eliminato con ${projectIdsToDelete.length} progetti e relative SAL.`,
       title: "Appaltatore eliminato",
       tone: "success",
     });
-  }
-
-  function handleEditFromActions(project: PortfolioProject) {
-    setProjectActionDialog(null);
-    selectProject(project.id);
-  }
-
-  function handleAskDeleteFromActions(project: PortfolioProject) {
-    setProjectActionDialog({ mode: "delete", project });
-  }
-
-  async function handleConfirmDeleteFromActions(project: PortfolioProject) {
-    setProjectActionDialog(null);
-    await deleteProject(project.id);
   }
 
   const handleBackFromContractor = useCallback(() => {
@@ -417,7 +400,8 @@ export function ProjectsScreen() {
             onFocusChange={(nextFocus) => startTransition(() => setFocus(nextFocus))}
             onImport={() => fileInputRef.current?.click()}
             onOpenProject={handleOpenProject}
-            onOpenProjectActions={handleOpenProjectActions}
+            onEditProject={(project) => selectProject(project.id)}
+            onDeleteProject={(projectId) => setProjectDeleteTarget(projectId)}
             projects={visibleProjects}
             query={query}
             salExposure={salExposure}
@@ -464,20 +448,6 @@ export function ProjectsScreen() {
             tariffBooks={tariffBooksState}
           />
         ) : null}
-        {projectActionDialog ? (
-          <ProjectActionDialog
-            mode={projectActionDialog.mode}
-            onClose={() => setProjectActionDialog(null)}
-            onDelete={() => handleAskDeleteFromActions(projectActionDialog.project)}
-            onEdit={() => handleEditFromActions(projectActionDialog.project)}
-            onOpen={() => {
-              setProjectActionDialog(null);
-              handleOpenProject(projectActionDialog.project);
-            }}
-            onConfirmDelete={() => void handleConfirmDeleteFromActions(projectActionDialog.project)}
-            project={projectActionDialog.project}
-          />
-        ) : null}
         {isContractorModalOpen ? (
           <ContractorModal
             contractorDraft={contractorDraft}
@@ -510,6 +480,18 @@ export function ProjectsScreen() {
             onConfirm={handleConfirmDeleteContractor}
           />
         ) : null}
+        <ConfirmDialog
+          isOpen={projectDeleteTarget !== null}
+          onCancel={() => setProjectDeleteTarget(null)}
+          onConfirm={() => {
+            if (projectDeleteTarget) void deleteProject(projectDeleteTarget);
+            setProjectDeleteTarget(null);
+          }}
+          title="Eliminare questo progetto?"
+          tone="danger"
+        >
+          L'operazione rimuove il contratto locale dal registro.
+        </ConfirmDialog>
       </Suspense>
     </main>
   );
@@ -624,72 +606,52 @@ function ContractorDeleteDialog({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
       <button
         aria-label="Chiudi conferma eliminazione appaltatore"
         className="absolute inset-0 cursor-default"
         onClick={onClose}
         type="button"
       />
-      <section className="relative w-full max-w-md rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
-        <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] md:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <span className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                Elimina appaltatore
-              </span>
-              <h3 className="mt-3 text-20px font-bold leading-tight text-[var(--text-primary)]">
-                {contractor.contractor}
-              </h3>
-              <p className="mt-2 text-13px leading-6 text-[var(--text-secondary)]">
-                {contractor.projectCount > 0
-                  ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato.`
-                  : "La cartella verra rimossa dal registro appaltatori."}
-              </p>
-            </div>
+      <motion.section
+        className="relative w-full max-w-sm rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: BUTTER_EASE }}
+      >
+        <div className="rounded-22px bg-[var(--surface-base)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          <div className="flex items-center justify-between">
+            <h3 className="text-16px font-bold text-[var(--text-primary)]">
+              Elimina {contractor.contractor}?
+            </h3>
             <button
-              aria-label="Chiudi"
-              className="flex size-9 shrink-0 items-center justify-center rounded-18px bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+              className="flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
               onClick={onClose}
               type="button"
             >
               <X className="size-4" />
             </button>
           </div>
-          <div className="mt-6 rounded-22px border border-[var(--danger-base)]/20 bg-[var(--danger-soft)]/50 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-18px bg-[var(--danger-soft)] text-[var(--danger-base)]">
-                <Trash2 className="size-5" />
-              </span>
-              <div>
-                <div className="text-14px font-semibold text-[var(--danger-base)]">
-                  Confermare eliminazione?
-                </div>
-                <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
-                  L'operazione aggiorna il registro locale e il menu laterale.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-18px bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-              onClick={onClose}
-              type="button"
-            >
+          <p className="mt-3 text-13px leading-6 text-[var(--text-secondary)]">
+            {contractor.projectCount > 0
+              ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato.`
+              : "La cartella verra rimossa dal registro appaltatori."}
+          </p>
+          <div className="mt-5 flex justify-end gap-3">
+            <ProjectControlButton onClick={onClose} variant="ghost">
               Annulla
-            </button>
-            <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-18px bg-[var(--danger-base)] px-5 text-13px font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
+            </ProjectControlButton>
+            <ProjectControlButton
+              className="!bg-[var(--danger-base)] !text-white hover:!bg-[var(--danger-soft)] hover:!text-[var(--danger-base)]"
               onClick={onConfirm}
-              type="button"
+              variant="primary"
             >
               <Trash2 className="size-4" />
               Elimina
-            </button>
+            </ProjectControlButton>
           </div>
         </div>
-      </section>
+      </motion.section>
     </div>
   );
 }

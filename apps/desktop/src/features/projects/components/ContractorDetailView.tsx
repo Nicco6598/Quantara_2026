@@ -47,7 +47,8 @@ type ContractorDetailViewProps = {
   onFocusChange: (focus: PortfolioFocus) => void;
   onImport: () => void;
   onOpenProject: (project: PortfolioProject) => void;
-  onOpenProjectActions: (project: PortfolioProject) => void;
+  onEditProject: (project: PortfolioProject) => void;
+  onDeleteProject: (projectId: string) => void;
   projects: PortfolioProject[];
   query: string;
   salExposure: number;
@@ -75,7 +76,8 @@ export function ContractorDetailView({
   onFocusChange,
   onImport,
   onOpenProject,
-  onOpenProjectActions,
+  onEditProject,
+  onDeleteProject,
   projects,
   query,
   salExposure,
@@ -187,10 +189,11 @@ export function ContractorDetailView({
         <section className="min-w-0">
           <ProjectsWorkbench
             onCreateProject={onCreateProject}
+            onDeleteProject={onDeleteProject}
+            onEditProject={onEditProject}
             onExport={onExport}
             onImport={onImport}
             onOpenProject={onOpenProject}
-            onOpenProjectActions={onOpenProjectActions}
             projects={projects}
             query={query}
             selectedProjectId={selectedProjectId}

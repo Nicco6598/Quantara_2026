@@ -1,15 +1,19 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Calendar,
+  Eye,
   FileSpreadsheet,
   FolderKanban,
   MapPin,
   MoreVertical,
+  Pencil,
   Plus,
+  Trash2,
   Upload,
 } from "lucide-react";
-import { memo, type MouseEvent, type ReactNode, useCallback, useState } from "react";
+import { memo, type MouseEvent, type ReactNode, useRef, useState } from "react";
 import type { PortfolioProject } from "@/features/projects/types";
+import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -18,9 +22,10 @@ import { BezelSurface, EmptyState, ProjectControlButton } from "./workspace-ui";
 type ProjectsWorkbenchProps = {
   children?: ReactNode;
   onCreateProject: () => void;
+  onDeleteProject: (projectId: string) => void;
+  onEditProject: (project: PortfolioProject) => void;
   onExport: () => void;
   onImport: () => void;
-  onOpenProjectActions: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
   projects: PortfolioProject[];
   query: string;
@@ -32,17 +37,17 @@ const spring = { damping: 30, stiffness: 260, type: "spring" as const };
 export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   children,
   onCreateProject,
+  onDeleteProject,
+  onEditProject,
   onExport,
   onImport,
-  onOpenProjectActions,
   onOpenProject,
   projects,
   query,
   selectedProjectId,
 }: ProjectsWorkbenchProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
-  const toggleActions = useCallback(() => setActionsOpen((value) => !value), []);
-  const closeActions = useCallback(() => setActionsOpen(false), []);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   return (
     <BezelSurface innerClassName="overflow-hidden p-0">
@@ -58,21 +63,37 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
             >
               Nuovo progetto
             </ProjectControlButton>
-            <div className="relative">
+            <div ref={actionsRef}>
               <ProjectControlButton
                 aria-label="Azioni"
                 icon={MoreVertical}
-                onClick={toggleActions}
+                onClick={() => setActionsOpen((v) => !v)}
                 variant="icon"
               >
                 <span className="sr-only">Azioni</span>
               </ProjectControlButton>
-              <WorkbenchActionsMenu
-                actionsOpen={actionsOpen}
-                closeActions={closeActions}
-                onExport={onExport}
-                onImport={onImport}
-              />
+              <DropdownMenu
+                isOpen={actionsOpen}
+                onClose={() => setActionsOpen(false)}
+                triggerRef={actionsRef}
+              >
+                <DropdownItem
+                  icon={Upload}
+                  label="Importa"
+                  onClick={() => {
+                    onImport();
+                    setActionsOpen(false);
+                  }}
+                />
+                <DropdownItem
+                  icon={FileSpreadsheet}
+                  label="Export"
+                  onClick={() => {
+                    onExport();
+                    setActionsOpen(false);
+                  }}
+                />
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -104,7 +125,8 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
             <WorkbenchRow
               isSelected={project.id === selectedProjectId}
               key={project.id}
-              onOpenProjectActions={onOpenProjectActions}
+              onDeleteProject={onDeleteProject}
+              onEditProject={onEditProject}
               onOpenProject={onOpenProject}
               project={project}
             />
@@ -122,102 +144,16 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   );
 });
 
-function WorkbenchActionsMenu({
-  actionsOpen,
-  closeActions,
-  onExport,
-  onImport,
-}: {
-  actionsOpen: boolean;
-  closeActions: () => void;
-  onExport: () => void;
-  onImport: () => void;
-}) {
-  return (
-    <AnimatePresence>
-      {actionsOpen ? (
-        <>
-          <button
-            aria-label="Chiudi azioni"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={closeActions}
-            type="button"
-          />
-          <motion.div
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="absolute right-0 top-full z-50 mt-3 w-72 overflow-hidden rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] shadow-[0_24px_70px_color-mix(in_srgb,var(--text-primary)_14%,transparent)] backdrop-blur-md"
-            exit={{ opacity: 0, scale: 0.96, y: -10 }}
-            initial={{ opacity: 0, scale: 0.96, y: -10 }}
-            transition={{ damping: 26, stiffness: 200, type: "spring" }}
-          >
-            <div className="rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
-              <WorkbenchActionItem
-                description="Carica contratti o dati da workbook"
-                icon={Upload}
-                label="Importa"
-                onClick={() => {
-                  onImport();
-                  closeActions();
-                }}
-              />
-              <WorkbenchActionItem
-                description="Esporta il perimetro corrente"
-                icon={FileSpreadsheet}
-                label="Export"
-                onClick={() => {
-                  onExport();
-                  closeActions();
-                }}
-              />
-            </div>
-          </motion.div>
-        </>
-      ) : null}
-    </AnimatePresence>
-  );
-}
-
-function WorkbenchActionItem({
-  description,
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  description: string;
-  icon: typeof Upload;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <motion.button
-      animate={{ opacity: 1, x: 0 }}
-      className="flex w-full items-start gap-3 rounded-18px px-3 py-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)]"
-      initial={{ opacity: 0, x: -12 }}
-      onClick={onClick}
-      transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-      type="button"
-    >
-      <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--info-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_22%,transparent)]">
-        <Icon className="size-4" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-13px font-semibold text-[var(--text-primary)]">{label}</span>
-        <span className="mt-0.5 block text-11px leading-4 text-[var(--text-secondary)]">
-          {description}
-        </span>
-      </span>
-    </motion.button>
-  );
-}
-
 function WorkbenchRow({
   isSelected,
-  onOpenProjectActions,
+  onDeleteProject,
+  onEditProject,
   onOpenProject,
   project,
 }: {
   isSelected: boolean;
-  onOpenProjectActions: (project: PortfolioProject) => void;
+  onDeleteProject: (projectId: string) => void;
+  onEditProject: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
   project: PortfolioProject;
 }) {
@@ -258,7 +194,12 @@ function WorkbenchRow({
         <ProjectManager project={project} />
         <SalCockpit project={project} salProgress={salProgress} />
         <ProjectProgress progress={project.progress} progressColor={progressColor} />
-        <ProjectActionsButton onOpenProjectActions={onOpenProjectActions} project={project} />
+        <ProjectActionsDropdown
+          onDeleteProject={onDeleteProject}
+          onEditProject={onEditProject}
+          onOpenProject={onOpenProject}
+          project={project}
+        />
       </div>
 
       <div className="flex flex-col gap-4 xl:hidden">
@@ -273,7 +214,12 @@ function WorkbenchRow({
             </div>
             <ProjectMeta project={project} />
           </div>
-          <ProjectActionsButton onOpenProjectActions={onOpenProjectActions} project={project} />
+          <ProjectActionsDropdown
+            onDeleteProject={onDeleteProject}
+            onEditProject={onEditProject}
+            onOpenProject={onOpenProject}
+            project={project}
+          />
         </div>
 
         <SalCockpit project={project} salProgress={salProgress} />
@@ -456,27 +402,61 @@ function ProjectProgress({ progress, progressColor }: { progress: number; progre
   );
 }
 
-function ProjectActionsButton({
-  onOpenProjectActions,
+function ProjectActionsDropdown({
+  onDeleteProject,
+  onEditProject,
+  onOpenProject,
   project,
 }: {
-  onOpenProjectActions: (project: PortfolioProject) => void;
+  onDeleteProject: (projectId: string) => void;
+  onEditProject: (project: PortfolioProject) => void;
+  onOpenProject: (project: PortfolioProject) => void;
   project: PortfolioProject;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   return (
-    <div className="flex justify-end">
+    <div className="flex justify-end" ref={menuRef}>
       <ProjectControlButton
         aria-label={`Azioni per ${project.title}`}
-        className="size-8"
         icon={MoreVertical}
         onClick={(event: MouseEvent) => {
           event.stopPropagation();
-          onOpenProjectActions(project);
+          setIsOpen((v) => !v);
         }}
         variant="icon"
       >
         <span className="sr-only">Azioni per {project.title}</span>
       </ProjectControlButton>
+      <DropdownMenu isOpen={isOpen} onClose={() => setIsOpen(false)} triggerRef={menuRef}>
+        <DropdownItem
+          icon={Eye}
+          label="Apri dossier"
+          onClick={() => {
+            setIsOpen(false);
+            onOpenProject(project);
+          }}
+        />
+        <DropdownItem
+          icon={Pencil}
+          label="Modifica progetto"
+          onClick={() => {
+            setIsOpen(false);
+            onEditProject(project);
+          }}
+        />
+        <DropdownDivider />
+        <DropdownItem
+          icon={Trash2}
+          label="Elimina progetto"
+          onClick={() => {
+            setIsOpen(false);
+            onDeleteProject(project.id);
+          }}
+          tone="danger"
+        />
+      </DropdownMenu>
     </div>
   );
 }

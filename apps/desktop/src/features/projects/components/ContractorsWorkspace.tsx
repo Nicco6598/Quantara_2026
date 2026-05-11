@@ -18,8 +18,9 @@ import {
   Upload,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { memo, type ReactNode, useMemo, useState } from "react";
+import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
+import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import type { ContractorFolder } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -443,7 +444,6 @@ function ContractorCard({
   onDeleteContractor: (folder: ContractorFolder) => void;
   onOpenFolder: (id: string) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const health = getFolderHealth(folder);
   const initials = getContractorInitials(folder.contractor);
   const salRatio =
@@ -464,12 +464,7 @@ function ContractorCard({
     >
       <div className="absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-highlight)_82%,transparent),transparent)]" />
       <div className="absolute right-4 top-4 z-20">
-        <ContractorMenu
-          folder={folder}
-          menuOpen={menuOpen}
-          onDeleteContractor={onDeleteContractor}
-          setMenuOpen={setMenuOpen}
-        />
+        <ContractorMenu folder={folder} onDeleteContractor={onDeleteContractor} />
       </div>
 
       <button
@@ -577,74 +572,37 @@ function ContractorAvatar({ initials, tone }: { initials: string; tone: StatusTo
 
 function ContractorMenu({
   folder,
-  menuOpen,
   onDeleteContractor,
-  setMenuOpen,
 }: {
   folder: ContractorFolder;
-  menuOpen: boolean;
   onDeleteContractor: (folder: ContractorFolder) => void;
-  setMenuOpen: (open: boolean | ((open: boolean) => boolean)) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   return (
-    <div className="relative">
-      <button
+    <div ref={menuRef}>
+      <ProjectControlButton
         aria-label={`Azioni ${folder.contractor}`}
-        className="flex size-8 items-center justify-center rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_72%,transparent)] text-[var(--text-secondary)] opacity-0 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_54%,transparent)] backdrop-blur-md transition-[opacity,background-color,color] duration-200 hover:bg-[var(--surface-base)] hover:text-[var(--text-primary)] group-hover:opacity-100"
         onClick={(event) => {
           event.stopPropagation();
-          setMenuOpen((open) => !open);
+          setIsOpen((v) => !v);
         }}
-        type="button"
+        variant="icon"
       >
         <MoreVertical className="size-4" />
-      </button>
-      <AnimatePresence>
-        {menuOpen ? (
-          <>
-            <button
-              aria-label="Chiudi menu appaltatore"
-              className="fixed inset-0 z-40 cursor-default"
-              onClick={() => setMenuOpen(false)}
-              type="button"
-            />
-            <motion.div
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="absolute right-0 top-full z-50 mt-3 w-64 overflow-hidden rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] shadow-[0_24px_70px_color-mix(in_srgb,var(--text-primary)_14%,transparent)] backdrop-blur-md"
-              exit={{ opacity: 0, scale: 0.96, y: -6 }}
-              initial={{ opacity: 0, scale: 0.96, y: -6 }}
-              transition={{ damping: 26, stiffness: 200, type: "spring" }}
-            >
-              <div className="rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
-                <motion.button
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex w-full items-start gap-3 rounded-18px px-3 py-3 text-left transition-colors hover:bg-[var(--danger-soft)]"
-                  initial={{ opacity: 0, x: -12 }}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setMenuOpen(false);
-                    onDeleteContractor(folder);
-                  }}
-                  transition={{ delay: 0.02, duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-                  type="button"
-                >
-                  <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--danger-soft)] text-[var(--danger-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_22%,transparent)]">
-                    <Trash2 className="size-4" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-13px font-semibold text-[var(--text-primary)]">
-                      Elimina appaltatore
-                    </span>
-                    <span className="mt-0.5 block text-11px leading-4 text-[var(--text-secondary)]">
-                      Rimuove la cartella dal registro locale
-                    </span>
-                  </span>
-                </motion.button>
-              </div>
-            </motion.div>
-          </>
-        ) : null}
-      </AnimatePresence>
+      </ProjectControlButton>
+      <DropdownMenu isOpen={isOpen} onClose={() => setIsOpen(false)} triggerRef={menuRef}>
+        <DropdownItem
+          icon={Trash2}
+          label="Elimina appaltatore"
+          onClick={() => {
+            setIsOpen(false);
+            onDeleteContractor(folder);
+          }}
+          tone="danger"
+        />
+      </DropdownMenu>
     </div>
   );
 }

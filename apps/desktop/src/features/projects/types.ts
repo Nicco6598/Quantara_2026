@@ -53,11 +53,6 @@ export type ProjectEditState = {
   };
 };
 
-export type ProjectActionDialogState = {
-  mode: "actions" | "delete";
-  project: PortfolioProject;
-};
-
 export type PriorityItem = {
   deadline: string;
   detail: string;

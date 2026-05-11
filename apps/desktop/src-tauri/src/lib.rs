@@ -79,6 +79,9 @@ pub fn run() {
             commands::backup::backup_database,
             commands::backup::restore_database,
             commands::backup::get_database_info,
+            commands::release_notes::write_pending_release_notes,
+            commands::release_notes::read_pending_release_notes,
+            commands::release_notes::clear_pending_release_notes,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Quantara desktop");

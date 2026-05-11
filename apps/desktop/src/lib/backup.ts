@@ -11,10 +11,12 @@ export type DatabaseInfo = {
 // All Zustand persist keys + app-specific storage keys
 const STORAGE_KEYS = [
   "quantara-shell-preferences",
-  "quantara-key",
-  "quantara-sal-workflow-store",
+  "quantara-sal-workflow",
   "quantara-sal-templates-v1",
   "quantara-audit-log-v1",
+  "quantara.tariffs.favoriteBookIds",
+  "quantara.salCreationDraft.v1",
+  "quantara.projectDraft.v2",
   "quantara.projectContractors.v1",
   "quantara.contractorRegistry.v1",
 ];

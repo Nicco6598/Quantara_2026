@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 
-const RELEASE_NOTES_STORAGE_KEY = "quantara.pending-release-notes";
-
 export type PendingReleaseNotes = {
   body: string;
   currentVersion: string;
@@ -9,45 +7,62 @@ export type PendingReleaseNotes = {
   version: string;
 };
 
-export function loadPendingReleaseNotes(): PendingReleaseNotes | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const raw = window.localStorage.getItem(RELEASE_NOTES_STORAGE_KEY);
-
-  if (!raw) {
-    return null;
-  }
-
+async function writeViaTauri(notes: PendingReleaseNotes): Promise<void> {
   try {
-    return JSON.parse(raw) as PendingReleaseNotes;
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("write_pending_release_notes", { json: JSON.stringify(notes) });
   } catch {
-    return null;
+    // Fallback to localStorage
+    try {
+      window.localStorage.setItem("quantara.pending-release-notes", JSON.stringify(notes));
+    } catch {
+      /* no-op */
+    }
+  }
+}
+
+async function readViaTauri(): Promise<PendingReleaseNotes | null> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const json = await invoke<string>("read_pending_release_notes");
+    return JSON.parse(json) as PendingReleaseNotes;
+  } catch {
+    // Fallback to localStorage
+    try {
+      const raw = window.localStorage.getItem("quantara.pending-release-notes");
+      return raw ? (JSON.parse(raw) as PendingReleaseNotes) : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function clearViaTauri(): Promise<void> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("clear_pending_release_notes");
+  } catch {
+    try {
+      window.localStorage.removeItem("quantara.pending-release-notes");
+    } catch {
+      /* no-op */
+    }
   }
 }
 
 export function storePendingReleaseNotes(notes: PendingReleaseNotes) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(RELEASE_NOTES_STORAGE_KEY, JSON.stringify(notes));
+  void writeViaTauri(notes);
 }
 
 export function clearPendingReleaseNotes() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.removeItem(RELEASE_NOTES_STORAGE_KEY);
+  void clearViaTauri();
 }
 
 export function usePendingReleaseNotes() {
   const [pendingReleaseNotes, setPendingReleaseNotes] = useState<PendingReleaseNotes | null>(null);
 
   useEffect(() => {
-    setPendingReleaseNotes(loadPendingReleaseNotes());
+    readViaTauri().then(setPendingReleaseNotes);
   }, []);
 
   const dismissPendingReleaseNotes = () => {

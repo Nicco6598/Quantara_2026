@@ -18,9 +18,9 @@ import {
 } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
+import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { BUTTER_EASE } from "@/components/shared/easings";
 
 import { ScreenHero } from "@/components/shared/ScreenHero";
@@ -65,8 +65,6 @@ import {
 import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
 import { groupTariffVoices } from "./utils/tariff-grouping";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
-
-const TARIFF_MENU_WIDTH = 224;
 
 function getScrollableAncestor(element: HTMLElement | null) {
   let current = element?.parentElement ?? null;
@@ -1264,28 +1262,8 @@ function TariffBookPreviewCard({
   voiceCount: number | undefined;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ left: 16, top: 16 });
   const menuRef = useRef<HTMLDivElement>(null);
   const displayVoiceCount = voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT");
-
-  function toggleMenu() {
-    if (isMenuOpen) {
-      setIsMenuOpen(false);
-      return;
-    }
-
-    const rect = menuRef.current?.getBoundingClientRect();
-    if (rect && typeof window !== "undefined") {
-      setMenuPosition({
-        left: Math.min(
-          Math.max(8, rect.right - TARIFF_MENU_WIDTH),
-          window.innerWidth - TARIFF_MENU_WIDTH - 8,
-        ),
-        top: Math.min(rect.bottom + 6, window.innerHeight - 260),
-      });
-    }
-    setIsMenuOpen(true);
-  }
 
   return (
     <motion.article
@@ -1371,65 +1349,50 @@ function TariffBookPreviewCard({
             >
               <Star className={cn("size-4", isFavorite && "fill-current")} />
             </button>
-            <div className="relative" ref={menuRef}>
-              <ProjectControlButton onClick={toggleMenu} variant="icon">
+            <div ref={menuRef}>
+              <ProjectControlButton onClick={() => setIsMenuOpen((v) => !v)} variant="icon">
                 <MoreVertical className="size-4" />
               </ProjectControlButton>
-              {isMenuOpen && typeof document !== "undefined"
-                ? createPortal(
-                    <>
-                      <button
-                        aria-label="Chiudi menu tariffario"
-                        className="fixed inset-0 z-[139] cursor-default"
-                        onClick={() => setIsMenuOpen(false)}
-                        type="button"
-                      />
-                      <motion.div
-                        className="fixed z-[140] w-56 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]"
-                        initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        style={menuPosition}
-                        transition={{ duration: 0.22, ease: BUTTER_EASE }}
-                      >
-                        <TariffMenuItem
-                          icon={Eye}
-                          label={showDetails ? "Nascondi scheda" : "Mostra scheda"}
-                          onClick={() => {
-                            onShowDetails();
-                            setIsMenuOpen(false);
-                          }}
-                        />
-                        <TariffMenuItem
-                          icon={Pencil}
-                          label="Modifica dettagli"
-                          onClick={() => {
-                            onEdit();
-                            setIsMenuOpen(false);
-                          }}
-                        />
-                        <TariffMenuItem
-                          icon={Database}
-                          label="Modifica voci"
-                          onClick={() => {
-                            onOpenVoices();
-                            setIsMenuOpen(false);
-                          }}
-                        />
-                        <div className="my-1 h-px bg-[var(--border-subtle)]/70" />
-                        <TariffMenuItem
-                          icon={Trash2}
-                          label="Elimina tariffario"
-                          onClick={() => {
-                            onDelete();
-                            setIsMenuOpen(false);
-                          }}
-                          tone="danger"
-                        />
-                      </motion.div>
-                    </>,
-                    document.body,
-                  )
-                : null}
+              <DropdownMenu
+                isOpen={isMenuOpen}
+                onClose={() => setIsMenuOpen(false)}
+                triggerRef={menuRef}
+              >
+                <DropdownItem
+                  icon={Eye}
+                  label={showDetails ? "Nascondi scheda" : "Mostra scheda"}
+                  onClick={() => {
+                    onShowDetails();
+                    setIsMenuOpen(false);
+                  }}
+                />
+                <DropdownItem
+                  icon={Pencil}
+                  label="Modifica dettagli"
+                  onClick={() => {
+                    onEdit();
+                    setIsMenuOpen(false);
+                  }}
+                />
+                <DropdownItem
+                  icon={Database}
+                  label="Modifica voci"
+                  onClick={() => {
+                    onOpenVoices();
+                    setIsMenuOpen(false);
+                  }}
+                />
+                <DropdownDivider />
+                <DropdownItem
+                  icon={Trash2}
+                  label="Elimina tariffario"
+                  onClick={() => {
+                    onDelete();
+                    setIsMenuOpen(false);
+                  }}
+                  tone="danger"
+                />
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -1529,44 +1492,6 @@ function DetailLine({ label, value }: { label: string; value: string }) {
         {value}
       </span>
     </div>
-  );
-}
-
-function TariffMenuItem({
-  icon: Icon,
-  label,
-  onClick,
-  tone = "neutral",
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-  tone?: "danger" | "neutral";
-}) {
-  return (
-    <motion.button
-      className={cn(
-        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-13px font-semibold transition-colors",
-        tone === "danger"
-          ? "text-[var(--danger-base)] hover:bg-[var(--danger-soft)]/55"
-          : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
-      )}
-      onClick={onClick}
-      type="button"
-      transition={{ duration: 0.32, ease: BUTTER_EASE }}
-    >
-      <span
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-10px",
-          tone === "danger"
-            ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-            : "bg-[var(--info-soft)] text-[var(--info-base)]",
-        )}
-      >
-        <Icon className="size-4" strokeWidth={1.9} />
-      </span>
-      <span className="truncate">{label}</span>
-    </motion.button>
   );
 }
 

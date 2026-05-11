@@ -1,10 +1,9 @@
 import { motion } from "framer-motion";
-import { ArrowUpRight, Clock3, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Clock3, FileText, LoaderCircle, Sparkles, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { SOFT_EASE } from "@/components/shared/easings";
+import { BUTTER_EASE } from "@/components/shared/easings";
+import { ProjectControlButton } from "@/components/shared/ui-primitives";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
-
-import { cn } from "@/lib/utils";
 
 type UpdateExperienceDialogProps = {
   installState: UpdateInstallState | { message: string; phase: "error" } | { phase: "idle" };
@@ -21,6 +20,7 @@ export function UpdateExperienceDialog({
 }: UpdateExperienceDialogProps) {
   const notes = normalizeNotes(update.notes);
   const isBusy = installState.phase === "installing";
+
   return createPortal(
     <div
       aria-modal="true"
@@ -28,31 +28,31 @@ export function UpdateExperienceDialog({
       role="dialog"
     >
       <button
-        aria-label="Chiudi updater"
+        aria-label="Chiudi"
         className="absolute inset-0 cursor-default"
         disabled={isBusy}
         onClick={onClose}
         type="button"
       />
       <motion.div
-        className="relative flex max-h-[calc(100dvh-24px)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-26px bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] sm:max-h-[calc(100dvh-32px)] sm:rounded-5xl sm:p-1.5"
-        initial={{ opacity: 0, y: 24, scale: 0.96 }}
-        transition={{ duration: 0.5, ease: SOFT_EASE }}
+        className="relative flex max-h-[75dvh] w-full max-w-4xl min-w-0 flex-col overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
         animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+        transition={{ duration: 0.4, ease: BUTTER_EASE }}
       >
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-22px bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] sm:rounded-3xl">
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3 sm:gap-4 sm:px-5 sm:py-4">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-[18px] bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
             <div className="min-w-0">
               <div className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
                 Aggiornamento disponibile
               </div>
-              <h3 className="mt-1 truncate text-17px font-semibold text-[var(--text-primary)] sm:text-18px">
+              <h3 className="mt-1 truncate text-17px font-semibold text-[var(--text-primary)]">
                 Da v{update.currentVersion} a v{update.version}
               </h3>
             </div>
             <button
-              aria-label="Chiudi updater"
-              className="flex size-9 items-center justify-center rounded-14px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Chiudi"
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isBusy}
               onClick={onClose}
               type="button"
@@ -61,121 +61,111 @@ export function UpdateExperienceDialog({
             </button>
           </div>
 
-          <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_260px]">
-            <div className="flex min-h-0 flex-col p-4 sm:p-5">
-              <span className="inline-flex items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-                <Sparkles className="size-3" />
-                Nuova versione pronta
+          <div className="flex min-h-0 flex-row">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5">
+              <span className="inline-flex w-max items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+                <Sparkles className="size-3" />v{update.version}
               </span>
-              <h2 className="mt-4 text-20px font-semibold leading-tight text-[var(--text-primary)] sm:text-22px">
-                Cosa cambia in v{update.version}
+              <h2 className="mt-4 text-20px font-semibold leading-tight text-[var(--text-primary)]">
+                Cosa cambia
               </h2>
-              <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)] sm:leading-6">
-                Quantara scaricherà la patch, applicherà l'update e riaprirà l'app sulla nuova
+              <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
+                Quantara scarichera la patch, applichera l'update e riaprira l'app sulla nuova
                 versione.
               </p>
 
-              <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden pr-1 sm:mt-5">
+              <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {notes.length > 0 ? (
-                  notes.map((note, i) => (
+                  notes.map((note) => (
                     <div
-                      className="flex min-w-0 items-start gap-3 rounded-14px bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)] sm:px-4 sm:py-3"
+                      className="flex min-w-0 items-start gap-3 rounded-xl bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]"
                       key={note.key}
                     >
-                      <span
-                        className={cn(
-                          "mt-1 size-2 shrink-0 rounded-full",
-                          i < notes.length / 3
-                            ? "bg-[var(--success-base)]"
-                            : i < (notes.length * 2) / 3
-                              ? "bg-[var(--info-base)]"
-                              : "bg-[var(--accent-primary)]",
-                        )}
-                      />
-                      <span className="min-w-0 break-words text-13px leading-5 text-[var(--text-primary)]">
+                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--accent-primary)]" />
+                      <span className="min-w-0 text-13px leading-5 text-[var(--text-primary)]">
                         {note.text}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-14px border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 py-4 text-center text-13px text-[var(--text-secondary)]">
+                  <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 py-4 text-center text-13px text-[var(--text-secondary)]">
                     Nessuna nota release disponibile per questa build.
                   </div>
                 )}
               </div>
             </div>
 
-            <aside className="flex min-h-0 shrink-0 flex-col border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_30%,transparent)] p-4 sm:p-5 lg:border-l lg:border-t-0">
-              <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1 lg:gap-3">
+            <div className="flex w-60 shrink-0 flex-col gap-4 border-l border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_30%,transparent)] p-5">
+              <div className="space-y-2">
                 <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
                 <MetricPill
                   icon={Clock3}
                   label="Controllo"
                   value={formatTimestamp(update.checkedAt)}
                 />
-                <MetricPill icon={ShieldCheck} label="Canale" value="Stable" />
+                <MetricPill icon={FileText} label="Modifiche" value={`${notes.length} note`} />
               </div>
 
               {installState.phase === "error" ? (
-                <div className="mt-4 rounded-14px bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)]">
+                <div className="rounded-xl bg-[var(--danger-soft)] px-3 py-2.5 text-12px font-medium text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)]">
                   {installState.message}
                 </div>
               ) : null}
 
-              <div className="mt-4 flex flex-col gap-2 lg:mt-auto lg:pt-5">
-                <ActionButton disabled={isBusy} onClick={onInstall}>
+              <div className="flex flex-col gap-2 sm:mt-auto">
+                <ProjectControlButton
+                  className="w-full"
+                  disabled={isBusy}
+                  onClick={onInstall}
+                  variant="primary"
+                >
                   {isBusy ? (
-                    <>
+                    <span className="flex items-center gap-2">
                       <LoaderCircle className="size-4 animate-spin" />
                       Installazione in corso...
-                    </>
+                    </span>
                   ) : (
-                    <>Aggiorna e riavvia</>
+                    <span className="flex items-center gap-2.5">
+                      <svg
+                        aria-hidden="true"
+                        className="size-4 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M21 2v6h-6M3 22v-6h6"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.8}
+                        />
+                        <path
+                          d="M21 8A9 9 0 003.28 13M3 16a9 9 0 0017.72-5"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.8}
+                        />
+                      </svg>
+                      Aggiorna e riavvia
+                    </span>
                   )}
-                </ActionButton>
-                <button
-                  className="group inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-50"
+                </ProjectControlButton>
+                <ProjectControlButton
+                  className="w-full"
                   disabled={isBusy}
                   onClick={onClose}
-                  type="button"
+                  variant="ghost"
                 >
                   Più tardi
-                </button>
+                </ProjectControlButton>
               </div>
-            </aside>
+            </div>
           </div>
         </div>
       </motion.div>
     </div>,
     document.body,
-  );
-}
-
-function ActionButton({
-  children,
-  disabled,
-  onClick,
-}: {
-  children: React.ReactNode;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <motion.button
-      className="micro-interact group inline-flex h-11 w-full shrink-0 items-center justify-center gap-3 rounded-full bg-[var(--accent-primary)] py-1 pl-5 pr-1 text-13px font-semibold text-[var(--text-inverse)] outline-none transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] disabled:cursor-not-allowed disabled:opacity-60"
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      <span>{children}</span>
-      <span className="flex size-9 items-center justify-center rounded-full bg-white/16 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-105">
-        {disabled ? (
-          <LoaderCircle className="size-4 animate-spin" />
-        ) : (
-          <ArrowUpRight className="size-4" />
-        )}
-      </span>
-    </motion.button>
   );
 }
 
@@ -211,16 +201,17 @@ function normalizeNotes(notes: string) {
       line
         .replace(/^#{1,6}\s+/, "")
         .replace(/^[-*]\s+/, "")
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/`([^`]+)`/g, "$1")
         .trim(),
     )
-    .filter(Boolean);
+    .filter((line) => line.length > 0 && !line.startsWith("```") && !line.startsWith("---"));
 
-  const occurrences = new Map<string, number>();
+  const seen = new Map<string, number>();
 
   return values.map((text) => {
-    const current = occurrences.get(text) ?? 0;
-    occurrences.set(text, current + 1);
-
+    const current = seen.get(text) ?? 0;
+    seen.set(text, current + 1);
     return {
       key: current === 0 ? text : `${text}-${current}`,
       text,

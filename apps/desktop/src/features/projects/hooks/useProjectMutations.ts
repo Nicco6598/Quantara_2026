@@ -14,6 +14,7 @@ import {
   deleteDesktopContract,
   updateDesktopContract,
 } from "@/lib/desktopData";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { dispatchDataChanged } from "@/lib/sync-events";
 
 type Notify = (toast: {
@@ -181,9 +182,19 @@ export function useProjectMutations({
         const { [projectId]: _deleted, ...remaining } = current;
         return remaining;
       });
+      useSalWorkflowStore.setState((state) => ({
+        projects: state.projects.filter((p) => p.id !== projectId),
+        salDocuments: state.salDocuments.filter((sal) => sal.projectId !== projectId),
+        activeProjectId: state.activeProjectId === projectId ? "" : state.activeProjectId,
+        activeSalId: state.salDocuments.some(
+          (sal) => sal.id === state.activeSalId && sal.projectId === projectId,
+        )
+          ? ""
+          : state.activeSalId,
+      }));
       dispatchDataChanged();
       notify({
-        message: `${deletedContract?.title ?? "Progetto"} eliminato dal registro.`,
+        message: `${deletedContract?.title ?? "Progetto"} e relative SAL eliminate.`,
         title: "Progetto eliminato",
         tone: "success",
       });

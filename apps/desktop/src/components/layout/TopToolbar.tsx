@@ -5,7 +5,6 @@ import {
   CaretLeft,
   CaretRight,
   CheckCircle,
-  ClockCounterClockwise,
   FileText,
   FloppyDisk,
   Plus,
@@ -14,9 +13,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
-import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-import { SaveIndicator } from "@/components/shared/SaveIndicator";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { type QuantaraRoute, useNavigationState, usePreferenceState } from "@/store/app-store";
 
@@ -40,13 +37,6 @@ type PageActionMenuItem = {
   label: string;
   mark: string;
 };
-
-function todayLabel(): string {
-  const now = new Date();
-  const day = now.toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
-  const time = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-  return `${day} · Aggiornato alle ${time}`;
-}
 
 function formatToolbarMoney(value: number): string {
   return value.toLocaleString("it-IT", {
@@ -130,27 +120,29 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
   const meta = routeMetaMap[activeRoute];
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
   const isTariffPreview = activeRoute === "tariffs" && tariffImportToolbar.phase === "preview";
+  const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    setIsMac(/Mac OS X|Macintosh/.test(navigator.userAgent));
+  }, []);
 
   return (
-    <header className="top-toolbar-shell relative z-30 shrink-0 px-3 py-2 md:px-4">
-      <div className="flex min-h-[52px] items-center justify-between gap-3 py-2 pl-[58px] pr-3 md:pr-4">
-        <HistoryNavigator />
-
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="animate-entry-sm flex min-w-0 shrink-0 items-center">
-            <Breadcrumbs />
-          </div>
-
-          <div className="min-w-0 border-l border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] pl-3">
+    <header
+      className="top-toolbar-shell relative z-30 shrink-0 px-3 py-2 md:px-4"
+      data-tauri-drag-region
+    >
+      <div
+        className={cn(
+          "flex min-h-[52px] items-center justify-between gap-3 py-2 pr-3 md:pr-4",
+          isMac ? "pl-[70px]" : "pl-3",
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-10">
+          <HistoryNavigator />
+          <div className="min-w-0">
             <h1 className="truncate text-18px font-semibold leading-5 text-[var(--text-primary)] md:text-20px">
               {meta.title}
             </h1>
-            <div className="mt-0.5 hidden items-center gap-2 lg:flex">
-              <span className="truncate text-10px font-semibold text-[var(--text-secondary)]">
-                {todayLabel()}
-              </span>
-              <SaveIndicator status="saved" lastSavedAt={null} />
-            </div>
           </div>
         </div>
 
@@ -165,7 +157,6 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
               <PageActions actions={pageActions} onAction={onPageAction} />
             </>
           )}
-          <div className="top-toolbar-divider" />
           <UtilityButtons onAction={onPageAction} />
         </div>
       </div>
@@ -523,28 +514,48 @@ function HistoryNavigator() {
     routeHistoryIndex,
   } = useNavigationState();
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleHistory = routeHistory
     .map((entry, index) => ({ ...entry, index }))
     .slice(Math.max(0, routeHistory.length - 8))
     .reverse();
 
+  function startLongPress() {
+    longPressRef.current = setTimeout(() => {
+      setIsHistoryOpen(true);
+      longPressRef.current = null;
+    }, 500);
+  }
+
+  function clearLongPress() {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  }
+
   return (
     <div className="animate-entry-sm top-toolbar-history-wrap">
-      <button
-        aria-expanded={isHistoryOpen}
-        aria-label="Apri cronologia pagine"
-        className="top-toolbar-history-trigger"
-        onClick={() => setIsHistoryOpen((current) => !current)}
-        title="Cronologia pagine"
-        type="button"
+      <HistoryButton
+        disabled={!canGoBack}
+        label="Torna indietro (tenere premuto per cronologia)"
+        onClick={navigateBack}
+        onPointerDown={canGoBack ? startLongPress : () => {}}
+        onPointerUp={clearLongPress}
+        onPointerLeave={clearLongPress}
       >
-        <ClockCounterClockwise size={15} weight="regular" />
-        <CaretDown
-          size={9}
-          weight="bold"
-          className={cn("transition-transform", isHistoryOpen && "rotate-180")}
-        />
-      </button>
+        <CaretLeft size={16} weight="bold" />
+      </HistoryButton>
+      <HistoryButton
+        disabled={!canGoForward}
+        label="Vai avanti (tenere premuto per cronologia)"
+        onClick={navigateForward}
+        onPointerDown={canGoForward ? startLongPress : () => {}}
+        onPointerUp={clearLongPress}
+        onPointerLeave={clearLongPress}
+      >
+        <CaretRight size={16} weight="bold" />
+      </HistoryButton>
 
       <AnimatePresence>
         {isHistoryOpen ? (
@@ -563,17 +574,7 @@ function HistoryNavigator() {
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="flex items-center gap-1 border-b border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] p-1 pb-1.5">
-                <HistoryButton disabled={!canGoBack} label="Torna indietro" onClick={navigateBack}>
-                  <CaretLeft size={14} weight="bold" />
-                </HistoryButton>
-                <HistoryButton
-                  disabled={!canGoForward}
-                  label="Vai avanti"
-                  onClick={navigateForward}
-                >
-                  <CaretRight size={14} weight="bold" />
-                </HistoryButton>
-                <span className="ml-auto px-2 text-10px font-semibold text-[var(--text-secondary)]">
+                <span className="px-2 text-10px font-semibold text-[var(--text-secondary)]">
                   {routeHistoryIndex + 1}/{routeHistory.length}
                 </span>
               </div>
@@ -625,28 +626,36 @@ function HistoryButton({
   disabled,
   label,
   onClick,
+  onPointerDown,
+  onPointerUp,
+  onPointerLeave,
 }: {
   children: React.ReactNode;
   disabled: boolean;
   label: string;
   onClick: () => void;
+  onPointerDown?: () => void;
+  onPointerUp?: () => void;
+  onPointerLeave?: () => void;
 }) {
-  const motionProps = disabled ? {} : {};
-
   return (
     <motion.button
       className={cn(
-        "top-toolbar-history-button flex size-7 items-center justify-center rounded-full text-[var(--text-secondary)]",
-        disabled ? "cursor-not-allowed opacity-40" : "hover:text-[var(--text-primary)]",
+        "top-toolbar-history-button flex size-9 items-center justify-center rounded-lg",
+        disabled
+          ? "cursor-not-allowed opacity-40 text-[var(--text-secondary)]"
+          : "text-[var(--text-secondary)]",
       )}
       disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
         onClick();
       }}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerLeave}
       title={label}
       type="button"
-      {...motionProps}
     >
       {children}
     </motion.button>

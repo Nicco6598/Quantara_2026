@@ -2,6 +2,67 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.61 - 2026-05-11
+
+### Menu a tre puntini uguali ovunque
+
+- I menu a tre puntini ora hanno lo stesso aspetto in tutta l'app: Tariffari, Progetti, Dettaglio SAL, Appaltatori. Stessa animazione, stessi bordi, stesse icone. Niente piu stili diversi tra una schermata e l'altra.
+- Cliccare "Elimina progetto" dal menu non apriva il progetto invece di eliminarlo — risolto.
+- Le azioni nei dropdown non attivano piu la card sottostante per errore.
+
+### Navigazione piu comoda
+
+- I pulsanti avanti e indietro sono sempre visibili nella barra in alto, non piu nascosti nel menu cronologia. Tieni premuto il tasto indietro (o avanti) per vedere la cronologia completa.
+- Rimossa la vecchia briciola di pane (breadcrumb) per non duplicare la navigazione.
+- Su Windows compaiono i pulsanti minimizza, massimizza e chiudi nell'angolo in alto a destra (mancavano completamente).
+- La spaziatura a sinistra per i pulsanti finestra Mac ora e applicata solo su Mac, non spreca spazio su Windows.
+
+### Backup ora funziona davvero
+
+- Il backup dei dati SAL non funzionava: cercava una chiave sbagliata nel salvataggio locale, quindi progetti, documenti e stati di avanzamento non venivano mai inclusi nel file .qbk. Ora il backup contiene tutto correttamente.
+- Aggiunte al backup anche le preferenze di favore, le bozze SAL e le bozze progetto.
+- Rimossa una chiave fantasma che non conteneva mai dati.
+
+### Eliminazione a cascata
+
+- Quando elimini un appaltatore, tutti i suoi progetti e le relative SAL vengono eliminati automaticamente. Niente piu progetti orfani.
+- Quando elimini un progetto, tutte le SAL collegate vengono eliminate insieme.
+
+### Dashboard con dati veri
+
+- La timeline Gantt mostra le date reali delle SAL (prima e ultima SAL registrata per ogni progetto). Barre colorate per stato, percentuale di progresso e tooltip con intervallo date.
+- Le card dei cantieri ora hanno lo stesso design della lista progetti dentro un appaltatore.
+- La sezione "Attivita recenti" mostra le operazioni realmente registrate, non orari fissi di esempio.
+- Il pulsante "Apri" sui cantieri funziona davvero e porta al dettaglio progetto.
+
+### Pagina Impostazioni rinnovata
+
+- Stesso design del resto dell'app: bordi squadrati, stessi componenti, niente piu stili diversi.
+- Nuova sezione "Verifica database" che controlla se il database locale esiste, la sua dimensione e lo stato generale.
+- Pulsanti backup con icone chiare (freccia che scarica / freccia che carica) e feedback visivo di completamento.
+
+### Finestre di aggiornamento piu pulite
+
+- Le finestre di "Aggiornamento disponibile" e "Note di rilascio" ora hanno lo stesso aspetto delle altre finestre dell'app.
+- Il testo delle note release non mostra piu asterischi, hashtag e markdown: solo testo pulito e leggibile.
+- Le note release ora sopravvivono al riavvio dell'app anche su Windows (prima si perdevano).
+- Le finestre si adattano bene a qualsiasi schermo, dal portatile 13" al monitor 4K.
+
+### Creazione SAL piu efficiente
+
+- Gli step "Impostazioni" e "Voci" sono ora visibili contemporaneamente: a sinistra il progetto e i tariffari, a destra la tabella voci. Niente piu avanti e indietro tra le schermate.
+- La pagina usa tutta l'altezza disponibile dello schermo invece di lasciare spazi vuoti.
+- Il pannello tariffari resta visibile anche mentre inserisci le voci.
+
+### Correzioni varie
+
+- Fixato il backup che non includeva i dati SAL.
+- Fixati i menu a tre puntini che attivavano la card sottostante.
+- Fixata la navigazione dalla dashboard al dettaglio progetto.
+- Fixata la persistenza delle note release su Windows.
+- Aggiunta conferma prima di eliminare un progetto.
+- Aggiunte icone animate sui pulsanti di verifica e backup.
+
 ## 0.2.60 - 2026-05-11
 
 ### Ricerca globale potenziata
