@@ -19,6 +19,7 @@ const STORAGE_KEYS = [
   "quantara.projectDraft.v2",
   "quantara.projectContractors.v1",
   "quantara.contractorRegistry.v1",
+  "quantara.preview.contracts.v1",
 ];
 
 export async function getDatabaseInfo(): Promise<DatabaseInfo> {

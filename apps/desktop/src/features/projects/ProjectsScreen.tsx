@@ -255,13 +255,9 @@ export function ProjectsScreen() {
     const deletedId = contractorDeleteTarget.id;
     const deletedName = contractorDeleteTarget.contractor;
 
-    const projectIdsToDelete = Object.entries(projectContractors)
-      .filter(([, contractor]) => createContractorId(contractor) === deletedId)
-      .map(([projectId]) => projectId);
-
-    for (const projectId of projectIdsToDelete) {
-      await deleteProject(projectId);
-    }
+    const unassignedProjectsCount = activeProjects.filter(
+      (project) => createContractorId(project.contractor) === deletedId,
+    ).length;
 
     setContractorRegistry((current) =>
       current.filter((contractor) => createContractorId(contractor) !== deletedId),
@@ -279,7 +275,10 @@ export function ProjectsScreen() {
     setContractorDeleteTarget(null);
     dispatchDataChanged();
     notify({
-      message: `${deletedName} eliminato con ${projectIdsToDelete.length} progetti e relative SAL.`,
+      message:
+        unassignedProjectsCount > 0
+          ? `${deletedName} rimosso: ${unassignedProjectsCount} progetti restano nel registro senza appaltatore.`
+          : `${deletedName} rimosso dal registro appaltatori.`,
       title: "Appaltatore eliminato",
       tone: "success",
     });

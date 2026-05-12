@@ -32,6 +32,7 @@ import type { DesktopDataResult } from "./tauri-wrapper";
 export type { DesktopDataResult };
 
 const tariffVoiceCache = new Map<string, DesktopTariffVoiceRecord[]>();
+const previewContractsStorageKey = "quantara.preview.contracts.v1";
 
 type InflightKey =
   | "contracts"
@@ -59,6 +60,14 @@ function withInflightCache<T>(key: InflightKey, run: () => Promise<DesktopDataRe
 export async function listDesktopContracts(
   fallback: DesktopContract[],
 ): Promise<DesktopDataResult<DesktopContract[]>> {
+  if (!isTauriRuntime()) {
+    return {
+      data: readPreviewContracts(fallback),
+      message: "Runtime browser: dati contratti locali in anteprima.",
+      source: "fallback",
+    };
+  }
+
   return cachedFetch("contracts", () =>
     withInflightCache("contracts", () =>
       invokeWithFallback("list_contracts", {}, fallback, "dati dimostrativi"),
@@ -84,6 +93,7 @@ export async function createDesktopContract(
   };
 
   if (!isTauriRuntime()) {
+    writePreviewContracts(upsertById(readPreviewContracts([]), contract));
     return contract;
   }
 
@@ -95,7 +105,9 @@ export async function updateDesktopContract(
   request: CreateDesktopContractRequest,
 ): Promise<DesktopContract> {
   if (!isTauriRuntime()) {
-    return createDesktopContract(request);
+    const updated = await createDesktopContract({ ...request, id: contractId });
+    writePreviewContracts(upsertById(readPreviewContracts([]), updated));
+    return updated;
   }
 
   return invoke<DesktopContract>("update_contract", { contractId, request });
@@ -103,10 +115,64 @@ export async function updateDesktopContract(
 
 export async function deleteDesktopContract(contractId: string): Promise<void> {
   if (!isTauriRuntime()) {
+    writePreviewContracts(
+      readPreviewContracts([]).filter((contract) => contract.id !== contractId),
+    );
     return;
   }
 
   await invoke<void>("delete_contract", { contractId });
+}
+
+function readPreviewContracts(fallback: DesktopContract[]): DesktopContract[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(previewContractsStorageKey) ?? "[]");
+    if (!Array.isArray(parsed)) {
+      return fallback;
+    }
+
+    const contracts = parsed.filter(isDesktopContract);
+    return contracts.length > 0 ? contracts : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writePreviewContracts(contracts: DesktopContract[]): void {
+  try {
+    window.localStorage.setItem(previewContractsStorageKey, JSON.stringify(contracts));
+  } catch {
+    // Browser preview persistence is best-effort.
+  }
+}
+
+function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
+  const existingIndex = items.findIndex((current) => current.id === item.id);
+  if (existingIndex === -1) {
+    return [item, ...items];
+  }
+
+  const next = [...items];
+  next[existingIndex] = item;
+  return next;
+}
+
+function isDesktopContract(value: unknown): value is DesktopContract {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const contract = value as Partial<DesktopContract>;
+  return (
+    typeof contract.id === "string" &&
+    typeof contract.title === "string" &&
+    typeof contract.applicationContractCode === "string" &&
+    typeof contract.frameworkAgreementCode === "string" &&
+    typeof contract.contractualAmount?.amount === "number" &&
+    typeof contract.contractualAmount.currency === "string" &&
+    typeof contract.tenderDiscountPercent === "number" &&
+    Array.isArray(contract.tariffPriorities)
+  );
 }
 
 export async function listDesktopTariffBooks(

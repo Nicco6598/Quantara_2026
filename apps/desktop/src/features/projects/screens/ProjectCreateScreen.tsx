@@ -17,11 +17,12 @@ import {
   type CreateDesktopContractRequest,
   type DesktopTariffBook,
   createDesktopContract,
+  listDesktopContracts,
   listDesktopTariffBooks,
   updateDesktopContract,
 } from "@/lib/desktopData";
 
-import { readStringRecord, writeJson } from "@/lib/shared-utils";
+import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { useAppStore } from "@/store/app-store";
 
@@ -39,6 +40,7 @@ type ProjectFormState = {
 };
 
 const projectContractorStorageKey = "quantara.projectContractors.v1";
+const contractorRegistryStorageKey = "quantara.contractorRegistry.v1";
 
 export function ProjectCreateScreen() {
   const { notify } = useToast();
@@ -111,11 +113,18 @@ export function ProjectCreateScreen() {
     let active = true;
     async function load() {
       try {
-        const tariffBooksResult = await listDesktopTariffBooks([]);
+        const [tariffBooksResult, contractsResult] = await Promise.all([
+          listDesktopTariffBooks([]),
+          listDesktopContracts([]),
+        ]);
         if (!active) return;
         setTariffBooks(tariffBooksResult.data);
         const contractors = readStringRecord(projectContractorStorageKey);
-        const uniqueContractors = [...new Set(Object.values(contractors))].sort();
+        const registry = readStringList(contractorRegistryStorageKey);
+        const assignedContractorNames = contractsResult.data
+          .map((contract) => contractors[contract.id])
+          .filter((value): value is string => typeof value === "string" && value.trim() !== "");
+        const uniqueContractors = mergeContractorOptions([...registry, ...assignedContractorNames]);
         setContractorOptions(uniqueContractors);
       } catch {
         /* no-op */
@@ -262,12 +271,14 @@ export function ProjectCreateScreen() {
         ? window.sessionStorage.getItem("quantara.editingContractId.v1")
         : null;
 
+      const savedContract = editingContractId
+        ? await updateDesktopContract(editingContractId, { ...request, id: editingContractId })
+        : await createDesktopContract(request);
+
       if (editingContractId) {
         window.sessionStorage.removeItem("quantara.editingContractId.v1");
-        await updateDesktopContract(editingContractId, { ...request, id: editingContractId });
         notify({ message: "Progetto aggiornato.", title: "Aggiornato", tone: "success" });
       } else {
-        await createDesktopContract(request);
         notify({ message: "Progetto creato.", title: "Creato", tone: "success" });
       }
 
@@ -276,7 +287,7 @@ export function ProjectCreateScreen() {
       if (contractorName) {
         writeJson(projectContractorStorageKey, {
           ...contractors,
-          [request.id]: contractorName,
+          [savedContract.id]: contractorName,
         });
       }
 
@@ -932,6 +943,32 @@ function sanitizeTextInput(value: string) {
 
 function sanitizeTextValue(value: string) {
   return sanitizeTextInput(value).trim();
+}
+
+function readStringList(key: string): string[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function mergeContractorOptions(values: string[]) {
+  const options = new Map<string, string>();
+
+  for (const value of values) {
+    const contractor = normalizeContractorName(value);
+    if (contractor.length < 2 || contractor === "Appaltatore da assegnare") {
+      continue;
+    }
+
+    options.set(contractor.toLocaleLowerCase("it-IT"), contractor);
+  }
+
+  return [...options.values()].sort((left, right) => left.localeCompare(right));
 }
 
 function sanitizeMoneyInput(value: string) {

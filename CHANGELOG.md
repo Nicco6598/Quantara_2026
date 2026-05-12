@@ -2,6 +2,57 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.63 - 2026-05-12
+
+### Creazione e modifica progetto in schermata intera
+
+- **Nuova route `/project-create`** — creare un progetto non apre piu un modale, ma una schermata dedicata con la stessa navigazione lineare della creazione SAL. Anche "Modifica progetto" (dai 3 puntini sulle card) ora usa la stessa schermata, portando i dati del progetto da modificare.
+- **Step e azioni nella toolbar** — i controlli (step Dati/Economico, pulsante Crea/Salva) sono nella barra superiore, come gia avviene per SAL e import tariffari. La schermata e piu pulita: niente footer button ne stepper duplicato.
+- **Setup economico potenziato** — aggiunto campo "OS Esclusi da ribassi" con validazione (deve essere inferiore al budget). Sia importo contrattuale che OS hanno un flag opzionale "+ IVA al X%" che mostra BASE + IVA = TOTALE in tempo reale. La preview laterale mostra la scomposizione IVA, e i check rapidi sono passati da 3 a 5 (inclusi OS < budget e almeno un tariffario).
+
+### Tariffari sotto controllo
+
+- **Ogni progetto ha i suoi tariffari** — la selezione dei tariffari non avviene piu in creazione SAL, ma nel dettaglio del progetto. Un pannello "Tariffari associati" nella sidebar mostra quelli collegati e permette di aggiungerne o rimuoverne con un modal di ricerca. Quando crei una SAL, i tariffari vengono presi automaticamente dal progetto (modificabili per la singola SAL con un selettore a chip).
+- **Cerca tariffari** — aggiunto campo di ricerca testuale nella selezione tariffari (sia in creazione progetto che nel dettaglio progetto). Filtra per nome, ente o anno, fondamentale con decine di tariffari.
+- **Voci personalizzate** — nella modifica voci di un tariffario, il pulsante "+ Nuova Voce" e sempre visibile nell'intestazione della griglia (colonna Azioni), non piu relegato in fondo. Inserisce una riga vuota editabile per codice, descrizione, unita, prezzo e manodopera.
+
+### Toolbar ridisegnata per chiarezza
+
+- **Gruppi visivi separati** — ogni toolbar (SAL, tariffari, creazione progetto) ora divide i comandi in contenitori pillolati con sfondo leggero: step nav, metriche, azioni secondarie, azione primaria. Niente piu pulsanti appiattiti in una riga senza gerarchia.
+- **Bottoni piu grandi** — i passaggi e i pulsanti azione passano da 32-36px a 40px, con font 12-13px. Su schermi stretti i controlli vanno a capo su due righe invece di venire tagliati.
+- **Colori distintivi** — "Revisiona" e' color verde/success, "Salva bozza" e' color ambra/warning, "Approva import" eì color accent primario. Il pulsante "Elimina" (cestino) e' raggruppato con la navigazione, separato dalle azioni positive.
+- **Notifiche nascoste durante preview** — il campanello notifiche non viene mostrato durante l'import tariffari per non distrarre.
+
+### Sidebar con contesto navigabile
+
+- **Breadcrumb contestuale sotto Appaltatori** — quando sei in un progetto o in un appaltatore, la sidebar mostra il nome dell'appaltatore e, se applicabile, il nome del progetto su righe separate (verticali, non troncati). Cliccando sull'appaltatore si torna alla vista filtrata, cliccando sul progetto si va al dettaglio.
+- **Sidebar piu larga** — da 184px a 220px per dare respiro a nomi progetto lunghi.
+
+### Dettaglio progetto ridisegnato
+
+- **Hero piu dashboard** — rimossi i pulsanti "Nuova SAL" e "Presidio economico" (erano duplicati rispetto al pannello Registro SAL). Sostituita l'immagine stock con una card "Avanzamento finanziario": barra di progresso animata, valori di Budget, Residuo, Approvato e In bozza con pallini colorati. Il Residuo diventa rosso se negativo.
+- **KPI card con badge informativi** — le quattro card in alto mostrano ora badge contestuali (percentuale budget usato, numero SAL, stato). I valori sono leggibili subito: Budget, Residuo, Approvato (con conteggio SAL) e Ultima SAL (con importo e data reale).
+- **Breakdown Approvato / In bozza** — la card finanziaria separa chiaramente "Approvato" (SAL chiuse) da "In bozza" (SAL in draft/revisione), con importi distinti.
+- **Date SAL reali** — le SAL non usano piu la data fissa del progetto (`project.periodEnd`) ma la data effettiva di creazione (`new Date().toISOString()`). SAL 1 avra la data di maggio, SAL 2 di giugno, ecc. La timeline progetto riflette automaticamente le date corrette.
+
+### Tema scuro meno aggressivo
+
+- **Colori stati attenuati** — i colori success, warning, danger, info e accent erano troppo neon/fluorescenti su fondo scuro. Ora sono piu morbidi e riposano meglio alla vista, mantenendo la distinguibilità.
+
+### Correzioni varie
+
+- **OS check funzionante** — il check rapido "OS esclusi < budget" diventa rosso se l'importo OS e uguale o superiore al budget (prima era sempre verde pur bloccando il submit).
+- **Rust backend** — aggiunta colonna `os_excluded_amount_cents` alla tabella `contracts` con migrazione automatica. I comandi `create_contract` e `update_contract` gestiscono `osExcludedAmount`.
+- **Tipi condivisi aggiornati** — `DesktopContractRecord`, `CreateDesktopContractRecordRequest` e schema Zod includono `osExcludedAmount`.
+
+### Coerenza dati locale/produzione
+
+- **Appaltatori allineati tra dev e release** — la creazione progetto ora carica gli appaltatori sia dal registro appaltatori sia dalle assegnazioni dei contratti reali. La select non dipende piu solo dalla mappa progetto-appaltatore in `localStorage`, quindi il comportamento resta coerente tra browser locale e build Tauri.
+- **Associazione appaltatore corretta in modifica** — salvando un progetto esistente, il collegamento appaltatore viene scritto sull'id effettivo del contratto aggiornato, non sull'id temporaneo generato dal form.
+- **Eliminazione appaltatore unificata** — eliminare un appaltatore rimuove il nome dal registro e scollega i progetti, senza cancellare i contratti. La modale, il comportamento locale e quello in produzione ora dicono e fanno la stessa cosa.
+- **Fallback contratti persistente** — fuori da Tauri, `list/create/update/delete` dei contratti usano uno store locale di anteprima. Questo evita differenze tra stato React temporaneo e successive riletture dei dati.
+- **Backup aggiornato** — inclusa la chiave dei contratti di anteprima nei backup, cosi i dati usati in locale restano ripristinabili insieme al resto dello stato app.
+
 ## 0.2.62 - 2026-05-12
 
 ### Creazione e modifica progetto in schermata intera
