@@ -27,7 +27,6 @@ import type {
   MigrationAction,
   PortfolioFocus,
   PortfolioProject,
-  ProjectEditState,
 } from "@/features/projects/types";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useNavigate } from "@/hooks/useNavigate";
@@ -66,12 +65,6 @@ const ContractorModal = lazy(() =>
 const SalModal = lazy(() =>
   import("@/features/projects/components/SalModal").then((m) => ({ default: m.SalModal })),
 );
-const CreateProjectModal = lazy(() =>
-  import("@/features/projects/dialogs/CreateProjectModal").then((m) => ({
-    default: m.CreateProjectModal,
-  })),
-);
-
 export function ProjectsScreen() {
   const navigate = useNavigate();
   const { activeContext, activeRoute, navigateBack } = useNavigationState();
@@ -82,8 +75,6 @@ export function ProjectsScreen() {
     message: "Caricamento contratti locali.",
     source: "fallback",
   });
-  const [editingProject, setEditingProject] = useState<ProjectEditState | null>(null);
-  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [contractorDraft, setContractorDraft] = useState("");
   const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
   const [contractorDeleteTarget, setContractorDeleteTarget] = useState<ContractorFolder | null>(
@@ -109,16 +100,12 @@ export function ProjectsScreen() {
     notify,
     setMigrationAction,
   });
-  const { createProject, deleteProject, selectProject, updateProject } = useProjectMutations({
+  const { deleteProject, selectProject } = useProjectMutations({
     contracts: contractsState.data,
-    editingProject,
     notify,
     projectContractors,
     selectedContractId,
-    setContractorRegistry,
     setContractsState,
-    setEditingProject,
-    setIsCreateProjectModalOpen,
     setProjectContractors,
     setSelectedContractId,
     tariffBookId: tariffBooksState[0]?.id ?? "",
@@ -188,8 +175,7 @@ export function ProjectsScreen() {
   const processPendingWorkflowAction = useCallback(
     (action: PendingWorkflowAction) => {
       if (action === "new-project") {
-        setEditingProject(null);
-        setIsCreateProjectModalOpen(true);
+        navigate("project-create");
         useAppStore.getState().setPendingWorkflowAction(null);
         return;
       }
@@ -218,14 +204,13 @@ export function ProjectsScreen() {
     const handleKeyboardShortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") {
         event.preventDefault();
-        setEditingProject(null);
-        setIsCreateProjectModalOpen(true);
+        navigate("project-create");
       }
     };
 
     window.addEventListener("keydown", handleKeyboardShortcut);
     return () => window.removeEventListener("keydown", handleKeyboardShortcut);
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (activeRoute === "projects") {
@@ -307,9 +292,8 @@ export function ProjectsScreen() {
   }, [navigateBack]);
 
   const handleOpenCreateProject = useCallback(() => {
-    setEditingProject(null);
-    setIsCreateProjectModalOpen(true);
-  }, []);
+    navigate("project-create");
+  }, [navigate]);
 
   const handleOpenFolder = useCallback(
     (folderId: string) => {
@@ -330,11 +314,6 @@ export function ProjectsScreen() {
     },
     [importMigrationFile],
   );
-
-  const handleCloseCreateProjectModal = useCallback(() => {
-    setIsCreateProjectModalOpen(false);
-    setEditingProject(null);
-  }, []);
 
   const {
     contractorFolders,
@@ -357,25 +336,6 @@ export function ProjectsScreen() {
     selectedContractorId,
   });
 
-  const createProjectInitialValues = useMemo(() => {
-    if (editingProject) {
-      return editingProject.values;
-    }
-
-    if (!selectedContractor) {
-      return undefined;
-    }
-
-    return {
-      applicationContractCode: "",
-      contractorName: selectedContractor.contractor,
-      contractualAmount: "",
-      frameworkAgreementCode: "",
-      tenderDiscountPercent: "",
-      tariffBookId: tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id,
-      title: "",
-    };
-  }, [editingProject, selectedContractor, tariffBooksState]);
   const { averageProgress, criticalCount, salExposure, salWindowCount, totalBudget } =
     portfolioMetrics;
 
@@ -437,17 +397,6 @@ export function ProjectsScreen() {
       />
 
       <Suspense fallback={null}>
-        {isCreateProjectModalOpen ? (
-          <CreateProjectModal
-            contractorOptions={contractorRegistry}
-            defaultTariffBookId={tariffBooksState[0]?.id ?? fallbackProjectTariffBook.id}
-            {...(createProjectInitialValues ? { initialValues: createProjectInitialValues } : {})}
-            onClose={handleCloseCreateProjectModal}
-            onCreate={editingProject ? updateProject : createProject}
-            submitLabel={editingProject ? "Salva modifiche" : "Crea progetto"}
-            tariffBooks={tariffBooksState}
-          />
-        ) : null}
         {isContractorModalOpen ? (
           <ContractorModal
             contractorDraft={contractorDraft}

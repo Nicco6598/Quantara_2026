@@ -6,6 +6,7 @@ export type QuantaraRoute =
   | "dashboard"
   | "projects"
   | "project-detail"
+  | "project-create"
   | "sal-create"
   | "tariffs"
   | "materials"
@@ -40,6 +41,16 @@ export type SalToolbarState = {
   voicesCount: number;
 };
 
+export type ProjectToolbarState = {
+  currentStep: number;
+  canGoNext: boolean;
+  canSubmit: boolean;
+  isEditing: boolean;
+  isSaving: boolean;
+  error: string;
+  totalSteps: number;
+};
+
 type NavEntry = {
   route: QuantaraRoute;
   context?: string;
@@ -54,11 +65,15 @@ type NavigationSlice = {
   navigateForward: () => void;
   navigateToHistoryIndex: (index: number) => void;
   pendingWorkflowAction: WorkflowAction;
+  projectToolbar: ProjectToolbarState;
+  projectPendingStep: number | null;
   routeHistory: NavEntry[];
   routeHistoryIndex: number;
   salToolbar: SalToolbarState;
   salPendingStep: number | null;
   setSalToolbar: (state: SalToolbarState) => void;
+  setProjectToolbar: (state: ProjectToolbarState) => void;
+  setProjectPendingStep: (step: number | null) => void;
   setTariffImportToolbar: (state: TariffImportToolbarState) => void;
   setActiveRoute: (route: QuantaraRoute, context?: string, replace?: boolean) => void;
   setPendingWorkflowAction: (action: WorkflowAction) => void;
@@ -147,6 +162,16 @@ export const useAppStore = create<AppStore>()(
           };
         }),
       pendingWorkflowAction: null,
+      projectPendingStep: null,
+      projectToolbar: {
+        canGoNext: false,
+        canSubmit: false,
+        currentStep: 1,
+        error: "",
+        isEditing: false,
+        isSaving: false,
+        totalSteps: 2,
+      },
       salPendingStep: null,
       salToolbar: {
         budgetResidual: 0,
@@ -194,6 +219,14 @@ export const useAppStore = create<AppStore>()(
       setPendingWorkflowAction: (pendingWorkflowAction) =>
         set({
           pendingWorkflowAction,
+        }),
+      setProjectPendingStep: (projectPendingStep) =>
+        set({
+          projectPendingStep,
+        }),
+      setProjectToolbar: (projectToolbar) =>
+        set({
+          projectToolbar,
         }),
       setSalPendingStep: (salPendingStep) =>
         set({
@@ -271,10 +304,12 @@ export function useNavigationState() {
       navigateForward: state.navigateForward,
       navigateToHistoryIndex: state.navigateToHistoryIndex,
       pendingWorkflowAction: state.pendingWorkflowAction,
+      projectToolbar: state.projectToolbar,
       routeHistory: state.routeHistory,
       routeHistoryIndex: state.routeHistoryIndex,
       setActiveRoute: state.setActiveRoute,
       setPendingWorkflowAction: state.setPendingWorkflowAction,
+      setProjectToolbar: state.setProjectToolbar,
       salToolbar: state.salToolbar,
       setSalToolbar: state.setSalToolbar,
       setTariffImportToolbar: state.setTariffImportToolbar,

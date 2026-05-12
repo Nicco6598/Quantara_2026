@@ -19,6 +19,11 @@ const ProjectDetailScreen = lazy(() =>
 const ProjectsScreen = lazy(() =>
   import("@/features/projects/ProjectsScreen").then((m) => ({ default: m.ProjectsScreen })),
 );
+const ProjectCreateScreen = lazy(() =>
+  import("@/features/projects/screens/ProjectCreateScreen").then((m) => ({
+    default: m.ProjectCreateScreen,
+  })),
+);
 const SalCreationScreen = lazy(() =>
   import("@/features/sal/SalCreationScreen").then((m) => ({ default: m.SalCreationScreen })),
 );
@@ -62,6 +67,7 @@ export function RouteRenderer({ activeRoute, pendingWorkflowAction }: RouteRende
       {activeRoute === "dashboard" && <DashboardScreen />}
       {activeRoute === "projects" && <ProjectsScreen />}
       {activeRoute === "project-detail" && <ProjectDetailScreen />}
+      {activeRoute === "project-create" && <ProjectCreateScreen />}
       {activeRoute === "sal-create" && <SalCreationScreen />}
       {activeRoute === "tariffs" && <TariffsScreen />}
       {activeRoute === "accounting" && <AccountingScreen />}
@@ -71,6 +77,7 @@ export function RouteRenderer({ activeRoute, pendingWorkflowAction }: RouteRende
       {activeRoute !== "dashboard" &&
         activeRoute !== "projects" &&
         activeRoute !== "project-detail" &&
+        activeRoute !== "project-create" &&
         activeRoute !== "sal-create" &&
         activeRoute !== "tariffs" &&
         activeRoute !== "accounting" &&

@@ -1,21 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { ProjectEditState } from "@/features/projects/types";
-import {
-  mergeContractorRegistry,
-  normalizeContractorName,
-} from "@/features/projects/utils/projects-helpers";
-import type {
-  CreateDesktopContractRequest,
-  DesktopContract,
-  DesktopDataResult,
-} from "@/lib/desktopData";
-import {
-  createDesktopContract,
-  deleteDesktopContract,
-  updateDesktopContract,
-} from "@/lib/desktopData";
+import type { DesktopContract, DesktopDataResult } from "@/lib/desktopData";
+import { deleteDesktopContract } from "@/lib/desktopData";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { useNavigate } from "@/hooks/useNavigate";
 
 type Notify = (toast: {
   message: string;
@@ -25,13 +13,9 @@ type Notify = (toast: {
 
 type UseProjectMutationsOptions = {
   contracts: DesktopContract[];
-  editingProject: ProjectEditState | null;
   notify: Notify;
   projectContractors: Record<string, string>;
-  setContractorRegistry: Dispatch<SetStateAction<string[]>>;
   setContractsState: Dispatch<SetStateAction<DesktopDataResult<DesktopContract[]>>>;
-  setEditingProject: Dispatch<SetStateAction<ProjectEditState | null>>;
-  setIsCreateProjectModalOpen: (isOpen: boolean) => void;
   setProjectContractors: Dispatch<SetStateAction<Record<string, string>>>;
   setSelectedContractId: (contractId: string) => void;
   selectedContractId: string;
@@ -40,101 +24,15 @@ type UseProjectMutationsOptions = {
 
 export function useProjectMutations({
   contracts,
-  editingProject,
   notify,
   projectContractors,
-  setContractorRegistry,
   setContractsState,
-  setEditingProject,
-  setIsCreateProjectModalOpen,
   setProjectContractors,
   setSelectedContractId,
   selectedContractId,
   tariffBookId,
 }: UseProjectMutationsOptions) {
-  async function createProject(
-    request: CreateDesktopContractRequest,
-    meta: { contractorName: string },
-  ) {
-    try {
-      const created = await createDesktopContract(request);
-
-      setContractsState((current) => ({
-        data: [created, ...current.data.filter((contract) => contract.id !== created.id)],
-        ...(current.source === "fallback"
-          ? { message: "Runtime browser: anteprima locale.", source: "fallback" }
-          : { source: "desktop" }),
-      }));
-      setProjectContractors((current) => ({
-        ...current,
-        [created.id]: normalizeContractorName(meta.contractorName),
-      }));
-      setContractorRegistry((current) =>
-        mergeContractorRegistry(current, normalizeContractorName(meta.contractorName)),
-      );
-      setSelectedContractId(created.id);
-      dispatchDataChanged();
-      notify({
-        message: `${created.title} e pronto nel registro progetti.`,
-        title: "Progetto creato",
-        tone: "success",
-      });
-      return created;
-    } catch (error) {
-      notify({
-        message: error instanceof Error ? error.message : String(error),
-        title: "Creazione non riuscita",
-        tone: "danger",
-      });
-      return null;
-    }
-  }
-
-  async function updateProject(
-    request: CreateDesktopContractRequest,
-    meta: { contractorName: string },
-  ) {
-    if (!editingProject) {
-      return createProject(request, meta);
-    }
-
-    try {
-      const updated = await updateDesktopContract(editingProject.contractId, {
-        ...request,
-        id: editingProject.contractId,
-      });
-
-      setContractsState((current) => ({
-        data: current.data.map((contract) => (contract.id === updated.id ? updated : contract)),
-        ...(current.source === "fallback"
-          ? { message: "Runtime browser: modifica in anteprima.", source: "fallback" }
-          : { source: "desktop" }),
-      }));
-      setProjectContractors((current) => ({
-        ...current,
-        [updated.id]: normalizeContractorName(meta.contractorName),
-      }));
-      setContractorRegistry((current) =>
-        mergeContractorRegistry(current, normalizeContractorName(meta.contractorName)),
-      );
-      setSelectedContractId(updated.id);
-      setEditingProject(null);
-      dispatchDataChanged();
-      notify({
-        message: `${updated.title} aggiornato correttamente.`,
-        title: "Progetto aggiornato",
-        tone: "success",
-      });
-      return updated;
-    } catch (error) {
-      notify({
-        message: error instanceof Error ? error.message : String(error),
-        title: "Modifica non riuscita",
-        tone: "danger",
-      });
-      return null;
-    }
-  }
+  const navigate = useNavigate();
 
   function selectProject(projectId: string) {
     const contract = contracts.find((item) => item.id === projectId);
@@ -148,20 +46,37 @@ export function useProjectMutations({
       return;
     }
 
+    const amount = contract.contractualAmount.amount;
+    const osAmount = contract.osExcludedAmount ?? 0;
+
     setSelectedContractId(contract.id);
-    setEditingProject({
-      contractId: contract.id,
-      values: {
-        applicationContractCode: contract.applicationContractCode,
-        contractorName: projectContractors[contract.id] ?? "",
-        contractualAmount: String(contract.contractualAmount.amount),
-        frameworkAgreementCode: contract.frameworkAgreementCode,
-        tenderDiscountPercent: String(contract.tenderDiscountPercent ?? 0),
-        tariffBookId: contract.tariffPriorities[0]?.tariffBookId ?? tariffBookId,
-        title: contract.title,
-      },
-    });
-    setIsCreateProjectModalOpen(true);
+
+    const values = {
+      applicationContractCode: contract.applicationContractCode,
+      contractorName: projectContractors[contract.id] ?? "",
+      contractualAmount: String(amount),
+      frameworkAgreementCode: contract.frameworkAgreementCode,
+      tenderDiscountPercent: String(contract.tenderDiscountPercent ?? 0),
+      tariffBookIds:
+        contract.tariffPriorities.length > 0
+          ? contract.tariffPriorities.map((p) => p.tariffBookId)
+          : tariffBookId
+            ? [tariffBookId]
+            : [],
+      title: contract.title,
+      osExcludedAmount: osAmount > 0 ? String(osAmount) : "",
+      budgetIvaPercent: "",
+      osIvaPercent: "",
+    };
+
+    try {
+      window.sessionStorage.setItem("quantara.editingProject.v1", JSON.stringify(values));
+      window.sessionStorage.setItem("quantara.editingContractId.v1", contract.id);
+    } catch {
+      /* no-op */
+    }
+
+    navigate("project-create");
   }
 
   async function deleteProject(projectId: string) {
@@ -207,5 +122,5 @@ export function useProjectMutations({
     }
   }
 
-  return { createProject, deleteProject, selectProject, updateProject };
+  return { deleteProject, selectProject };
 }

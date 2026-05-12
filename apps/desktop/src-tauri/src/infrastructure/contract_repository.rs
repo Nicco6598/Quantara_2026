@@ -25,6 +25,8 @@ pub struct CreateContractRequest {
     pub tender_discount_percent: f64,
     pub tariff_priorities: Vec<TariffPriorityRecord>,
     pub title: String,
+    #[serde(default)]
+    pub os_excluded_amount: Option<f64>,
 }
 
 pub type UpdateContractRequest = CreateContractRequest;
@@ -39,6 +41,7 @@ pub struct ContractRecord {
     pub tender_discount_percent: f64,
     pub tariff_priorities: Vec<TariffPriorityRecord>,
     pub title: String,
+    pub os_excluded_amount: Option<f64>,
 }
 
 pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, AppError> {
@@ -47,7 +50,7 @@ pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, Ap
     let mut statement = connection
         .prepare(
             "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
-             , tender_discount_percent
+             , tender_discount_percent, os_excluded_amount_cents
              FROM contracts
              ORDER BY updated_at DESC, title ASC",
         )
@@ -77,7 +80,7 @@ pub fn get_contract(
     let mut contract = connection
         .query_row(
             "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
-             , tender_discount_percent
+             , tender_discount_percent, os_excluded_amount_cents
              FROM contracts
              WHERE id = ?1",
             [contract_id],
@@ -103,6 +106,11 @@ pub fn create_contract(
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
 
+    let os_cents = request
+        .os_excluded_amount
+        .map(money_to_cents)
+        .unwrap_or(0);
+
     transaction
         .execute(
             "INSERT INTO contracts (
@@ -111,15 +119,17 @@ pub fn create_contract(
                 application_contract_code,
                 framework_agreement_code,
                 contractual_amount_cents,
-                tender_discount_percent
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                tender_discount_percent,
+                os_excluded_amount_cents
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 request.id,
                 request.title,
                 request.application_contract_code,
                 request.framework_agreement_code,
                 amount_cents,
-                request.tender_discount_percent
+                request.tender_discount_percent,
+                os_cents
             ],
         )
         .map_err(to_database_error)?;
@@ -156,6 +166,11 @@ pub fn update_contract(
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
 
+    let os_cents = request
+        .os_excluded_amount
+        .map(money_to_cents)
+        .unwrap_or(0);
+
     let updated = transaction
         .execute(
             "UPDATE contracts
@@ -164,14 +179,16 @@ pub fn update_contract(
                  framework_agreement_code = ?3,
                  contractual_amount_cents = ?4,
                  tender_discount_percent = ?5,
+                 os_excluded_amount_cents = ?6,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?6",
+             WHERE id = ?7",
             params![
                 request.title,
                 request.application_contract_code,
                 request.framework_agreement_code,
                 amount_cents,
                 request.tender_discount_percent,
+                os_cents,
                 contract_id
             ],
         )
@@ -262,6 +279,7 @@ fn list_priorities(
 fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord> {
     let amount_cents: i64 = row.get(4)?;
     let tender_discount_percent: f64 = row.get(5)?;
+    let os_cents: Option<i64> = row.get(6).ok();
 
     Ok(ContractRecord {
         application_contract_code: row.get(2)?,
@@ -274,6 +292,7 @@ fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord>
         tender_discount_percent,
         tariff_priorities: Vec::new(),
         title: row.get(1)?,
+        os_excluded_amount: os_cents.map(cents_to_money),
     })
 }
 
@@ -416,6 +435,7 @@ mod tests {
                 },
             ],
             title: "Linea AV/AC Milano-Verona".into(),
+            os_excluded_amount: None,
         }
     }
 }

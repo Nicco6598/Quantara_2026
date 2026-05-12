@@ -48,8 +48,11 @@ export type ProjectEditState = {
     contractualAmount: string;
     frameworkAgreementCode: string;
     tenderDiscountPercent: string;
-    tariffBookId: string;
+    tariffBookIds: string[];
     title: string;
+    osExcludedAmount: string;
+    budgetIvaPercent: string;
+    osIvaPercent: string;
   };
 };
 

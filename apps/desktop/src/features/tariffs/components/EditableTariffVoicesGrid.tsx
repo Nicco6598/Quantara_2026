@@ -1,4 +1,4 @@
-import { Info, Trash2, X } from "lucide-react";
+import { Info, Plus, Trash2, WandSparkles, X } from "lucide-react";
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DesktopTariffVoice, TariffWarning } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
@@ -146,6 +146,7 @@ const VoiceRow = memo(function VoiceRow({
       } ${index % 2 === 0 && !isDuplicate ? "bg-[var(--surface-base)]/55" : ""} ${
         isInvalid && !isDuplicate ? "border-l-2 border-l-[var(--warning-base)]/50" : ""
       }`}
+      data-voice-id={voice.id}
     >
       <ImportCell
         field="officialCode"
@@ -210,6 +211,7 @@ function areVoiceRowsEqual(previous: Readonly<VoiceRowProps>, next: Readonly<Voi
 export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
   duplicateCodes,
   groups,
+  onAddVoice,
   onChange,
   onDelete,
   onSectionsChange,
@@ -217,6 +219,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
 }: {
   duplicateCodes: Set<string>;
   groups: VoiceGroup[];
+  onAddVoice?: () => void;
   onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDelete: (index: number) => void;
   onSectionsChange?: (sections: TariffGridSectionSummary[]) => void;
@@ -332,7 +335,7 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                   className="overflow-hidden rounded-18px bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_18%,transparent)] [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
                   key={grp.gruppo}
                 >
-                  <div className="flex items-center justify-between border-b border-[var(--border-subtle)]/55 bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] px-5 py-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)]/55 bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
                       <span className="rounded-md bg-[var(--info-soft)] px-2 py-1 text-12px font-bold text-[var(--info-base)]">
                         {grp.gruppo}
@@ -348,9 +351,23 @@ export const EditableTariffVoicesGrid = memo(function EditableTariffVoicesGrid({
                         </span>
                       ) : null}
                     </div>
-                    <span className="text-11px font-semibold text-[var(--text-secondary)]">
-                      {grp.voci.length} voci · {totalSubVoices} sottovoci
-                    </span>
+                    <div className="flex items-center gap-2.5">
+                      {onAddVoice ? (
+                        <button
+                          className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--info-base)]/30 bg-[color-mix(in_srgb,var(--info-base)_6%,transparent)] px-3 py-1.5 text-11px font-semibold text-[var(--info-base)] transition-all hover:border-[var(--info-base)]/60 hover:bg-[color-mix(in_srgb,var(--info-base)_14%,transparent)]"
+                          onClick={onAddVoice}
+                          title="Aggiungi voce personalizzata"
+                          type="button"
+                        >
+                          <WandSparkles className="size-3.5" />
+                          <span>Nuova voce</span>
+                          <Plus className="size-3" strokeWidth={3} />
+                        </button>
+                      ) : null}
+                      <span className="text-11px font-semibold text-[var(--text-secondary)]">
+                        {grp.voci.length} voci · {totalSubVoices} sottovoci
+                      </span>
+                    </div>
                   </div>
 
                   <div className="divide-y divide-[var(--border-subtle)]/45 bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)]">

@@ -42,6 +42,7 @@ export type DesktopContractRecord = {
   tenderDiscountPercent: number;
   tariffPriorities: DesktopTariffPriorityRecord[];
   title: string;
+  osExcludedAmount?: number | null;
 };
 
 export type CreateDesktopContractRecordRequest = {
@@ -52,6 +53,7 @@ export type CreateDesktopContractRecordRequest = {
   tenderDiscountPercent: number;
   tariffPriorities: DesktopTariffPriorityRecord[];
   title: string;
+  osExcludedAmount?: number | null;
 };
 
 export type DesktopTariffBookRecord = {

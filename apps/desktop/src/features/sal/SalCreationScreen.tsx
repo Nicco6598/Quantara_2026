@@ -505,7 +505,7 @@ export function SalCreationScreen() {
     });
 
     const finalSalPayload = {
-      date: data.project.periodEnd,
+      date: new Date().toISOString().slice(0, 10),
       description: "Periodo corrente",
       lines: lineViews.map((l) => ({
         id: l.id,
@@ -570,7 +570,7 @@ export function SalCreationScreen() {
       year: data.selectedTariffBook?.year ?? 2026,
     });
     const draftPayload = {
-      date: project.periodEnd,
+      date: new Date().toISOString().slice(0, 10),
       description: salTitle.trim() || project.salTitle,
       lines: lineViews.map((l) => ({
         id: l.id,
@@ -810,7 +810,6 @@ function SetupStep({
   onPrimary: () => void;
   onSelectContract?: ((id: string) => void) | undefined;
 }) {
-  const [showAll, setShowAll] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   if (!project) {
     return (
@@ -968,7 +967,7 @@ function SetupStep({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-17px font-bold text-[var(--text-primary)]">
-              Tariffari disponibili
+              Tariffari del progetto
             </h3>
             <div className="mt-1 flex items-center gap-1.5 text-12px text-[var(--text-secondary)]">
               {selectedTariffBooks.length > 0 ? (
@@ -987,83 +986,43 @@ function SetupStep({
               )}
             </div>
           </div>
-          {tariffBooks.length > 3 ? (
-            <motion.button
-              className="rounded-full border border-[var(--border-subtle)] px-3 py-2 text-12px font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--bg-muted)]"
-              onClick={() => setShowAll(!showAll)}
-              type="button"
-            >
-              {showAll ? "Mostra meno" : `Tutti (${tariffBooks.length})`}
-            </motion.button>
-          ) : null}
         </div>
         {tariffBooks.length === 0 ? (
           <p className="mt-2 text-12px text-[var(--text-secondary)]">Nessun tariffario caricato.</p>
         ) : (
-          <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {(showAll ? tariffBooks : tariffBooks.slice(0, 3)).map((book) => {
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tariffBooks.map((book) => {
               const isSelected = selectedTariffBooks.some((b) => b.id === book.id);
               return (
                 <motion.button
                   className={cn(
-                    "relative flex min-h-[148px] items-center gap-5 rounded-lg border p-5 text-left transition-all duration-200",
+                    "inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-12px font-semibold transition-all",
                     isSelected
-                      ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
-                      : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
+                      ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] text-[var(--accent-primary)]"
+                      : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]",
                   )}
                   key={book.id}
+                  layout
                   onClick={() => void selectTariffBook(book.id)}
                   type="button"
                 >
-                  <div
-                    className={cn(
-                      "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-md border bg-white text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]",
-                      isSelected
-                        ? "border-[var(--accent-primary)]"
-                        : "border-[var(--border-subtle)]",
-                    )}
-                  >
-                    <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-white">
-                      PDF
-                    </span>
-                    <div className="space-y-1.5 text-slate-300">
-                      <div className="h-1 w-9 rounded bg-current" />
-                      <div className="h-1 w-7 rounded bg-current" />
-                      <div className="h-1 w-10 rounded bg-current" />
-                      <div className="mt-4 h-1 w-8 rounded bg-current" />
-                      <div className="h-1 w-11 rounded bg-current" />
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div
-                      className={cn(
-                        "truncate text-16px font-bold leading-tight",
-                        isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-primary)]",
-                      )}
-                    >
-                      {book.name}
-                    </div>
-                    <div className="mt-3 text-13px text-[var(--text-secondary)]">
-                      Anno {book.year}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-12px font-medium text-[var(--text-secondary)]">
-                      <span>PDF</span>
-                      <span>·</span>
-                      <span>{voicesCount} voci</span>
-                    </div>
-                  </div>
                   {isSelected ? (
-                    <span className="absolute right-4 top-4 flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--accent-primary)] text-white">
-                      <Check className="size-4" strokeWidth={3} />
-                    </span>
+                    <Check className="size-3.5" strokeWidth={3} />
                   ) : (
-                    <span className="absolute right-4 top-4 size-5 shrink-0 rounded-full border-2 border-[var(--border-subtle)]" />
+                    <span className="size-3.5 rounded-full border-2 border-[var(--border-subtle)]" />
                   )}
+                  <span>{book.name}</span>
+                  <span className="text-11px text-[var(--text-secondary)]">{book.year}</span>
                 </motion.button>
               );
             })}
           </div>
         )}
+        <div className="mt-3 text-11px text-[var(--text-secondary)]">
+          I tariffari associati al progetto vengono presi come predefiniti. Puoi modificare la
+          selezione qui per questa SAL. Per modificare i tariffari del progetto, vai al{" "}
+          <span className="font-semibold text-[var(--info-base)]">dettaglio progetto</span>.
+        </div>
       </div>
 
       <div className="border-t border-[var(--border-subtle)]/70 pt-5">

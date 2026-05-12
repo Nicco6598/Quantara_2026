@@ -10,9 +10,8 @@ import {
   ListChecks,
   Save,
   Trash2,
-  X,
 } from "lucide-react";
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BUTTER_EASE, SPRING_EASE } from "@/components/shared/easings";
 import { useToast } from "@/components/shared/ToastProvider";
 
@@ -120,6 +119,7 @@ export function TariffImportPreviewModal({
     () => new Set(loadedDraft?.reviewedFiles ?? (metadatas.length === 1 ? [0] : [])),
   );
   const [categorySections, setCategorySections] = useState<TariffGridSectionSummary[]>([]);
+  const scrollToVoiceIdRef = useRef<string | null>(null);
   const localActiveIndex = pageView ? activeIndex : modalActiveIndex;
   const activeMetadata = metadatas[localActiveIndex];
   const activeVoices = editableVoicesList[localActiveIndex] ?? [];
@@ -214,6 +214,45 @@ export function TariffImportPreviewModal({
     },
     [localActiveIndex],
   );
+
+  const handleAddVoice = useCallback(() => {
+    const now = Date.now();
+    const voiceId = `voice_custom_${now}`;
+    const bookId = existingBookIds?.[localActiveIndex] ?? `tariff_custom_${now}`;
+    const newVoice: DesktopTariffVoice = {
+      category: "",
+      description: "",
+      id: voiceId,
+      laborPercentage: null,
+      officialCode: `CUSTOM-${now}`,
+      tariffBookId: bookId,
+      unitOfMeasure: "",
+      unitPrice: 0,
+    };
+    scrollToVoiceIdRef.current = voiceId;
+    setEditableVoicesList((current) =>
+      current.map((voices, listIndex) =>
+        listIndex !== localActiveIndex ? voices : [...voices, newVoice],
+      ),
+    );
+  }, [localActiveIndex, existingBookIds]);
+
+  // Scroll to newly added voice row
+  useEffect(() => {
+    const voiceId = scrollToVoiceIdRef.current;
+    if (!voiceId) return;
+    scrollToVoiceIdRef.current = null;
+
+    const frameId = requestAnimationFrame(() => {
+      const row = document.querySelector(`[data-voice-id="${voiceId}"]`);
+      if (row) {
+        row.scrollIntoView({ block: "center", behavior: "smooth" });
+        const firstInput = row.querySelector("input, textarea");
+        if (firstInput instanceof HTMLElement) firstInput.focus();
+      }
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, []);
 
   const confirmableMetadatas = useMemo(
     () =>
@@ -577,6 +616,7 @@ export function TariffImportPreviewModal({
             <EditableTariffVoicesGrid
               duplicateCodes={duplicateCodes}
               groups={editableGroups}
+              onAddVoice={handleAddVoice}
               onChange={updateVoice}
               onDelete={askDeleteVoice}
               onSectionsChange={setCategorySections}
@@ -638,15 +678,6 @@ export function TariffImportPreviewModal({
                 Controlla i dati estratti prima di confermarli nel catalogo.
               </p>
             </div>
-            <motion.button
-              aria-label="Chiudi"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
-              onClick={onCancel}
-              type="button"
-              transition={{ duration: 0.42, ease: BUTTER_EASE }}
-            >
-              <X className="size-4" />
-            </motion.button>
           </div>
 
           {metadatas.length > 1 ? (
@@ -746,6 +777,7 @@ export function TariffImportPreviewModal({
                 <EditableTariffVoicesGrid
                   duplicateCodes={duplicateCodes}
                   groups={editableGroups}
+                  onAddVoice={handleAddVoice}
                   onChange={updateVoice}
                   onDelete={askDeleteVoice}
                   onSectionsChange={setCategorySections}

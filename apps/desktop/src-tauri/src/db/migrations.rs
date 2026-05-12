@@ -75,5 +75,16 @@ fn ensure_contract_migration(connection: &rusqlite::Connection) -> rusqlite::Res
         )?;
     }
 
+    // Add os_excluded_amount_cents if missing
+    if !columns
+        .iter()
+        .any(|c| c == "os_excluded_amount_cents")
+    {
+        connection.execute(
+            "ALTER TABLE contracts ADD COLUMN os_excluded_amount_cents INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
+
     Ok(())
 }

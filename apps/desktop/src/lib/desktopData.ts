@@ -80,6 +80,7 @@ export async function createDesktopContract(
     tenderDiscountPercent: request.tenderDiscountPercent,
     tariffPriorities: request.tariffPriorities,
     title: request.title,
+    osExcludedAmount: request.osExcludedAmount ?? null,
   };
 
   if (!isTauriRuntime()) {

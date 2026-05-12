@@ -19,6 +19,7 @@ export const contractSchema = z.object({
     }),
   ),
   title: z.string().min(1),
+  osExcludedAmount: z.number().min(0).optional().nullable(),
 });
 
 export type ContractInput = z.infer<typeof contractSchema>;

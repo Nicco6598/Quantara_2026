@@ -6,6 +6,7 @@ import {
   Check,
   CircleAlert,
   FileText,
+  Percent,
   PlusCircle,
   ShieldCheck,
   WalletCards,
@@ -32,8 +33,11 @@ export type ProjectFormState = {
   contractualAmount: string;
   frameworkAgreementCode: string;
   tenderDiscountPercent: string;
-  tariffBookId: string;
+  tariffBookIds: string[];
   title: string;
+  osExcludedAmount: string;
+  budgetIvaPercent: string;
+  osIvaPercent: string;
 };
 
 type CreateProjectModalProps = {
@@ -59,8 +63,11 @@ function createInitialProjectForm(defaultTariffBookId: string): ProjectFormState
     contractualAmount: "",
     frameworkAgreementCode: "",
     tenderDiscountPercent: "",
-    tariffBookId: defaultTariffBookId,
+    tariffBookIds: defaultTariffBookId ? [defaultTariffBookId] : [],
     title: "",
+    osExcludedAmount: "",
+    budgetIvaPercent: "",
+    osIvaPercent: "",
   };
 }
 
@@ -81,11 +88,13 @@ export function CreateProjectModal({
   );
   const [draft, setDraft] = useState<ProjectFormState>(() => {
     if (initialValues) {
+      const validIds = initialValues.tariffBookIds.filter((id) =>
+        tariffBooks.some((book) => book.id === id),
+      );
       return {
+        ...fallbackDraft,
         ...initialValues,
-        tariffBookId: tariffBooks.some((book) => book.id === initialValues.tariffBookId)
-          ? initialValues.tariffBookId
-          : fallbackDraft.tariffBookId,
+        tariffBookIds: validIds.length > 0 ? validIds : fallbackDraft.tariffBookIds,
       };
     }
 
@@ -93,10 +102,10 @@ export function CreateProjectModal({
       window.localStorage.removeItem(draftStorageKey);
       const saved = window.localStorage.getItem(currentDraftStorageKey);
       const savedDraft = saved ? { ...fallbackDraft, ...JSON.parse(saved) } : fallbackDraft;
-
-      return tariffBooks.some((book) => book.id === savedDraft.tariffBookId)
-        ? savedDraft
-        : fallbackDraft;
+      const validIds = savedDraft.tariffBookIds.filter((id: string) =>
+        tariffBooks.some((book) => book.id === id),
+      );
+      return validIds.length > 0 ? { ...savedDraft, tariffBookIds: validIds } : fallbackDraft;
     } catch {
       return fallbackDraft;
     }
@@ -114,15 +123,18 @@ export function CreateProjectModal({
 
   useEffect(() => {
     if (tariffBooks.length === 0) {
-      setDraft((state) => ({ ...state, tariffBookId: "" }));
+      setDraft((state) => ({ ...state, tariffBookIds: [] }));
       return;
     }
 
-    setDraft((state) =>
-      tariffBooks.some((book) => book.id === state.tariffBookId)
-        ? state
-        : { ...state, tariffBookId: firstTariffBook?.id ?? "" },
-    );
+    setDraft((state) => {
+      const validIds = state.tariffBookIds.filter((id) =>
+        tariffBooks.some((book) => book.id === id),
+      );
+      return validIds.length > 0
+        ? { ...state, tariffBookIds: validIds }
+        : { ...state, tariffBookIds: firstTariffBook?.id ? [firstTariffBook.id] : [] };
+    });
   }, [firstTariffBook?.id, tariffBooks]);
 
   useEffect(() => {
@@ -157,14 +169,24 @@ export function CreateProjectModal({
       return;
     }
 
+    const osParsed = parseLocalizedMoney(draft.osExcludedAmount);
+    const osAmount = Number.isFinite(osParsed) && osParsed > 0 ? osParsed : 0;
+
+    const tariffPriorities = draft.tariffBookIds.map((bookId, index) => ({
+      priority: (index + 1) * 10,
+      reason: "Tariffario associato al progetto",
+      tariffBookId: bookId,
+    }));
+
     const request: CreateDesktopContractRequest = {
       applicationContractCode: sanitizeTextValue(draft.applicationContractCode),
       contractualAmount: amount,
       frameworkAgreementCode: sanitizeTextValue(draft.frameworkAgreementCode),
       id: `contract_locale_${Date.now()}`,
       tenderDiscountPercent: Number.isFinite(parsedDiscount) ? parsedDiscount : 0,
-      tariffPriorities: [],
+      tariffPriorities,
       title: sanitizeTextValue(draft.title),
+      osExcludedAmount: osAmount > 0 ? osAmount : null,
     };
 
     const parsed = contractSchema.safeParse({
@@ -217,12 +239,12 @@ export function CreateProjectModal({
                 Nuovo progetto
               </div>
               <h3 className="mt-2 max-w-3xl text-24px font-semibold leading-1_05 tracking-neg-0_035em text-[var(--text-primary)] md:text-30px">
-                {step === 1 ? "Dati contratto e perimetro" : "Importo e ribasso gara"}
+                {step === 1 ? "Dati contratto e perimetro" : "Importo e perimetro economico"}
               </h3>
               <p className="mt-2 max-w-2xl text-13px font-medium leading-5 text-[var(--text-secondary)]">
                 {step === 1
                   ? "Definisci identita, codici contrattuali e appaltatore del progetto."
-                  : "Definisci importo contrattuale e percentuale di ribasso d'asta."}
+                  : "Definisci importo contrattuale, OS esclusi e tariffari del progetto."}
               </p>
             </div>
             <button
@@ -325,47 +347,143 @@ export function CreateProjectModal({
                         </div>
                       </div>
                     </div>
+
                     <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
-                      <ProjectCurrencyField
-                        label="Importo contrattuale"
-                        onChange={(value) =>
-                          setDraft((state) => ({ ...state, contractualAmount: value }))
-                        }
-                        placeholder="26.150.000,00"
-                        value={draft.contractualAmount}
-                      />
-                      <label className="block">
-                        <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-                          Ribasso d'asta (%)
-                        </span>
-                        <input
-                          className="mt-3 h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                          max={100}
-                          min={0}
-                          onChange={(event) => {
-                            const v = event.target.value;
-                            if (v === "" || v === "-") {
-                              setDraft((state) => ({ ...state, tenderDiscountPercent: v }));
-                              return;
-                            }
-                            const parsed = parseFloat(v.replace(",", "."));
-                            if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) {
-                              setDraft((state) => ({
-                                ...state,
-                                tenderDiscountPercent: String(Math.round(parsed * 100) / 100),
-                              }));
-                            }
-                          }}
-                          placeholder="18,25"
-                          step="0.01"
-                          type="number"
-                          value={draft.tenderDiscountPercent}
+                      <div className="space-y-2">
+                        <ProjectCurrencyField
+                          label="Importo contrattuale"
+                          onChange={(value) =>
+                            setDraft((state) => ({ ...state, contractualAmount: value }))
+                          }
+                          placeholder="26.150.000,00"
+                          value={draft.contractualAmount}
                         />
-                      </label>
+                        <IvaToggleInput
+                          label="IVA su importo"
+                          percent={draft.budgetIvaPercent}
+                          baseAmount={parseLocalizedMoney(draft.contractualAmount)}
+                          onChange={(pct) =>
+                            setDraft((state) => ({ ...state, budgetIvaPercent: pct }))
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block">
+                          <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                            Ribasso d'asta (%)
+                          </span>
+                          <input
+                            className="mt-3 h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                            max={100}
+                            min={0}
+                            onChange={(event) => {
+                              const v = event.target.value;
+                              if (v === "" || v === "-") {
+                                setDraft((state) => ({ ...state, tenderDiscountPercent: v }));
+                                return;
+                              }
+                              const parsed = parseFloat(v.replace(",", "."));
+                              if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) {
+                                setDraft((state) => ({
+                                  ...state,
+                                  tenderDiscountPercent: String(Math.round(parsed * 100) / 100),
+                                }));
+                              }
+                            }}
+                            placeholder="18,25"
+                            step="0.01"
+                            type="number"
+                            value={draft.tenderDiscountPercent}
+                          />
+                        </label>
+                      </div>
                     </div>
+
+                    <div className="mt-5">
+                      <ProjectCurrencyField
+                        label="OS Esclusi da ribassi"
+                        onChange={(value) =>
+                          setDraft((state) => ({ ...state, osExcludedAmount: value }))
+                        }
+                        placeholder="1.500.000,00"
+                        value={draft.osExcludedAmount}
+                      />
+                      <IvaToggleInput
+                        label="IVA su OS esclusi"
+                        percent={draft.osIvaPercent}
+                        baseAmount={parseLocalizedMoney(draft.osExcludedAmount)}
+                        onChange={(pct) => setDraft((state) => ({ ...state, osIvaPercent: pct }))}
+                      />
+                    </div>
+
                     <div className="mt-5 rounded-18px bg-[var(--bg-muted)]/70 px-4 py-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
                       Il ribasso viene applicato a tutte le voci SAL. Le voci OS (oneri sicurezza)
                       sono escluse automaticamente.
+                    </div>
+
+                    <div className="mt-6 border-t border-[var(--border-subtle)]/70 pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-12px bg-[var(--info-soft)] text-[var(--info-base)]">
+                          <FileText className="size-5" />
+                        </div>
+                        <div>
+                          <div className="text-14px font-semibold text-[var(--text-primary)]">
+                            Tariffari associati
+                          </div>
+                          <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
+                            Seleziona i tariffari da collegare al progetto.
+                          </p>
+                        </div>
+                      </div>
+                      {tariffBooks.length === 0 ? (
+                        <p className="mt-3 text-12px text-[var(--text-secondary)]">
+                          Nessun tariffario disponibile. Importane uno prima di creare il progetto.
+                        </p>
+                      ) : (
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                          {tariffBooks.map((book) => {
+                            const isSelected = draft.tariffBookIds.includes(book.id);
+                            return (
+                              <button
+                                className={`flex items-center gap-3 rounded-14px border px-4 py-3 text-left transition-all ${
+                                  isSelected
+                                    ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)]"
+                                    : "border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/50 hover:border-[var(--border-subtle)]"
+                                }`}
+                                key={book.id}
+                                onClick={() =>
+                                  setDraft((state) => ({
+                                    ...state,
+                                    tariffBookIds: isSelected
+                                      ? state.tariffBookIds.filter((id) => id !== book.id)
+                                      : [...state.tariffBookIds, book.id],
+                                  }))
+                                }
+                                type="button"
+                              >
+                                <span
+                                  className={`flex size-6 shrink-0 items-center justify-center rounded-md border ${
+                                    isSelected
+                                      ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+                                      : "border-[var(--border-subtle)]"
+                                  }`}
+                                >
+                                  {isSelected && <Check className="size-3.5" strokeWidth={3} />}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
+                                    {book.name}
+                                  </div>
+                                  <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
+                                    Anno {book.year} · {book.sourceName}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </section>
                 )}
@@ -405,6 +523,24 @@ export function CreateProjectModal({
                         Number.isFinite(parsedDiscount)
                           ? `${parsedDiscount.toLocaleString("it-IT")}%`
                           : "Da inserire"
+                      }
+                    />
+                    <PreviewMetric
+                      icon={<Percent className="size-5" />}
+                      label="OS esclusi da ribasso"
+                      value={
+                        Number.isFinite(parseLocalizedMoney(draft.osExcludedAmount))
+                          ? formatAmount(parseLocalizedMoney(draft.osExcludedAmount))
+                          : "Non impostato"
+                      }
+                    />
+                    <PreviewMetric
+                      icon={<FileText className="size-5" />}
+                      label="Tariffari associati"
+                      value={
+                        draft.tariffBookIds.length > 0
+                          ? `${draft.tariffBookIds.length} tariffari`
+                          : "Nessuno"
                       }
                     />
                   </div>
@@ -459,6 +595,106 @@ export function CreateProjectModal({
           </div>
         </div>
       </motion.section>
+    </div>
+  );
+}
+
+function formatAmount(v: number) {
+  return v.toLocaleString("it-IT", {
+    currency: "EUR",
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    style: "currency",
+  });
+}
+
+function IvaToggleInput({
+  baseAmount,
+  label,
+  onChange,
+  percent,
+}: {
+  baseAmount: number;
+  label: string;
+  onChange: (value: string) => void;
+  percent: string;
+}) {
+  const [isOpen, setIsOpen] = useState(percent !== "");
+  const pct = parseFloat(percent.replace(",", "."));
+  const hasValidPct = Number.isFinite(pct) && pct > 0;
+  const ivaAmount = hasValidPct && Number.isFinite(baseAmount) ? baseAmount * (pct / 100) : 0;
+  const total = ivaAmount > 0 && Number.isFinite(baseAmount) ? baseAmount + ivaAmount : 0;
+
+  return (
+    <div className="mt-2 space-y-2">
+      <button
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-11px font-semibold transition-colors ${
+          isOpen
+            ? "bg-[var(--info-soft)] text-[var(--info-base)] ring-1 ring-[var(--info-base)]/30"
+            : "bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted-strong)]"
+        }`}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (isOpen) onChange("");
+        }}
+        type="button"
+      >
+        <Percent className="size-3" />
+        {label}
+      </button>
+      {isOpen ? (
+        <div className="space-y-1.5 rounded-12px bg-[var(--bg-muted)]/50 p-3">
+          <div className="flex items-center gap-2">
+            <input
+              className="h-8 w-20 rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] px-2.5 text-12px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              max={100}
+              min={0}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "" || v === "-") {
+                  onChange(v);
+                  return;
+                }
+                const parsed = parseFloat(v.replace(",", "."));
+                if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) {
+                  onChange(String(Math.round(parsed * 100) / 100));
+                }
+              }}
+              placeholder="22"
+              step="0.1"
+              type="number"
+              value={percent}
+            />
+            <span className="text-11px font-medium text-[var(--text-secondary)]">% IVA</span>
+          </div>
+          {Number.isFinite(baseAmount) && baseAmount > 0 ? (
+            <div className="space-y-0.5 text-11px font-medium text-[var(--text-secondary)]">
+              <div className="flex justify-between">
+                <span>BASE</span>
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {formatAmount(baseAmount)}
+                </span>
+              </div>
+              {hasValidPct ? (
+                <div className="flex justify-between">
+                  <span>+ IVA ({pct.toLocaleString("it-IT")}%)</span>
+                  <span className="font-semibold text-[var(--text-primary)]">
+                    {formatAmount(ivaAmount)}
+                  </span>
+                </div>
+              ) : null}
+              {hasValidPct ? (
+                <div className="flex justify-between border-t border-[var(--border-subtle)]/50 pt-0.5">
+                  <span className="font-semibold text-[var(--info-base)]">= TOTALE</span>
+                  <span className="font-semibold text-[var(--info-base)]">
+                    {formatAmount(total)}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -824,6 +1060,8 @@ function getProjectValidation(draft: ProjectFormState) {
   const hasValidAmount = Number.isFinite(amount) && amount > 0;
   const hasValidDiscount =
     discountStr === "" || (Number.isFinite(discountVal) && discountVal >= 0 && discountVal <= 100);
+  const osParsed = parseLocalizedMoney(draft.osExcludedAmount);
+  const hasValidOs = draft.osExcludedAmount === "" || (Number.isFinite(osParsed) && osParsed > 0);
 
   if (identityError) {
     return {
@@ -832,6 +1070,7 @@ function getProjectValidation(draft: ProjectFormState) {
         amount: hasValidAmount,
         discount: hasValidDiscount,
         identity: false,
+        os: hasValidOs,
       },
       identityError,
       submitError: identityError,
@@ -843,15 +1082,13 @@ function getProjectValidation(draft: ProjectFormState) {
     submitError = "Inserisci un importo contrattuale valido e maggiore di zero.";
   } else if (!hasValidDiscount) {
     submitError = "Inserisci un ribasso valido tra 0 e 100%.";
+  } else if (Number.isFinite(osParsed) && osParsed > 0 && hasValidAmount && osParsed >= amount) {
+    submitError = "L'importo OS esclusi da ribassi deve essere inferiore al budget contrattuale.";
   }
 
   return {
     canSubmit: submitError === null,
-    checks: {
-      amount: hasValidAmount,
-      discount: hasValidDiscount,
-      identity: true,
-    },
+    checks: { amount: hasValidAmount, discount: hasValidDiscount, identity: true, os: hasValidOs },
     identityError,
     submitError,
   };

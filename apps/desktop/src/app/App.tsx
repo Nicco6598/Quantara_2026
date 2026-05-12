@@ -86,7 +86,7 @@ function WindowTitleBar({
   isMacOs: boolean;
   onCheckUpdates: () => void;
   onOpenCommandPalette: (anchorRect: DOMRect) => void;
-  onRouteChange: (route: QuantaraRoute) => void;
+  onRouteChange: (route: QuantaraRoute, context?: string) => void;
   onToggleSidebar: () => void;
 }) {
   const [isRouteMenuOpen, setIsRouteMenuOpen] = useState(false);
@@ -433,6 +433,19 @@ function AppShell() {
         return;
       }
 
+      if (actionId.startsWith("project-goto-step-")) {
+        const step = Number.parseInt(actionId.replace("project-goto-step-", ""), 10);
+        if (step >= 1 && step <= 2) {
+          useAppStore.getState().setProjectPendingStep(step);
+        }
+        return;
+      }
+
+      if (actionId === "project-submit") {
+        window.dispatchEvent(new CustomEvent("project-create-action", { detail: actionId }));
+        return;
+      }
+
       if (actionId.startsWith("tariff-import-")) {
         window.dispatchEvent(new CustomEvent("tariff-preview-action", { detail: actionId }));
         return;
@@ -452,8 +465,19 @@ function AppShell() {
               tone: "success",
             });
           } else if (result.kind === "available") {
+            setAvailableUpdate(result);
+            setInstallState({
+              phase: "idle",
+            });
             notify({
+              actionLabel: "Apri dettagli",
               message: `${result.version} disponibile per installazione.`,
+              onAction: () => {
+                setAvailableUpdate(result);
+                setInstallState({
+                  phase: "idle",
+                });
+              },
               title: "Nuova release",
               tone: "warning",
             });

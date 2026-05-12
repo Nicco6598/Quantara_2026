@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  CaretRight,
   ChartBar,
   Folders,
   Gear,
@@ -11,12 +12,17 @@ import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
-import { isPlaceholderContractorName } from "@/features/projects/utils/projects-helpers";
-import { APP_VERSION } from "@/generated/appVersion";
+import {
+  createContractorId,
+  isPlaceholderContractorName,
+} from "@/features/projects/utils/projects-helpers";
+import type { DesktopContract } from "@/lib/desktopData";
 import { listDesktopContracts } from "@/lib/desktopData";
 import { DATA_CHANGED_EVENT } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import type { QuantaraRoute } from "@/store/app-store";
+import { useNavigationState } from "@/store/app-store";
+import { APP_VERSION } from "@/generated/appVersion";
 
 type NavItem = {
   badges?: {
@@ -30,16 +36,25 @@ type NavItem = {
   route: QuantaraRoute;
 };
 
+type SidebarContextInfo = {
+  primary: string;
+  primaryId: string | null;
+  secondary: string | null;
+  secondaryId: string | null;
+};
+
 type AppSidebarProps = {
   activeRoute: QuantaraRoute;
   collapsed: boolean;
-  onRouteChange: (route: QuantaraRoute) => void;
+  onRouteChange: (route: QuantaraRoute, context?: string) => void;
 };
 
-const SIDEBAR_WIDTH_EXPANDED = 184;
+const SIDEBAR_WIDTH_EXPANDED = 220;
 const SIDEBAR_WIDTH_COLLAPSED = 0;
 
 export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebarProps) {
+  const { activeContext } = useNavigationState();
+  const [contracts, setContracts] = useState<DesktopContract[]>([]);
   const [projects, setProjects] = useState<{ id: string; contractor: string }[]>([]);
   const [contractorCount, setContractorCount] = useState(0);
   const debounceRef = useRef<number | undefined>(undefined);
@@ -75,9 +90,10 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
             }
           })();
 
-    listDesktopContracts([]).then((contracts) => {
+    listDesktopContracts([]).then((result) => {
       if (!active) return;
-      const projectRows = contracts.data.map((c) => {
+      setContracts(result.data);
+      const projectRows = result.data.map((c) => {
         const p = mapContractToProject(c);
         const contractor = registry[c.id];
         return contractor ? { ...p, contractor } : p;
@@ -119,6 +135,45 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   const projectCount = projects.length;
   const criticalMaterialsCount = 0;
   const warningMaterialsCount = 0;
+
+  const contextLabel = useMemo(() => {
+    const selectedProjectId = (() => {
+      try {
+        const raw = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as { id?: unknown };
+        return typeof parsed.id === "string" ? parsed.id : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    if (activeRoute === "projects" && activeContext) {
+      return {
+        primary: activeContext,
+        primaryId: activeContext,
+        secondary: null,
+        secondaryId: null,
+      };
+    }
+
+    if ((activeRoute === "project-detail" || activeRoute === "sal-create") && selectedProjectId) {
+      const contract = contracts.find((c) => c.id === selectedProjectId);
+      const project = projects.find((p) => p.id === selectedProjectId);
+      if (contract) {
+        const contractorName = project?.contractor ?? "";
+        const contractorId = contractorName ? createContractorId(contractorName) : null;
+        return {
+          primary: contractorName || "Progetto",
+          primaryId: contractorId,
+          secondary: contract.title,
+          secondaryId: contract.id,
+        };
+      }
+    }
+
+    return null;
+  }, [activeRoute, activeContext, contracts, projects]);
 
   const primaryNavItems: NavItem[] = useMemo(
     () => [
@@ -176,6 +231,7 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
             <SidebarNav
               activeRoute={activeRoute}
               collapsed={collapsed}
+              contextLabel={contextLabel}
               items={primaryNavItems}
               onNavigate={onRouteChange}
             />
@@ -185,6 +241,7 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
             <SidebarNav
               activeRoute={activeRoute}
               collapsed={collapsed}
+              contextLabel={null}
               items={utilityNavItems}
               onNavigate={onRouteChange}
             />
@@ -260,27 +317,95 @@ function SidebarNav({
   activeRoute,
   collapsed,
   className,
+  contextLabel,
   items,
   onNavigate,
 }: {
   activeRoute: QuantaraRoute;
   collapsed: boolean;
   className?: string;
+  contextLabel: { primary: string; secondary: string | null } | null;
   items: NavItem[];
   onNavigate: (route: QuantaraRoute) => void;
 }) {
   return (
     <nav className={cn("space-y-1.5", className)}>
-      {items.map((item) => (
-        <SidebarNavItem
-          active={isRouteActive(item.route, activeRoute)}
-          collapsed={collapsed}
-          item={item}
-          key={item.route}
-          onClick={() => onNavigate(item.route)}
-        />
-      ))}
+      {items.map((item) => {
+        const isActive = isRouteActive(item.route, activeRoute);
+        return (
+          <div key={item.route}>
+            <SidebarNavItem
+              active={isActive}
+              collapsed={collapsed}
+              item={item}
+              onClick={() => onNavigate(item.route)}
+            />
+            {isActive && contextLabel && !collapsed ? (
+              <SidebarContextBreadcrumb
+                label={contextLabel as SidebarContextInfo}
+                onNavigate={onNavigate}
+              />
+            ) : null}
+          </div>
+        );
+      })}
     </nav>
+  );
+}
+
+function SidebarContextBreadcrumb({
+  label,
+  onNavigate,
+}: {
+  label: SidebarContextInfo;
+  onNavigate: (route: QuantaraRoute, context?: string) => void;
+}) {
+  return (
+    <div className="ml-10 mt-1.5 flex min-w-0 flex-col gap-0.5 px-2">
+      {label.primaryId ? (
+        <button
+          className="w-full truncate rounded-md px-1 py-0.5 text-left text-11px font-medium leading-4 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+          onClick={() => {
+            if (label.primaryId) onNavigate("projects", label.primaryId);
+          }}
+          title={`Vedi progetti di ${label.primary}`}
+          type="button"
+        >
+          {label.primary}
+        </button>
+      ) : (
+        <span className="truncate text-11px font-medium leading-4 text-[var(--text-tertiary)]">
+          {label.primary}
+        </span>
+      )}
+      {label.secondary && label.secondaryId ? (
+        <div className="flex items-start gap-1">
+          <CaretRight
+            size={10}
+            weight="bold"
+            className="mt-0.5 shrink-0 text-[var(--text-tertiary)] opacity-50"
+          />
+          <button
+            className="min-w-0 rounded-md px-1 py-0.5 text-left text-11px font-semibold leading-4 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--accent-primary)]"
+            onClick={() => {
+              try {
+                window.sessionStorage.setItem(
+                  "quantara.selectedProjectDetail.v1",
+                  JSON.stringify({ id: label.secondaryId }),
+                );
+              } catch {
+                /* no-op */
+              }
+              onNavigate("project-detail");
+            }}
+            title={`Vedi dettaglio ${label.secondary}`}
+            type="button"
+          >
+            {label.secondary}
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
