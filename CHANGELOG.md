@@ -2,6 +2,34 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.2.64 — 2026-05-14
+
+### MG (Maggiorazioni) come percentuali tariff-specifiche
+
+- **MG ora funzionano** — le voci MG importate dai tariffari non vengono più perse: aggiunto campo `maggiorazioni` alla struct Rust `ParserOutput` (era assente, Serde le scartava silenziosamente). I record MG vengono ora concatenati a quelli normali durante il parsing.
+- **MG = percentuale, non prezzo** — il `unitPrice` di una voce MG (es. 30) viene interpretato come percentuale, non come importo euro. La maggiorazione viene distribuita su tutte le voci tariffarie che condividono lo stesso prefisso (es. MG su AC → si applica solo alle voci AC).
+- **Calcolo sull'importo lordo, sconto dopo** — la percentuale MG viene applicata sul `grossAmount` (prezzo base prima di qualsiasi sconto). Il ribasso gara viene poi calcolato su `(grossAmount + surchargeLinked + MG share)`, non prima della maggiorazione.
+- **Equazione economica a scontrino** — il componente `EconomicEquation` è stato ridisegnato in stile ricevuta: ogni riga mostra operazione (`−` sconto, `+` MG), label e importo, con finale accentato per il totale. Presente in tutti e 3 gli step (Voci, Revisione, Conferma).
+
+### UI griglia SAL migliorata
+
+- **Campo note sotto la riga** — la colonna "Note riga" è stata rimossa dalla griglia; la textarea note ora vive sotto ogni riga come estensione verticale, sempre visibile con auto-resize. Griglia passata da 15 a 14 colonne.
+- **Colonne allineate al contenuto** — la prima colonna (N.) non è più centrata ma allineata a sinistra come l'intestazione, con `justify-center` rimosso. In modalità non virtualizzata, l'intestazione "N." riceve `pl-7` per compensare i 28px della maniglia di drag (`DragDropReorder`), allineando perfettamente header e righe.
+- **Tabella contabile allineata** — griglia `AccountingRows` aumentata da 10 a 11 colonne (aggiunta colonna `36px` per l'icona azioni), eliminando l'overflow dell'undicesimo elemento che finiva in una riga implicita.
+- **Warning tooltip via portal** — il popup delle avvertenze (icona Info) non viene più tagliato dallo scroll container: usa `createPortal` a `document.body` con posizionamento fixed e flip automatico sopra/sotto.
+
+### Parser PDF — keep-alive (macOS più veloce)
+
+- **Processo Python persistente** — il parser RFI ora supporta la modalità `--serve`: legge i path da stdin e scrive i risultati su stdout, mantenendo il processo vivo tra una richiesta e l'altra. Su macOS, dove l'avvio del binario PyInstaller subisce i controlli Gatekeeper (1-3s ciascuno), si paga il costo UNA VOLTA sola invece che per ogni file.
+- **`RfiParserClient` in Rust** — nuova struct thread-safe che avvia il parser in modalità `--serve` al primo utilizzo, comunicando via pipe. Se il processo crasha, viene droppato e ricreato alla richiesta successiva. Fallback trasparente al vecchio approccio "un subprocesso per file".
+
+### Correzioni varie
+
+- **Fix infinite loop su delete file multiplo** — l'effetto `LOAD_DRAFT` aveva `[loadedDraft, metadatas]` come dipendenze: quando `removeActiveFile` chiamava `onMetadatasChange`, il genitore aggiornava le metadatas e l'effetto scattava dispatchando `LOAD_DRAFT`, che sovrascriveva lo stato del reducer creando un loop. Risolto proteggendo l'effetto con un flag `initialSyncRef` che lo fa eseguire una sola volta al mount; il dispatch `LOAD_DRAFT` era ridondante (l'initializer di `useReducer` già gestisce lo stato iniziale).
+- **Aria-expanded rimosso da input** — `aria-expanded` non è supportato su `<input>` senza `role="combobox"`. Rimosso dall'`<AutocompleteInput>` per rispettare le specifiche ARIA.
+- **NoAccumulatingSpread** — sostituito spread operator in `.reduce()` con `Object.assign` per evitare complessità O(n²) in `TariffImportPreviewModal`.
+- **useExhaustiveDependencies** — aggiunte tutte le dipendenze mancanti nei `useCallback`/`useEffect` di `SalCreationScreen`, `TariffsScreen`, `TariffImportPreviewModal`, `EditableTariffVoicesGrid`, `App`.
+
 ## 0.2.63 - 2026-05-12
 
 ### Creazione e modifica progetto in schermata intera
