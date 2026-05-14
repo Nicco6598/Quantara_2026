@@ -1,9 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useNavigate } from "@/hooks/useNavigate";
 import type { DesktopContract, DesktopDataResult } from "@/lib/desktopData";
 import { deleteDesktopContract } from "@/lib/desktopData";
-import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { useNavigate } from "@/hooks/useNavigate";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 type Notify = (toast: {
   message: string;

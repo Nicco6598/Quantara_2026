@@ -404,9 +404,44 @@ export type CreateDesktopMaterialRequest = {
   notes: string;
 };
 
+const previewMaterialsStorageKey = "quantara.preview.materials.v1";
+
+function readPreviewMaterials(fallback: DesktopMaterial[]): DesktopMaterial[] {
+  try {
+    const stored = localStorage.getItem(previewMaterialsStorageKey);
+    if (stored) {
+      const parsed = JSON.parse(stored) as DesktopMaterial[];
+      return parsed;
+    }
+  } catch {
+    /* no-op */
+  }
+  return fallback;
+}
+
+function writePreviewMaterials(materials: DesktopMaterial[]) {
+  try {
+    localStorage.setItem(previewMaterialsStorageKey, JSON.stringify(materials));
+  } catch {
+    /* no-op */
+  }
+}
+
 export async function listDesktopMaterials(
   fallback: DesktopMaterial[],
 ): Promise<DesktopDataResult<DesktopMaterial[]>> {
+  if (!isTauriRuntime()) {
+    let data = readPreviewMaterials([]);
+    if (data.length === 0 && fallback.length > 0) {
+      writePreviewMaterials(fallback);
+      data = fallback;
+    }
+    return {
+      data,
+      message: "Runtime browser: dati materiali locali in anteprima.",
+      source: "fallback",
+    };
+  }
   return cachedFetch("materials", () =>
     withInflightCache("materials", () =>
       invokeWithFallback("list_materials", {}, fallback, "materiali dimostrativi"),
@@ -418,6 +453,9 @@ export async function createDesktopMaterial(
   request: CreateDesktopMaterialRequest,
 ): Promise<DesktopMaterial> {
   if (!isTauriRuntime()) {
+    const current = readPreviewMaterials([]);
+    current.push(request);
+    writePreviewMaterials(current);
     return request;
   }
 
@@ -429,14 +467,47 @@ export async function updateDesktopMaterial(
   request: CreateDesktopMaterialRequest,
 ): Promise<DesktopMaterial> {
   if (!isTauriRuntime()) {
+    let current = readPreviewMaterials([]);
+    const index = current.findIndex((m) => m.id === materialId);
+    if (index >= 0) {
+      current[index] = { ...current[index], ...request };
+    } else {
+      current = [request, ...current];
+    }
+    writePreviewMaterials(current);
     return request;
   }
 
   return invoke<DesktopMaterial>("update_material", { materialId, request });
 }
 
+export async function restoreMaterialsFromSalUsage(
+  usage: { materialId: string; quantity: number }[],
+): Promise<void> {
+  if (usage.length === 0) return;
+  const { data: all } = await listDesktopMaterials([]);
+  const map = new Map(all.map((m) => [m.id, m]));
+  for (const { materialId, quantity } of usage) {
+    const mat = map.get(materialId);
+    if (mat) {
+      await updateDesktopMaterial(materialId, {
+        id: mat.id,
+        code: mat.code,
+        description: mat.description,
+        category: mat.category,
+        unit: mat.unit,
+        quantity: mat.quantity + quantity,
+        minQuantity: mat.minQuantity,
+        notes: mat.notes,
+      });
+    }
+  }
+}
+
 export async function deleteDesktopMaterial(materialId: string): Promise<void> {
   if (!isTauriRuntime()) {
+    const current = readPreviewMaterials([]);
+    writePreviewMaterials(current.filter((m) => m.id !== materialId));
     return;
   }
 

@@ -20,15 +20,16 @@ import {
   useRef,
   useState,
 } from "react";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
-import { useToast } from "@/components/shared/ToastProvider";
-
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { useToast } from "@/components/shared/ToastProvider";
 
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 
 import type { ImportValidation } from "../tariffs-types";
+import { groupEditableTariffVoices } from "../utils/tariff-grouping";
+import type { ImportDraft } from "../utils/tariff-import-drafts";
 import {
   createDraftName,
   createDraftSignature,
@@ -36,8 +37,6 @@ import {
   loadImportDraft,
   saveImportDraftRecord,
 } from "../utils/tariff-import-drafts";
-import type { ImportDraft } from "../utils/tariff-import-drafts";
-import { groupEditableTariffVoices } from "../utils/tariff-grouping";
 import { getImportValidation, parseOptionalPercent } from "../utils/tariffs-validation";
 import {
   EditableTariffVoicesGrid,
@@ -925,7 +924,7 @@ export function TariffImportPreviewModal({
       {deleteDialog}
     </>
   ) : (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-md">
       <m.button
         aria-label="Chiudi"
         className="absolute inset-0 cursor-default"

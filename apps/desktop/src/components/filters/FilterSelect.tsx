@@ -47,7 +47,7 @@ export function FilterSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-max min-w-full overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
+        <div className="absolute left-0 top-full z-50 mt-1 w-max min-w-full overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]">
           {options.map((opt) => {
             const displayOpt = displayMap?.get(opt) ?? opt;
             const isSelected = opt === value;

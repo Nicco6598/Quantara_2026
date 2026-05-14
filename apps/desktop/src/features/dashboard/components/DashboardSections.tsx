@@ -1,3 +1,4 @@
+import { scaleTime } from "@visx/scale";
 import { m } from "framer-motion";
 import {
   AlertTriangle,
@@ -8,20 +9,21 @@ import {
   FolderKanban,
   HardHat,
   Plus,
+  Trash2,
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { scaleTime } from "@visx/scale";
 import { useEffect, useMemo, useState } from "react";
-import { ModernDonut, SegmentBars } from "@/components/shared/Charts";
-import type { StatusTone } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/shared/Button";
+import { ModernDonut, SegmentBars } from "@/components/shared/Charts";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { MOTION_VARIANTS } from "@/components/shared/easings";
+import type { StatusTone } from "@/components/shared/StatusBadge";
 import { BezelSurface } from "@/components/shared/ui-primitives";
-import type { AuditEntry } from "@/store/audit-log-store";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import type { AuditEntry } from "@/store/audit-log-store";
 
 export type GanttBar = {
   id: string;
@@ -229,7 +231,7 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
                       whileInView={{ scaleX: 1 }}
                     >
                       <m.span
-                        className="absolute inset-y-0 left-0 rounded-10px bg-white/24"
+                        className="absolute inset-y-0 left-0 rounded-10px bg-[var(--text-inverse)]/24"
                         initial={MOTION_VARIANTS.progress.initial}
                         style={{ width: `${progress}%` }}
                         transition={{
@@ -238,12 +240,12 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
                         }}
                         whileInView={{ scaleX: 1 }}
                       />
-                      <span className="relative z-10 flex h-full min-w-0 items-center justify-between gap-2 px-2.5 text-white">
-                        <span className="truncate text-10px font-black leading-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.24)]">
+                      <span className="relative z-10 flex h-full min-w-0 items-center justify-between gap-2 px-2.5 text-[var(--text-inverse)]">
+                        <span className="truncate text-10px font-black leading-none drop-shadow-[0_1px_1px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]">
                           {progress.toFixed(0)}%
                         </span>
                         {width > 10 ? (
-                          <span className="shrink-0 text-9px font-bold leading-none text-white/75">
+                          <span className="shrink-0 text-9px font-bold leading-none text-[var(--text-inverse)]/75">
                             {bar.days}g
                           </span>
                         ) : null}
@@ -349,6 +351,7 @@ export function OperationalSites({
 }) {
   const PAGE_SIZE = 10;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const visibleProjects = useMemo(
     () => projects.slice(0, Math.min(visibleCount, projects.length)),
     [projects, visibleCount],
@@ -381,12 +384,26 @@ export function OperationalSites({
           <ProjectRow
             key={project.id}
             {...(operational ? { operational } : {})}
-            onDelete={() => onDeleteProject(project.id)}
+            onDelete={() => setDeleteTargetId(project.id)}
             onOpen={() => onOpenProject(project)}
             project={project}
           />
         );
       })}
+
+      <ConfirmDialog
+        confirmLabel="Elimina"
+        isOpen={deleteTargetId !== null}
+        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={() => {
+          if (deleteTargetId) onDeleteProject(deleteTargetId);
+          setDeleteTargetId(null);
+        }}
+        title="Eliminare questo progetto?"
+        tone="danger"
+      >
+        Il progetto verrà rimosso definitivamente insieme a tutte le SAL collegate.
+      </ConfirmDialog>
 
       {projects.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-22px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] p-10 text-center shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--surface-highlight)_48%,transparent)]">
@@ -473,17 +490,12 @@ function ProjectRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Button className="h-9 px-3 text-12px" onClick={onOpen} variant="outline">
+          <Button onClick={onOpen} size="sm" variant="outline">
             Apri
           </Button>
-          <button
-            aria-label="Elimina cantiere"
-            className="flex size-9 items-center justify-center rounded-lg text-[var(--danger-base)] opacity-0 ring-1 ring-[var(--border-subtle)] transition-all hover:bg-[var(--danger-soft)] group-hover:opacity-100"
-            onClick={onDelete}
-            type="button"
-          >
-            <span className="text-lg font-bold leading-none">×</span>
-          </button>
+          <Button aria-label="Elimina cantiere" onClick={onDelete} size="sm" variant="destructive">
+            <Trash2 className="size-4" />
+          </Button>
         </div>
       </div>
 

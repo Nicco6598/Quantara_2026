@@ -1,9 +1,9 @@
 import { Calculator, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ScreenHero } from "@/components/shared/ScreenHero";
-import { useToast } from "@/components/shared/ToastProvider";
 import { MetricCard } from "@/components/shared/MetricCard";
+import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import {
   buildActivityRows,
@@ -17,14 +17,14 @@ import {
   RightRail,
   TimelineGantt,
 } from "@/features/dashboard/components/DashboardSections";
-import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { PortfolioProject } from "@/features/projects/types";
-import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
+import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { SalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
+import { useNavigate } from "@/hooks/useNavigate";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { useNavigate } from "@/hooks/useNavigate";
 import { useAuditLogStore } from "@/store/audit-log-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
@@ -141,10 +141,20 @@ export function DashboardScreen() {
     try {
       await deleteDesktopContract(projectId);
       setProjects((current) => current.filter((p) => p.id !== projectId));
+      useSalWorkflowStore.setState((state) => ({
+        projects: state.projects.filter((p) => p.id !== projectId),
+        salDocuments: state.salDocuments.filter((sal) => sal.projectId !== projectId),
+        activeProjectId: state.activeProjectId === projectId ? "" : state.activeProjectId,
+        activeSalId: state.salDocuments.some(
+          (sal) => sal.id === state.activeSalId && sal.projectId === projectId,
+        )
+          ? ""
+          : state.activeSalId,
+      }));
       dispatchDataChanged();
       notify({
         title: "Progetto eliminato",
-        message: "Il progetto e stato rimosso dalla dashboard.",
+        message: "Il progetto, le relative SAL e i riferimenti sono stati eliminati.",
         tone: "success",
       });
     } catch (error) {

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   FileSpreadsheet,
   FileText,
+  Package,
   Printer,
   Wallet,
 } from "lucide-react";
@@ -24,12 +25,16 @@ import {
   useState,
 } from "react";
 import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
+import { SeverityBar, severityToneForPercentage } from "@/components/shared/SeverityBar";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useNavigate } from "@/hooks/useNavigate";
+import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowService } from "@/services/sal-service";
 import { useAppStore } from "@/store/app-store";
 import type { SalTemplate } from "@/store/template-store";
+import type { DesktopMaterial } from "@/lib/desktopData";
+import { updateDesktopMaterial } from "@/lib/desktopData";
 import { SalComparisonView } from "./components/SalComparisonView";
 import {
   AccountingRows,
@@ -83,12 +88,15 @@ type SalFormState = {
   economicRules: SalEconomicRules;
   salTitle: string;
   phase: SalWorkflowPhase;
+  materialUsage: Record<string, number>;
+  materials: DesktopMaterial[];
 };
 type SalFormAction =
   | { type: "LINES"; lines: SalLineDraft[] }
   | { type: "ECONOMIC_RULES"; economicRules: SalEconomicRules }
   | { type: "SAL_TITLE"; salTitle: string }
   | { type: "PHASE"; phase: SalWorkflowPhase }
+  | { type: "MATERIAL_USAGE"; materialUsage: Record<string, number> }
   | { type: "ALL"; partial: Partial<SalFormState> };
 
 function salFormReducer(state: SalFormState, action: SalFormAction): SalFormState {
@@ -101,6 +109,8 @@ function salFormReducer(state: SalFormState, action: SalFormAction): SalFormStat
       return { ...state, salTitle: action.salTitle };
     case "PHASE":
       return { ...state, phase: action.phase };
+    case "MATERIAL_USAGE":
+      return { ...state, materialUsage: action.materialUsage };
     case "ALL":
       return { ...state, ...action.partial };
   }
@@ -124,10 +134,12 @@ export function SalCreationScreen() {
     economicRules: defaultSalEconomicRules,
     salTitle: "",
     phase: "context",
+    materialUsage: {},
+    materials: [],
   });
   const formStateRef = useRef(formState);
   formStateRef.current = formState;
-  const { lines, economicRules, salTitle, phase } = formState;
+  const { lines, economicRules, materialUsage, materials, salTitle, phase } = formState;
 
   const setLines = useCallback(
     (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => {
@@ -196,6 +208,8 @@ export function SalCreationScreen() {
         partial: {
           lines: draft.lines,
           economicRules: draft.economicRules,
+          materialUsage: draft.materialUsage ?? {},
+          materials: (draft.materials ?? []) as DesktopMaterial[],
           salTitle: draft.salTitle || draftSal?.title || project.salTitle,
           phase: draft.phase,
         },
@@ -309,6 +323,7 @@ export function SalCreationScreen() {
             factor3: 1,
             notes: "",
             quantity: l.quantity,
+            sourceType: "voice",
             surchargePercent: l.surcharge === "night" ? 25 : l.surcharge === "day" ? 10 : 0,
             voice,
           });
@@ -333,6 +348,7 @@ export function SalCreationScreen() {
             factor3: 1,
             notes: "",
             quantity: 1,
+            sourceType: "voice",
             surchargePercent: 0,
             voice,
           },
@@ -436,6 +452,7 @@ export function SalCreationScreen() {
           factor3: entry.factor3,
           notes: "",
           quantity: entry.factor1 * entry.factor2 * entry.factor3,
+          sourceType: "voice",
           surchargePercent: entry.surchargePercent,
           voice,
         });
@@ -519,6 +536,19 @@ export function SalCreationScreen() {
       year: data.selectedTariffBook?.year ?? 2026,
     });
 
+    const materialUsagePayload = Object.entries(materialUsage)
+      .filter(([_, qty]) => qty > 0)
+      .map(([materialId, qty]) => {
+        const mat = materials.find((m) => m.id === materialId);
+        return {
+          materialId,
+          code: mat?.code ?? materialId,
+          description: mat?.description ?? materialId,
+          unit: mat?.unit ?? "",
+          quantity: qty,
+        };
+      });
+
     const finalSalPayload = {
       date: new Date().toISOString().slice(0, 10),
       description: "Periodo corrente",
@@ -532,6 +562,7 @@ export function SalCreationScreen() {
       projectId: data.project.id,
       title: salTitle.trim() || data.project.salTitle,
       total: summary.total,
+      ...(materialUsagePayload.length > 0 ? { materialUsage: materialUsagePayload } : {}),
       voices: lineViews.map((l) => ({
         category: l.voice.category,
         code: l.voice.code,
@@ -551,6 +582,26 @@ export function SalCreationScreen() {
       createSal(finalSalPayload);
     }
 
+    // Deduct materials from inventory on SAL confirmation
+    for (const mu of materialUsagePayload) {
+      const mat = materials.find((m) => m.id === mu.materialId);
+      if (mat) {
+        updateDesktopMaterial(mu.materialId, {
+          id: mat.id,
+          code: mat.code,
+          description: mat.description,
+          category: mat.category,
+          unit: mat.unit,
+          quantity: Math.max(0, mat.quantity - mu.quantity),
+          minQuantity: mat.minQuantity,
+          notes: mat.notes,
+        });
+      }
+    }
+    if (materialUsagePayload.length > 0) {
+      dispatchDataChanged();
+    }
+
     setCreatedSalTitle(salTitle.trim() || data.project.salTitle);
     clearSalCreationDraft(data.project.id);
     if (editingDraftSalId.current) {
@@ -565,6 +616,41 @@ export function SalCreationScreen() {
     });
   }
 
+  const persistDraftSilent = useCallback(() => {
+    const project = data.project;
+    const pid = project?.id;
+    if (!project || !pid) return;
+    saveSalCreationDraft(pid, {
+      economicRules,
+      lines,
+      materialUsage,
+      materials: materials.map((m: DesktopMaterial) => ({
+        id: m.id,
+        code: m.code,
+        description: m.description,
+        unit: m.unit,
+      })),
+      phase,
+      salTitle,
+      selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
+    });
+  }, [
+    economicRules,
+    lines,
+    materialUsage,
+    materials,
+    phase,
+    salTitle,
+    data.project,
+    data.selectedTariffBooks,
+  ]);
+
+  const debounceAutoSave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleAutoSave = useCallback(() => {
+    if (debounceAutoSave.current) clearTimeout(debounceAutoSave.current);
+    debounceAutoSave.current = setTimeout(persistDraftSilent, 800);
+  }, [persistDraftSilent]);
+
   const handleSaveDraft = useCallback(() => {
     const project = data.project;
     const pid = project?.id;
@@ -572,6 +658,13 @@ export function SalCreationScreen() {
     saveSalCreationDraft(pid, {
       economicRules,
       lines,
+      materialUsage,
+      materials: materials.map((m) => ({
+        id: m.id,
+        code: m.code,
+        description: m.description,
+        unit: m.unit,
+      })),
       phase,
       salTitle,
       selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
@@ -584,6 +677,18 @@ export function SalCreationScreen() {
       name: project.title,
       year: data.selectedTariffBook?.year ?? 2026,
     });
+    const draftMaterialUsage = Object.entries(materialUsage)
+      .filter(([_, qty]) => qty > 0)
+      .map(([mid, qty]) => {
+        const mat = materials.find((m) => m.id === mid);
+        return {
+          materialId: mid,
+          code: mat?.code ?? mid,
+          description: mat?.description ?? "",
+          unit: mat?.unit ?? "",
+          quantity: qty,
+        };
+      });
     const draftPayload = {
       date: new Date().toISOString().slice(0, 10),
       description: salTitle.trim() || project.salTitle,
@@ -598,6 +703,7 @@ export function SalCreationScreen() {
       status: "draft" as const,
       title: salTitle.trim() || project.salTitle,
       total: summary.total,
+      ...(draftMaterialUsage.length > 0 ? { materialUsage: draftMaterialUsage } : {}),
       voices: lineViews.map((l) => ({
         category: l.voice.category,
         code: l.voice.code,
@@ -618,11 +724,21 @@ export function SalCreationScreen() {
       saveSalCreationDraftBySalId(draftSalId, {
         economicRules,
         lines,
+        materialUsage,
+        materials: materials.map((m) => ({
+          id: m.id,
+          code: m.code,
+          description: m.description,
+          unit: m.unit,
+        })),
         phase,
         salTitle: salTitle.trim() || project.salTitle,
         selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
       });
     }
+    // Materials are NOT deducted on draft save — only on final SAL confirmation.
+    // This avoids double-deduction when saving draft then confirming.
+
     notify({
       message: "Bozza salvata. La trovi nel registro SAL del progetto.",
       title: "Bozza salvata",
@@ -643,6 +759,8 @@ export function SalCreationScreen() {
     data.selectedTariffBook,
     economicRules,
     lines,
+    materialUsage,
+    materials,
     phase,
     salTitle,
     notify,
@@ -732,7 +850,14 @@ export function SalCreationScreen() {
             handlePasteLine={handlePasteLine}
             lineViews={lineViews}
             lines={lines}
+            materialUsage={materialUsage}
+            materials={materials}
             notify={notify}
+            onAutoSave={handleAutoSave}
+            onMaterialUsageChange={(usage) =>
+              dispatch({ type: "MATERIAL_USAGE", materialUsage: usage })
+            }
+            onMaterialsChange={(mats) => dispatch({ type: "ALL", partial: { materials: mats } })}
             onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
             previousSalLines={previousSalLines}
             removeLine={removeLine}
@@ -789,7 +914,12 @@ function SalEditorContent({
   handlePasteLine,
   lineViews,
   lines,
+  materialUsage,
+  materials,
   notify,
+  onAutoSave,
+  onMaterialUsageChange,
+  onMaterialsChange,
   onToggleCompare,
   previousSalLines,
   phase,
@@ -823,7 +953,12 @@ function SalEditorContent({
   handlePasteLine: (d: SalLineDraft) => void;
   lineViews: SalLineView[];
   lines: SalLineDraft[];
+  materialUsage: Record<string, number>;
+  materials: DesktopMaterial[];
   notify: ReturnType<typeof useToast>["notify"];
+  onAutoSave: () => void;
+  onMaterialUsageChange: (usage: Record<string, number>) => void;
+  onMaterialsChange: (mats: DesktopMaterial[]) => void;
   onToggleCompare: () => void;
   previousSalLines: SalLineView[];
   phase: SalWorkflowPhase;
@@ -895,6 +1030,11 @@ function SalEditorContent({
           checks={checks}
           economicRules={economicRules}
           lineViews={lineViews}
+          materialUsage={materialUsage}
+          materials={materials}
+          onAutoSave={onAutoSave}
+          onMaterialUsageChange={onMaterialUsageChange}
+          onMaterialsChange={onMaterialsChange}
           onPrimary={goPrimary}
           summary={summary}
           previousSalLines={previousSalLines}
@@ -906,6 +1046,7 @@ function SalEditorContent({
         <ConfirmStep
           economicRules={economicRules}
           lineViews={lineViews}
+          materialUsage={materialUsage}
           onPrimary={goPrimary}
           summary={summary}
         />
@@ -1010,7 +1151,7 @@ function SetupStep({
                   type="button"
                   aria-label="Chiudi"
                 />
-                <div className="absolute left-0 top-full z-50 mt-1.5 w-full min-w-[300px] overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]">
+                <div className="absolute left-0 top-full z-50 mt-1.5 w-full min-w-[300px] overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
                   {contracts.map((c) => {
                     const isActive = c.id === project.id;
                     return (
@@ -1032,7 +1173,7 @@ function SetupStep({
                           className={cn(
                             "flex size-9 shrink-0 items-center justify-center rounded-10px",
                             isActive
-                              ? "bg-[var(--accent-primary)] text-white"
+                              ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
                               : "bg-[var(--info-soft)] text-[var(--info-base)]",
                           )}
                         >
@@ -1047,7 +1188,7 @@ function SetupStep({
                           </div>
                         </div>
                         {isActive && (
-                          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-white">
+                          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[var(--text-inverse)]">
                             <Check className="size-3.5" strokeWidth={3} />
                           </span>
                         )}
@@ -1168,7 +1309,7 @@ function SetupStep({
 
       <div className="flex items-center justify-end">
         <m.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
@@ -1337,6 +1478,7 @@ function VoicesStep({
         factor3: line.factor3,
         notes: "",
         quantity: line.quantity,
+        sourceType: line.sourceType,
         surchargePercent: line.surchargePercent,
         voice: line.voice,
       });
@@ -1368,6 +1510,7 @@ function VoicesStep({
           factor3: line.factor3,
           notes: "",
           quantity: line.quantity,
+          sourceType: line.sourceType,
           surchargePercent: line.surchargePercent,
           voice: line.voice,
         });
@@ -1450,6 +1593,7 @@ function VoicesStep({
                         factor3: 1,
                         notes: "",
                         quantity: 1,
+                        sourceType: "voice",
                         surchargePercent: 0,
                         voice: v,
                       });
@@ -1512,7 +1656,7 @@ function VoicesStep({
           )}
         </div>
         <m.button
-          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-5 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-5 text-12px font-bold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
@@ -1528,6 +1672,11 @@ function ReviewStep({
   checks,
   economicRules,
   lineViews,
+  materialUsage,
+  materials,
+  onAutoSave,
+  onMaterialUsageChange,
+  onMaterialsChange,
   onPrimary,
   summary,
   previousSalLines,
@@ -1537,12 +1686,34 @@ function ReviewStep({
   checks: ReturnType<typeof buildVerificationChecks>;
   economicRules: SalEconomicRules;
   lineViews: SalLineView[];
+  materialUsage: Record<string, number>;
+  materials: DesktopMaterial[];
+  onAutoSave: () => void;
+  onMaterialUsageChange: (usage: Record<string, number>) => void;
+  onMaterialsChange: (mats: DesktopMaterial[]) => void;
   onPrimary: () => void;
   summary: SalEconomicSummary;
   previousSalLines: SalLineView[];
   compareLines: SalLineView[] | null;
   onToggleCompare: () => void;
 }) {
+  const [isMaterialPanelOpen, setIsMaterialPanelOpen] = useState(false);
+  const [isSearchingMaterials, setIsSearchingMaterials] = useState(false);
+
+  useEffect(() => {
+    if (!isMaterialPanelOpen) return;
+    setIsSearchingMaterials(true);
+    import("@/lib/desktopData").then(({ listDesktopMaterials }) =>
+      listDesktopMaterials([]).then((res) => {
+        onMaterialsChange(res.data);
+        setIsSearchingMaterials(false);
+      }),
+    );
+  }, [isMaterialPanelOpen, onMaterialsChange]);
+
+  const usageCount = Object.values(materialUsage).filter((q) => q > 0).length;
+  const usageTotalQty = Object.values(materialUsage).reduce((a, b) => a + b, 0);
+
   return (
     <div className="space-y-3">
       {/* Checks + compare button */}
@@ -1564,7 +1735,7 @@ function ReviewStep({
               "shrink-0 inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-12px font-semibold ring-1 transition-colors",
               compareLines
                 ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] ring-[var(--accent-primary)]/30 hover:bg-[var(--accent-primary)]/20"
-                : "bg-[var(--accent-primary)] text-white ring-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90 shadow-sm",
+                : "bg-[var(--accent-primary)] text-[var(--text-inverse)] ring-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90 shadow-sm",
             )}
             onClick={onToggleCompare}
             type="button"
@@ -1576,6 +1747,119 @@ function ReviewStep({
       </div>
 
       {compareLines && <SalComparisonView before={previousSalLines} after={lineViews} />}
+
+      {/* ── Materiali in cantiere ── */}
+      <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
+        <div className="flex items-center justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Package className="size-4 text-[var(--text-secondary)]" />
+            <div>
+              <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                Materiali in cantiere
+              </div>
+              {usageCount > 0 && (
+                <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
+                  {usageCount} material{usageCount !== 1 ? "i" : "e"} ·{" "}
+                  {usageTotalQty.toLocaleString("it-IT")} unità
+                </div>
+              )}
+            </div>
+          </div>
+          <m.button
+            className={cn(
+              "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-11px font-semibold transition-colors",
+              isMaterialPanelOpen
+                ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+            )}
+            onClick={() => setIsMaterialPanelOpen((o) => !o)}
+            type="button"
+          >
+            <Package className="size-3.5" />
+            {isMaterialPanelOpen ? "Chiudi" : "Registra materiali"}
+          </m.button>
+        </div>
+        {isMaterialPanelOpen && (
+          <div className="border-t border-[var(--border-subtle)]/50">
+            <div className="max-h-[300px] overflow-y-auto">
+              {materials.length === 0 ? (
+                <div className="flex items-center justify-center px-4 py-8 text-13px text-[var(--text-secondary)]">
+                  {isSearchingMaterials
+                    ? "Caricamento materiali..."
+                    : "Nessun materiale disponibile."}
+                </div>
+              ) : (
+                materials.map((mat) => {
+                  const available = mat.quantity ?? 0;
+                  const used = materialUsage[mat.id] ?? 0;
+                  const coverage =
+                    available > 0
+                      ? Math.min(100, Math.round(((available - used) / available) * 100))
+                      : 0;
+                  const tone = severityToneForPercentage(100 - coverage);
+                  return (
+                    <div
+                      className="flex items-center gap-3 border-b border-[var(--border-subtle)]/30 px-4 py-3 last:border-b-0"
+                      key={mat.id}
+                    >
+                      <div className="min-w-0 flex-[2]">
+                        <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
+                          {mat.code} — {mat.description}
+                        </div>
+                        <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
+                          {mat.category} · {mat.unit} · disp. {available.toLocaleString("it-IT")}
+                        </div>
+                        {available > 0 && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <SeverityBar
+                              percentage={coverage}
+                              tone={tone}
+                              className="h-1.5 flex-1"
+                            />
+                            <span
+                              className={cn(
+                                "w-10 text-right text-10px font-bold tabular-nums",
+                                tone === "danger" && "text-[var(--danger-base)]",
+                                tone === "warning" && "text-[var(--warning-base)]",
+                                tone === "success" && "text-[var(--success-base)]",
+                              )}
+                            >
+                              {coverage}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-11px text-[var(--text-secondary)]">Qtà usata</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            className="h-8 w-20 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-right text-12px font-semibold outline-none transition focus:border-[var(--accent-primary)]"
+                            min={0}
+                            onBlur={onAutoSave}
+                            onChange={(e) => {
+                              const qty = Math.max(
+                                0,
+                                Number.parseFloat(e.target.value.replace(",", ".")) || 0,
+                              );
+                              onMaterialUsageChange({ ...materialUsage, [mat.id]: qty });
+                            }}
+                            placeholder="0"
+                            type="number"
+                            value={materialUsage[mat.id] ?? ""}
+                          />
+                          <span className="w-8 text-11px text-[var(--text-secondary)]">
+                            {mat.unit}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
         <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
@@ -1627,7 +1911,7 @@ function ReviewStep({
       </details>
       <div className="flex justify-end">
         <m.button
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
@@ -1642,14 +1926,18 @@ function ReviewStep({
 function ConfirmStep({
   economicRules,
   lineViews,
+  materialUsage,
   onPrimary,
   summary,
 }: {
   economicRules: SalEconomicRules;
   lineViews: SalLineView[];
+  materialUsage: Record<string, number>;
   onPrimary: () => void;
   summary: SalEconomicSummary;
 }) {
+  const usageCount = Object.values(materialUsage).filter((q) => q > 0).length;
+  const usageTotalQty = Object.values(materialUsage).reduce((a, b) => a + b, 0);
   return (
     <div className="space-y-3">
       <FeedbackBanner
@@ -1657,6 +1945,19 @@ function ConfirmStep({
         title="Pronta per conferma"
         tone="success"
       />
+      {usageCount > 0 ? (
+        <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/60">
+          <Package className="size-4 text-[var(--text-secondary)]" />
+          <span className="text-13px font-medium text-[var(--text-primary)]">
+            {usageCount} material{usageCount !== 1 ? "i" : "e"} tracciat
+            {usageCount !== 1 ? "i" : "o"}
+          </span>
+          <span className="text-[var(--border-subtle)]">·</span>
+          <span className="text-12px text-[var(--text-secondary)]">
+            {usageTotalQty.toLocaleString("it-IT")} unità totali
+          </span>
+        </div>
+      ) : null}
       <div className="responsive-grid-elastic gap-3">
         <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
           <div className="text-10px font-semibold uppercase tracking-caption text-[var(--text-secondary)]">
@@ -1724,7 +2025,7 @@ function ConfirmStep({
       </div>
       <div className="flex justify-end">
         <m.button
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
@@ -1774,7 +2075,7 @@ function CompletedView({
           Chiudi
         </m.button>
         <m.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-12px font-bold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onNew}
           type="button"
         >

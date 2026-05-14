@@ -1,9 +1,11 @@
-import type { SalDocument } from "./sal-workflow";
 import type { SalEconomicRules, SalLineDraft, SalVoiceDraft } from "../types";
+import type { SalDocument } from "./sal-workflow";
 
 type SalCreationDraft = {
   economicRules: SalEconomicRules;
   lines: SalLineDraft[];
+  materialUsage: Record<string, number>;
+  materials: { code: string; description: string; id: string; unit: string }[];
   phase: "context" | "voices" | "review" | "confirm" | "completed";
   projectId: string;
   salTitle: string;
@@ -79,6 +81,7 @@ export function lineDraftsFromStoredSal(
         factor3: 1,
         notes: "",
         quantity: line.quantity,
+        sourceType: "voice",
         surchargePercent: line.surcharge === "night" ? 20 : line.surcharge === "day" ? 10 : 0,
         voice,
       },

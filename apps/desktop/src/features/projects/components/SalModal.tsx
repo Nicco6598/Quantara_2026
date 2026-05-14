@@ -6,6 +6,8 @@ import { Button } from "@/components/shared/Button";
 import { Dialog } from "@/components/shared/Dialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { cn } from "@/lib/utils";
+import { dispatchDataChanged } from "@/lib/sync-events";
+import { restoreMaterialsFromSalUsage } from "@/lib/desktopData";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import type { RecentSalItem } from "../types";
 
@@ -57,8 +59,13 @@ export function SalModal({
     [tariffVoices],
   );
 
-  function handleDelete(salId: string) {
+  async function handleDelete(salId: string) {
+    const doc = useSalWorkflowStore.getState().salDocuments.find((d) => d.id === salId);
+    if (doc?.materialUsage) {
+      await restoreMaterialsFromSalUsage(doc.materialUsage);
+    }
     deleteSal(salId);
+    dispatchDataChanged();
     setDeletingSal(null);
     notify({
       message: "SAL eliminata",

@@ -22,20 +22,17 @@ import {
 } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { ContextToolbar } from "@/components/shared/ContextToolbar";
-import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-
-import { useToast } from "@/components/shared/ToastProvider";
-import { StatusPill } from "@/components/shared/StatusPill";
-
 import { Button } from "@/components/shared/Button";
+import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
+import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { StatusPill } from "@/components/shared/StatusPill";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
-
-import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { PortfolioProject } from "@/features/projects/types";
+import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useNavigate } from "@/hooks/useNavigate";
@@ -44,10 +41,12 @@ import {
   type DesktopTariffBook,
   listDesktopContracts,
   listDesktopTariffBooks,
+  restoreMaterialsFromSalUsage,
   updateDesktopContract,
 } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
 import { readStringRecord } from "@/lib/shared-utils";
+import { dispatchDataChanged } from "@/lib/sync-events";
 
 import { cn } from "@/lib/utils";
 
@@ -62,6 +61,7 @@ import {
   buildProjectTeam,
   buildRecentActivities,
 } from "./domain/project-detail-model";
+
 type ProjectState = {
   contracts: DesktopContract[];
   tariffBooks: DesktopTariffBook[];
@@ -305,9 +305,13 @@ export function ProjectDetailScreen() {
   }
 
   const handleDeleteSal = useCallback(
-    (salId: string) => {
-      const sal = salDocumentById.get(salId);
+    async (salId: string) => {
+      const sal = salDocuments.find((d) => d.id === salId);
+      if (sal?.materialUsage) {
+        await restoreMaterialsFromSalUsage(sal.materialUsage);
+      }
       deleteSal(salId);
+      dispatchDataChanged();
       setDeleteTargetId(null);
       notify({
         message: `"${sal?.title ?? salId}" eliminato dal registro locale.`,
@@ -315,7 +319,7 @@ export function ProjectDetailScreen() {
         tone: "success",
       });
     },
-    [deleteSal, notify, salDocumentById],
+    [deleteSal, notify, salDocuments],
   );
 
   const handleSaveTariffBooks = useCallback(
@@ -359,6 +363,7 @@ export function ProjectDetailScreen() {
     (salId: string, status: "in-review" | "approved" | "closed") => {
       const sal = salDocumentById.get(salId);
       setSalStatus(salId, status);
+      dispatchDataChanged();
       notify({
         message:
           status === "in-review"
@@ -631,14 +636,18 @@ export function ProjectDetailScreen() {
                   },
                   {
                     ...ContextToolbar.actions.delete,
-                    run: () => {
+                    run: async () => {
                       const ids = [...useSelectionStore.getState().ids];
                       const count = ids.length;
-                      ids.forEach((id) => {
+                      for (const id of ids) {
                         const sal = salDocuments.find((d) => d.id === id);
+                        if (sal?.materialUsage) {
+                          await restoreMaterialsFromSalUsage(sal.materialUsage);
+                        }
                         if (sal) deleteSal(sal.id);
-                      });
+                      }
                       useSelectionStore.getState().clear();
+                      dispatchDataChanged();
                       notify({
                         message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
                         title: "Eliminate",
@@ -1130,7 +1139,7 @@ function SalCard({
           {isSelected && (
             <svg
               aria-label="Selezionato"
-              className="size-2.5 text-white"
+              className="size-2.5 text-[var(--text-inverse)]"
               fill="none"
               viewBox="0 0 12 12"
             >
@@ -1340,7 +1349,7 @@ function TariffPanelDialog({
                     className={cn(
                       "flex size-5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
                       isSelected
-                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]"
                         : "border-[var(--border-subtle)]",
                     )}
                   >

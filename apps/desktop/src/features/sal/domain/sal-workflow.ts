@@ -83,6 +83,7 @@ function buildSalDocumentViewWithVoiceMap(
         factor3: 1,
         notes: "",
         quantity: line.quantity,
+        sourceType: "voice",
         surchargePercent: line.surchargePercent ?? getSurchargePercent(line.surcharge),
         voice: {
           category: voice.category,

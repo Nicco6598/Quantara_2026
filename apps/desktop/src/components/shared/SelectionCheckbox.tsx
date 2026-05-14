@@ -16,7 +16,7 @@ export function SelectionCheckbox({ checked, id, onToggle, className }: Selectio
       className={cn(
         "flex size-5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
         checked
-          ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+          ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]"
           : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/60",
         className,
       )}
@@ -67,7 +67,7 @@ export function SelectAllCheckbox({
       className={cn(
         "flex size-5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
         allSelected
-          ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+          ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]"
           : someSelected
             ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/20 text-[var(--accent-primary)]"
             : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/60",

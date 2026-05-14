@@ -1,10 +1,9 @@
 import { m } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { useMemo } from "react";
+import { Currency } from "@/components/shared/Currency";
 import { MOTION_VARIANTS } from "@/components/shared/easings";
 import type { PortfolioProject } from "@/features/projects/types";
-
-import { Currency } from "@/components/shared/Currency";
 
 import type { SalDocument } from "@/features/sal/domain/sal-workflow";
 
@@ -87,12 +86,14 @@ function TimelineDot({ event, index }: { event: TimelineEvent; index: number }) 
         )}
       >
         {event.status === "completed" ? (
-          <CheckCircle2 className="size-3 text-white" />
+          <CheckCircle2 className="size-3 text-[var(--text-inverse)]" />
         ) : (
           <Icon
             className={cn(
               "size-3",
-              event.status === "overdue" ? "text-white" : "text-[var(--text-secondary)]",
+              event.status === "overdue"
+                ? "text-[var(--text-inverse)]"
+                : "text-[var(--text-secondary)]",
             )}
           />
         )}

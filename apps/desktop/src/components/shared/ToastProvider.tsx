@@ -9,7 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { MOTION_DURATION, SPRING_EASE } from "@/components/shared/easings";
 import { cn } from "@/lib/utils";
 
 type ToastTone = "info" | "success" | "warning" | "danger";
@@ -198,11 +198,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <m.div
               className={cn(
-                "pointer-events-auto rounded-18px bg-[var(--surface-base)] p-3.5 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.15),inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 backdrop-blur-md",
+                "pointer-events-auto rounded-18px bg-[var(--surface-base)] p-3.5 shadow-soft inset-shadow-[0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 backdrop-blur-md",
                 toneBorder[toast.tone],
               )}
               initial={{ opacity: 0, y: 20, scale: 0.94 }}
-              transition={{ duration: 0.5, ease: SPRING_EASE }}
+              transition={{ duration: MOTION_DURATION.reveal, ease: SPRING_EASE }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.94 }}
               key={toast.id}

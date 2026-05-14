@@ -11,12 +11,12 @@ import {
   useState,
   useTransition,
 } from "react";
+import { Button } from "@/components/shared/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
-import { useToast } from "@/components/shared/ToastProvider";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { Button } from "@/components/shared/Button";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { useToast } from "@/components/shared/ToastProvider";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
 import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
 import { useProjectMigration } from "@/features/projects/hooks/useProjectMigration";
@@ -384,7 +384,7 @@ export function ProjectsScreen() {
     portfolioMetrics;
 
   return (
-    <ScreenLayout gradient="accent" gradientHeight={460} className="premium-page">
+    <ScreenLayout gradient="accent" gradientHeight={460}>
       <ErrorBoundary resetKey={`projects-workspace:${selectedContractorId ?? "root"}`}>
         {selectedContractor ? (
           <ContractorDetailView

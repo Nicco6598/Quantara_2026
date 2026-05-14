@@ -1,3 +1,4 @@
+import type { Icon } from "@phosphor-icons/react";
 import {
   ArrowsClockwise,
   BellRinging,
@@ -7,19 +8,16 @@ import {
   FloppyDisk,
   GitBranch,
   MagicWand,
-  Moon,
   Palette,
   ShieldCheck,
   Sparkle,
-  Sun,
   Trash,
   WaveSine,
 } from "@phosphor-icons/react";
-import type { Icon } from "@phosphor-icons/react";
 import { m } from "framer-motion";
 import { useCallback, useEffect, useReducer, useState } from "react";
-import { ScreenHero } from "@/components/shared/ScreenHero";
 import { Button } from "@/components/shared/Button";
+import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { APP_VERSION } from "@/generated/appVersion";
@@ -103,7 +101,14 @@ function ClientDate({ timestamp }: { timestamp: string }) {
 // ── Card sub-components ──────────────────────────────────
 
 function ThemeCard() {
-  const { setThemeMode, themeMode } = useThemeState();
+  const {
+    setThemeMode,
+    themeMode,
+    lightThemePref,
+    darkThemePref,
+    setLightThemePref,
+    setDarkThemePref,
+  } = useThemeState();
   return (
     <BezelSurface innerClassName="p-5">
       <div className="flex items-center gap-3">
@@ -120,21 +125,188 @@ function ThemeCard() {
       <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
         Trattamento cromatico della shell.
       </p>
-      <div className="mt-4 grid gap-2">
-        <ThemeOption
-          active={themeMode === "light"}
-          description="Superfici chiare"
-          icon={Sun}
-          label="Chiaro"
-          onClick={() => setThemeMode("light")}
-        />
-        <ThemeOption
-          active={themeMode === "dark"}
-          description="Superfici scure"
-          icon={Moon}
-          label="Scuro"
-          onClick={() => setThemeMode("dark")}
-        />
+
+      <div className="mt-4">
+        <div className="mb-3 text-13px font-semibold text-[var(--text-primary)]">
+          Tema chiaro preferito
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            {
+              id: "light" as const,
+              label: "Naturale",
+              desc: "Neutro predefinito",
+              previewAccent: "#3b7dd8",
+            },
+            {
+              id: "light-warm" as const,
+              label: "Caldo",
+              desc: "Terra e ambra",
+              previewAccent: "#c97a28",
+            },
+            {
+              id: "light-cool" as const,
+              label: "Freddo",
+              desc: "Teal minimal",
+              previewAccent: "#2a9a8a",
+            },
+            {
+              id: "light-soft" as const,
+              label: "Soft",
+              desc: "Rosa pastello",
+              previewAccent: "#c87a9a",
+            },
+          ].map((t) => (
+            <button
+              className={cn(
+                "flex flex-col items-center gap-2 rounded-2xl border-2 p-4 text-left transition-all min-w-[160px]",
+                lightThemePref === t.id
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5"
+                  : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40",
+              )}
+              key={t.id}
+              onClick={() => {
+                setLightThemePref(t.id);
+                if (themeMode.startsWith("light")) setThemeMode(t.id);
+              }}
+              type="button"
+            >
+              <div className="w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm">
+                <div className="h-2" style={{ backgroundColor: t.previewAccent }} />
+                <div className="p-3">
+                  <div className="mb-2 flex justify-between">
+                    <div className="h-2 w-12 rounded bg-[var(--text-tertiary)]/40" />
+                    <div
+                      className="size-2 rounded-full"
+                      style={{ backgroundColor: t.previewAccent }}
+                    />
+                  </div>
+                  <div className="mb-1.5 h-2.5 w-3/4 rounded bg-[var(--text-primary)]/60" />
+                  <div className="mb-3 h-2 w-1/2 rounded bg-[var(--text-secondary)]/40" />
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="h-5 flex-1 rounded-md"
+                      style={{ backgroundColor: t.previewAccent }}
+                    />
+                    <div className="h-5 w-5 rounded-md border border-[var(--border-subtle)]" />
+                  </div>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-13px font-bold text-[var(--text-primary)]">{t.label}</div>
+                <div className="text-11px text-[var(--text-secondary)]">{t.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6 mb-3 text-13px font-semibold text-[var(--text-primary)]">
+          Tema scuro preferito
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            {
+              id: "dark" as const,
+              label: "Notte",
+              desc: "Blu navy scuro",
+              previewAccent: "#4a8ae0",
+              previewBg: "#0e1017",
+              previewCard: "#161822",
+              previewTextPri: "#e6e8ef",
+              previewTextSec: "#9ba0b0",
+              previewBorder: "#282a36",
+            },
+            {
+              id: "dark-amber" as const,
+              label: "Ambra",
+              desc: "Carbon caldo",
+              previewAccent: "#d4903a",
+              previewBg: "#12100c",
+              previewCard: "#1c1a16",
+              previewTextPri: "#e8e4de",
+              previewTextSec: "#9a948a",
+              previewBorder: "#2a2824",
+            },
+            {
+              id: "dark-midnight" as const,
+              label: "Midnight",
+              desc: "Viola profondo",
+              previewAccent: "#7c6ac8",
+              previewBg: "#0c0b14",
+              previewCard: "#141320",
+              previewTextPri: "#e4e2ee",
+              previewTextSec: "#9490b0",
+              previewBorder: "#24223a",
+            },
+            {
+              id: "dark-forest" as const,
+              label: "Foresta",
+              desc: "Verde scuro naturale",
+              previewAccent: "#4aaa6a",
+              previewBg: "#0c100e",
+              previewCard: "#141c18",
+              previewTextPri: "#e0e8e4",
+              previewTextSec: "#8a9a94",
+              previewBorder: "#222a26",
+            },
+          ].map((t) => (
+            <button
+              className={cn(
+                "flex flex-col items-center gap-2 rounded-2xl border-2 p-4 text-left transition-all min-w-[160px]",
+                darkThemePref === t.id
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5"
+                  : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40",
+              )}
+              key={t.id}
+              onClick={() => {
+                setDarkThemePref(t.id);
+                if (themeMode.startsWith("dark")) setThemeMode(t.id);
+              }}
+              type="button"
+            >
+              <div
+                className="w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] shadow-sm"
+                style={{ backgroundColor: t.previewBg }}
+              >
+                <div className="h-2" style={{ backgroundColor: t.previewAccent }} />
+                <div className="p-3" style={{ backgroundColor: t.previewCard }}>
+                  <div className="mb-2 flex justify-between">
+                    <div
+                      className="h-2 w-12 rounded"
+                      style={{ backgroundColor: t.previewTextSec }}
+                    />
+                    <div
+                      className="size-2 rounded-full"
+                      style={{ backgroundColor: t.previewAccent }}
+                    />
+                  </div>
+                  <div
+                    className="mb-1.5 h-2.5 w-3/4 rounded"
+                    style={{ backgroundColor: t.previewTextPri }}
+                  />
+                  <div
+                    className="mb-3 h-2 w-1/2 rounded"
+                    style={{ backgroundColor: t.previewTextSec }}
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="h-5 flex-1 rounded-md"
+                      style={{ backgroundColor: t.previewAccent }}
+                    />
+                    <div
+                      className="h-5 w-5 rounded-md border"
+                      style={{ borderColor: t.previewBorder }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-13px font-bold text-[var(--text-primary)]">{t.label}</div>
+                <div className="text-11px text-[var(--text-secondary)]">{t.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </BezelSurface>
   );
@@ -792,7 +964,7 @@ function ToggleRow({
       >
         <m.span
           animate={{ x: checked ? 20 : 0 }}
-          className="block size-5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.12)]"
+          className="block size-5 rounded-full bg-[var(--surface-raised)] shadow-soft"
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         />
       </m.button>

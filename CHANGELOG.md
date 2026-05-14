@@ -4,43 +4,39 @@ All notable changes to Quantara follow SemVer.
 
 ## 0.3.0 — 2026-05-14
 
-### Design system unificato
+### Materiali in magazzino
 
-- **Button system unico** — `ProjectControlButton` e `Button` unificati in un unico componente con varianti `primary`, `secondary` (stile Invia invito), `destructive` (nuovo), `ghost`, `outline`, `icon`. Rimosse 111 occorrenze del vecchio `ProjectControlButton`.
-- **Dialog primitiva** — nuovo componente `Dialog` con overlay, z-index, backdrop e animazione standardizzati. `ConfirmDialog`, `DeleteConfirmDialog`, `TariffPanelDialog`, `SaveAsTemplateDialog` e `ContractorModal` ora lo usano tutti.
-- **FilterChip, Pagination, SelectionCheckbox** — nuovi componenti condivisi per tabs filtro, paginazione e selezione. Sostituiti in MaterialsScreen, TariffsScreen e TeamScreen.
-- **ScreenLayout** — wrapper pagina con gradienti unificati. Rimosse 8 copie identiche di `pointer-events-none absolute ... bg-[radial-gradient(...)]`.
-- **ContextToolbar rinnovata** — badge più grande, layout migliorato, coerenza tra tutte le view.
+- **Nuovo cruscotto materiali** — ogni materiale mostra quanto ne hai in stock, quanto è impegnato in SAL (bozze e conferme) e, se scende sotto la soglia minima, la barra diventa rossa.
+- **Si scalano dall'inventario** — quando confermi una SAL, i materiali che hai usato vengono scalati automaticamente. Se cancelli la SAL, tornano disponibili. Le bozze non scalano nulla per evitare errori.
+- **Badge materiali nella sidebar** — il menu laterale ora mostra quanti materiali sono "critici" e "in esaurimento" in tempo reale.
 
-### Coerenza UI e motion
+### 8 temi, non solo chiaro/scuro
 
-- **Motion tokens centralizzati** — aggiunti preset condivisi per `row`, `progress` e `viewSwap`: liste, barre di avanzamento e cambi vista ora usano la stessa direzione verticale e gli stessi timing.
-- **Dashboard più coerente** — normalizzate animazioni, hover, spacing e responsive di metriche, timeline Gantt, azioni prioritarie e lista cantieri operativi.
-- **Modali allineate** — `Dialog` ora usa portal su `document.body`, attributi ARIA, chiusura overlay configurabile e shell riusabile per modali grandi. Uniformate SAL, guida scorciatoie, update dialog, note release, conferme appaltatore, explorer voci tariffarie e delete dialog della preview import.
-- **Rimossi slide incoerenti** — eliminati ingressi laterali discordanti da timeline progetto, tariffari associati, explorer tariffari e liste materiali/tariffari; restano solo hover verticali minimi sugli elementi interattivi.
-- **Preview import più stabile** — apertura modal e conferme interne ora seguono i preset comuni, senza transizioni locali inutili su pulsanti e chip.
+- **4 temi chiari** — Naturale, Caldo, Freddo, Soft.
+- **4 temi scuri** — Notte, Ambra, Midnight, Foresta.
+- **Scegli i tuoi due preferiti** — in Impostazioni scegli il tema chiaro e quello scuro che preferisci, poi alterni con un click dall'alto.
+- **I temi non appesantiscono** — vengono caricati solo quando li selezioni.
 
-### Componenti condivisi estratti
+### Transizioni e aspetto generale
 
-- **MetricCard, EmptyState, QuickAction, SectionHeader, LoadingSkeleton** — estratti in file propri. Rimossi duplicati locali in MaterialsScreen e TariffsScreen. Import aggiornati in ContractorDetailView, ProjectsWorkbench, ControlRailPanel.
+- **Cambio pagina più fluido** — passando da una sezione all'altra la pagina sfuma dolcemente, niente più scatti.
+- **Bottoni più ordinati** — stesso stile in tutta l'app, niente più differenze tra una schermata e l'altra.
+- **Finestre e menu uniformi** — tutte le finestre (conferme, messaggi, aiuti) hanno lo stesso aspetto e si comportano allo stesso modo.
+- **Cruscotto e pannelli coerenti** — dashboard, metriche e timeline hanno animazioni e spaziature allineate.
+- **Selezioni e filtri uguali ovunque** — il click per selezionare, i filtri e la selezione multipla funzionano allo stesso modo in tutte le schermate.
+- **Indicatori e card condivisi** — metriche, sezioni vuote, azioni rapide e scheletri di caricamento sono gli stessi in tutta l'app.
 
-### Materiali — completamente rivisto
+### Cosa abbiamo sistemato
 
-- **Griglia card** — layout passato da `space-y` a `md:grid-cols-2 2xl:grid-cols-3` come TariffsScreen.
-- **Click = selezione** — il click sulla card ora toggola la selezione. Checkbox nascosta, visibile solo in hover.
-- **Seleziona tutti** — link stile AccountingScreen.
-- **Menu 3 puntini** — DropdownMenu con Modifica / Elimina, identico al pattern TariffsScreen.
-- **Modale modifica** — AddMaterialModal ora accetta `material` prop: modifica invece di creare.
-
-### Appaltatori, Progetti, Dettaglio progetto
-
-- **Bottoni** — tutti i `variant="outline"` con testo nero convertiti a `variant="secondary"` (testo accent) o `variant="ghost"`.
-
-### Selezione multipla
-
-- **selection-store esteso** — aggiunto `toggleRange` per selezione Shift+click.
-- **AccountingScreen** — ContextToolbar con azioni Esporta/Elimina reali.
-- **MaterialsScreen** — ContextToolbar + SelectionCheckbox + seleziona tutti.
+- **Campi che non si lasciavano scrivere** — nelle finestre di creazione appaltatore e simili, cliccare sul campo non funzionava perché un pulsante invisibile copriva tutto. Ora si scrive subito.
+- **Materiali fantasma nell'inventario** — la cancellazione multipla materiali (dal menu contestuale) faceva solo finta. Ora elimina davvero.
+- **Stati SAL fermi** — cambiando lo stato di una SAL (es. da "bozza" a "approvata") le altre schermate non lo vedevano. Ora Dashboard e Contabilità si aggiornano subito.
+- **Tariffari silenziosi** — se creavi, modificavi o cancellavi un tariffario, i progetti collegati non lo sapevano. Ora l'app tiene tutto allineato.
+- **Riferimenti a tariffari cancellati** — cancellando un tariffario, i progetti restavano con un riferimento rotto. Ora vengono puliti automaticamente.
+- **Sidebar non aggiornata** — i badge "Critici" e "In esaurimento" accanto a Materiali restavano sempre a zero anche se avevi materiali sotto soglia. Ora mostrano i numeri veri.
+- **Eliminazione progetto dalla Dashboard** — se cancellavi un progetto dalla Dashboard, i dati collegati (SAL, appaltatori) restavano in giro.
+- **Dati non allineati tra schermate** — modificando qualcosa in una pagina, le altre pagine mostravano ancora i vecchi dati finché non ricaricavi. Ora tutto si aggiorna da solo.
+- **Bottoni della titlebar più curati** — hover con leggero sollevamento e bagliore, effetto pressione al click, pulsanti finestra con angoli arrotondati.
 
 ## 0.2.64 — 2026-05-14
 

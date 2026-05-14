@@ -12,14 +12,14 @@ import {
   Upload,
 } from "lucide-react";
 import { memo, type ReactNode, useRef, useState } from "react";
+import { Button } from "@/components/shared/Button";
+import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { MOTION_VARIANTS } from "@/components/shared/easings";
 import type { PortfolioProject } from "@/features/projects/types";
-import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/shared/Button";
-import { EmptyState } from "@/components/shared/EmptyState";
 import { BezelSurface } from "./workspace-ui";
 
 type ProjectsWorkbenchProps = {

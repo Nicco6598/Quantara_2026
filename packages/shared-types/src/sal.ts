@@ -20,6 +20,14 @@ export type SalTariffVoice = {
   unitPrice: number;
 };
 
+export type SalMaterialUsage = {
+  materialId: string;
+  code: string;
+  description: string;
+  unit: string;
+  quantity: number;
+};
+
 export type SalLine = {
   id: string;
   notes?: string;
@@ -45,6 +53,7 @@ export type SalDocument = {
   id: string;
   economicRules?: SalEconomicRules;
   lines: SalLine[];
+  materialUsage?: SalMaterialUsage[];
   notes: string;
   projectId: string;
   status: SalDocumentStatus;

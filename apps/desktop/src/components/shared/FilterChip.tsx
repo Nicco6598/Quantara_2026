@@ -25,7 +25,9 @@ export function FilterChip({ active, children, count, onClick }: FilterChipProps
         <span
           className={cn(
             "ml-2 rounded-full px-2 py-0.5 text-11px font-bold",
-            active ? "bg-white/20" : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
+            active
+              ? "bg-[var(--accent-primary)]/20"
+              : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
           )}
         >
           {count}

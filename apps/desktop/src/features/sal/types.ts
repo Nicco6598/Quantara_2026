@@ -5,6 +5,7 @@ export type {
   SalDocumentStatus,
   SalEconomicRules,
   SalLine,
+  SalMaterialUsage,
   SalProject,
   SalSurchargeKind,
   SalTariffVoice,
@@ -54,7 +55,20 @@ export type SalLineDraft = {
   notes: string;
   quantity: number;
   surchargePercent: number;
+  sourceType: "voice" | "material";
   voice: SalVoiceDraft;
+};
+
+export type SalMaterialDraft = {
+  id: string;
+  materialId: string;
+  code: string;
+  description: string;
+  category: string;
+  unit: string;
+  unitPrice: number;
+  quantity: number;
+  notes: string;
 };
 
 export type SalMeasurementRow = {

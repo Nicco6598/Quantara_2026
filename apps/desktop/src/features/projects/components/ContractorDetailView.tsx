@@ -7,6 +7,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { FilterSearch } from "@/components/filters";
+import { Button } from "@/components/shared/Button";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { MetricCard } from "@/components/shared/MetricCard";
 import type {
   ActivityItem,
   ApprovalItem,
@@ -18,9 +21,6 @@ import type {
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { ControlRailPanel } from "./ControlRailPanel";
 import { ProjectsWorkbench } from "./ProjectsWorkbench";
-import { Button } from "@/components/shared/Button";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { MetricCard } from "@/components/shared/MetricCard";
 import { BezelSurface, CompactRail, FocusChip } from "./workspace-ui";
 
 type FocusOption = {
@@ -89,7 +89,7 @@ export function ContractorDetailView({
 
   return (
     <div className="w-full">
-      <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
+      <section className="grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
         <div className="min-w-0">
           <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
             Cartella operativa

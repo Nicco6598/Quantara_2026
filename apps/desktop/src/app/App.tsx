@@ -9,8 +9,8 @@ import {
   SunDim,
   X,
 } from "@phosphor-icons/react";
-import { useCallback, useEffect, useReducer, useRef, useState, useEffectEvent } from "react";
-import { LazyMotion, domAnimation } from "framer-motion";
+import { domAnimation, LazyMotion } from "framer-motion";
+import { useCallback, useEffect, useEffectEvent, useReducer, useRef, useState } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopToolbar } from "@/components/layout/TopToolbar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
@@ -28,6 +28,7 @@ import {
   runAppUpdateCheck,
   type UpdateInstallState,
 } from "@/lib/appUpdater";
+import { loadThemeCSS } from "@/lib/theme-loader";
 import { migrateLegacyContractorsToDb } from "@/lib/contractorMigration";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
@@ -56,12 +57,18 @@ function ThemeApplier() {
   useEffect(() => {
     const state = useAppStore.getState();
     document.documentElement.dataset.theme = state.themeMode;
-    document.documentElement.style.colorScheme = state.themeMode === "dark" ? "dark" : "light";
+    document.documentElement.style.colorScheme = state.themeMode.startsWith("dark")
+      ? "dark"
+      : "light";
+    loadThemeCSS(state.themeMode);
 
     const unsub = useAppStore.subscribe((current, prev) => {
       if (current.themeMode === prev.themeMode) return;
       document.documentElement.dataset.theme = current.themeMode;
-      document.documentElement.style.colorScheme = current.themeMode === "dark" ? "dark" : "light";
+      document.documentElement.style.colorScheme = current.themeMode.startsWith("dark")
+        ? "dark"
+        : "light";
+      loadThemeCSS(current.themeMode);
     });
 
     return unsub;
@@ -316,10 +323,10 @@ function WindowTitleBar({
             toggleTheme();
           }}
           onMouseDown={(event) => event.stopPropagation()}
-          title={themeMode === "light" ? "Modo scuro" : "Modo chiaro"}
+          title="Cambia tema"
           type="button"
         >
-          {themeMode === "light" ? (
+          {themeMode.startsWith("dark") ? (
             <SunDim size={14} weight="regular" />
           ) : (
             <Moon size={14} weight="regular" />

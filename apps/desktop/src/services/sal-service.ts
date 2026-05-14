@@ -27,6 +27,7 @@ type CreateSalInput = {
   }>;
   economicRules?: SalDocument["economicRules"];
   status?: SalDocumentStatus;
+  materialUsage?: import("@/features/sal/types").SalMaterialUsage[];
   total?: number;
 };
 

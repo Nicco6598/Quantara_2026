@@ -1,7 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Dialog } from "@/components/shared/Dialog";
 import { Button } from "@/components/shared/Button";
+import { Dialog } from "@/components/shared/Dialog";
 import type { PendingReleaseNotes } from "@/lib/updateReleaseNotes";
 
 type UpdateReleaseNotesDialogProps = {

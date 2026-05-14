@@ -15,6 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import { AnimatePresence, m } from "framer-motion";
 import { useRef, useState, useSyncExternalStore } from "react";
+import { MOTION_DURATION, SPRING_EASE } from "@/components/shared/easings";
 import { cn } from "@/lib/utils";
 import { type QuantaraRoute, useNavigationState, usePreferenceState } from "@/store/app-store";
 
@@ -226,16 +227,16 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
               <>
                 <button
                   aria-label="Chiudi selezione file"
-                  className="fixed inset-0 z-40 cursor-default"
+                  className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
                   onClick={() => setIsFileMenuOpen(false)}
                   type="button"
                 />
                 <m.div
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="absolute right-0 top-full z-50 mt-3 w-[360px] overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--bg-muted-strong)_72%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
+                  className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-3 w-[360px] overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--bg-muted-strong)_72%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
                   exit={{ opacity: 0, scale: 0.96, y: -8 }}
                   initial={{ opacity: 0, scale: 0.96, y: -8 }}
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: MOTION_DURATION.base, ease: SPRING_EASE }}
                 >
                   <div className="max-h-[360px] overflow-y-auto rounded-17px bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] p-1">
                     {tariffImportToolbar.fileLabels.map((label, index) => {
@@ -337,7 +338,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
             className={cn(
               "flex size-5 items-center justify-center rounded-full",
               tariffImportToolbar.activeReviewed
-                ? "bg-white/20 text-white"
+                ? "bg-[var(--accent-primary)]/20 text-[var(--text-inverse)]"
                 : "text-[var(--success-base)]",
             )}
           >
@@ -360,7 +361,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
             className={cn(
               "flex size-5 items-center justify-center rounded-full",
               tariffImportToolbar.activeDrafted
-                ? "bg-white/20 text-white"
+                ? "bg-[var(--accent-primary)]/20 text-[var(--text-inverse)]"
                 : "text-[var(--warning-base)]",
             )}
           >
@@ -666,16 +667,16 @@ function HistoryNavigator() {
           <>
             <button
               aria-label="Chiudi cronologia pagine"
-              className="fixed inset-0 z-40 cursor-default"
+              className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
               onClick={() => setIsHistoryOpen(false)}
               type="button"
             />
             <m.div
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="top-toolbar-history-menu absolute left-0 top-full z-50 mt-2 w-[260px] overflow-hidden rounded-18px p-1.5"
+              className="top-toolbar-history-menu absolute left-0 top-full z-[var(--z-dropdown-menu)] mt-2 w-[260px] overflow-hidden rounded-18px p-1.5"
               exit={{ opacity: 0, scale: 0.97, y: -6 }}
               initial={{ opacity: 0, scale: 0.97, y: -6 }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: MOTION_DURATION.fast, ease: SPRING_EASE }}
             >
               <div className="flex items-center gap-1 border-b border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] p-1 pb-1.5">
                 <span className="px-2 text-10px font-semibold text-[var(--text-secondary)]">
@@ -806,7 +807,7 @@ function PageActions({
               <CaretDown
                 size={10}
                 weight="regular"
-                className="opacity-60 transition-transform duration-[440ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+                className="opacity-60 transition-transform duration-slow ease-standard"
               />
             ) : null}
           </m.button>
@@ -847,7 +848,7 @@ function PageActionMenu({
           size={10}
           weight="regular"
           className={cn(
-            "opacity-60 transition-transform duration-[440ms] ease-[cubic-bezier(0.16,1,0.3,1)]",
+            "opacity-60 transition-transform duration-slow ease-standard",
             isOpen && "rotate-180",
           )}
         />
@@ -857,20 +858,16 @@ function PageActionMenu({
           <>
             <button
               aria-label="Chiudi menu topbar"
-              className="fixed inset-0 z-40 cursor-default"
+              className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
               onClick={() => setIsOpen(false)}
               type="button"
             />
             <m.div
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
+              className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-3 w-80 overflow-hidden rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
               exit={{ opacity: 0, scale: 0.96, y: -10 }}
               initial={{ opacity: 0, scale: 0.96, y: -10 }}
-              transition={{
-                type: "spring",
-                stiffness: 200,
-                damping: 26,
-              }}
+              transition={{ duration: MOTION_DURATION.slow, ease: SPRING_EASE }}
             >
               <div className="rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
                 {action.menuItems?.map((item, index) => {
@@ -886,8 +883,8 @@ function PageActionMenu({
                       }}
                       transition={{
                         delay: index * 0.05,
-                        duration: 0.32,
-                        ease: [0.16, 1, 0.3, 1],
+                        duration: MOTION_DURATION.base,
+                        ease: SPRING_EASE,
                       }}
                       type="button"
                     >

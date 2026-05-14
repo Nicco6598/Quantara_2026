@@ -2,7 +2,15 @@ import { cn } from "@/lib/utils";
 
 export function LoadingSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("h-4 animate-pulse rounded-md bg-[var(--bg-muted-strong)]", className)} />
+    <div
+      className={cn("h-4 rounded-md bg-[var(--skeleton-base)]", className)}
+      style={{
+        animation: "shimmer 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        backgroundSize: "200% 100%",
+        backgroundImage:
+          "linear-gradient(90deg, var(--skeleton-base) 0%, var(--skeleton-shimmer) 50%, var(--skeleton-base) 100%)",
+      }}
+    />
   );
 }
 

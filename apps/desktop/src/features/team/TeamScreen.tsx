@@ -12,12 +12,12 @@ import {
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { ScreenHero } from "@/components/shared/ScreenHero";
-import { StatusPill as SharedStatusPill } from "@/components/shared/StatusPill";
-import { useToast } from "@/components/shared/ToastProvider";
 import { Button } from "@/components/shared/Button";
 import { Pagination } from "@/components/shared/Pagination";
+import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { StatusPill as SharedStatusPill } from "@/components/shared/StatusPill";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { cn } from "@/lib/utils";
 
@@ -394,7 +394,7 @@ function TeamMembersPanel({
                   type="button"
                   aria-label="Chiudi"
                 />
-                <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[180px] overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
+                <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[180px] overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]">
                   <button
                     className={cn(
                       "flex w-full items-center rounded-10px px-3 py-2 text-left text-13px font-medium transition-colors",

@@ -93,7 +93,7 @@ export function SavedViewSelector({
             }}
             type="button"
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]">
+          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
             <div className="flex items-center justify-between px-3 py-2">
               <span className="text-12px font-semibold text-[var(--text-primary)]">
                 Viste salvate
@@ -131,7 +131,7 @@ export function SavedViewSelector({
                     Annulla
                   </button>
                   <button
-                    className="inline-flex h-8 items-center rounded-full bg-[var(--accent-primary)] px-3 text-11px font-bold text-white disabled:opacity-50"
+                    className="inline-flex h-8 items-center rounded-full bg-[var(--accent-primary)] px-3 text-11px font-bold text-[var(--text-inverse)] disabled:opacity-50"
                     disabled={viewName.trim().length < 2}
                     onClick={handleSave}
                     type="button"

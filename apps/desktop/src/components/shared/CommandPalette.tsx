@@ -17,14 +17,14 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "@/lib/utils";
-import type { QuantaraRoute } from "@/store/app-store";
-import { useThemeState } from "@/store/app-store";
 import {
   listDesktopContracts,
   listDesktopMaterials,
   listDesktopTariffBooks,
 } from "@/lib/desktopData";
+import { cn } from "@/lib/utils";
+import type { QuantaraRoute } from "@/store/app-store";
+import { useThemeState } from "@/store/app-store";
 
 type PaletteCommand = {
   group: string;
@@ -309,10 +309,10 @@ export function CommandPalette({
       },
       {
         group: "Sistema",
-        icon: themeMode === "light" ? Moon : Sun,
+        icon: themeMode.startsWith("light") ? Moon : Sun,
         id: "toggle-theme",
         keywords: "tema dark light chiaro scuro",
-        label: themeMode === "light" ? "Attiva modo scuro" : "Attiva modo chiaro",
+        label: themeMode.startsWith("light") ? "Attiva modo scuro" : "Attiva modo chiaro",
         run: toggleTheme,
       },
     ],

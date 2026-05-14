@@ -19,35 +19,34 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { MOTION_VARIANTS } from "@/components/shared/easings";
-
-import { ScreenHero } from "@/components/shared/ScreenHero";
-
-import { useToast } from "@/components/shared/ToastProvider";
-
-import { Button } from "@/components/shared/Button";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { MetricCard } from "@/components/shared/MetricCard";
+import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 
 import {
   createDesktopTariffBook,
+  deleteDesktopTariffBook,
   type DesktopContract,
   type DesktopDataResult,
   type DesktopTariffBook,
   type DesktopTariffVoice,
-  deleteDesktopTariffBook,
   listDesktopContracts,
   listDesktopTariffBooks,
   listDesktopTariffVoiceCounts,
   listDesktopTariffVoices,
   type TariffPdfMetadata,
+  updateDesktopContract,
   updateDesktopTariffBook,
 } from "@/lib/desktopData";
 
 import { cn } from "@/lib/utils";
+import { dispatchDataChanged } from "@/lib/sync-events";
 
 import { useAppStore } from "@/store/app-store";
 
@@ -697,6 +696,7 @@ export function TariffsScreen() {
       if (allSavedVoices.length > 0) {
         setVoicesState({ data: allSavedVoices, source: "desktop" });
       }
+      dispatchDataChanged();
       notify({
         message: `${importedCount} tariffari (${totalVoices.toLocaleString("it-IT")} voci) salvati in locale.`,
         title: "Importazione completata",
@@ -835,6 +835,7 @@ export function TariffsScreen() {
       }));
       setEditingBookId(null);
       setDetailBookId(updated.id);
+      dispatchDataChanged();
       notify({
         message: "Dati tariffario aggiornati.",
         title: "Tariffario modificato",
@@ -867,6 +868,30 @@ export function TariffsScreen() {
       }
       setDetailBookId((current) => (current === bookId ? null : current));
       setFavoriteBookIds((current) => current.filter((id) => id !== bookId));
+      // Clean up dangling tariffPriorities in contracts that reference this book
+      try {
+        const { data: allContracts } = await listDesktopContracts([]);
+        for (const contract of allContracts) {
+          if (contract.tariffPriorities?.some((tp) => tp.tariffBookId === bookId)) {
+            await updateDesktopContract(contract.id, {
+              applicationContractCode: contract.applicationContractCode,
+              contractorName: contract.contractorName ?? null,
+              contractualAmount: contract.contractualAmount.amount,
+              frameworkAgreementCode: contract.frameworkAgreementCode,
+              id: contract.id,
+              osExcludedAmount: contract.osExcludedAmount ?? null,
+              tariffPriorities: contract.tariffPriorities.filter(
+                (tp) => tp.tariffBookId !== bookId,
+              ),
+              tenderDiscountPercent: contract.tenderDiscountPercent,
+              title: contract.title,
+            });
+          }
+        }
+      } catch {
+        // Best-effort cleanup of orphan references
+      }
+      dispatchDataChanged();
       notify({
         message: `${deletedBook?.name ?? "Tariffario"} eliminato dal catalogo.`,
         title: "Tariffario eliminato",
@@ -1231,11 +1256,11 @@ function TariffBookPreviewCard({
           >
             <div
               className={cn(
-                "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-md border bg-white text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]",
+                "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-md border bg-[var(--surface-raised)] text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]",
                 isSelected ? "border-[var(--accent-primary)]" : "border-[var(--border-subtle)]",
               )}
             >
-              <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-white">
+              <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-[var(--text-inverse)]">
                 PDF
               </span>
               <div className="space-y-1.5 text-[var(--text-tertiary)]">
@@ -1414,7 +1439,7 @@ function TariffBookPreviewCard({
         ) : null}
       </div>
       {isSelected ? (
-        <span className="absolute bottom-4 right-4 flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--accent-primary)] text-white">
+        <span className="absolute bottom-4 right-4 flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--accent-primary)] text-[var(--text-inverse)]">
           <CheckCircle2 className="size-4" strokeWidth={3} />
         </span>
       ) : null}

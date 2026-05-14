@@ -1,4 +1,6 @@
+import { AnimatePresence, m } from "framer-motion";
 import { lazy, Suspense } from "react";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import type { PendingWorkflowAction, QuantaraRoute } from "@/store/app-store";
 
@@ -64,26 +66,36 @@ function ScreenGuard({ children, resetKey }: { children: React.ReactNode; resetK
 export function RouteRenderer({ activeRoute, pendingWorkflowAction }: RouteRendererProps) {
   return (
     <ScreenGuard resetKey={`${activeRoute}:${pendingWorkflowAction ?? "idle"}`}>
-      {activeRoute === "dashboard" && <DashboardScreen />}
-      {activeRoute === "projects" && <ProjectsScreen />}
-      {activeRoute === "project-detail" && <ProjectDetailScreen />}
-      {activeRoute === "project-create" && <ProjectCreateScreen />}
-      {activeRoute === "sal-create" && <SalCreationScreen />}
-      {activeRoute === "tariffs" && <TariffsScreen />}
-      {activeRoute === "accounting" && <AccountingScreen />}
-      {activeRoute === "materials" && <MaterialsScreen />}
-      {activeRoute === "team" && <TeamScreen />}
-      {activeRoute === "settings" && <SettingsScreen />}
-      {activeRoute !== "dashboard" &&
-        activeRoute !== "projects" &&
-        activeRoute !== "project-detail" &&
-        activeRoute !== "project-create" &&
-        activeRoute !== "sal-create" &&
-        activeRoute !== "tariffs" &&
-        activeRoute !== "accounting" &&
-        activeRoute !== "materials" &&
-        activeRoute !== "team" &&
-        activeRoute !== "settings" && <PlaceholderScreen title={activeRoute} />}
+      <AnimatePresence mode="wait">
+        <m.div
+          key={activeRoute}
+          initial={MOTION_VARIANTS.viewSwap.initial}
+          animate={MOTION_VARIANTS.viewSwap.animate}
+          exit={MOTION_VARIANTS.viewSwap.exit}
+          transition={MOTION_VARIANTS.viewSwap.transition}
+        >
+          {activeRoute === "dashboard" && <DashboardScreen />}
+          {activeRoute === "projects" && <ProjectsScreen />}
+          {activeRoute === "project-detail" && <ProjectDetailScreen />}
+          {activeRoute === "project-create" && <ProjectCreateScreen />}
+          {activeRoute === "sal-create" && <SalCreationScreen />}
+          {activeRoute === "tariffs" && <TariffsScreen />}
+          {activeRoute === "accounting" && <AccountingScreen />}
+          {activeRoute === "materials" && <MaterialsScreen />}
+          {activeRoute === "team" && <TeamScreen />}
+          {activeRoute === "settings" && <SettingsScreen />}
+          {activeRoute !== "dashboard" &&
+            activeRoute !== "projects" &&
+            activeRoute !== "project-detail" &&
+            activeRoute !== "project-create" &&
+            activeRoute !== "sal-create" &&
+            activeRoute !== "tariffs" &&
+            activeRoute !== "accounting" &&
+            activeRoute !== "materials" &&
+            activeRoute !== "team" &&
+            activeRoute !== "settings" && <PlaceholderScreen title={activeRoute} />}
+        </m.div>
+      </AnimatePresence>
     </ScreenGuard>
   );
 }

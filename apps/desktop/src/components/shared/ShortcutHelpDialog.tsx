@@ -27,7 +27,7 @@ export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
     <Dialog className="max-w-lg" contentClassName="p-5" isOpen onClose={onClose} zIndex={85}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-white">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-[var(--text-inverse)]">
             <Keyboard className="size-5" />
           </span>
           <div>

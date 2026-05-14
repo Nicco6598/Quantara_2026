@@ -175,7 +175,7 @@ export function AutocompleteInput({
         showResults &&
         createPortal(
           <div
-            className="overflow-hidden rounded-18px bg-[var(--surface-base)] shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]"
+            className="overflow-hidden rounded-18px bg-[var(--surface-base)] shadow-soft ring-1 ring-[var(--border-subtle)]"
             style={{
               position: "fixed",
               left: floating.left,

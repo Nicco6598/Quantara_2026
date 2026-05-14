@@ -46,6 +46,7 @@ export function ContractorModal({
               Nome appaltatore <span className="text-[var(--danger-base)]">*</span>
             </span>
             <input
+              autoFocus
               className={cn(
                 "mt-2 h-11 w-full rounded-14px border bg-[var(--surface-base)] px-3.5 text-14px font-medium text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]",
                 name.trim().length > 0 && name.trim().length < 2

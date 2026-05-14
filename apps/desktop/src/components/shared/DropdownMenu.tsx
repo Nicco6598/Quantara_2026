@@ -82,12 +82,12 @@ export function DropdownMenu({
     <>
       <button
         aria-label="Chiudi menu"
-        className="fixed inset-0 z-[139] cursor-default"
+        className="fixed inset-0 z-[var(--z-dropdown-portal)] cursor-default"
         onClick={onClose}
         type="button"
       />
       <m.div
-        className="fixed z-[140] w-56 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]"
+        className="fixed z-[var(--z-dropdown-portal)] w-56 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]"
         initial={MOTION_VARIANTS.popover.initial}
         animate={MOTION_VARIANTS.popover.animate}
         style={{ left: position.left, top: position.top }}

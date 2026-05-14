@@ -214,17 +214,17 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {isChanged && diff.status === "added" && (
-              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--success-base)] text-white">
+              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--success-base)] text-[var(--text-inverse)]">
                 <Plus className="size-2.5" strokeWidth={3} />
               </span>
             )}
             {isChanged && diff.status === "removed" && (
-              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--danger-base)] text-white">
+              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--danger-base)] text-[var(--text-inverse)]">
                 <Minus className="size-2.5" strokeWidth={3} />
               </span>
             )}
             {isChanged && diff.status === "modified" && (
-              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--warning-base)] text-white text-9px font-bold leading-none">
+              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--warning-base)] text-[var(--text-inverse)] text-9px font-bold leading-none">
                 ~
               </span>
             )}

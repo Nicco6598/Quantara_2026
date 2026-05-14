@@ -24,13 +24,13 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
       {count > 0 && (
         <m.div
           animate={MOTION_VARIANTS.popover.animate}
-          className="mb-4 flex items-center gap-4 rounded-2xl border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] px-4 py-3 shadow-[0_8px_28px_-12px_rgba(0,0,0,0.12)]"
+          className="mb-4 flex items-center gap-4 rounded-2xl border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] px-4 py-3 shadow-soft"
           exit={{ opacity: 0, y: -6, scale: 0.98 }}
           initial={MOTION_VARIANTS.popover.initial}
           transition={MOTION_VARIANTS.popover.transition}
         >
           <span className="inline-flex items-center gap-2 text-13px font-semibold text-[var(--text-primary)]">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-[var(--accent-primary)] text-12px font-bold text-white shadow-sm">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-[var(--accent-primary)] text-12px font-bold text-[var(--text-inverse)] shadow-sm">
               {count}
             </span>
             <span>

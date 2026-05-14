@@ -16,13 +16,13 @@ import {
   createContractorId,
   isPlaceholderContractorName,
 } from "@/features/projects/utils/projects-helpers";
-import type { DesktopContract } from "@/lib/desktopData";
-import { listDesktopContracts } from "@/lib/desktopData";
+import { APP_VERSION } from "@/generated/appVersion";
+import type { DesktopContract, DesktopMaterial } from "@/lib/desktopData";
+import { listDesktopContracts, listDesktopMaterials } from "@/lib/desktopData";
 import { DATA_CHANGED_EVENT } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import type { QuantaraRoute } from "@/store/app-store";
 import { useNavigationState } from "@/store/app-store";
-import { APP_VERSION } from "@/generated/appVersion";
 
 type NavItem = {
   badges?: {
@@ -57,6 +57,8 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   const [contracts, setContracts] = useState<DesktopContract[]>([]);
   const [projects, setProjects] = useState<{ id: string; contractor: string }[]>([]);
   const [contractorCount, setContractorCount] = useState(0);
+  const [criticalMaterialsCount, setCriticalMaterialsCount] = useState(0);
+  const [warningMaterialsCount, setWarningMaterialsCount] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const loadProjects = useCallback(() => {
@@ -109,6 +111,18 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
       );
     });
 
+    const matFbPromise: Promise<DesktopMaterial[]> = import.meta.env.DEV
+      ? import("@/features/materials/materials-data").then((m) => m.fallbackMaterials)
+      : Promise.resolve([]);
+    matFbPromise.then((fb) => {
+      listDesktopMaterials(fb).then((result) => {
+        if (!active) return;
+        const data = result.data;
+        setCriticalMaterialsCount(data.filter((m) => m.quantity < m.minQuantity).length);
+        setWarningMaterialsCount(data.filter((m) => m.quantity === 0).length);
+      });
+    });
+
     return () => {
       active = false;
     };
@@ -133,8 +147,6 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   }, [loadProjects]);
 
   const projectCount = projects.length;
-  const criticalMaterialsCount = 0;
-  const warningMaterialsCount = 0;
 
   const contextLabel = useMemo(() => {
     const selectedProjectId = (() => {
@@ -205,7 +217,7 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
       { icon: ChartBar, label: "Contabilità", route: "accounting" },
       { icon: Users, label: "Team", route: "team" },
     ],
-    [contractorCount, projectCount],
+    [contractorCount, projectCount, criticalMaterialsCount, warningMaterialsCount],
   );
 
   const utilityNavItems: NavItem[] = useMemo(

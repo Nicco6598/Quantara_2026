@@ -53,7 +53,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               </pre>
             ) : null}
             <button
-              className="mt-6 rounded-full bg-[var(--accent-primary)] px-6 py-2 text-sm font-semibold text-white"
+              className="mt-6 rounded-full bg-[var(--accent-primary)] px-6 py-2 text-sm font-semibold text-[var(--text-inverse)]"
               onClick={() => this.setState({ error: null })}
               type="button"
             >

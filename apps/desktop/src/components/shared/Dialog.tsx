@@ -31,20 +31,15 @@ export function Dialog({
   if (!isOpen) return null;
 
   return createPortal(
+    // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop overlay, keyboard handled by global Escape
     <div
       aria-labelledby={title ? titleId : undefined}
       aria-modal="true"
       className="fixed inset-0 flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm"
+      onClick={closeOnOverlay ? onClose : undefined}
       role="dialog"
       style={{ zIndex }}
     >
-      <button
-        aria-label="Chiudi"
-        className="absolute inset-0 cursor-default"
-        disabled={!closeOnOverlay}
-        onClick={closeOnOverlay ? onClose : undefined}
-        type="button"
-      />
       <m.div
         className={cn(
           "w-full max-w-sm rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]",
@@ -52,6 +47,7 @@ export function Dialog({
         )}
         initial={MOTION_VARIANTS.dialog.initial}
         animate={MOTION_VARIANTS.dialog.animate}
+        onClick={(e) => e.stopPropagation()}
         transition={MOTION_VARIANTS.dialog.transition}
       >
         <div

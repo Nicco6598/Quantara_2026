@@ -15,8 +15,8 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   type CreateDesktopContractRequest,
-  type DesktopTariffBook,
   createDesktopContract,
+  type DesktopTariffBook,
   listDesktopContracts,
   listDesktopTariffBooks,
   updateDesktopContract,
@@ -25,6 +25,7 @@ import {
 import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { useAppStore } from "@/store/app-store";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 type ProjectFormState = {
   applicationContractCode: string;
@@ -316,6 +317,15 @@ export function ProjectCreateScreen() {
         });
       }
 
+      // Sync SAL workflow project so the project appears in SAL screens immediately
+      useSalWorkflowStore.getState().createProject({
+        client: contractorName || "Senza appaltatore",
+        description: `${sanitizeTextValue(draft.frameworkAgreementCode)} - ${sanitizeTextValue(draft.applicationContractCode)}`,
+        id: savedContract.id,
+        name: sanitizeTextValue(draft.title),
+        year: new Date().getFullYear(),
+      });
+
       dispatchDataChanged();
       navigate("projects");
     } catch (err) {
@@ -573,7 +583,7 @@ export function ProjectCreateScreen() {
                               <span
                                 className={`flex size-6 shrink-0 items-center justify-center rounded-md border ${
                                   isSelected
-                                    ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+                                    ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]"
                                     : "border-[var(--border-subtle)]"
                                 }`}
                               >

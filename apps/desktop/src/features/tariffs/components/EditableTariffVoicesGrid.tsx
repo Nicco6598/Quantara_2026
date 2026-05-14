@@ -92,7 +92,7 @@ function WarningTooltip({
   return createPortal(
     <div
       ref={tooltipRef}
-      className="fixed z-[100] w-72 rounded-14px bg-[var(--surface-base)] p-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)] ring-1 ring-[var(--border-subtle)]"
+      className="fixed z-[100] w-72 rounded-14px bg-[var(--surface-base)] p-3 shadow-soft ring-1 ring-[var(--border-subtle)]"
       style={{
         left: position.left,
         top: position.top,

@@ -44,7 +44,7 @@ export function FocusChip({
   return (
     <m.button
       className={cn(
-        "micro-interact inline-flex items-center gap-2 rounded-full border px-4 py-2 text-13px font-medium outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "micro-interact inline-flex items-center gap-2 rounded-full border px-4 py-2 text-13px font-medium outline-none transition-all duration-slow ease-standard",
         active
           ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-none"
           : "border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/24 hover:bg-[var(--bg-muted)]",
@@ -57,7 +57,7 @@ export function FocusChip({
         className={cn(
           "inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-11px font-semibold",
           active
-            ? "bg-white/16 text-white"
+            ? "bg-[var(--accent-primary)]/16 text-[var(--text-inverse)]"
             : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
         )}
       >

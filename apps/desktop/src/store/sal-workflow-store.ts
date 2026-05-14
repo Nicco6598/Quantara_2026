@@ -6,6 +6,7 @@ import type {
   SalDocument,
   SalDocumentStatus,
   SalLine,
+  SalMaterialUsage,
   SalProject,
   SalSurchargeKind,
   SalTariffVoice,
@@ -20,6 +21,7 @@ type CreateSalInput = {
   lines?: SalLine[];
   voices?: SalTariffVoice[];
   economicRules?: SalDocument["economicRules"];
+  materialUsage?: SalMaterialUsage[];
   status?: SalDocumentStatus;
   total?: number;
 };
@@ -91,6 +93,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           date: input.date,
           description: input.description,
           ...(input.economicRules ? { economicRules: input.economicRules } : {}),
+          ...(input.materialUsage ? { materialUsage: input.materialUsage } : {}),
           id: createId("sal"),
           lines: salLines,
           notes: input.notes,
@@ -128,6 +131,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
               ...(input.date !== undefined && { date: input.date }),
               ...(input.description !== undefined && { description: input.description }),
               ...(input.economicRules !== undefined && { economicRules: input.economicRules }),
+              ...(input.materialUsage !== undefined && { materialUsage: input.materialUsage }),
               ...(input.lines !== undefined && { lines: input.lines }),
               ...(input.notes !== undefined && { notes: input.notes }),
               ...(input.projectId !== undefined && { projectId: input.projectId }),
@@ -164,10 +168,32 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
         })),
 
       deleteSal: (salId) =>
-        set((state) => ({
-          salDocuments: state.salDocuments.filter((sal) => sal.id !== salId),
-          activeSalId: state.activeSalId === salId ? "" : state.activeSalId,
-        })),
+        set((state) => {
+          const deletedSal = state.salDocuments.find((sal) => sal.id === salId);
+          if (!deletedSal) {
+            return {
+              salDocuments: state.salDocuments.filter((sal) => sal.id !== salId),
+              activeSalId: state.activeSalId === salId ? "" : state.activeSalId,
+            };
+          }
+
+          const orphanVoiceIds = new Set(deletedSal.lines.map((l) => l.voiceId));
+          const usedVoiceIds = new Set<string>();
+          for (const sal of state.salDocuments) {
+            if (sal.id === salId) continue;
+            for (const line of sal.lines) {
+              usedVoiceIds.add(line.voiceId);
+            }
+          }
+
+          return {
+            salDocuments: state.salDocuments.filter((sal) => sal.id !== salId),
+            tariffVoices: state.tariffVoices.filter(
+              (v) => !orphanVoiceIds.has(v.id) || usedVoiceIds.has(v.id),
+            ),
+            activeSalId: state.activeSalId === salId ? "" : state.activeSalId,
+          };
+        }),
 
       addLineToSal: (salId, voiceId) =>
         set((state) => ({

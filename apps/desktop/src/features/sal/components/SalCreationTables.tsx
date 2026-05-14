@@ -2,12 +2,14 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { m } from "framer-motion";
 import { Check, ChevronDown, Copy, Download, MoreHorizontal, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useRef, useState } from "react";
+import { Currency } from "@/components/shared/Currency";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
 import { SPRING_EASE } from "@/components/shared/easings";
 import { InlineEdit } from "@/components/shared/InlineEdit";
-import { Currency } from "@/components/shared/Currency";
 import { StatusPill } from "@/components/shared/StatusPill";
+
 export { Currency };
+
 import { cn } from "@/lib/utils";
 import type { SalEconomicRules, SalEconomicSummary, SalLineDraft, SalLineView } from "../types";
 
@@ -607,17 +609,17 @@ export function DocumentPreview({
   return (
     <div
       className={cn(
-        "rounded-lg border border-[var(--border-subtle)] bg-white p-4 text-[#10182f] shadow-inner",
+        "rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-[var(--text-primary)] shadow-inner",
         compact && "p-3 text-11px",
       )}
     >
-      <div className="grid grid-cols-3 border border-[#c9d2e3] text-center text-xs font-semibold">
+      <div className="grid grid-cols-3 border border-[var(--border-subtle)] text-center text-xs font-semibold">
         <div className="p-3 text-left">
           COMUNE DI ESEMPIO
           <br />
           Ufficio Tecnico
         </div>
-        <div className="border-x border-[#c9d2e3] p-3">
+        <div className="border-x border-[var(--border-subtle)] p-3">
           LIBRETTO DELLE MISURE
           <br />
           Stato Avanzamento Lavori n. 1
@@ -632,9 +634,9 @@ export function DocumentPreview({
       </div>
       <table className="mt-3 w-full border-collapse text-xs">
         <thead>
-          <tr className="bg-[#f4f6fa]">
+          <tr className="bg-[var(--bg-muted)]">
             {["N.", "Codice", "Descrizione", "U.M.", "Qtà", "Prezzo", "Importo"].map((h) => (
-              <th className="border border-[#c9d2e3] p-2 text-left" key={h}>
+              <th className="border border-[var(--border-subtle)] p-2 text-left" key={h}>
                 {h}
               </th>
             ))}
@@ -643,24 +645,29 @@ export function DocumentPreview({
         <tbody>
           {lines.length === 0 ? (
             <tr>
-              <td className="border border-[#c9d2e3] p-3 text-center text-[#53617a]" colSpan={7}>
+              <td
+                className="border border-[var(--border-subtle)] p-3 text-center text-[var(--text-tertiary)]"
+                colSpan={7}
+              >
                 Anteprima dopo l'inserimento delle voci.
               </td>
             </tr>
           ) : (
             lines.slice(0, compact ? 5 : 8).map((line, idx) => (
               <tr key={line.id}>
-                <td className="border border-[#c9d2e3] p-2">{idx + 1}</td>
-                <td className="border border-[#c9d2e3] p-2">{line.voice.code}</td>
-                <td className="border border-[#c9d2e3] p-2">{line.voice.description}</td>
-                <td className="border border-[#c9d2e3] p-2">{line.voice.unit}</td>
-                <td className="border border-[#c9d2e3] p-2 text-right">
+                <td className="border border-[var(--border-subtle)] p-2">{idx + 1}</td>
+                <td className="border border-[var(--border-subtle)] p-2">{line.voice.code}</td>
+                <td className="border border-[var(--border-subtle)] p-2">
+                  {line.voice.description}
+                </td>
+                <td className="border border-[var(--border-subtle)] p-2">{line.voice.unit}</td>
+                <td className="border border-[var(--border-subtle)] p-2 text-right">
                   {line.quantity.toLocaleString("it-IT")}
                 </td>
-                <td className="border border-[#c9d2e3] p-2 text-right">
+                <td className="border border-[var(--border-subtle)] p-2 text-right">
                   {line.voice.unitPrice.toLocaleString("it-IT")}
                 </td>
-                <td className="border border-[#c9d2e3] p-2 text-right">
+                <td className="border border-[var(--border-subtle)] p-2 text-right">
                   {line.totalAmount.toLocaleString("it-IT")}
                 </td>
               </tr>
@@ -668,30 +675,30 @@ export function DocumentPreview({
           )}
         </tbody>
       </table>
-      <div className="mt-3 overflow-hidden rounded-md border border-[#c9d2e3] text-xs">
-        <div className="grid grid-cols-[1fr_180px] border-b border-[#c9d2e3]">
+      <div className="mt-3 overflow-hidden rounded-md border border-[var(--border-subtle)] text-xs">
+        <div className="grid grid-cols-[1fr_180px] border-b border-[var(--border-subtle)]">
           <div className="p-2 font-semibold">Totale voci</div>
-          <div className="border-l border-[#c9d2e3] p-2 text-right font-semibold">
+          <div className="border-l border-[var(--border-subtle)] p-2 text-right font-semibold">
             {grossTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
           </div>
         </div>
         {linkedTotal > 0 ? (
-          <div className="grid grid-cols-[1fr_180px] border-b border-[#c9d2e3]">
+          <div className="grid grid-cols-[1fr_180px] border-b border-[var(--border-subtle)]">
             <div className="p-2">Maggiorazioni</div>
-            <div className="border-l border-[#c9d2e3] p-2 text-right">
+            <div className="border-l border-[var(--border-subtle)] p-2 text-right">
               {linkedTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
             </div>
           </div>
         ) : null}
-        <div className="grid grid-cols-[1fr_180px] border-b border-[#c9d2e3] text-[#b42318]">
+        <div className="grid grid-cols-[1fr_180px] border-b border-[var(--border-subtle)] text-[var(--danger-base)]">
           <div className="p-2">Ribasso gara</div>
-          <div className="border-l border-[#c9d2e3] p-2 text-right">
+          <div className="border-l border-[var(--border-subtle)] p-2 text-right">
             -{discountTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
           </div>
         </div>
-        <div className="grid grid-cols-[1fr_180px] bg-[#eef5ff] font-bold">
+        <div className="grid grid-cols-[1fr_180px] bg-[var(--info-soft)] font-bold">
           <div className="p-2">TOTALE ATTUALE SAL</div>
-          <div className="border-l border-[#c9d2e3] p-2 text-right text-[#006BFF]">
+          <div className="border-l border-[var(--border-subtle)] p-2 text-right text-[var(--accent-primary)]">
             {total.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
           </div>
         </div>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { statusToneStyles, type StatusTone } from "@/components/shared/StatusBadge";
+import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 
 type StatusPillProps = {

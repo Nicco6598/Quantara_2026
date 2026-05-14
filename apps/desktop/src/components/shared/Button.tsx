@@ -19,9 +19,9 @@ const buttonVariants = cva(
         toolbar: "h-9 px-3",
       },
       variant: {
-        primary: "quantara-button-primary text-white",
+        primary: "quantara-button-primary text-[var(--text-inverse)]",
         secondary: "quantara-button-soft text-[var(--accent-primary)]",
-        destructive: "quantara-button-destructive text-white",
+        destructive: "quantara-button-destructive text-[var(--text-inverse)]",
         ghost:
           "quantara-button-ghost text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
         outline: "quantara-button-neutral text-[var(--text-primary)]",

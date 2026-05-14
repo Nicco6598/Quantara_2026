@@ -1,3 +1,4 @@
+import { AnimatePresence, m } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -17,16 +18,15 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { AnimatePresence, m } from "framer-motion";
 import { memo, type ReactNode, useMemo, useRef, useState } from "react";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
-import type { StatusTone } from "@/components/shared/StatusBadge";
+import { Button } from "@/components/shared/Button";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { MetricCard } from "@/components/shared/MetricCard";
+import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/shared/Button";
-import { MetricCard } from "@/components/shared/MetricCard";
 import { BezelSurface } from "./workspace-ui";
 
 type ContractorsWorkspaceProps = {
@@ -67,7 +67,7 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
 
   return (
     <div className="space-y-8">
-      <section className="animate-entry grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
         <div className="min-w-0">
           <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)]">
             Appaltatori

@@ -17,19 +17,20 @@ import {
   FilterSearch,
   FilterSelect,
 } from "@/components/filters";
+import { Button } from "@/components/shared/Button";
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { SavedViewSelector } from "@/components/shared/SavedViewSelector";
 import { ScreenHero } from "@/components/shared/ScreenHero";
-import { StatusPill } from "@/components/shared/StatusPill";
-import { SeverityBar, severityToneForPercentage } from "@/components/shared/SeverityBar";
-import { useToast } from "@/components/shared/ToastProvider";
-import { Button } from "@/components/shared/Button";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { SeverityBar, severityToneForPercentage } from "@/components/shared/SeverityBar";
+import { StatusPill } from "@/components/shared/StatusPill";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
-import { listDesktopContracts } from "@/lib/desktopData";
+import { listDesktopContracts, restoreMaterialsFromSalUsage } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
+import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useSelectionStore } from "@/store/selection-store";
@@ -360,11 +361,20 @@ export function AccountingScreen() {
                       icon: <Trash2 className="size-4" />,
                       label: "Elimina",
                       tone: "danger",
-                      run: () => {
+                      run: async () => {
                         const ids = [...useSelectionStore.getState().ids];
                         const count = ids.length;
-                        for (const id of ids) useSalWorkflowStore.getState().deleteSal(id);
+                        for (const id of ids) {
+                          const doc = useSalWorkflowStore
+                            .getState()
+                            .salDocuments.find((d) => d.id === id);
+                          if (doc?.materialUsage) {
+                            await restoreMaterialsFromSalUsage(doc.materialUsage);
+                          }
+                          useSalWorkflowStore.getState().deleteSal(id);
+                        }
                         useSelectionStore.getState().clear();
+                        dispatchDataChanged();
                         notify({
                           message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
                           title: "Eliminate",

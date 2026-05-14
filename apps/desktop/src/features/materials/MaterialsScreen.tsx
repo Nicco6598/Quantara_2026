@@ -8,7 +8,6 @@ import {
   PackagePlus,
   Pencil,
   Plus,
-  ShieldCheck,
   ShoppingCart,
   Trash2,
   Warehouse,
@@ -16,23 +15,22 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch } from "@/components/filters";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
-import { ScreenHero } from "@/components/shared/ScreenHero";
-import { StatusPill } from "@/components/shared/StatusPill";
-import { SeverityBar } from "@/components/shared/SeverityBar";
-import { useToast } from "@/components/shared/ToastProvider";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { QuickAction } from "@/components/shared/QuickAction";
+import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
+import { SeverityBar } from "@/components/shared/SeverityBar";
+import { StatusPill } from "@/components/shared/StatusPill";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
-import { useSelectionStore } from "@/store/selection-store";
 import {
   type DesktopMaterial,
   deleteDesktopMaterial,
@@ -41,6 +39,8 @@ import {
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+import { useSelectionStore } from "@/store/selection-store";
 
 type StockTone = "danger" | "success" | "warning";
 type CategoryTone = "blue" | "green" | "orange" | "purple";
@@ -62,8 +62,7 @@ const categoryToneLabel: Record<CategoryTone, string> = {
 const CATEGORIES = ["Armamento", "Sottofondo", "Opere civili", "Impianti"];
 
 function toneForQuantity(quantity: number, minQuantity: number): StockTone {
-  if (quantity === 0) return "danger";
-  if (quantity < minQuantity) return "warning";
+  if (quantity === 0 || quantity < minQuantity) return "danger";
   return "success";
 }
 
@@ -231,6 +230,10 @@ export function MaterialsScreen() {
     const totalStock = materials.reduce((s, m) => s + m.quantity, 0);
     const critical = materials.filter((m) => m.quantity < m.minQuantity).length;
     const zero = materials.filter((m) => m.quantity === 0).length;
+    const committed = materials.reduce((s, m) => {
+      const info = getMaterialUsageInfo(m.id);
+      return s + info.inDraft + info.inConfirmed;
+    }, 0);
     const avgCoverage =
       materials.length > 0
         ? Math.round(
@@ -241,7 +244,7 @@ export function MaterialsScreen() {
             ) / materials.length,
           )
         : 0;
-    return { totalStock, critical, zero, avgCoverage };
+    return { totalStock, critical, zero, committed, avgCoverage };
   }, [materials]);
 
   const handleDelete = useCallback(
@@ -400,6 +403,55 @@ export function MaterialsScreen() {
   );
 }
 
+/* ── Material usage helpers ── */
+
+type SalUsageEntry = {
+  salId: string;
+  salTitle: string;
+  projectName: string;
+  contractor: string;
+  quantity: number;
+  status: string;
+};
+
+type MaterialUsageInfo = {
+  inDraft: number;
+  inConfirmed: number;
+  usedCount: number;
+  entries: SalUsageEntry[];
+};
+
+function getMaterialUsageInfo(materialId: string): MaterialUsageInfo {
+  const docs = useSalWorkflowStore.getState().salDocuments;
+  const projects = useSalWorkflowStore.getState().projects;
+  const projectMap = new Map(projects.map((p) => [p.id, p]));
+  let inDraft = 0;
+  let inConfirmed = 0;
+  let usedCount = 0;
+  const entries: SalUsageEntry[] = [];
+  for (const doc of docs) {
+    if (!doc.materialUsage) continue;
+    for (const mu of doc.materialUsage) {
+      if (mu.materialId === materialId) {
+        usedCount++;
+        if (doc.status === "draft") inDraft += mu.quantity;
+        else inConfirmed += mu.quantity;
+        const proj = projectMap.get(doc.projectId);
+        entries.push({
+          salId: doc.id,
+          salTitle: doc.title,
+          projectName: proj?.name ?? proj?.client ?? doc.projectId,
+          contractor: proj?.client ?? "—",
+          quantity: mu.quantity,
+          status: doc.status === "draft" ? "Bozza" : "Confermata",
+        });
+      }
+    }
+  }
+  entries.sort((a) => (a.status === "Bozza" ? -1 : 1));
+  return { inDraft, inConfirmed, usedCount, entries };
+}
+
 function MaterialCard({
   checked,
   material,
@@ -413,11 +465,10 @@ function MaterialCard({
   onEdit: () => void;
   onToggleSelection: (id: string) => void;
 }) {
-  const tone = toneForQuantity(material.quantity, material.minQuantity);
-  const coverage =
-    material.minQuantity > 0
-      ? Math.min(100, Math.round((material.quantity / material.minQuantity) * 100))
-      : 100;
+  const usageInfo = getMaterialUsageInfo(material.id);
+  const committed = usageInfo.inDraft + usageInfo.inConfirmed;
+  const effectiveStock = Math.max(0, material.quantity - committed);
+  const effTone = toneForQuantity(effectiveStock, material.minQuantity);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -456,10 +507,10 @@ function MaterialCard({
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   variant={
-                    tone === "danger" ? "danger" : tone === "warning" ? "warning" : "success"
+                    effTone === "danger" ? "danger" : effTone === "warning" ? "warning" : "success"
                   }
                 >
-                  {tone === "danger" ? "Critico" : tone === "warning" ? "Attenzione" : "OK"}
+                  {effTone === "danger" ? "Critico" : effTone === "warning" ? "Attenzione" : "OK"}
                 </Badge>
                 <span className="rounded-sm bg-[var(--bg-muted)] px-1.5 py-0.5 text-10px font-bold text-[var(--text-secondary)]">
                   {material.category}
@@ -471,60 +522,109 @@ function MaterialCard({
               <p className="mt-2 truncate text-13px font-medium text-[var(--text-secondary)]">
                 {material.description}
               </p>
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-12px font-medium text-[var(--text-secondary)]">
-                <span className="inline-flex items-center gap-1.5">
+              {/* Stock overview row */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <div className="inline-flex items-center gap-1.5 text-12px font-medium text-[var(--text-secondary)]">
                   <span className="text-10px uppercase tracking-wider text-[var(--text-tertiary)]">
                     Stock
                   </span>
                   <span
                     className={cn(
                       "font-bold",
-                      tone === "danger"
+                      effTone === "danger"
                         ? "text-[var(--danger-base)]"
-                        : tone === "warning"
+                        : effTone === "warning"
                           ? "text-[var(--warning-base)]"
                           : "text-[var(--text-primary)]",
                     )}
                   >
                     {formatQuantity(material.quantity, material.unit)}
                   </span>
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="text-10px uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Soglia
-                  </span>
-                  <span className="font-bold text-[var(--text-primary)]">
-                    {formatQuantity(material.minQuantity, material.unit)}
-                  </span>
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-1.5 w-12 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-                    <span
-                      className={cn(
-                        "block h-full rounded-full",
-                        tone === "danger"
-                          ? "bg-[var(--danger-base)]"
-                          : tone === "warning"
-                            ? "bg-[var(--warning-base)]"
-                            : "bg-[var(--success-base)]",
-                      )}
-                      style={{ width: `${coverage}%` }}
-                    />
-                  </span>
-                  <span
-                    className={cn(
-                      "text-11px font-bold tabular-nums",
-                      tone === "danger"
-                        ? "text-[var(--danger-base)]"
-                        : tone === "warning"
-                          ? "text-[var(--warning-base)]"
-                          : "text-[var(--success-base)]",
-                    )}
-                  >
-                    {coverage}%
-                  </span>
-                </span>
+                </div>
+                {material.minQuantity > 0 && (
+                  <div className="inline-flex items-center gap-1.5 text-12px font-medium text-[var(--text-secondary)]">
+                    <span className="text-10px uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Soglia
+                    </span>
+                    <span className="font-bold text-[var(--text-primary)]">
+                      {formatQuantity(material.minQuantity, material.unit)}
+                    </span>
+                  </div>
+                )}
               </div>
+
+              {/* Dual coverage bar: faded raw stock + solid effective */}
+              {(() => {
+                const effective = Math.max(0, material.quantity - committed);
+                const maxVal = Math.max(material.quantity, material.minQuantity, 1);
+                const rawPct = Math.min(100, Math.round((material.quantity / maxVal) * 100));
+                const effPct = Math.min(100, Math.round((effective / maxVal) * 100));
+                const effBarColor =
+                  effTone === "danger"
+                    ? "var(--danger-base)"
+                    : effTone === "warning"
+                      ? "var(--warning-base)"
+                      : "var(--success-base)";
+                return (
+                  <div className="mt-3">
+                    <div className="relative h-2.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full opacity-20"
+                        style={{ width: `${rawPct}%`, backgroundColor: effBarColor }}
+                      />
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full transition-all"
+                        style={{ width: `${effPct}%`, backgroundColor: effBarColor }}
+                      />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-10px">
+                      <span className="text-[var(--text-tertiary)]">
+                        {committed > 0 ? (
+                          <>
+                            {effPct}% effettivo · -{committed.toLocaleString("it-IT")} in SAL
+                          </>
+                        ) : (
+                          <>{effPct}% disponibile</>
+                        )}
+                      </span>
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        {formatQuantity(effective, material.unit)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Committed SAL details inline */}
+              {usageInfo.usedCount > 0 && (
+                <div className="mt-2 divide-y divide-[var(--border-subtle)]/40 rounded-lg bg-[var(--bg-muted)]/30 px-2.5 py-1 text-11px">
+                  {usageInfo.entries.map((e) => (
+                    <div className="flex items-center justify-between gap-2 py-1.5" key={e.salId}>
+                      <div className="min-w-0 flex-1">
+                        <span className="font-medium text-[var(--text-primary)]">{e.salTitle}</span>
+                        <span className="ml-1.5 text-[var(--text-tertiary)]">
+                          {e.projectName} · {e.contractor}
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="font-bold tabular-nums text-[var(--text-primary)]">
+                          {e.quantity.toLocaleString("it-IT")}
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 font-semibold",
+                            e.status === "Bozza"
+                              ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                              : "bg-[var(--info-soft)] text-[var(--info-base)]",
+                          )}
+                        >
+                          {e.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </button>
 
@@ -571,12 +671,22 @@ function MaterialCard({
 }
 
 function MaterialDetail({ material }: { material: DesktopMaterial }) {
-  const tone = toneForQuantity(material.quantity, material.minQuantity);
+  const usageInfo = getMaterialUsageInfo(material.id);
+  const committed = usageInfo.inDraft + usageInfo.inConfirmed;
+  const effectiveStock = Math.max(0, material.quantity - committed);
+  const effectiveCoverage =
+    material.minQuantity > 0
+      ? Math.min(100, Math.round((effectiveStock / material.minQuantity) * 100))
+      : 100;
   const coverage =
     material.minQuantity > 0
       ? Math.min(100, Math.round((material.quantity / material.minQuantity) * 100))
       : 100;
+  const tone = toneForQuantity(material.quantity, material.minQuantity);
+  const effectiveTone = toneForQuantity(effectiveStock, material.minQuantity);
   const catTone = categoryColorMap[material.category] ?? "blue";
+  const effectiveColor =
+    effectiveTone === "danger" ? "danger" : effectiveTone === "warning" ? "warning" : "success";
 
   return (
     <Panel>
@@ -616,11 +726,99 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
         </dl>
 
         <div className="mt-3">
-          <div className="flex items-center justify-between text-13px">
-            <span className="font-medium text-[var(--text-secondary)]">Copertura</span>
-            <span className="text-13px font-bold text-[var(--text-primary)]">{coverage}%</span>
+          <div className="flex items-center justify-between text-12px text-[var(--text-secondary)]">
+            <span className="font-medium">Copertura stock</span>
+            <span className="font-bold text-[var(--text-primary)]">
+              {formatQuantity(material.quantity, material.unit)}
+            </span>
           </div>
           <CoverageBar coverage={coverage} tone={tone} />
+          {committed > 0 && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-12px text-[var(--text-secondary)]">
+                <span className="font-medium">Copertura effettiva</span>
+                <span
+                  className={cn(
+                    "font-bold",
+                    effectiveColor === "danger"
+                      ? "text-[var(--danger-base)]"
+                      : effectiveColor === "warning"
+                        ? "text-[var(--warning-base)]"
+                        : "text-[var(--success-base)]",
+                  )}
+                >
+                  {formatQuantity(effectiveStock, material.unit)}
+                </span>
+              </div>
+              <CoverageBar coverage={effectiveCoverage} tone={effectiveTone} />
+              <div className="mt-0.5 text-right text-10px text-[var(--text-tertiary)]">
+                -{committed.toLocaleString("it-IT")} impegnato in SAL
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Usage in SAL documents */}
+        <div className="mt-4 border-t border-[var(--border-subtle)] pt-4">
+          <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            Utilizzo nei SAL
+          </div>
+          {usageInfo.usedCount > 0 ? (
+            <div className="mt-2 space-y-1.5">
+              {usageInfo.entries.map((e) => (
+                <div
+                  className="flex items-center justify-between gap-2 rounded-md bg-[var(--bg-muted)]/50 px-2.5 py-2 text-11px"
+                  key={e.salId}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold text-[var(--text-primary)]">
+                      {e.salTitle}
+                    </div>
+                    <div className="truncate text-10px text-[var(--text-tertiary)]">
+                      {e.projectName} · {e.contractor}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-bold text-[var(--text-primary)]">
+                      {e.quantity.toLocaleString("it-IT")}
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-9px font-semibold",
+                        e.status === "Bozza"
+                          ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                          : "bg-[var(--info-soft)] text-[var(--info-base)]",
+                      )}
+                    >
+                      {e.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <div className="border-t border-[var(--border-subtle)]/40 pt-2">
+                <DetailLine
+                  label="Disponibile (lordo)"
+                  value={formatQuantity(material.quantity, material.unit)}
+                />
+                <DetailLine
+                  label="Impegnato"
+                  value={`- ${formatQuantity(committed, material.unit)}`}
+                  className="text-[var(--warning-base)]"
+                />
+                <DetailLine
+                  label="Effettivo disponibile"
+                  value={formatQuantity(effectiveStock, material.unit)}
+                  className={cn(
+                    effectiveStock < material.minQuantity && "text-[var(--danger-base)]",
+                  )}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 text-12px text-[var(--text-tertiary)]">
+              Nessuna SAL utilizza questo materiale
+            </div>
+          )}
         </div>
       </div>
     </Panel>
@@ -888,19 +1086,32 @@ function SidebarCategories({
 function MetricsGrid({
   metrics,
 }: {
-  metrics: { totalStock: number; critical: number; zero: number; avgCoverage: number };
+  metrics: {
+    totalStock: number;
+    critical: number;
+    zero: number;
+    committed: number;
+    avgCoverage: number;
+  };
 }) {
   return (
     <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard
         caption="Quantità totale in magazzino"
         icon={Warehouse}
-        label="Valore stock"
+        label="Stock totale"
         tone="blue"
         value={`${Math.round(metrics.totalStock)}`}
       />
       <MetricCard
-        caption="Sotto la soglia minima"
+        caption="Quantità impegnata in SAL (bozze + conferme)"
+        icon={ShoppingCart}
+        label="Impegnato"
+        tone="info"
+        value={`${Math.round(metrics.committed)}`}
+      />
+      <MetricCard
+        caption="Sotto la soglia minima di scorta"
         icon={AlertTriangle}
         label="Critici"
         tone="danger"
@@ -912,13 +1123,6 @@ function MetricsGrid({
         label="Esauriti"
         tone="warning"
         value={String(metrics.zero)}
-      />
-      <MetricCard
-        caption="Copertura media vs soglia minima"
-        icon={ShieldCheck}
-        label="Copertura media"
-        tone="success"
-        value={`${metrics.avgCoverage}%`}
       />
     </div>
   );
@@ -1030,10 +1234,22 @@ function MaterialListSection({
           {
             icon: <Trash2 className="size-4" />,
             label: "Elimina",
-            run: () => {
+            run: async () => {
+              const ids = [...useSelectionStore.getState().ids];
+              for (const id of ids) {
+                try {
+                  await deleteDesktopMaterial(id);
+                } catch {
+                  // continue deleting remaining materials
+                }
+              }
               useSelectionStore.getState().clear();
               dispatchDataChanged();
-              notify({ message: "Materiali eliminati.", title: "Eliminati", tone: "success" });
+              notify({
+                message: `${ids.length} materiali eliminati.`,
+                title: "Eliminati",
+                tone: "success",
+              });
             },
             tone: "danger",
           },
@@ -1119,11 +1335,21 @@ function CoverageBar({ coverage, tone }: { coverage: number; tone: StockTone }) 
   return <SeverityBar percentage={coverage} tone={tone} />;
 }
 
-function DetailLine({ label, value }: { label: string; value: string }) {
+function DetailLine({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
     <div className="flex items-center justify-between gap-4 py-2.5">
       <dt className="text-13px font-medium text-[var(--text-secondary)]">{label}</dt>
-      <dd className="text-right text-13px font-bold text-[var(--text-primary)]">{value}</dd>
+      <dd className={cn("text-right text-13px font-bold text-[var(--text-primary)]", className)}>
+        {value}
+      </dd>
     </div>
   );
 }

@@ -14,7 +14,17 @@ export type QuantaraRoute =
   | "team"
   | "settings";
 type MotionMode = "full" | "reduced";
-type ThemeMode = "light" | "dark";
+type ThemeMode =
+  | "light"
+  | "light-warm"
+  | "light-cool"
+  | "light-soft"
+  | "dark"
+  | "dark-amber"
+  | "dark-midnight"
+  | "dark-forest";
+type LightThemePref = "light" | "light-warm" | "light-cool" | "light-soft";
+type DarkThemePref = "dark" | "dark-amber" | "dark-midnight" | "dark-forest";
 
 type WorkflowAction = "new-project" | "new-sal" | "import-tariff" | null;
 export type PendingWorkflowAction = WorkflowAction;
@@ -104,10 +114,16 @@ type ThemeSlice = {
   setThemeMode: (themeMode: ThemeMode) => void;
   themeMode: ThemeMode;
   toggleTheme: () => void;
+  lightThemePref: LightThemePref;
+  darkThemePref: DarkThemePref;
+  setLightThemePref: (pref: LightThemePref) => void;
+  setDarkThemePref: (pref: DarkThemePref) => void;
 };
 
 type PreferenceSlice = {
   autoCheckUpdatesOnLaunch: boolean;
+  bumpDataVersion: () => void;
+  dataVersion: number;
   hasHydratedPreferences: boolean;
   motionMode: MotionMode;
   salCurrentStep: number;
@@ -142,6 +158,8 @@ export const useAppStore = create<AppStore>()(
     (set) => ({
       ...createNavigationState(initialRouteHistory, 0),
       autoCheckUpdatesOnLaunch: true,
+      bumpDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
+      dataVersion: 0,
       hasHydratedPreferences: false,
       motionMode: "full",
       salCurrentStep: 1,
@@ -293,10 +311,27 @@ export const useAppStore = create<AppStore>()(
         }),
       showReleaseNotesAfterUpdate: true,
       themeMode: "light",
+      lightThemePref: "light",
+      darkThemePref: "dark",
       toggleTheme: () =>
-        set((state) => ({
-          themeMode: state.themeMode === "light" ? "dark" : "light",
-        })),
+        set((state) => {
+          const currentIsLight =
+            state.themeMode === "light" ||
+            state.themeMode === "light-warm" ||
+            state.themeMode === "light-cool" ||
+            state.themeMode === "light-soft";
+          return {
+            themeMode: currentIsLight ? state.darkThemePref : state.lightThemePref,
+          };
+        }),
+      setLightThemePref: (lightThemePref) =>
+        set({
+          lightThemePref,
+        }),
+      setDarkThemePref: (darkThemePref) =>
+        set({
+          darkThemePref,
+        }),
     }),
     {
       name: "quantara-shell-preferences",
@@ -305,11 +340,14 @@ export const useAppStore = create<AppStore>()(
       },
       partialize: (state) => ({
         autoCheckUpdatesOnLaunch: state.autoCheckUpdatesOnLaunch,
+        dataVersion: state.dataVersion,
         motionMode: state.motionMode,
         salCurrentStep: state.salCurrentStep,
         selectedProjectId: state.selectedProjectId,
         showReleaseNotesAfterUpdate: state.showReleaseNotesAfterUpdate,
         themeMode: state.themeMode,
+        lightThemePref: state.lightThemePref,
+        darkThemePref: state.darkThemePref,
       }),
       storage: createJSONStorage(() => localStorage),
     },
@@ -366,6 +404,10 @@ export function useThemeState() {
       setThemeMode: state.setThemeMode,
       themeMode: state.themeMode,
       toggleTheme: state.toggleTheme,
+      lightThemePref: state.lightThemePref,
+      darkThemePref: state.darkThemePref,
+      setLightThemePref: state.setLightThemePref,
+      setDarkThemePref: state.setDarkThemePref,
     })),
   );
 }

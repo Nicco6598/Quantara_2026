@@ -122,6 +122,97 @@
   --space-72: 18rem;
   --space-80: 20rem;
   --space-96: 24rem;
+
+  /* ── Transition durations (allineate a easings.ts MOTION_DURATION) ── */
+  --duration-fast: 180ms;
+  --duration-base: 280ms;
+  --duration-slow: 420ms;
+  --duration-reveal: 580ms;
+
+  /* ── Z-index scale ── */
+  --z-dropdown-menu: 50;
+  --z-sticky: 60;
+  --z-topbar: 70;
+  --z-dialog: 80;
+  --z-toast: 90;
+  --z-dropdown-portal: 140;
+  --z-command-palette: 200;
+
+  /* ── Button gradient tokens (primary) ── */
+  --button-primary-start: color-mix(in srgb, var(--accent-primary) 70%, white 30%);
+  --button-primary-mid: var(--accent-primary);
+  --button-primary-end: color-mix(in srgb, var(--accent-primary) 80%, black 20%);
+  --button-primary-border: color-mix(in srgb, var(--accent-primary) 85%, white 15%);
+  --button-primary-shadow-outer: color-mix(in srgb, var(--accent-primary) 22%, transparent);
+  --button-primary-shadow-inner: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  --button-primary-glow: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+
+  /* ── Button gradient tokens (primary hover) ── */
+  --button-primary-hover-start: color-mix(in srgb, var(--accent-primary) 75%, white 25%);
+  --button-primary-hover-mid: color-mix(in srgb, var(--accent-primary) 95%, white 5%);
+  --button-primary-hover-end: color-mix(in srgb, var(--accent-primary) 75%, black 25%);
+  --button-primary-hover-shadow-outer: color-mix(in srgb, var(--accent-primary) 24%, transparent);
+  --button-primary-hover-shadow-inner: color-mix(in srgb, var(--accent-primary) 16%, transparent);
+  --button-primary-hover-glow: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+
+  /* ── Button gradient tokens (primary dark) ── */
+  --button-primary-dark-border: color-mix(in srgb, var(--accent-primary) 60%, white 40%);
+  --button-primary-dark-start: color-mix(in srgb, var(--accent-primary) 80%, white 20%);
+  --button-primary-dark-mid: var(--accent-primary);
+  --button-primary-dark-end: color-mix(in srgb, var(--accent-primary) 70%, black 30%);
+  --button-primary-dark-shadow-outer: color-mix(in srgb, var(--accent-primary) 28%, transparent);
+  --button-primary-dark-shadow-inner: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  --button-primary-dark-glow: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+
+  /* ── Button gradient tokens (neutral/ghost) ── */
+  --button-neutral-border: color-mix(in srgb, var(--accent-primary) 12%, var(--border-subtle) 88%);
+  --button-neutral-start: color-mix(in srgb, var(--surface-raised) 88%, var(--accent-primary) 12%);
+  --button-neutral-end: color-mix(in srgb, var(--surface-base) 78%, var(--bg-muted) 22%);
+  --button-neutral-hover-border: color-mix(
+    in srgb,
+    var(--accent-primary) 28%,
+    var(--border-subtle) 72%
+  );
+  --button-neutral-hover-start: color-mix(
+    in srgb,
+    var(--surface-raised) 84%,
+    var(--accent-primary) 16%
+  );
+  --button-neutral-hover-end: color-mix(in srgb, var(--surface-base) 74%, var(--bg-muted) 26%);
+
+  /* ── Button gradient tokens (soft/info) ── */
+  --button-soft-border: color-mix(in srgb, var(--accent-primary) 32%, var(--info-soft) 68%);
+  --button-soft-start: color-mix(in srgb, var(--accent-primary) 18%, var(--info-soft) 82%);
+  --button-soft-end: color-mix(in srgb, var(--info-soft) 66%, var(--surface-base) 34%);
+
+  /* ── Button gradient tokens (neutral/ghost dark) ── */
+  --button-neutral-dark-border: color-mix(
+    in srgb,
+    var(--accent-primary) 20%,
+    var(--border-subtle) 80%
+  );
+  --button-neutral-dark-start: color-mix(
+    in srgb,
+    var(--surface-raised) 86%,
+    var(--accent-primary) 14%
+  );
+  --button-neutral-dark-end: color-mix(in srgb, var(--surface-base) 90%, var(--accent-primary) 10%);
+  --button-neutral-dark-shadow: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+
+  /* ── Button gradient tokens (soft dark) ── */
+  --button-soft-dark-border: color-mix(in srgb, var(--accent-primary) 30%, var(--info-soft) 70%);
+  --button-soft-dark-start: color-mix(in srgb, var(--info-soft) 74%, var(--accent-primary) 26%);
+  --button-soft-dark-end: color-mix(in srgb, var(--surface-base) 80%, var(--accent-primary) 20%);
+  --button-soft-dark-shadow: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+
+  /* ── Button gradient tokens (destructive) ── */
+  --button-destructive-start: color-mix(in srgb, var(--danger-base) 80%, white 20%);
+  --button-destructive-mid: var(--danger-base);
+  --button-destructive-end: color-mix(in srgb, var(--danger-base) 80%, black 20%);
+  --button-destructive-hover-start: color-mix(in srgb, var(--danger-base) 85%, white 15%);
+  --button-destructive-hover-mid: color-mix(in srgb, var(--danger-base) 95%, black 5%);
+  --button-destructive-hover-end: color-mix(in srgb, var(--danger-base) 75%, black 25%);
+
   --font-sans:
     Geist, "Proxima Nova", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-heading:
@@ -129,10 +220,6 @@
     sans-serif;
   --font-serif: "Nocturne Serif", "Iowan Old Style", "New York", Georgia, serif;
   --font-mono: "Geist Mono", "SFMono-Regular", Consolas, monospace;
-  --duration-fast: 120ms;
-  --duration-base: 180ms;
-  --duration-slow: 260ms;
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
   /* ── Expanded border radius ── */
   --radius-2xs: 2px;
@@ -466,7 +553,15 @@
   --duration-fast: var(--duration-fast);
   --duration-base: var(--duration-base);
   --duration-slow: var(--duration-slow);
+  --duration-reveal: var(--duration-reveal);
   --ease-standard: var(--ease-standard);
+  --z-dropdown-menu: var(--z-dropdown-menu);
+  --z-sticky: var(--z-sticky);
+  --z-topbar: var(--z-topbar);
+  --z-dialog: var(--z-dialog);
+  --z-toast: var(--z-toast);
+  --z-dropdown-portal: var(--z-dropdown-portal);
+  --z-command-palette: var(--z-command-palette);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -474,5 +569,6 @@
     --duration-fast: 1ms;
     --duration-base: 1ms;
     --duration-slow: 1ms;
+    --duration-reveal: 1ms;
   }
 }
