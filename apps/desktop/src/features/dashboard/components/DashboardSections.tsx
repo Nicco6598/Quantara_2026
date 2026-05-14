@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ModernDonut, SegmentBars } from "@/components/shared/Charts";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/shared/Button";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { AuditEntry } from "@/store/audit-log-store";
 import type { PortfolioProject } from "@/features/projects/types";
@@ -42,11 +43,15 @@ export function PriorityActions({ items }: { items: PortfolioProject[] }) {
       <div className="space-y-3">
         {items.slice(0, 4).map((project) => (
           <m.div
-            className="flex items-start gap-3 rounded-14px p-3 transition-colors hover:bg-[var(--bg-muted)]"
-            initial={{ opacity: 0, x: -8 }}
+            className="flex items-start gap-3 rounded-18px p-3 transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--bg-muted)]"
+            initial={MOTION_VARIANTS.listItem.initial}
             key={project.id}
-            whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            transition={{
+              ...MOTION_VARIANTS.listItem.transition,
+              delay: Math.min(0.12, items.indexOf(project) * 0.03),
+            }}
+            viewport={MOTION_VARIANTS.row.viewport}
+            whileInView={MOTION_VARIANTS.listItem.animate}
           >
             <span
               className={cn(
@@ -150,16 +155,19 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
             return (
               <m.div
                 className={cn(
-                  "group grid min-h-[58px] grid-cols-[minmax(150px,210px)_minmax(420px,1fr)] transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                  "group grid min-h-[58px] grid-cols-[minmax(150px,210px)_minmax(420px,1fr)] transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
                   isHovered
                     ? "bg-[color-mix(in_srgb,var(--bg-muted)_58%,transparent)]"
                     : "hover:bg-[color-mix(in_srgb,var(--bg-muted)_34%,transparent)]",
                 )}
-                initial={{ opacity: 0, y: 8 }}
+                initial={MOTION_VARIANTS.row.initial}
                 key={bar.id}
-                transition={{ duration: 0.44, delay: index * 0.035, ease: [0.16, 1, 0.3, 1] }}
-                viewport={{ once: true, amount: 0.35 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                transition={{
+                  ...MOTION_VARIANTS.row.transition,
+                  delay: index * 0.035,
+                }}
+                viewport={MOTION_VARIANTS.row.viewport}
+                whileInView={MOTION_VARIANTS.row.whileInView}
               >
                 <div className="flex min-w-0 items-center gap-3 px-4 py-3">
                   <span
@@ -203,19 +211,18 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
                     <m.button
                       aria-label={`${bar.label}, ${progress.toFixed(0)}%, ${bar.days} giorni`}
                       className={cn(
-                        "absolute top-1 bottom-1 overflow-hidden rounded-10px text-left shadow-[0_10px_22px_color-mix(in_srgb,var(--text-primary)_9%,transparent)] outline-none transition-[filter,box-shadow] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
+                        "absolute top-1 bottom-1 overflow-hidden rounded-10px text-left shadow-[0_10px_22px_color-mix(in_srgb,var(--text-primary)_9%,transparent)] outline-none transition-[filter,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
                         toneClass,
                       )}
-                      initial={{ scaleX: 0, transformOrigin: "left center" }}
+                      initial={MOTION_VARIANTS.progress.initial}
                       onBlur={() => setHoveredBar(null)}
                       onFocus={() => setHoveredBar(bar)}
                       onMouseEnter={() => setHoveredBar(bar)}
                       onMouseLeave={() => setHoveredBar(null)}
                       style={{ left: `${start}%`, width: `${width}%` }}
                       transition={{
-                        duration: 0.68,
+                        ...MOTION_VARIANTS.progress.transition,
                         delay: 0.08 + index * 0.035,
-                        ease: [0.16, 1, 0.3, 1],
                       }}
                       type="button"
                       whileHover={{ y: -1 }}
@@ -223,12 +230,11 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
                     >
                       <m.span
                         className="absolute inset-y-0 left-0 rounded-10px bg-white/24"
-                        initial={{ scaleX: 0, transformOrigin: "left center" }}
+                        initial={MOTION_VARIANTS.progress.initial}
                         style={{ width: `${progress}%` }}
                         transition={{
-                          duration: 0.78,
+                          ...MOTION_VARIANTS.progress.transition,
                           delay: 0.18 + index * 0.035,
-                          ease: [0.16, 1, 0.3, 1],
                         }}
                         whileInView={{ scaleX: 1 }}
                       />
@@ -253,10 +259,10 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
 
       {hoveredBar ? (
         <m.div
-          animate={{ opacity: 1, y: 0, scale: 1 }}
+          animate={MOTION_VARIANTS.popover.animate}
           className="absolute right-3 top-12 z-20 hidden max-w-[280px] rounded-14px border border-[color-mix(in_srgb,var(--border-subtle)_66%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_94%,transparent)] px-3 py-2 text-10px font-semibold text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl md:block"
-          initial={{ opacity: 0, y: 4, scale: 0.98 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          initial={MOTION_VARIANTS.popover.initial}
+          transition={MOTION_VARIANTS.popover.transition}
         >
           <div className="text-12px font-bold text-[var(--text-primary)]">{hoveredBar.label}</div>
           <div className="mt-1">{hoveredBar.subtitle}</div>
@@ -356,8 +362,8 @@ export function OperationalSites({
   }, [projects.length]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
+    <section className="space-y-3">
+      <div className="flex items-center gap-3 px-1">
         <HardHat className="size-5 text-[var(--info-base)]" />
         <div>
           <div className="text-13px font-semibold text-[var(--text-primary)]">
@@ -383,7 +389,7 @@ export function OperationalSites({
       })}
 
       {projects.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-22px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] p-10 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-22px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] p-10 text-center shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--surface-highlight)_48%,transparent)]">
           <HardHat className="size-8 text-[var(--text-secondary)]" />
           <p className="text-13px font-medium text-[var(--text-secondary)]">
             Nessun cantiere nel portafoglio.
@@ -401,7 +407,7 @@ export function OperationalSites({
           </Button>
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }
 
@@ -427,10 +433,11 @@ function ProjectRow({
 
   return (
     <m.article
-      className="group cursor-pointer rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_56%,transparent)] bg-[var(--surface-base)] p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_8%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_14%,transparent)]"
-      initial={{ opacity: 0, y: 10 }}
-      transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-      whileInView={{ opacity: 1, y: 0 }}
+      className="group cursor-pointer rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_56%,transparent)] bg-[var(--surface-base)] p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--surface-base)_90%,var(--bg-muted)_10%)] hover:shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_8%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_14%,transparent)]"
+      initial={MOTION_VARIANTS.row.initial}
+      transition={MOTION_VARIANTS.row.transition}
+      viewport={MOTION_VARIANTS.row.viewport}
+      whileInView={MOTION_VARIANTS.row.whileInView}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-4">
@@ -480,7 +487,7 @@ function ProjectRow({
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-3 rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_62%,transparent)] p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_42%,transparent)]">
+      <div className="mt-3 grid grid-cols-1 gap-3 rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_62%,transparent)] p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_42%,transparent)] sm:grid-cols-3">
         <div>
           <div className="text-10px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
             SAL
@@ -613,7 +620,7 @@ export function RightRail({
 function ActionButton({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
     <button
-      className="flex w-full items-center gap-3 rounded-14px bg-[var(--bg-muted)]/70 px-4 py-3 text-left text-13px font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+      className="flex w-full items-center gap-3 rounded-18px bg-[var(--bg-muted)]/70 px-4 py-3 text-left text-13px font-semibold text-[var(--text-primary)] transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--bg-muted)]"
       type="button"
     >
       <span className="flex size-8 shrink-0 items-center justify-center rounded-10px bg-[var(--info-soft)] text-[var(--info-base)]">

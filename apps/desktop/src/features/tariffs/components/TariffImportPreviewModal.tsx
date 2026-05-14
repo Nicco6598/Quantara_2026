@@ -20,10 +20,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { useToast } from "@/components/shared/ToastProvider";
 
 import { Button } from "@/components/shared/Button";
+import { Dialog, DialogActions } from "@/components/shared/Dialog";
 
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 
@@ -815,7 +816,6 @@ export function TariffImportPreviewModal({
               key={meta.name}
               onClick={() => switchFile(i)}
               type="button"
-              transition={{ duration: 0.42, ease: SPRING_EASE }}
             >
               {draftedFiles.has(i) ? (
                 <Save className="size-3.5 shrink-0" />
@@ -937,9 +937,9 @@ export function TariffImportPreviewModal({
       />
       <m.div
         className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-        initial={{ opacity: 0, y: 24, scale: 0.96 }}
-        transition={{ duration: 0.5, ease: SPRING_EASE }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={MOTION_VARIANTS.dialog.initial}
+        transition={MOTION_VARIANTS.dialog.transition}
+        animate={MOTION_VARIANTS.dialog.animate}
       >
         <div className="flex min-h-0 flex-col rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
@@ -1397,7 +1397,6 @@ function InterventionPanel({
                 key={`${row.index}-${row.field}`}
                 onClick={() => onFocusCell(row.index, row.field)}
                 type="button"
-                transition={{ duration: 0.42, ease: SPRING_EASE }}
               >
                 Riga {row.index + 1}: {row.label}
               </m.button>
@@ -1535,38 +1534,30 @@ function DeleteVoiceDialog({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm">
-      <button
-        aria-label="Annulla eliminazione"
-        className="absolute inset-0"
-        onClick={onCancel}
-        type="button"
-      />
-      <div className="relative w-full max-w-md rounded-22px bg-[var(--surface-base)] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] ring-1 ring-[var(--border-subtle)]">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
-            <Trash2 className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-18px font-semibold leading-tight text-[var(--text-primary)]">
-              Eliminare questa voce?
-            </h3>
-            <p className="mt-2 text-13px font-medium leading-5 text-[var(--text-secondary)]">
-              {code}
-              {description ? ` - ${description}` : ""}
-            </p>
-          </div>
+    <Dialog className="max-w-md" isOpen onClose={onCancel} zIndex={120}>
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
+          <Trash2 className="size-5" />
         </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button onClick={onCancel} variant="outline">
-            Annulla
-          </Button>
-          <Button icon={Trash2} onClick={onConfirm} variant="secondary">
-            Elimina
-          </Button>
+        <div className="min-w-0">
+          <h3 className="text-18px font-semibold leading-tight text-[var(--text-primary)]">
+            Eliminare questa voce?
+          </h3>
+          <p className="mt-2 text-13px font-medium leading-5 text-[var(--text-secondary)]">
+            {code}
+            {description ? ` - ${description}` : ""}
+          </p>
         </div>
       </div>
-    </div>
+      <DialogActions className="gap-2">
+        <Button onClick={onCancel} variant="outline">
+          Annulla
+        </Button>
+        <Button icon={Trash2} onClick={onConfirm} variant="secondary">
+          Elimina
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

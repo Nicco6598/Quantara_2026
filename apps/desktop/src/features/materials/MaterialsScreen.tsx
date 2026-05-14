@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch } from "@/components/filters";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { SeverityBar } from "@/components/shared/SeverityBar";
@@ -429,10 +429,10 @@ function MaterialCard({
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
           : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
       )}
-      initial={{ opacity: 0, y: 10 }}
-      transition={{ duration: 0.42, ease: SPRING_EASE }}
-      viewport={{ amount: 0.18, once: true }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={MOTION_VARIANTS.row.initial}
+      transition={MOTION_VARIANTS.row.transition}
+      viewport={MOTION_VARIANTS.row.viewport}
+      whileInView={MOTION_VARIANTS.row.whileInView}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">

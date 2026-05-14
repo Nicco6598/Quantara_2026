@@ -12,6 +12,7 @@ import {
   Upload,
 } from "lucide-react";
 import { memo, type ReactNode, useRef, useState } from "react";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import type { PortfolioProject } from "@/features/projects/types";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
@@ -33,8 +34,6 @@ type ProjectsWorkbenchProps = {
   query: string;
   selectedProjectId: string;
 };
-
-const spring = { damping: 30, stiffness: 260, type: "spring" as const };
 
 export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   children,
@@ -168,15 +167,15 @@ function WorkbenchRow({
 
   return (
     <m.article
-      animate={{ opacity: 1, scale: 1, y: 0 }}
+      animate={MOTION_VARIANTS.card.whileInView}
       className={cn(
         "group relative cursor-pointer overflow-hidden rounded-26px p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
         isSelected
           ? "bg-[color-mix(in_srgb,var(--info-soft)_28%,var(--surface-base)_72%)]"
           : "bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] hover:shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_8%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_14%,transparent)]",
       )}
-      exit={{ opacity: 0, scale: 0.98, y: 10 }}
-      initial={{ opacity: 0, scale: 0.985, y: 12 }}
+      exit={{ opacity: 0, scale: 0.994, y: 10 }}
+      initial={MOTION_VARIANTS.card.initial}
       layout
       onClick={() => onOpenProject(project)}
       onKeyDown={(event) => {
@@ -187,7 +186,7 @@ function WorkbenchRow({
       }}
       role="button"
       tabIndex={0}
-      transition={spring}
+      transition={MOTION_VARIANTS.card.transition}
       whileHover={{ y: -2 }}
     >
       <div className="hidden grid-cols-[1.45fr_0.78fr_0.72fr_1fr_0.78fr_64px] items-center gap-3 xl:grid">
@@ -354,10 +353,10 @@ function SalCockpit({ project, salProgress }: { project: PortfolioProject; salPr
       <div className="mt-3 h-1.5 overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--border-subtle)_64%,transparent)]">
         <m.div
           className="h-full rounded-18px bg-[var(--accent-primary)]"
-          initial={{ scaleX: 0 }}
+          initial={MOTION_VARIANTS.progress.initial}
           style={{ originX: 0 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          viewport={{ once: true }}
+          transition={MOTION_VARIANTS.progress.transition}
+          viewport={MOTION_VARIANTS.progress.viewport}
           whileInView={{ scaleX: salProgress / 100 }}
         />
       </div>

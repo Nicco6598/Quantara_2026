@@ -30,6 +30,7 @@ import { StatusPill } from "@/components/shared/StatusPill";
 
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 
@@ -466,9 +467,10 @@ export function ProjectDetailScreen() {
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
               <m.div
                 className="h-full rounded-full bg-[var(--accent-primary)]"
-                initial={{ width: 0 }}
-                animate={{ width: `${detail.progress}%` }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                animate={{ scaleX: detail.progress / 100 }}
+                initial={MOTION_VARIANTS.progress.initial}
+                style={{ originX: 0 }}
+                transition={MOTION_VARIANTS.progress.transition}
               />
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-11px">
@@ -777,12 +779,11 @@ export function ProjectDetailScreen() {
                     return (
                       <m.div
                         key={bookId}
-                        initial={{ opacity: 0, x: -12 }}
-                        animate={{ opacity: 1, x: 0 }}
+                        animate={MOTION_VARIANTS.row.whileInView}
+                        initial={MOTION_VARIANTS.row.initial}
                         transition={{
-                          delay: index * 0.04,
-                          duration: 0.25,
-                          ease: [0.22, 1, 0.36, 1],
+                          ...MOTION_VARIANTS.row.transition,
+                          delay: index * 0.035,
                         }}
                         className="flex items-center justify-between gap-2 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]/50"
                       >

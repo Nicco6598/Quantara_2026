@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, m } from "framer-motion";
 import { memo, type ReactNode, useMemo, useRef, useState } from "react";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import type { ContractorFolder } from "@/features/projects/types";
@@ -45,8 +46,6 @@ type FolderHealth = {
   score: number;
   tone: StatusTone;
 };
-
-const spring = { damping: 30, stiffness: 260, type: "spring" as const };
 
 export const ContractorsWorkspace = memo(function ContractorsWorkspace({
   activeProjectsCount,
@@ -448,12 +447,12 @@ function ContractorCard({
   return (
     <m.article
       layout
-      animate={{ opacity: 1, scale: 1, y: 0 }}
+      animate={MOTION_VARIANTS.card.whileInView}
       className="group relative min-h-[244px] overflow-hidden rounded-26px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[0_16px_42px_color-mix(in_srgb,var(--text-primary)_7%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_58%,transparent)]"
-      exit={{ opacity: 0, scale: 0.98, y: 10 }}
-      initial={{ opacity: 0, scale: 0.985, y: 12 }}
-      transition={spring}
-      whileHover={{ y: -3 }}
+      exit={{ opacity: 0, scale: 0.994, y: 10 }}
+      initial={MOTION_VARIANTS.card.initial}
+      transition={MOTION_VARIANTS.card.transition}
+      whileHover={{ y: -2 }}
     >
       <div className="absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-highlight)_82%,transparent),transparent)]" />
       <div className="absolute right-4 top-4 z-20">
@@ -524,10 +523,13 @@ function ContractorCard({
           <div className="mt-3 h-2 overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
             <m.div
               className="h-full rounded-18px bg-[var(--accent-primary)]"
-              initial={{ scaleX: 0 }}
+              initial={MOTION_VARIANTS.progress.initial}
               style={{ originX: 0 }}
-              transition={{ delay: 0.08, duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
-              viewport={{ once: true }}
+              transition={{
+                ...MOTION_VARIANTS.progress.transition,
+                delay: 0.08,
+              }}
+              viewport={MOTION_VARIANTS.progress.viewport}
               whileInView={{ scaleX: salRatio / 100 }}
             />
           </div>

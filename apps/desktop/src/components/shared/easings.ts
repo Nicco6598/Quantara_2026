@@ -20,16 +20,33 @@ export const MOTION_VARIANTS = {
     transition: { duration: MOTION_DURATION.slow, ease: SPRING_EASE },
   },
   listItem: {
-    animate: { opacity: 1, x: 0 },
-    initial: { opacity: 0, x: -8 },
+    animate: { opacity: 1, x: 0, y: 0 },
+    initial: { opacity: 0, x: -8, y: 0 },
     transition: { duration: MOTION_DURATION.base, ease: SPRING_EASE },
+  },
+  row: {
+    initial: { opacity: 0, y: 10 },
+    transition: { duration: MOTION_DURATION.slow, ease: SPRING_EASE },
+    viewport: { amount: 0.18, once: true },
+    whileInView: { opacity: 1, y: 0 },
   },
   popover: {
     animate: { opacity: 1, scale: 1, y: 0 },
     initial: { opacity: 0, scale: 0.98, y: -6 },
     transition: { duration: MOTION_DURATION.fast, ease: SPRING_EASE },
   },
+  progress: {
+    initial: { scaleX: 0 },
+    transition: { duration: MOTION_DURATION.reveal, ease: SPRING_EASE },
+    viewport: { once: true },
+  },
   press: {
     whileTap: { scale: 0.98 },
+  },
+  viewSwap: {
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: 6 },
+    initial: { opacity: 0, y: 6 },
+    transition: { duration: MOTION_DURATION.base, ease: SPRING_EASE },
   },
 } as const;

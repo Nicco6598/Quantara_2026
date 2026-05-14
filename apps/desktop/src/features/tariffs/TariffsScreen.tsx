@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 
 import { ScreenHero } from "@/components/shared/ScreenHero";
 
@@ -1217,10 +1217,10 @@ function TariffBookPreviewCard({
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
           : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
       )}
-      initial={{ opacity: 0, y: 10 }}
-      transition={{ duration: 0.42, ease: SPRING_EASE }}
-      viewport={{ amount: 0.18, once: true }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={MOTION_VARIANTS.row.initial}
+      transition={MOTION_VARIANTS.row.transition}
+      viewport={MOTION_VARIANTS.row.viewport}
+      whileInView={MOTION_VARIANTS.row.whileInView}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
@@ -1398,9 +1398,10 @@ function TariffBookPreviewCard({
         ) : showDetails ? (
           <m.div
             className="mt-4 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/40 p-3"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.32, ease: SPRING_EASE }}
+            animate={MOTION_VARIANTS.viewSwap.animate}
+            exit={MOTION_VARIANTS.viewSwap.exit}
+            initial={MOTION_VARIANTS.viewSwap.initial}
+            transition={MOTION_VARIANTS.viewSwap.transition}
           >
             <div className="grid gap-2 text-12px font-medium text-[var(--text-secondary)]">
               <DetailLine label="ID" value={book.id} />
@@ -1509,10 +1510,10 @@ function TariffImportPreviewPanel({
       <m.button
         id="fab-back-to-top"
         className="group fixed bottom-6 right-6 z-[120] flex h-11 w-11 items-center justify-start gap-2 overflow-hidden rounded-full bg-[var(--accent-primary)] px-3 text-[var(--text-inverse)] shadow-lg outline-none ring-1 ring-white/10 transition-[width,box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:w-40 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-        initial={{ opacity: 0, scale: 0.8, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
+        initial={MOTION_VARIANTS.popover.initial}
+        animate={MOTION_VARIANTS.popover.animate}
         onClick={scrollPreviewToTop}
-        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        transition={MOTION_VARIANTS.popover.transition}
         type="button"
         title="Torna su"
       >

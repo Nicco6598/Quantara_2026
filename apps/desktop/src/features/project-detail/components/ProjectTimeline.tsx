@@ -1,7 +1,7 @@
 import { m } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { useMemo } from "react";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import type { PortfolioProject } from "@/features/projects/types";
 
 import { Currency } from "@/components/shared/Currency";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 import { buildProjectTimeline, type TimelineEvent } from "../domain/project-timeline";
 
-const STAGGER = 0.04;
+const STAGGER = 0.035;
 
 type ProjectTimelineProps = {
   project: PortfolioProject;
@@ -71,10 +71,13 @@ function TimelineDot({ event, index }: { event: TimelineEvent; index: number }) 
 
   return (
     <m.div
-      animate={{ opacity: 1, x: 0 }}
+      animate={MOTION_VARIANTS.row.whileInView}
       className="relative flex items-start gap-3"
-      initial={{ opacity: 0, x: -12 }}
-      transition={{ delay: index * STAGGER, duration: 0.3, ease: SPRING_EASE }}
+      initial={MOTION_VARIANTS.row.initial}
+      transition={{
+        ...MOTION_VARIANTS.row.transition,
+        delay: index * STAGGER,
+      }}
     >
       {/* Dot */}
       <div

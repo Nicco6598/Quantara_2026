@@ -1,4 +1,3 @@
-import { m } from "framer-motion";
 import { Trash2, X } from "lucide-react";
 import {
   type ChangeEvent,
@@ -13,9 +12,9 @@ import {
   useTransition,
 } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { SPRING_EASE } from "@/components/shared/easings";
 import { Button } from "@/components/shared/Button";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
@@ -598,48 +597,33 @@ function ContractorDeleteDialog({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
-      <button
-        aria-label="Chiudi conferma eliminazione appaltatore"
-        className="absolute inset-0 cursor-default"
-        onClick={onClose}
-        type="button"
-      />
-      <m.section
-        className="relative w-full max-w-sm rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: SPRING_EASE }}
-      >
-        <div className="rounded-22px bg-[var(--surface-base)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-          <div className="flex items-center justify-between">
-            <h3 className="text-16px font-semibold text-[var(--text-primary)]">
-              Elimina {contractor.contractor}?
-            </h3>
-            <button
-              className="flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-              onClick={onClose}
-              type="button"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-          <p className="mt-3 text-13px leading-6 text-[var(--text-secondary)]">
-            {contractor.projectCount > 0
-              ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato. Anche i SAL collegati non ricreeranno la cartella.`
-              : "La cartella verra rimossa dal registro appaltatori e dai SAL collegati."}
-          </p>
-          <div className="mt-5 flex justify-end gap-3">
-            <Button onClick={onClose} variant="ghost">
-              Annulla
-            </Button>
-            <Button onClick={onConfirm} variant="destructive">
-              <Trash2 className="size-4" />
-              Elimina
-            </Button>
-          </div>
-        </div>
-      </m.section>
-    </div>
+    <Dialog isOpen onClose={onClose} zIndex={80}>
+      <div className="flex items-center justify-between">
+        <h3 className="text-16px font-semibold text-[var(--text-primary)]">
+          Elimina {contractor.contractor}?
+        </h3>
+        <button
+          className="flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+          onClick={onClose}
+          type="button"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+      <p className="mt-3 text-13px leading-6 text-[var(--text-secondary)]">
+        {contractor.projectCount > 0
+          ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato. Anche i SAL collegati non ricreeranno la cartella.`
+          : "La cartella verra rimossa dal registro appaltatori e dai SAL collegati."}
+      </p>
+      <DialogActions>
+        <Button onClick={onClose} variant="ghost">
+          Annulla
+        </Button>
+        <Button onClick={onConfirm} variant="destructive">
+          <Trash2 className="size-4" />
+          Elimina
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

@@ -12,6 +12,14 @@ All notable changes to Quantara follow SemVer.
 - **ScreenLayout** — wrapper pagina con gradienti unificati. Rimosse 8 copie identiche di `pointer-events-none absolute ... bg-[radial-gradient(...)]`.
 - **ContextToolbar rinnovata** — badge più grande, layout migliorato, coerenza tra tutte le view.
 
+### Coerenza UI e motion
+
+- **Motion tokens centralizzati** — aggiunti preset condivisi per `row`, `progress` e `viewSwap`: liste, barre di avanzamento e cambi vista ora usano la stessa direzione verticale e gli stessi timing.
+- **Dashboard più coerente** — normalizzate animazioni, hover, spacing e responsive di metriche, timeline Gantt, azioni prioritarie e lista cantieri operativi.
+- **Modali allineate** — `Dialog` ora usa portal su `document.body`, attributi ARIA, chiusura overlay configurabile e shell riusabile per modali grandi. Uniformate SAL, guida scorciatoie, update dialog, note release, conferme appaltatore, explorer voci tariffarie e delete dialog della preview import.
+- **Rimossi slide incoerenti** — eliminati ingressi laterali discordanti da timeline progetto, tariffari associati, explorer tariffari e liste materiali/tariffari; restano solo hover verticali minimi sugli elementi interattivi.
+- **Preview import più stabile** — apertura modal e conferme interne ora seguono i preset comuni, senza transizioni locali inutili su pulsanti e chip.
+
 ### Componenti condivisi estratti
 
 - **MetricCard, EmptyState, QuickAction, SectionHeader, LoadingSkeleton** — estratti in file propri. Rimossi duplicati locali in MaterialsScreen e TariffsScreen. Import aggiornati in ContractorDetailView, ProjectsWorkbench, ControlRailPanel.
