@@ -18,14 +18,10 @@ import type {
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { ControlRailPanel } from "./ControlRailPanel";
 import { ProjectsWorkbench } from "./ProjectsWorkbench";
-import {
-  BezelSurface,
-  CompactRail,
-  EmptyState,
-  FocusChip,
-  MetricCard,
-  ProjectControlButton,
-} from "./workspace-ui";
+import { Button } from "@/components/shared/Button";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { MetricCard } from "@/components/shared/MetricCard";
+import { BezelSurface, CompactRail, FocusChip } from "./workspace-ui";
 
 type FocusOption = {
   label: string;
@@ -173,14 +169,9 @@ export function ContractorDetailView({
             {formatMoney({ amount: totalBudget, currency: "EUR" })} di contratti attivi.
           </p>
           <div className="mt-4 flex items-center gap-3">
-            <ProjectControlButton
-              className="text-12px"
-              icon={ArrowLeft}
-              onClick={onBack}
-              variant="neutral"
-            >
+            <Button className="text-12px" icon={ArrowLeft} onClick={onBack} variant="secondary">
               Appaltatori
-            </ProjectControlButton>
+            </Button>
           </div>
         </BezelSurface>
       </section>

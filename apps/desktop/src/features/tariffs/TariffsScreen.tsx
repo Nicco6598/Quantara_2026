@@ -8,7 +8,6 @@ import {
   Database,
   Eye,
   FileText,
-  type LucideIcon,
   MoreVertical,
   Pencil,
   Save,
@@ -27,7 +26,11 @@ import { ScreenHero } from "@/components/shared/ScreenHero";
 
 import { useToast } from "@/components/shared/ToastProvider";
 
-import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
+import { FilterChip } from "@/components/shared/FilterChip";
+import { MetricCard } from "@/components/shared/MetricCard";
+import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 
 import {
   createDesktopTariffBook,
@@ -879,15 +882,10 @@ export function TariffsScreen() {
   }
 
   return (
-    <main
+    <ScreenLayout
       ref={screenRef}
-      className={cn(
-        "relative w-full max-w-full px-4 pb-10 pt-4 md:px-6",
-        importPhase === "preview" && importPreviews.length > 0 ? "" : "overflow-x-hidden",
-      )}
+      className={importPhase === "preview" && importPreviews.length > 0 ? "" : "overflow-x-hidden"}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
-
       {importPhase === "preview" && importPreviews.length > 0 ? (
         <TariffImportPreviewPanel
           draftedImportFiles={draftedImportFiles}
@@ -1042,36 +1040,20 @@ export function TariffsScreen() {
             <Panel className="min-w-0 overflow-visible p-0">
               <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    className={cn(
-                      "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
-                      activeCatalogTab === "all"
-                        ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                        : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-                    )}
+                  <FilterChip
+                    active={activeCatalogTab === "all"}
+                    count={baseFilteredTariffBooks.length}
                     onClick={() => setActiveCatalogTab("all")}
-                    type="button"
                   >
                     Tutti i tariffari
-                    <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-11px font-bold">
-                      {baseFilteredTariffBooks.length}
-                    </span>
-                  </button>
-                  <button
-                    className={cn(
-                      "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
-                      activeCatalogTab === "favorites"
-                        ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                        : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-                    )}
+                  </FilterChip>
+                  <FilterChip
+                    active={activeCatalogTab === "favorites"}
+                    count={favoriteCount}
                     onClick={() => setActiveCatalogTab("favorites")}
-                    type="button"
                   >
                     I miei preferiti
-                    <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-11px font-bold">
-                      {favoriteCount}
-                    </span>
-                  </button>
+                  </FilterChip>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -1182,7 +1164,7 @@ export function TariffsScreen() {
           total={voicesState.data.length}
         />
       ) : null}
-    </main>
+    </ScreenLayout>
   );
 }
 
@@ -1312,9 +1294,9 @@ function TariffBookPreviewCard({
               <Star className={cn("size-4", isFavorite && "fill-current")} />
             </button>
             <div ref={menuRef}>
-              <ProjectControlButton onClick={() => setIsMenuOpen((v) => !v)} variant="icon">
+              <Button onClick={() => setIsMenuOpen((v) => !v)} variant="icon">
                 <MoreVertical className="size-4" />
-              </ProjectControlButton>
+              </Button>
               <DropdownMenu
                 isOpen={isMenuOpen}
                 onClose={() => setIsMenuOpen(false)}
@@ -1405,17 +1387,12 @@ function TariffBookPreviewCard({
               </label>
             </div>
             <div className="flex gap-2 pt-1">
-              <ProjectControlButton
-                className="flex-1"
-                icon={Save}
-                onClick={onSaveEdit}
-                variant="primary"
-              >
+              <Button className="flex-1" icon={Save} onClick={onSaveEdit} variant="primary">
                 Salva
-              </ProjectControlButton>
-              <ProjectControlButton onClick={onCancelEdit} variant="neutral">
+              </Button>
+              <Button onClick={onCancelEdit} variant="outline">
                 Annulla
-              </ProjectControlButton>
+              </Button>
             </div>
           </div>
         ) : showDetails ? (
@@ -1572,57 +1549,5 @@ function PanelTitle({ children }: { children: string }) {
     <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
       {children}
     </div>
-  );
-}
-
-function MetricCard({
-  caption,
-  icon: Icon,
-  label,
-  tone,
-  value,
-}: {
-  caption: string;
-  icon: LucideIcon;
-  label: string;
-  tone?: "blue" | "info" | "success" | "warning";
-  value: string;
-}) {
-  return (
-    <BezelSurface
-      innerClassName={cn(
-        "group flex min-h-[112px] items-center gap-3 p-4 2xl:min-h-[128px] 2xl:gap-4",
-        tone === "blue" ? "bg-[var(--info-soft)]/20" : "",
-      )}
-    >
-      <div
-        className={cn(
-          "flex size-11 shrink-0 items-center justify-center rounded-full 2xl:size-12",
-          (!tone || tone === "blue") && "bg-[var(--info-soft)] text-[var(--info-base)]",
-          tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-          tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-          tone === "info" && "bg-[var(--info-soft)] text-[var(--info-base)]",
-        )}
-      >
-        <Icon className="size-5 2xl:size-6" />
-      </div>
-      <div className="min-w-0">
-        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-          {label}
-        </div>
-        <div
-          className={cn(
-            "mt-2 text-20px font-bold leading-none 2xl:text-22px",
-            (!tone || tone === "blue") && "text-[var(--info-base)]",
-            tone === "success" && "text-[var(--success-base)]",
-            tone === "warning" && "text-[var(--warning-base)]",
-            tone === "info" && "text-[var(--info-base)]",
-          )}
-        >
-          {value}
-        </div>
-        <div className="mt-2 text-12px font-medium text-[var(--text-secondary)]">{caption}</div>
-      </div>
-    </BezelSurface>
   );
 }

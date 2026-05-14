@@ -23,7 +23,9 @@ import { ScreenHero } from "@/components/shared/ScreenHero";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { SeverityBar, severityToneForPercentage } from "@/components/shared/SeverityBar";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
+import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { listDesktopContracts } from "@/lib/desktopData";
@@ -225,9 +227,7 @@ export function AccountingScreen() {
     dateTo;
 
   return (
-    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_16%_8%,color-mix(in_srgb,var(--accent-primary)_14%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_32%)]" />
-
+    <ScreenLayout gradient="success-info">
       <section className="animate-entry">
         <ScreenHero
           badge="Contabilità"
@@ -463,7 +463,7 @@ export function AccountingScreen() {
                     <p className="mt-7 max-w-[260px] text-14px font-medium leading-6 text-[var(--text-secondary)]">
                       {selectedSalIds.size} SAL pronti per il report contabile.
                     </p>
-                    <ProjectControlButton
+                    <Button
                       className="mt-5 h-12 w-full justify-between"
                       icon={Download}
                       onClick={() =>
@@ -478,7 +478,7 @@ export function AccountingScreen() {
                     >
                       Genera report contabile
                       <ChevronRight className="ml-auto size-4" />
-                    </ProjectControlButton>
+                    </Button>
                   </>
                 ) : (
                   <p className="mt-6 max-w-[260px] text-14px font-medium leading-6 text-[var(--text-secondary)]">
@@ -520,7 +520,7 @@ export function AccountingScreen() {
             </div>
 
             <div className="mt-5 grid gap-2">
-              <ProjectControlButton
+              <Button
                 className="w-full"
                 icon={Download}
                 onClick={() =>
@@ -531,18 +531,14 @@ export function AccountingScreen() {
                     tone: "info",
                   })
                 }
-                variant="neutral"
+                variant="secondary"
               >
                 Scarica report (.csv)
-              </ProjectControlButton>
-              <ProjectControlButton
-                className="h-12 w-full justify-between"
-                icon={FileBadge}
-                variant="primary"
-              >
+              </Button>
+              <Button className="h-12 w-full justify-between" icon={FileBadge} variant="primary">
                 Genera certificato pagamento
                 <ChevronRight className="ml-auto size-4" />
-              </ProjectControlButton>
+              </Button>
             </div>
           </Panel>
 
@@ -611,7 +607,7 @@ export function AccountingScreen() {
           </Panel>
         </aside>
       </section>
-    </main>
+    </ScreenLayout>
   );
 }
 

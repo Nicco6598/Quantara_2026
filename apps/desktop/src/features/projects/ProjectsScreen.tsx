@@ -16,7 +16,8 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { SPRING_EASE } from "@/components/shared/easings";
-import { ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
+import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
 import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
 import { useProjectMigration } from "@/features/projects/hooks/useProjectMigration";
@@ -384,9 +385,7 @@ export function ProjectsScreen() {
     portfolioMetrics;
 
   return (
-    <main className="premium-page relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] bg-[radial-gradient(ellipse_at_18%_0%,color-mix(in_srgb,var(--surface-base)_92%,transparent),transparent_42%),radial-gradient(ellipse_at_88%_10%,color-mix(in_srgb,var(--accent-primary)_8%,transparent),transparent_36%)]" />
-
+    <ScreenLayout gradient="accent" gradientHeight={460} className="premium-page">
       <ErrorBoundary resetKey={`projects-workspace:${selectedContractorId ?? "root"}`}>
         {selectedContractor ? (
           <ContractorDetailView
@@ -486,7 +485,7 @@ export function ProjectsScreen() {
           L'operazione rimuove il contratto locale dal registro.
         </ConfirmDialog>
       </Suspense>
-    </main>
+    </ScreenLayout>
   );
 }
 
@@ -631,17 +630,13 @@ function ContractorDeleteDialog({
               : "La cartella verra rimossa dal registro appaltatori e dai SAL collegati."}
           </p>
           <div className="mt-5 flex justify-end gap-3">
-            <ProjectControlButton onClick={onClose} variant="ghost">
+            <Button onClick={onClose} variant="ghost">
               Annulla
-            </ProjectControlButton>
-            <ProjectControlButton
-              className="!bg-[var(--danger-base)] !text-white hover:!bg-[var(--danger-soft)] hover:!text-[var(--danger-base)]"
-              onClick={onConfirm}
-              variant="primary"
-            >
+            </Button>
+            <Button onClick={onConfirm} variant="destructive">
               <Trash2 className="size-4" />
               Elimina
-            </ProjectControlButton>
+            </Button>
           </div>
         </div>
       </m.section>

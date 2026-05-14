@@ -1,4 +1,4 @@
-import { AnimatePresence, m } from "framer-motion";
+import { m } from "framer-motion";
 import {
   Activity,
   Check,
@@ -24,12 +24,14 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
 
 import { useToast } from "@/components/shared/ToastProvider";
 import { StatusPill } from "@/components/shared/StatusPill";
 
-import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
+import { Dialog, DialogActions } from "@/components/shared/Dialog";
+import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { PortfolioProject } from "@/features/projects/types";
@@ -432,9 +434,7 @@ export function ProjectDetailScreen() {
   ];
 
   return (
-    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
-
+    <ScreenLayout>
       <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_340px] md:items-start">
         <div className="min-w-0">
           <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
@@ -610,14 +610,9 @@ export function ProjectDetailScreen() {
                 <FileText className="size-4 text-[var(--info-base)]" />
                 Registro SAL
               </div>
-              <ProjectControlButton
-                icon={Plus}
-                onClick={handleCreateSal}
-                className="h-9 px-3 text-13px"
-                variant="primary"
-              >
+              <Button icon={Plus} onClick={handleCreateSal} size="sm" variant="secondary">
                 Nuova SAL
-              </ProjectControlButton>
+              </Button>
             </div>
 
             <div className="mt-4 space-y-2">
@@ -838,9 +833,13 @@ export function ProjectDetailScreen() {
             filteredTariffBooks={filteredTariffBooks}
             isOpen={isTariffPanelOpen}
             onClose={() => setIsTariffPanelOpen(false)}
-            onSave={handleSaveTariffBooks}
+            onConfirm={() => void handleSaveTariffBooks(pendingTariffIds)}
+            onToggleTariffBook={(bookId) =>
+              setPendingTariffIds((prev) =>
+                prev.includes(bookId) ? prev.filter((id) => id !== bookId) : [...prev, bookId],
+              )
+            }
             pendingTariffIds={pendingTariffIds}
-            onPendingTariffIdsChange={setPendingTariffIds}
             searchQuery={tariffSearchQuery}
             onSearchQueryChange={setTariffSearchQuery}
             tariffBooks={tariffBooks}
@@ -896,10 +895,10 @@ export function ProjectDetailScreen() {
                   </div>
                 </div>
               ))}
-              <ProjectControlButton className="mt-1 w-full justify-between px-3" variant="soft">
+              <Button className="mt-1 w-full justify-between px-3" variant="secondary">
                 Vedi tutte le attivita
                 <ChevronRight className="size-4" />
-              </ProjectControlButton>
+              </Button>
             </div>
           </Panel>
         </aside>
@@ -910,7 +909,7 @@ export function ProjectDetailScreen() {
         onClose={() => setDeleteTargetId(null)}
         onConfirm={handleDeleteSal}
       />
-    </main>
+    </ScreenLayout>
   );
 }
 
@@ -1171,29 +1170,29 @@ function SalCard({
 
       <div className="pointer-events-auto relative z-10 flex shrink-0 items-center gap-1">
         {isDraft ? (
-          <button
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--accent-primary)] px-3.5 text-11px font-bold text-white shadow-sm transition-all hover:bg-[var(--accent-primary)]/90"
+          <Button
+            size="sm"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onContinue?.();
             }}
-            type="button"
+            variant="secondary"
           >
             <Play className="size-3.5" />
             Continua
-          </button>
+          </Button>
         ) : isReview ? (
-          <button
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-3.5 text-11px font-bold text-[var(--info-base)] ring-1 ring-[var(--info-base)]/30 transition-all hover:bg-[var(--info-soft)]/80"
+          <Button
+            size="sm"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onClose();
             }}
-            type="button"
+            variant="secondary"
           >
             <ThumbsUp className="size-3.5" />
             Approva
-          </button>
+          </Button>
         ) : isClosed || isApproved ? (
           <span
             className={cn(
@@ -1207,7 +1206,7 @@ function SalCard({
         ) : null}
 
         <div ref={menuBtnRef}>
-          <ProjectControlButton
+          <Button
             aria-label="Azioni SAL"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
@@ -1216,7 +1215,7 @@ function SalCard({
             variant="icon"
           >
             <MoreVertical className="size-4" />
-          </ProjectControlButton>
+          </Button>
           <DropdownMenu
             isOpen={menuOpen}
             onClose={() => setMenuOpen(false)}
@@ -1259,189 +1258,117 @@ function SalCard({
 }
 
 function TariffPanelDialog({
-  filteredTariffBooks,
   isOpen,
   onClose,
-  onSave,
-  pendingTariffIds,
-  onPendingTariffIdsChange,
-  searchQuery,
   onSearchQueryChange,
+  pendingTariffIds,
   tariffBooks,
+  searchQuery,
+  filteredTariffBooks,
+  onToggleTariffBook,
+  onConfirm,
 }: {
-  filteredTariffBooks: DesktopTariffBook[];
   isOpen: boolean;
   onClose: () => void;
-  onSave: (ids: string[]) => Promise<void>;
-  pendingTariffIds: string[];
-  onPendingTariffIdsChange: Dispatch<SetStateAction<string[]>>;
-  searchQuery: string;
   onSearchQueryChange: Dispatch<SetStateAction<string>>;
+  pendingTariffIds: string[];
   tariffBooks: DesktopTariffBook[];
+  searchQuery: string;
+  filteredTariffBooks: DesktopTariffBook[];
+  onToggleTariffBook: (bookId: string) => void;
+  onConfirm: () => void;
 }) {
   return (
-    <AnimatePresence>
-      {isOpen ? (
-        <m.div
-          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <button
-            aria-label="Chiudi"
-            className="absolute inset-0 cursor-default"
-            onClick={onClose}
-            type="button"
+    <Dialog isOpen={isOpen} onClose={onClose} zIndex={75}>
+      <div>
+        <h3 className="text-16px font-semibold text-[var(--text-primary)]">
+          Tariffari del progetto
+        </h3>
+        <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
+          {pendingTariffIds.length} selezionat
+          {pendingTariffIds.length !== 1 ? "i" : "o"} · {tariffBooks.length} disponibili
+        </p>
+      </div>
+
+      <div className="mt-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
+          <input
+            className="h-10 w-full rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+            placeholder="Cerca per nome, ente o anno…"
+            value={searchQuery}
           />
-          <m.div
-            className="relative w-full max-w-lg rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-            initial={MOTION_VARIANTS.dialog.initial}
-            animate={MOTION_VARIANTS.dialog.animate}
-            exit={{ opacity: 0, y: 10, scale: 0.97 }}
-            transition={MOTION_VARIANTS.dialog.transition}
-          >
-            <div className="rounded-2xl bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-              <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
-                <div>
-                  <h3 className="text-16px font-semibold text-[var(--text-primary)]">
-                    Tariffari del progetto
-                  </h3>
-                  <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
-                    {pendingTariffIds.length} selezionat
-                    {pendingTariffIds.length !== 1 ? "i" : "o"} · {tariffBooks.length} disponibili
-                  </p>
-                </div>
-                <button
-                  aria-label="Chiudi"
-                  className="flex size-8 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
-                  onClick={onClose}
+          {searchQuery ? (
+            <button
+              className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+              onClick={() => onSearchQueryChange("")}
+              type="button"
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 max-h-[340px] overflow-y-auto">
+        {filteredTariffBooks.length === 0 ? (
+          <p className="py-6 text-center text-12px font-medium text-[var(--text-tertiary)]">
+            {searchQuery
+              ? "Nessun tariffario corrisponde alla ricerca."
+              : "Nessun tariffario disponibile."}
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {filteredTariffBooks.map((book) => {
+              const isSelected = pendingTariffIds.includes(book.id);
+              return (
+                <m.button
+                  key={book.id}
+                  layout
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-14px border px-3.5 py-3 text-left transition-colors",
+                    isSelected
+                      ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)]"
+                      : "border-transparent hover:bg-[var(--bg-muted)]",
+                  )}
+                  onClick={() => onToggleTariffBook(book.id)}
                   type="button"
                 >
-                  <X className="size-4" />
-                </button>
-              </div>
+                  <span
+                    className={cn(
+                      "flex size-5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+                      isSelected
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+                        : "border-[var(--border-subtle)]",
+                    )}
+                  >
+                    {isSelected ? <Check className="size-3.5" strokeWidth={3} /> : null}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-13px font-semibold text-[var(--text-primary)]">
+                      {book.name}
+                    </span>
+                    <span className="mt-0.5 block truncate text-11px font-medium text-[var(--text-secondary)]">
+                      {book.sourceName} · {book.year}
+                    </span>
+                  </span>
+                </m.button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-              <div className="px-5 py-3">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
-                  <input
-                    className="h-10 w-full rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                    onChange={(e) => onSearchQueryChange(e.target.value)}
-                    placeholder="Cerca per nome, ente o anno…"
-                    value={searchQuery}
-                  />
-                  {searchQuery ? (
-                    <button
-                      className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-                      onClick={() => onSearchQueryChange("")}
-                      type="button"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="max-h-[340px] overflow-y-auto border-t border-[var(--border-subtle)]/50 px-5 py-2">
-                {filteredTariffBooks.length === 0 ? (
-                  <p className="py-6 text-center text-12px font-medium text-[var(--text-tertiary)]">
-                    {searchQuery
-                      ? "Nessun tariffario corrisponde alla ricerca."
-                      : "Nessun tariffario disponibile."}
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    {filteredTariffBooks.map((book, index) => {
-                      const isSelected = pendingTariffIds.includes(book.id);
-                      return (
-                        <m.button
-                          className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
-                            isSelected
-                              ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)]"
-                              : "border-transparent bg-[var(--bg-muted)]/40 hover:border-[var(--border-subtle)]"
-                          }`}
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{
-                            delay: index * 0.025,
-                            duration: 0.2,
-                            ease: [0.22, 1, 0.36, 1],
-                          }}
-                          key={book.id}
-                          onClick={() =>
-                            onPendingTariffIdsChange((prev) =>
-                              isSelected ? prev.filter((id) => id !== book.id) : [...prev, book.id],
-                            )
-                          }
-                          type="button"
-                        >
-                          <span
-                            className={`flex size-6 shrink-0 items-center justify-center rounded-lg border transition-all ${
-                              isSelected
-                                ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
-                                : "border-[var(--border-subtle)]"
-                            }`}
-                          >
-                            {isSelected && <Check className="size-3.5" strokeWidth={3} />}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
-                              {book.name}
-                            </div>
-                            <div className="flex items-center gap-2 text-11px text-[var(--text-tertiary)]">
-                              <span>Anno {book.year}</span>
-                              <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                              <span>{book.sourceName}</span>
-                              <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                              <span
-                                className={
-                                  book.status === "active"
-                                    ? "text-[var(--success-base)]"
-                                    : "text-[var(--warning-base)]"
-                                }
-                              >
-                                {book.status === "active"
-                                  ? "Attivo"
-                                  : book.status === "draft"
-                                    ? "Bozza"
-                                    : book.status}
-                              </span>
-                            </div>
-                          </div>
-                        </m.button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4">
-                <button
-                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-                  onClick={onClose}
-                  type="button"
-                >
-                  Annulla
-                </button>
-                <button
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
-                  onClick={() => {
-                    void onSave(pendingTariffIds);
-                    onClose();
-                  }}
-                  type="button"
-                >
-                  <Check className="size-4" />
-                  Salva
-                </button>
-              </div>
-            </div>
-          </m.div>
-        </m.div>
-      ) : null}
-    </AnimatePresence>
+      <DialogActions className="mt-4">
+        <Button onClick={onClose} variant="ghost">
+          Annulla
+        </Button>
+        <Button icon={Check} onClick={onConfirm} variant="primary">
+          Salva
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -1454,56 +1381,35 @@ function DeleteConfirmDialog({
   onClose: () => void;
   onConfirm: (salId: string) => void;
 }) {
-  return deleteTargetId ? (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
-      <button
-        aria-label="Chiudi"
-        className="absolute inset-0 cursor-default"
-        onClick={onClose}
-        type="button"
-      />
-      <m.div
-        className="relative w-full max-w-sm rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-        initial={MOTION_VARIANTS.dialog.initial}
-        transition={MOTION_VARIANTS.dialog.transition}
-        animate={MOTION_VARIANTS.dialog.animate}
-      >
-        <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
-              <Trash2 className="size-5" />
-            </span>
-            <div>
-              <div className="text-14px font-semibold text-[var(--text-primary)]">
-                Eliminare questa SAL?
-              </div>
-              <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
-                L'operazione rimuove definitivamente il documento. I dati non possono essere
-                recuperati.
-              </p>
-            </div>
+  return (
+    <Dialog isOpen={deleteTargetId !== null} onClose={onClose} zIndex={75}>
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
+          <Trash2 className="size-5" />
+        </span>
+        <div>
+          <div className="text-14px font-semibold text-[var(--text-primary)]">
+            Eliminare questa SAL?
           </div>
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-              onClick={onClose}
-              type="button"
-            >
-              Annulla
-            </button>
-            <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--danger-base)] px-5 text-13px font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
-              onClick={() => onConfirm(deleteTargetId)}
-              type="button"
-            >
-              <Trash2 className="size-4" />
-              Elimina
-            </button>
-          </div>
+          <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
+            L'operazione rimuove definitivamente il documento. I dati non possono essere recuperati.
+          </p>
         </div>
-      </m.div>
-    </div>
-  ) : null;
+      </div>
+      <DialogActions>
+        <Button onClick={onClose} variant="ghost">
+          Annulla
+        </Button>
+        <Button
+          icon={Trash2}
+          onClick={() => deleteTargetId && onConfirm(deleteTargetId)}
+          variant="destructive"
+        >
+          Elimina
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 function readSelectedProjectId(): string | null {

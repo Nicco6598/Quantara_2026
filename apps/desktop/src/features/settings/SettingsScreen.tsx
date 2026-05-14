@@ -19,7 +19,9 @@ import type { Icon } from "@phosphor-icons/react";
 import { m } from "framer-motion";
 import { useCallback, useEffect, useReducer, useState } from "react";
 import { ScreenHero } from "@/components/shared/ScreenHero";
-import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
+import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
 import { backupDatabase, type DatabaseInfo, getDatabaseInfo, restoreDatabase } from "@/lib/backup";
@@ -212,11 +214,7 @@ function UpdateCheckCard({
         {releaseStatus.description}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <ProjectControlButton
-          disabled={isCheckingUpdates}
-          onClick={onCheckForUpdates}
-          variant="primary"
-        >
+        <Button disabled={isCheckingUpdates} onClick={onCheckForUpdates} variant="primary">
           <svg
             aria-hidden="true"
             className={cn("size-4", isCheckingUpdates ? "animate-spin" : "")}
@@ -239,7 +237,7 @@ function UpdateCheckCard({
             />
           </svg>
           {isCheckingUpdates ? "Verifica in corso\u2026" : "Verifica disponibilita"}
-        </ProjectControlButton>
+        </Button>
         {releaseStatus.notes ? (
           <span className="rounded-full bg-[var(--warning-soft)] px-2.5 py-1 text-10px font-semibold text-[var(--warning-base)]">
             {releaseStatus.notes}
@@ -306,7 +304,7 @@ function BackupRestoreCard({
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <ProjectControlButton disabled={isBackupRunning} onClick={onBackup} variant="primary">
+        <Button disabled={isBackupRunning} onClick={onBackup} variant="primary">
           <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
             <path
               d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"
@@ -317,8 +315,8 @@ function BackupRestoreCard({
             />
           </svg>
           {isBackupRunning ? "Backup in corso\u2026" : "Crea backup"}
-        </ProjectControlButton>
-        <ProjectControlButton onClick={onRestore} variant="ghost">
+        </Button>
+        <Button onClick={onRestore} variant="ghost">
           <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
             <path
               d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
@@ -329,7 +327,7 @@ function BackupRestoreCard({
             />
           </svg>
           Ripristina
-        </ProjectControlButton>
+        </Button>
       </div>
       {isBackupRunning ? (
         <div className="mt-3 flex items-center gap-2 text-12px text-[var(--text-secondary)]">
@@ -395,11 +393,7 @@ function IntegrityCheckCard({
         </div>
       </div>
       <div className="mt-4">
-        <ProjectControlButton
-          disabled={isIntegrityRunning}
-          onClick={onIntegrityCheck}
-          variant="neutral"
-        >
+        <Button disabled={isIntegrityRunning} onClick={onIntegrityCheck} variant="secondary">
           <svg
             aria-hidden="true"
             className={cn("size-4", isIntegrityRunning ? "animate-spin" : "")}
@@ -423,7 +417,7 @@ function IntegrityCheckCard({
             />
           </svg>
           {isIntegrityRunning ? "Verifica in corso\u2026" : "Esegui verifica"}
-        </ProjectControlButton>
+        </Button>
       </div>
       {integrityResult ? (
         <div className="mt-3 flex items-center gap-2 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-12px font-medium text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20">
@@ -566,14 +560,14 @@ function AuditLogCard() {
         )}
       </div>
       {auditEntries.length > 0 ? (
-        <button
-          className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-12px font-semibold text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
+        <Button
+          className="mt-3"
           onClick={() => useAuditLogStore.getState().clearAll()}
-          type="button"
+          variant="destructive"
         >
           <Trash className="size-4" />
           Cancella registro
-        </button>
+        </Button>
       ) : null}
     </BezelSurface>
   );
@@ -648,9 +642,7 @@ export function SettingsScreen() {
   }, []);
 
   return (
-    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_16%_8%,color-mix(in_srgb,var(--accent-primary)_16%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--info-base)_14%,transparent),transparent_32%)]" />
-
+    <ScreenLayout gradient="success-info">
       <ScreenHero
         badge="Impostazioni"
         title="Configurazione applicazione"
@@ -715,7 +707,7 @@ export function SettingsScreen() {
         <ReleaseRulesCard />
         <AuditLogCard />
       </div>
-    </main>
+    </ScreenLayout>
   );
 }
 

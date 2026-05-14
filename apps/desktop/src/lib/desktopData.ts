@@ -424,6 +424,17 @@ export async function createDesktopMaterial(
   return invoke<DesktopMaterial>("create_material", { request });
 }
 
+export async function updateDesktopMaterial(
+  materialId: string,
+  request: CreateDesktopMaterialRequest,
+): Promise<DesktopMaterial> {
+  if (!isTauriRuntime()) {
+    return request;
+  }
+
+  return invoke<DesktopMaterial>("update_material", { materialId, request });
+}
+
 export async function deleteDesktopMaterial(materialId: string): Promise<void> {
   if (!isTauriRuntime()) {
     return;

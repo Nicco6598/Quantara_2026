@@ -23,7 +23,7 @@ import {
 import { SPRING_EASE } from "@/components/shared/easings";
 import { useToast } from "@/components/shared/ToastProvider";
 
-import { ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
 
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 
@@ -846,36 +846,36 @@ export function TariffImportPreviewModal({
   const ModalFooter = () => (
     <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
-        <ProjectControlButton onClick={onCancel} variant="neutral">
+        <Button onClick={onCancel} variant="outline">
           Annulla
-        </ProjectControlButton>
-        <ProjectControlButton icon={Save} onClick={saveDraft} variant="neutral">
+        </Button>
+        <Button icon={Save} onClick={saveDraft} variant="secondary">
           Salva bozza
-        </ProjectControlButton>
+        </Button>
         {loadedDraft ? (
-          <ProjectControlButton icon={Archive} onClick={discardDraft} variant="neutral">
+          <Button icon={Archive} onClick={discardDraft} variant="outline">
             Elimina bozza
-          </ProjectControlButton>
+          </Button>
         ) : null}
         {metadatas.length > 0 ? (
-          <ProjectControlButton icon={Trash2} onClick={removeActiveFile} variant="neutral">
+          <Button icon={Trash2} onClick={removeActiveFile} variant="outline">
             Cancella file
-          </ProjectControlButton>
+          </Button>
         ) : null}
         {metadatas.length > 1 ? (
-          <ProjectControlButton icon={Save} onClick={toggleActiveFileDraft} variant="neutral">
+          <Button icon={Save} onClick={toggleActiveFileDraft} variant="secondary">
             {draftedFiles.has(localActiveIndex) ? "Salvato in bozza" : "Salva in bozza"}
-          </ProjectControlButton>
+          </Button>
         ) : null}
         {metadatas.length > 1 && !modalReviewedFiles.has(localActiveIndex) ? (
-          <ProjectControlButton
+          <Button
             disabled={draftedFiles.has(localActiveIndex)}
             icon={CheckCircle2}
             onClick={markActiveFileReviewed}
-            variant="soft"
+            variant="secondary"
           >
             Segna come revisionato
-          </ProjectControlButton>
+          </Button>
         ) : null}
         {metadatas.length > 1 && (modalReviewedFiles.size > 0 || draftedFiles.size > 0) ? (
           <span className="text-12px font-medium text-[var(--text-secondary)]">
@@ -886,7 +886,7 @@ export function TariffImportPreviewModal({
           </span>
         ) : null}
       </div>
-      <ProjectControlButton
+      <Button
         disabled={!canConfirm || isBusy}
         icon={CheckCircle2}
         onClick={confirmChanges}
@@ -897,7 +897,7 @@ export function TariffImportPreviewModal({
             ? `Conferma tutti (${metadatas.length})`
             : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
           : "Conferma importazione"}
-      </ProjectControlButton>
+      </Button>
     </div>
   );
 
@@ -1558,12 +1558,12 @@ function DeleteVoiceDialog({
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <ProjectControlButton onClick={onCancel} variant="neutral">
+          <Button onClick={onCancel} variant="outline">
             Annulla
-          </ProjectControlButton>
-          <ProjectControlButton icon={Trash2} onClick={onConfirm} variant="soft">
+          </Button>
+          <Button icon={Trash2} onClick={onConfirm} variant="secondary">
             Elimina
-          </ProjectControlButton>
+          </Button>
         </div>
       </div>
     </div>

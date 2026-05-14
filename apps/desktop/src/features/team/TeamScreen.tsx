@@ -2,8 +2,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Crown,
   Ellipsis,
   Mail,
@@ -17,7 +15,10 @@ import { useMemo, useState } from "react";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { StatusPill as SharedStatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
+import { Pagination } from "@/components/shared/Pagination";
+import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import { cn } from "@/lib/utils";
 
 type MemberStatus = "active" | "inactive" | "invited";
@@ -197,9 +198,7 @@ export function TeamScreen() {
   }
 
   return (
-    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_15%_10%,color-mix(in_srgb,var(--accent-primary)_13%,transparent),transparent_34%),radial-gradient(circle_at_88%_18%,color-mix(in_srgb,var(--success-base)_12%,transparent),transparent_32%)]" />
-
+    <ScreenLayout gradient="accent-success">
       <ScreenHero
         badge="Workspace"
         title="Team e permessi"
@@ -281,7 +280,7 @@ export function TeamScreen() {
         I permessi sono applicati a livello di progetto. Un membro puo avere ruoli diversi su
         progetti diversi.
       </p>
-    </main>
+    </ScreenLayout>
   );
 }
 
@@ -464,46 +463,13 @@ function TeamMembersPanel({
         ))}
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-12px font-medium text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          Mostra {PAGE_SIZE} di {filteredCount} risult{filteredCount === 1 ? "ato" : "i"}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            aria-label="Pagina precedente"
-            className="flex size-8 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            type="button"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <button
-              className={cn(
-                "flex size-8 items-center justify-center rounded-full text-12px font-bold transition-colors",
-                p === page
-                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                  : "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted)]",
-              )}
-              key={p}
-              onClick={() => onPageChange(p)}
-              type="button"
-            >
-              {p}
-            </button>
-          ))}
-          <button
-            aria-label="Pagina successiva"
-            className="flex size-8 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            type="button"
-          >
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
-      </div>
+      <Pagination
+        filteredCount={filteredCount}
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+      />
     </BezelSurface>
   );
 }
@@ -530,13 +496,13 @@ function MobileMemberCard({ member }: { member: TeamMember }) {
           </div>
         </div>
       </div>
-      <ProjectControlButton
+      <Button
         aria-label={`Azioni per ${member.name}`}
         className="size-8 shrink-0 px-0"
         variant="icon"
       >
         <Ellipsis className="size-4" />
-      </ProjectControlButton>
+      </Button>
     </div>
   );
 }
@@ -568,13 +534,9 @@ function TeamMemberRow({ member }: { member: TeamMember }) {
         {member.lastAccess}
       </td>
       <td className="px-5 py-3 text-right">
-        <ProjectControlButton
-          aria-label={`Azioni per ${member.name}`}
-          className="size-8 px-0"
-          variant="icon"
-        >
+        <Button aria-label={`Azioni per ${member.name}`} className="size-8 px-0" variant="icon">
           <Ellipsis className="size-4" />
-        </ProjectControlButton>
+        </Button>
       </td>
     </tr>
   );
@@ -600,11 +562,11 @@ function InviteMemberCard() {
             type="email"
           />
         </label>
-        <ProjectControlButton className="w-full justify-between" variant="neutral">
+        <Button className="w-full justify-between" variant="outline">
           Seleziona ruolo
           <ChevronDown className="size-4 text-[var(--text-secondary)]" />
-        </ProjectControlButton>
-        <ProjectControlButton
+        </Button>
+        <Button
           className="w-full"
           icon={Send}
           onClick={() =>
@@ -615,10 +577,10 @@ function InviteMemberCard() {
               tone: "info",
             })
           }
-          variant="soft"
+          variant="secondary"
         >
           Invia invito
-        </ProjectControlButton>
+        </Button>
       </div>
     </BezelSurface>
   );
@@ -668,7 +630,7 @@ function RolesCard({ rolesData }: { rolesData: { role: TeamRole; count: number }
           );
         })}
       </div>
-      <ProjectControlButton
+      <Button
         className="mt-5 w-full"
         icon={UserCog}
         onClick={() =>
@@ -679,10 +641,10 @@ function RolesCard({ rolesData }: { rolesData: { role: TeamRole; count: number }
             tone: "info",
           })
         }
-        variant="soft"
+        variant="secondary"
       >
         Gestisci ruoli
-      </ProjectControlButton>
+      </Button>
     </BezelSurface>
   );
 }

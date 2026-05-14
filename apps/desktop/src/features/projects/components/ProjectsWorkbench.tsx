@@ -11,13 +11,15 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { memo, type MouseEvent, type ReactNode, useRef, useState } from "react";
+import { memo, type ReactNode, useRef, useState } from "react";
 import type { PortfolioProject } from "@/features/projects/types";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { BezelSurface, EmptyState, ProjectControlButton } from "./workspace-ui";
+import { Button } from "@/components/shared/Button";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { BezelSurface } from "./workspace-ui";
 
 type ProjectsWorkbenchProps = {
   children?: ReactNode;
@@ -55,23 +57,23 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">{children}</div>
           <div className="flex flex-wrap items-center gap-2">
-            <ProjectControlButton
+            <Button
               className="text-13px text-[var(--text-inverse)]"
               icon={Plus}
               onClick={onCreateProject}
               variant="primary"
             >
               Nuovo progetto
-            </ProjectControlButton>
+            </Button>
             <div ref={actionsRef}>
-              <ProjectControlButton
+              <Button
                 aria-label="Azioni"
                 icon={MoreVertical}
                 onClick={() => setActionsOpen((v) => !v)}
                 variant="icon"
               >
                 <span className="sr-only">Azioni</span>
-              </ProjectControlButton>
+              </Button>
               <DropdownMenu
                 isOpen={actionsOpen}
                 onClose={() => setActionsOpen(false)}
@@ -418,17 +420,17 @@ function ProjectActionsDropdown({
 
   return (
     <div className="flex justify-end" ref={menuRef}>
-      <ProjectControlButton
+      <Button
         aria-label={`Azioni per ${project.title}`}
         icon={MoreVertical}
-        onClick={(event: MouseEvent) => {
+        onClick={(event: React.MouseEvent) => {
           event.stopPropagation();
           setIsOpen((v) => !v);
         }}
         variant="icon"
       >
         <span className="sr-only">Azioni per {project.title}</span>
-      </ProjectControlButton>
+      </Button>
       <DropdownMenu isOpen={isOpen} onClose={() => setIsOpen(false)} triggerRef={menuRef}>
         <DropdownItem
           icon={Eye}

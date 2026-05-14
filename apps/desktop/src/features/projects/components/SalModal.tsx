@@ -87,13 +87,9 @@ export function SalModal({
                 Tutte le SAL
               </h3>
             </div>
-            <button
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
-              onClick={onClose}
-              type="button"
-            >
+            <Button aria-label="Chiudi" className="size-9 px-0" onClick={onClose} variant="icon">
               <X className="size-4" />
-            </button>
+            </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] px-5 py-3">
@@ -154,16 +150,15 @@ export function SalModal({
                               onClick={() => setDeletingSal(null)}
                               size="sm"
                               type="button"
-                              variant="outline"
+                              variant="secondary"
                             >
                               Annulla
                             </Button>
                             <Button
-                              className="border-danger/25 bg-danger text-white hover:bg-danger/90"
                               onClick={() => handleDelete(sal.id)}
                               size="sm"
                               type="button"
-                              variant="outline"
+                              variant="destructive"
                             >
                               <Trash2 className="size-4" />
                               Elimina
@@ -195,22 +190,22 @@ export function SalModal({
                               )}
                             </div>
                             <div className="flex gap-1">
-                              <button
-                                className="flex size-8 items-center justify-center rounded-lg text-secondary hover:bg-muted hover:text-foreground"
+                              <Button
+                                aria-label="Modifica"
+                                className="size-8 px-0"
                                 onClick={() => setEditingSal(sal.id)}
-                                title="Modifica"
-                                type="button"
+                                variant="icon"
                               >
                                 <Pencil className="size-4" />
-                              </button>
-                              <button
-                                className="flex size-8 items-center justify-center rounded-lg text-secondary hover:bg-muted hover:text-danger"
+                              </Button>
+                              <Button
+                                aria-label="Elimina"
+                                className="size-8 px-0"
                                 onClick={() => setDeletingSal(sal.id)}
-                                title="Elimina"
-                                type="button"
+                                variant="icon"
                               >
                                 <Trash2 className="size-4" />
-                              </button>
+                              </Button>
                             </div>
                           </div>
                           {isEditing || sal.status === "draft" ? (
@@ -281,7 +276,7 @@ export function SalModal({
 
           <div className="flex items-center justify-between border-t border-subtle px-5 py-4">
             <div className="text-sm text-secondary">{filteredSals.length} SAL</div>
-            <Button onClick={onClose} size="sm" type="button" variant="outline">
+            <Button onClick={onClose} size="sm" type="button" variant="secondary">
               Chiudi
             </Button>
           </div>

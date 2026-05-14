@@ -1,5 +1,6 @@
 import { Badge } from "@/components/shared/Badge";
-import { BezelSurface, EmptyState } from "@/components/shared/ui-primitives";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { ActivityItem, ControlSignal } from "../types";
 import { getTonePalette } from "../utils/projects-helpers";
 

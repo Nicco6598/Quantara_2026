@@ -24,25 +24,28 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
       {count > 0 && (
         <m.div
           animate={MOTION_VARIANTS.popover.animate}
-          className="flex items-center gap-3 rounded-2xl bg-[var(--surface-base)] px-3.5 py-2.5 shadow-[0_8px_28px_-12px_rgba(0,0,0,0.12)] ring-1 ring-[var(--border-subtle)]"
+          className="mb-4 flex items-center gap-4 rounded-2xl border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] px-4 py-3 shadow-[0_8px_28px_-12px_rgba(0,0,0,0.12)]"
           exit={{ opacity: 0, y: -6, scale: 0.98 }}
           initial={MOTION_VARIANTS.popover.initial}
           transition={MOTION_VARIANTS.popover.transition}
         >
-          <span className="inline-flex items-center gap-1.5 text-13px font-semibold text-[var(--text-primary)]">
-            <span className="flex size-6 items-center justify-center rounded-md bg-[var(--accent-primary)] text-11px font-bold text-white">
+          <span className="inline-flex items-center gap-2 text-13px font-semibold text-[var(--text-primary)]">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-[var(--accent-primary)] text-12px font-bold text-white shadow-sm">
               {count}
             </span>
-            {entityLabel} selezionat{count === 1 ? (entityLabel.endsWith("a") ? "a" : "o") : "i"}
+            <span>
+              {count} {entityLabel} selezionat
+              {count === 1 ? (entityLabel.endsWith("a") ? "a" : "o") : "i"}
+            </span>
           </span>
 
-          <div className="mx-1.5 h-[26px] w-px bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--border-strong)_74%,transparent),transparent)]" />
+          <span className="h-7 w-px bg-[var(--border-subtle)]" />
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {actions.map((action) => (
-              <m.button
+              <button
                 className={
-                  "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-12px font-bold ring-1 transition-colors focus-visible:outline-2 focus-visible:outline-[var(--ring-focus)] focus-visible:outline-offset-2 " +
+                  "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-12px font-bold ring-1 transition-all focus-visible:outline-2 focus-visible:outline-[var(--ring-focus)] focus-visible:outline-offset-2 " +
                   (action.tone === "danger"
                     ? "bg-[var(--danger-soft)] text-[var(--danger-base)] ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
                     : "bg-[var(--bg-muted)] text-[var(--text-primary)] ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]")
@@ -53,12 +56,12 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
               >
                 {action.icon}
                 {action.label}
-              </m.button>
+              </button>
             ))}
           </div>
 
           <m.button
-            className="ml-auto flex size-9 items-center justify-center rounded-full text-[var(--text-secondary)] ring-1 ring-transparent transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] hover:ring-[var(--border-subtle)]"
+            className="ml-auto flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
             onClick={() => useSelectionStore.getState().clear()}
             title="Deseleziona tutto"
             type="button"

@@ -24,7 +24,9 @@ import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import type { ContractorFolder } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { BezelSurface, MetricCard, ProjectControlButton } from "./workspace-ui";
+import { Button } from "@/components/shared/Button";
+import { MetricCard } from "@/components/shared/MetricCard";
+import { BezelSurface } from "./workspace-ui";
 
 type ContractorsWorkspaceProps = {
   activeProjectsCount: number;
@@ -140,13 +142,9 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
               <p className="mt-2 max-w-[230px] text-12px leading-5 text-[var(--text-secondary)]">
                 Progetti, SAL e controlli appariranno qui quando vengono aggiornati.
               </p>
-              <ProjectControlButton
-                className="mt-5 h-9"
-                onClick={onOpenNotifications}
-                variant="neutral"
-              >
+              <Button className="mt-5 h-9" onClick={onOpenNotifications} variant="secondary">
                 Vai alle notifiche
-              </ProjectControlButton>
+              </Button>
             </div>
           </WorkspaceRailCard>
 
@@ -379,22 +377,17 @@ function ContractorFoldersPanel({
               value={query}
             />
           </label>
-          <ProjectControlButton
+          <Button
             className="h-10 px-3 text-12px"
             icon={Upload}
             onClick={onImport}
-            variant="neutral"
+            variant="secondary"
           >
             Importa
-          </ProjectControlButton>
-          <ProjectControlButton
-            className="h-10 px-3 text-12px text-[var(--text-inverse)]"
-            icon={Plus}
-            onClick={onOpenCreateContractor}
-            variant="primary"
-          >
+          </Button>
+          <Button size="sm" icon={Plus} onClick={onOpenCreateContractor} variant="primary">
             Nuovo
-          </ProjectControlButton>
+          </Button>
         </div>
       </div>
 
@@ -582,7 +575,7 @@ function ContractorMenu({
 
   return (
     <div ref={menuRef}>
-      <ProjectControlButton
+      <Button
         aria-label={`Azioni ${folder.contractor}`}
         onClick={(event) => {
           event.stopPropagation();
@@ -591,7 +584,7 @@ function ContractorMenu({
         variant="icon"
       >
         <MoreVertical className="size-4" />
-      </ProjectControlButton>
+      </Button>
       <DropdownMenu isOpen={isOpen} onClose={() => setIsOpen(false)} triggerRef={menuRef}>
         <DropdownItem
           icon={Trash2}

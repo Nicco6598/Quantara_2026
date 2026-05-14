@@ -2,6 +2,38 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.0 — 2026-05-14
+
+### Design system unificato
+
+- **Button system unico** — `ProjectControlButton` e `Button` unificati in un unico componente con varianti `primary`, `secondary` (stile Invia invito), `destructive` (nuovo), `ghost`, `outline`, `icon`. Rimosse 111 occorrenze del vecchio `ProjectControlButton`.
+- **Dialog primitiva** — nuovo componente `Dialog` con overlay, z-index, backdrop e animazione standardizzati. `ConfirmDialog`, `DeleteConfirmDialog`, `TariffPanelDialog`, `SaveAsTemplateDialog` e `ContractorModal` ora lo usano tutti.
+- **FilterChip, Pagination, SelectionCheckbox** — nuovi componenti condivisi per tabs filtro, paginazione e selezione. Sostituiti in MaterialsScreen, TariffsScreen e TeamScreen.
+- **ScreenLayout** — wrapper pagina con gradienti unificati. Rimosse 8 copie identiche di `pointer-events-none absolute ... bg-[radial-gradient(...)]`.
+- **ContextToolbar rinnovata** — badge più grande, layout migliorato, coerenza tra tutte le view.
+
+### Componenti condivisi estratti
+
+- **MetricCard, EmptyState, QuickAction, SectionHeader, LoadingSkeleton** — estratti in file propri. Rimossi duplicati locali in MaterialsScreen e TariffsScreen. Import aggiornati in ContractorDetailView, ProjectsWorkbench, ControlRailPanel.
+
+### Materiali — completamente rivisto
+
+- **Griglia card** — layout passato da `space-y` a `md:grid-cols-2 2xl:grid-cols-3` come TariffsScreen.
+- **Click = selezione** — il click sulla card ora toggola la selezione. Checkbox nascosta, visibile solo in hover.
+- **Seleziona tutti** — link stile AccountingScreen.
+- **Menu 3 puntini** — DropdownMenu con Modifica / Elimina, identico al pattern TariffsScreen.
+- **Modale modifica** — AddMaterialModal ora accetta `material` prop: modifica invece di creare.
+
+### Appaltatori, Progetti, Dettaglio progetto
+
+- **Bottoni** — tutti i `variant="outline"` con testo nero convertiti a `variant="secondary"` (testo accent) o `variant="ghost"`.
+
+### Selezione multipla
+
+- **selection-store esteso** — aggiunto `toggleRange` per selezione Shift+click.
+- **AccountingScreen** — ContextToolbar con azioni Esporta/Elimina reali.
+- **MaterialsScreen** — ContextToolbar + SelectionCheckbox + seleziona tutti.
+
 ## 0.2.64 — 2026-05-14
 
 ### MG (Maggiorazioni) come percentuali tariff-specifiche

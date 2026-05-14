@@ -2,7 +2,7 @@ import { m } from "framer-motion";
 import { Clock3, FileText, LoaderCircle, Sparkles, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { MOTION_VARIANTS } from "@/components/shared/easings";
-import { ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
 
 type UpdateExperienceDialogProps = {
@@ -113,12 +113,7 @@ export function UpdateExperienceDialog({
               ) : null}
 
               <div className="flex flex-col gap-2 sm:mt-auto">
-                <ProjectControlButton
-                  className="w-full"
-                  disabled={isBusy}
-                  onClick={onInstall}
-                  variant="primary"
-                >
+                <Button className="w-full" disabled={isBusy} onClick={onInstall} variant="primary">
                   {isBusy ? (
                     <span className="flex items-center gap-2">
                       <LoaderCircle className="size-4 animate-spin" />
@@ -150,15 +145,10 @@ export function UpdateExperienceDialog({
                       Aggiorna e riavvia
                     </span>
                   )}
-                </ProjectControlButton>
-                <ProjectControlButton
-                  className="w-full"
-                  disabled={isBusy}
-                  onClick={onClose}
-                  variant="ghost"
-                >
+                </Button>
+                <Button className="w-full" disabled={isBusy} onClick={onClose} variant="ghost">
                   Più tardi
-                </ProjectControlButton>
+                </Button>
               </div>
             </div>
           </div>

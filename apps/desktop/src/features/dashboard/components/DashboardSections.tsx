@@ -15,7 +15,8 @@ import { scaleTime } from "@visx/scale";
 import { useEffect, useMemo, useState } from "react";
 import { ModernDonut, SegmentBars } from "@/components/shared/Charts";
 import type { StatusTone } from "@/components/shared/StatusBadge";
-import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { AuditEntry } from "@/store/audit-log-store";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
@@ -395,12 +396,9 @@ export function OperationalSites({
 
       {canShowMore ? (
         <div className="flex justify-center pt-1">
-          <ProjectControlButton
-            onClick={() => setVisibleCount((value) => value + PAGE_SIZE)}
-            variant="neutral"
-          >
+          <Button onClick={() => setVisibleCount((value) => value + PAGE_SIZE)} variant="outline">
             Mostra altro ({projects.length - visibleProjects.length} rimanenti)
-          </ProjectControlButton>
+          </Button>
         </div>
       ) : null}
     </div>
@@ -468,9 +466,9 @@ function ProjectRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <ProjectControlButton className="h-9 px-3 text-12px" onClick={onOpen} variant="neutral">
+          <Button className="h-9 px-3 text-12px" onClick={onOpen} variant="outline">
             Apri
-          </ProjectControlButton>
+          </Button>
           <button
             aria-label="Elimina cantiere"
             className="flex size-9 items-center justify-center rounded-lg text-[var(--danger-base)] opacity-0 ring-1 ring-[var(--border-subtle)] transition-all hover:bg-[var(--danger-soft)] group-hover:opacity-100"

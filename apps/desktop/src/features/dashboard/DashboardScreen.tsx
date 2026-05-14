@@ -2,7 +2,9 @@ import { Calculator, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface, MetricCard } from "@/components/shared/ui-primitives";
+import { MetricCard } from "@/components/shared/MetricCard";
+import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import {
   buildActivityRows,
   buildFocusRows,
@@ -155,9 +157,7 @@ export function DashboardScreen() {
   }
 
   return (
-    <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
-
+    <ScreenLayout>
       <div className="grid min-w-0 gap-8 lg:gap-10 2xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-8">
           <ScreenHero
@@ -233,6 +233,6 @@ export function DashboardScreen() {
           projectCount={projects.length}
         />
       </div>
-    </main>
+    </ScreenLayout>
   );
 }

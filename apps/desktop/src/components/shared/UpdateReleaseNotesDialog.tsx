@@ -3,7 +3,7 @@ import { CheckCircle2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { MOTION_VARIANTS } from "@/components/shared/easings";
-import { ProjectControlButton } from "@/components/shared/ui-primitives";
+import { Button } from "@/components/shared/Button";
 import type { PendingReleaseNotes } from "@/lib/updateReleaseNotes";
 
 type UpdateReleaseNotesDialogProps = {
@@ -82,9 +82,9 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
 
           <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_88%,transparent)] p-5">
             <div className="flex justify-end">
-              <ProjectControlButton onClick={onClose} variant="primary">
+              <Button onClick={onClose} variant="primary">
                 Continua
-              </ProjectControlButton>
+              </Button>
             </div>
           </div>
         </div>
