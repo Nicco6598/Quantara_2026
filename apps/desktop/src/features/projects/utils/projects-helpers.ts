@@ -9,14 +9,9 @@ export type TonePalette = {
   surface: string;
 };
 
-import {
-  createDesktopVoiceKey,
-  normalizeContractorName,
-  readStringRecord,
-  writeJson,
-} from "@/lib/shared-utils";
+import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
 
-export { createDesktopVoiceKey, normalizeContractorName, readStringRecord, writeJson };
+export { normalizeContractorName, readStringRecord, writeJson };
 
 export function getTonePalette(tone: StatusTone): TonePalette {
   if (tone === "danger") {
@@ -88,12 +83,6 @@ export function formatForecastDelta(days: number): string {
   if (days === 0) return "In data";
   if (days < 0) return `${days} gg`;
   return `+${days} gg`;
-}
-
-export function getSalTone(project: PortfolioProject): StatusTone {
-  if (project.salDays <= 1 || project.salState.toLowerCase().includes("blocc")) return "danger";
-  if (project.salDays <= 7 || project.salState.toLowerCase().includes("document")) return "warning";
-  return "neutral";
 }
 
 export function isSalWindow(project: PortfolioProject): boolean {
@@ -207,12 +196,6 @@ export function countValidationIssues(
   return validation.issues.filter((issue) => issue.severity === severity).length;
 }
 
-export function formatSheetName(sheet: string): string {
-  if (sheet === "projects") return "Progetti";
-  if (sheet === "materials") return "Materiali";
-  return "SAL";
-}
-
 export function waitForUiPaint(): Promise<void> {
   return new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => resolve());
@@ -231,18 +214,4 @@ export function downloadWorkbook(bytes: Uint8Array, fileName: string): void {
   link.download = fileName;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 100);
-}
-
-export function createMigrationId(title: string, timestamp: number, index: number): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 36);
-  return `migration_${slug || "project"}_${timestamp}_${index}`;
-}
-
-export function mergeContracts<T extends { id: string }>(created: T[], current: T[]): T[] {
-  const createdIds = new Set(created.map((contract) => contract.id));
-  return [...created, ...current.filter((contract) => !createdIds.has(contract.id))];
 }

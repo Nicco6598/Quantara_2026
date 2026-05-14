@@ -37,7 +37,13 @@ export function useProjectPortfolioView({
     () => buildContractorFolders(contractorRegistry, activeProjects, allSals, projectSalIndex),
     [activeProjects, allSals, contractorRegistry, projectSalIndex],
   );
-  const selectedContractor = contractorFolders.find((folder) => folder.id === selectedContractorId);
+  const contractorFolderById = useMemo(
+    () => new Map(contractorFolders.map((folder) => [folder.id, folder])),
+    [contractorFolders],
+  );
+  const selectedContractor = selectedContractorId
+    ? (contractorFolderById.get(selectedContractorId) ?? null)
+    : null;
   const contractorProjects = useMemo(
     () =>
       selectedContractorId
@@ -77,10 +83,13 @@ export function useProjectPortfolioView({
   }, [contractorProjects, deferredQuery, focus]);
 
   const derivedView = useMemo(() => {
+    const isVisibleProject = (project: PortfolioProject | undefined): project is PortfolioProject =>
+      Boolean(project && matchesFocus(project, focus));
+
     const visibleQueue = priorityQueue.filter((item) => {
       const project = projectByIdMap.get(item.projectId);
 
-      if (!project || !matchesFocus(project, focus)) {
+      if (!isVisibleProject(project)) {
         return false;
       }
 
@@ -93,7 +102,7 @@ export function useProjectPortfolioView({
     const visibleApprovals = approvalWindow.filter((item) => {
       const project = projectByIdMap.get(item.projectId);
 
-      if (!project || !matchesFocus(project, focus)) {
+      if (!isVisibleProject(project)) {
         return false;
       }
 
@@ -106,7 +115,7 @@ export function useProjectPortfolioView({
     const visibleActivities = activityFeed.filter((item) => {
       const project = projectByIdMap.get(item.projectId);
 
-      if (!project || !matchesFocus(project, focus)) {
+      if (!isVisibleProject(project)) {
         return false;
       }
 

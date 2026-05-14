@@ -6,7 +6,7 @@ type TariffGroup<T> = {
   description: string;
 };
 
-export type SubVoiceRow = {
+type SubVoiceRow = {
   index: number;
   voice: DesktopTariffVoice;
 };

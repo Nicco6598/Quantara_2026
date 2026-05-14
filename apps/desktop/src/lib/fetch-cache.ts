@@ -28,7 +28,7 @@ export function cachedFetch<T>(
   return promise;
 }
 
-export function invalidateCache(pattern?: string) {
+function invalidateCache(pattern?: string) {
   if (!pattern) {
     cache.clear();
     return;

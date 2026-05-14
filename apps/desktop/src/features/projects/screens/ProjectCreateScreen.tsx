@@ -9,7 +9,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useToast } from "@/components/shared/ToastProvider";
 
 import { useNavigate } from "@/hooks/useNavigate";
@@ -42,26 +42,47 @@ type ProjectFormState = {
 const projectContractorStorageKey = "quantara.projectContractors.v1";
 const contractorRegistryStorageKey = "quantara.contractorRegistry.v1";
 
+type ProjectUIState = {
+  draft: ProjectFormState;
+  step: 1 | 2;
+  error: string;
+  tariffSearchQuery: string;
+};
+
+type ProjectUIAction =
+  | {
+      type: "SET_DRAFT";
+      payload: ProjectFormState | ((prev: ProjectFormState) => ProjectFormState);
+    }
+  | { type: "NAVIGATE_STEP"; payload: { step: 1 | 2; error: string } }
+  | { type: "SET_ERROR"; payload: string }
+  | { type: "SET_TARIFF_SEARCH"; payload: string };
+
+function projectUIReducer(state: ProjectUIState, action: ProjectUIAction): ProjectUIState {
+  switch (action.type) {
+    case "SET_DRAFT":
+      return {
+        ...state,
+        draft:
+          typeof action.payload === "function"
+            ? (action.payload as (prev: ProjectFormState) => ProjectFormState)(state.draft)
+            : action.payload,
+      };
+    case "NAVIGATE_STEP":
+      return { ...state, step: action.payload.step, error: action.payload.error };
+    case "SET_ERROR":
+      return { ...state, error: action.payload };
+    case "SET_TARIFF_SEARCH":
+      return { ...state, tariffSearchQuery: action.payload };
+  }
+}
+
 export function ProjectCreateScreen() {
   const { notify } = useToast();
   const navigate = useNavigate();
   const [tariffBooks, setTariffBooks] = useState<DesktopTariffBook[]>([]);
   const [contractorOptions, setContractorOptions] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState<1 | 2>(1);
-  const [error, setError] = useState("");
-  const [tariffSearchQuery, setTariffSearchQuery] = useState("");
-
-  const filteredTariffBooks = useMemo(() => {
-    const q = tariffSearchQuery.trim().toLowerCase();
-    if (!q) return tariffBooks;
-    return tariffBooks.filter(
-      (book) =>
-        book.name.toLowerCase().includes(q) ||
-        book.sourceName.toLowerCase().includes(q) ||
-        String(book.year).includes(q),
-    );
-  }, [tariffBooks, tariffSearchQuery]);
+  const savingRef = useRef(false);
 
   const initialValues = useMemo(() => {
     try {
@@ -76,36 +97,35 @@ export function ProjectCreateScreen() {
     return null;
   }, []);
 
-  const defaultTariffBookId = tariffBooks[0]?.id ?? "";
-
-  function createFallbackDraft(): ProjectFormState {
-    return {
+  const [ui, dispatch] = useReducer(projectUIReducer, null, () => ({
+    draft: initialValues ?? {
       applicationContractCode: "",
       contractorName: "",
       contractualAmount: "",
       frameworkAgreementCode: "",
       tenderDiscountPercent: "",
-      tariffBookIds: defaultTariffBookId ? [defaultTariffBookId] : [],
+      tariffBookIds: [],
       title: "",
       osExcludedAmount: "",
       budgetIvaPercent: "",
       osIvaPercent: "",
-    };
-  }
+    },
+    step: 1 as const,
+    error: "",
+    tariffSearchQuery: "",
+  }));
+  const { draft, step, error, tariffSearchQuery } = ui;
 
-  const [draft, setDraft] = useState<ProjectFormState>(() => {
-    if (initialValues) {
-      const validIds = initialValues.tariffBookIds.filter((id) =>
-        tariffBooks.some((book) => book.id === id),
-      );
-      return {
-        ...createFallbackDraft(),
-        ...initialValues,
-        tariffBookIds: validIds.length > 0 ? validIds : [],
-      };
-    }
-    return createFallbackDraft();
-  });
+  const filteredTariffBooks = useMemo(() => {
+    const q = tariffSearchQuery.trim().toLowerCase();
+    if (!q) return tariffBooks;
+    return tariffBooks.filter(
+      (book) =>
+        book.name.toLowerCase().includes(q) ||
+        book.sourceName.toLowerCase().includes(q) ||
+        String(book.year).includes(q),
+    );
+  }, [tariffBooks, tariffSearchQuery]);
 
   const firstTariffBook = tariffBooks[0];
 
@@ -121,9 +141,11 @@ export function ProjectCreateScreen() {
         setTariffBooks(tariffBooksResult.data);
         const contractors = readStringRecord(projectContractorStorageKey);
         const registry = readStringList(contractorRegistryStorageKey);
-        const assignedContractorNames = contractsResult.data
-          .map((contract) => contractors[contract.id])
-          .filter((value): value is string => typeof value === "string" && value.trim() !== "");
+        const assignedContractorNames = contractsResult.data.reduce<string[]>((acc, contract) => {
+          const name = contract.contractorName ?? contractors[contract.id];
+          if (typeof name === "string" && name.trim() !== "") acc.push(name);
+          return acc;
+        }, []);
         const uniqueContractors = mergeContractorOptions([...registry, ...assignedContractorNames]);
         setContractorOptions(uniqueContractors);
       } catch {
@@ -138,14 +160,17 @@ export function ProjectCreateScreen() {
 
   useEffect(() => {
     if (tariffBooks.length === 0) {
-      setDraft((s) => ({ ...s, tariffBookIds: [] }));
+      dispatch({ type: "SET_DRAFT", payload: (s) => ({ ...s, tariffBookIds: [] }) });
       return;
     }
-    setDraft((s) => {
-      const validIds = s.tariffBookIds.filter((id) => tariffBooks.some((book) => book.id === id));
-      return validIds.length > 0
-        ? { ...s, tariffBookIds: validIds }
-        : { ...s, tariffBookIds: firstTariffBook?.id ? [firstTariffBook.id] : [] };
+    dispatch({
+      type: "SET_DRAFT",
+      payload: (s) => {
+        const validIds = s.tariffBookIds.filter((id) => tariffBooks.some((book) => book.id === id));
+        return validIds.length > 0
+          ? { ...s, tariffBookIds: validIds }
+          : { ...s, tariffBookIds: firstTariffBook?.id ? [firstTariffBook.id] : [] };
+      },
     });
   }, [firstTariffBook?.id, tariffBooks]);
 
@@ -166,10 +191,10 @@ export function ProjectCreateScreen() {
       currentStep: step,
       error,
       isEditing: !!initialValues,
-      isSaving: saving,
+      isSaving: savingRef.current,
       totalSteps: 2,
     });
-  }, [canGoNext, error, initialValues, saving, step, validation.canSubmit]);
+  }, [canGoNext, error, initialValues, step, validation.canSubmit]);
 
   const validationRef = useRef(validation);
   validationRef.current = validation;
@@ -178,18 +203,16 @@ export function ProjectCreateScreen() {
     const handler = (event: Event) => {
       const actionId = (event as CustomEvent<string>).detail;
       if (actionId === "project-goto-step-1") {
-        setStep(1);
-        setError("");
+        dispatch({ type: "NAVIGATE_STEP", payload: { step: 1, error: "" } });
         return;
       }
       if (actionId === "project-goto-step-2") {
         const err = validationRef.current.identityError;
         if (err) {
-          setError(err);
+          dispatch({ type: "SET_ERROR", payload: err });
           return;
         }
-        setError("");
-        setStep(2);
+        dispatch({ type: "NAVIGATE_STEP", payload: { step: 2, error: "" } });
         return;
       }
       if (actionId === "project-submit") {
@@ -209,16 +232,14 @@ export function ProjectCreateScreen() {
       ) {
         const target = state.projectPendingStep;
         if (target === 1) {
-          setStep(1);
-          setError("");
+          dispatch({ type: "NAVIGATE_STEP", payload: { step: 1, error: "" } });
         } else if (target === 2) {
           const err = validationRef.current.identityError;
           if (err) {
-            setError(err);
+            dispatch({ type: "SET_ERROR", payload: err });
             return;
           }
-          setError("");
-          setStep(2);
+          dispatch({ type: "NAVIGATE_STEP", payload: { step: 2, error: "" } });
         }
         useAppStore.getState().setProjectPendingStep(null);
       }
@@ -229,7 +250,7 @@ export function ProjectCreateScreen() {
   const handleSubmit = useCallback(async () => {
     const err = validation.submitError;
     if (err) {
-      setError(err);
+      dispatch({ type: "SET_ERROR", payload: err });
       return;
     }
 
@@ -244,6 +265,7 @@ export function ProjectCreateScreen() {
 
     const request: CreateDesktopContractRequest = {
       applicationContractCode: sanitizeTextValue(draft.applicationContractCode),
+      contractorName: sanitizeTextValue(draft.contractorName) || null,
       contractualAmount: amount,
       frameworkAgreementCode: sanitizeTextValue(draft.frameworkAgreementCode),
       id: `contract_locale_${Date.now()}`,
@@ -260,11 +282,14 @@ export function ProjectCreateScreen() {
     });
 
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Controlla i dati inseriti.");
+      dispatch({
+        type: "SET_ERROR",
+        payload: parsed.error.issues[0]?.message ?? "Controlla i dati inseriti.",
+      });
       return;
     }
 
-    setSaving(true);
+    savingRef.current = true;
 
     try {
       const editingContractId = initialValues?.contractorName
@@ -282,9 +307,9 @@ export function ProjectCreateScreen() {
         notify({ message: "Progetto creato.", title: "Creato", tone: "success" });
       }
 
-      const contractors = readStringRecord(projectContractorStorageKey);
       const contractorName = sanitizeTextValue(draft.contractorName);
       if (contractorName) {
+        const contractors = readStringRecord(projectContractorStorageKey);
         writeJson(projectContractorStorageKey, {
           ...contractors,
           [savedContract.id]: contractorName,
@@ -294,9 +319,9 @@ export function ProjectCreateScreen() {
       dispatchDataChanged();
       navigate("projects");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : String(err) });
     } finally {
-      setSaving(false);
+      savingRef.current = false;
     }
   }, [amount, draft, initialValues, navigate, notify, parsedDiscount, validation.submitError]);
 
@@ -341,14 +366,22 @@ export function ProjectCreateScreen() {
               <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
                 <ProjectTextField
                   label="Nome progetto"
-                  onChange={(v) => setDraft((s) => ({ ...s, title: sanitizeTextInput(v) }))}
+                  onChange={(v) =>
+                    dispatch({
+                      type: "SET_DRAFT",
+                      payload: (s) => ({ ...s, title: sanitizeTextInput(v) }),
+                    })
+                  }
                   placeholder="Linea AV/AC Milano-Verona"
                   value={draft.title}
                 />
                 <ProjectTextField
                   label="Contratto applicativo"
                   onChange={(v) =>
-                    setDraft((s) => ({ ...s, applicationContractCode: sanitizeTextInput(v) }))
+                    dispatch({
+                      type: "SET_DRAFT",
+                      payload: (s) => ({ ...s, applicationContractCode: sanitizeTextInput(v) }),
+                    })
                   }
                   placeholder="CA-MV-001"
                   value={draft.applicationContractCode}
@@ -356,7 +389,10 @@ export function ProjectCreateScreen() {
                 <ProjectTextField
                   label="Accordo quadro"
                   onChange={(v) =>
-                    setDraft((s) => ({ ...s, frameworkAgreementCode: sanitizeTextInput(v) }))
+                    dispatch({
+                      type: "SET_DRAFT",
+                      payload: (s) => ({ ...s, frameworkAgreementCode: sanitizeTextInput(v) }),
+                    })
                   }
                   placeholder="AQ-RFI-2026"
                   value={draft.frameworkAgreementCode}
@@ -365,7 +401,10 @@ export function ProjectCreateScreen() {
                   options={contractorOptions}
                   value={draft.contractorName}
                   onChange={(v) =>
-                    setDraft((s) => ({ ...s, contractorName: sanitizeTextInput(v) }))
+                    dispatch({
+                      type: "SET_DRAFT",
+                      payload: (s) => ({ ...s, contractorName: sanitizeTextInput(v) }),
+                    })
                   }
                 />
               </div>
@@ -390,7 +429,12 @@ export function ProjectCreateScreen() {
                 <div className="space-y-2">
                   <ProjectCurrencyField
                     label="Importo contrattuale"
-                    onChange={(v) => setDraft((s) => ({ ...s, contractualAmount: v }))}
+                    onChange={(v) =>
+                      dispatch({
+                        type: "SET_DRAFT",
+                        payload: (s) => ({ ...s, contractualAmount: v }),
+                      })
+                    }
                     placeholder="26.150.000,00"
                     value={draft.contractualAmount}
                   />
@@ -398,7 +442,12 @@ export function ProjectCreateScreen() {
                     label="IVA su importo"
                     percent={draft.budgetIvaPercent}
                     baseAmount={parseLocalizedMoney(draft.contractualAmount)}
-                    onChange={(pct) => setDraft((s) => ({ ...s, budgetIvaPercent: pct }))}
+                    onChange={(pct) =>
+                      dispatch({
+                        type: "SET_DRAFT",
+                        payload: (s) => ({ ...s, budgetIvaPercent: pct }),
+                      })
+                    }
                   />
                 </div>
 
@@ -413,15 +462,21 @@ export function ProjectCreateScreen() {
                     onChange={(e) => {
                       const v = e.target.value;
                       if (v === "" || v === "-") {
-                        setDraft((s) => ({ ...s, tenderDiscountPercent: v }));
+                        dispatch({
+                          type: "SET_DRAFT",
+                          payload: (s) => ({ ...s, tenderDiscountPercent: v }),
+                        });
                         return;
                       }
                       const parsed = parseFloat(v.replace(",", "."));
                       if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100)
-                        setDraft((s) => ({
-                          ...s,
-                          tenderDiscountPercent: String(Math.round(parsed * 100) / 100),
-                        }));
+                        dispatch({
+                          type: "SET_DRAFT",
+                          payload: (s) => ({
+                            ...s,
+                            tenderDiscountPercent: String(Math.round(parsed * 100) / 100),
+                          }),
+                        });
                     }}
                     placeholder="18,25"
                     step="0.01"
@@ -434,7 +489,9 @@ export function ProjectCreateScreen() {
               <div className="mt-5">
                 <ProjectCurrencyField
                   label="OS Esclusi da ribassi"
-                  onChange={(v) => setDraft((s) => ({ ...s, osExcludedAmount: v }))}
+                  onChange={(v) =>
+                    dispatch({ type: "SET_DRAFT", payload: (s) => ({ ...s, osExcludedAmount: v }) })
+                  }
                   placeholder="1.500.000,00"
                   value={draft.osExcludedAmount}
                 />
@@ -442,7 +499,9 @@ export function ProjectCreateScreen() {
                   label="IVA su OS esclusi"
                   percent={draft.osIvaPercent}
                   baseAmount={parseLocalizedMoney(draft.osExcludedAmount)}
-                  onChange={(pct) => setDraft((s) => ({ ...s, osIvaPercent: pct }))}
+                  onChange={(pct) =>
+                    dispatch({ type: "SET_DRAFT", payload: (s) => ({ ...s, osIvaPercent: pct }) })
+                  }
                 />
               </div>
 
@@ -475,7 +534,9 @@ export function ProjectCreateScreen() {
                       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
                       <input
                         className="h-10 w-full rounded-12px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-9 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                        onChange={(e) => setTariffSearchQuery(e.target.value)}
+                        onChange={(e) =>
+                          dispatch({ type: "SET_TARIFF_SEARCH", payload: e.target.value })
+                        }
                         placeholder={`Cerca tra ${tariffBooks.length} tariffari...`}
                         value={tariffSearchQuery}
                       />
@@ -497,12 +558,15 @@ export function ProjectCreateScreen() {
                               }`}
                               key={book.id}
                               onClick={() =>
-                                setDraft((s) => ({
-                                  ...s,
-                                  tariffBookIds: isSelected
-                                    ? s.tariffBookIds.filter((id) => id !== book.id)
-                                    : [...s.tariffBookIds, book.id],
-                                }))
+                                dispatch({
+                                  type: "SET_DRAFT",
+                                  payload: (s) => ({
+                                    ...s,
+                                    tariffBookIds: isSelected
+                                      ? s.tariffBookIds.filter((id) => id !== book.id)
+                                      : [...s.tariffBookIds, book.id],
+                                  }),
+                                })
                               }
                               type="button"
                             >
@@ -968,7 +1032,7 @@ function mergeContractorOptions(values: string[]) {
     options.set(contractor.toLocaleLowerCase("it-IT"), contractor);
   }
 
-  return [...options.values()].sort((left, right) => left.localeCompare(right));
+  return [...options.values()].toSorted((left, right) => left.localeCompare(right));
 }
 
 function sanitizeMoneyInput(value: string) {

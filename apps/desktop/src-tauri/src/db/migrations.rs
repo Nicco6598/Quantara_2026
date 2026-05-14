@@ -1,16 +1,7 @@
-use std::sync::OnceLock;
-
 pub const CURRENT_SCHEMA_VERSION: i32 = 1;
 const INITIAL_SCHEMA: &str = include_str!("../../migrations/0001_initial.sql");
 
-static MIGRATIONS_DONE: OnceLock<()> = OnceLock::new();
-
 pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
-    // Only run migrations once per process lifetime
-    if MIGRATIONS_DONE.get().is_some() {
-        return Ok(());
-    }
-
     connection.execute_batch(INITIAL_SCHEMA)?;
     connection.execute(
         "INSERT OR IGNORE INTO schema_migrations (version) VALUES (?1)",
@@ -20,11 +11,37 @@ pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<(
     connection.execute_batch(include_str!("../../migrations/0002_tariff_voices.sql"))?;
     ensure_tariff_voice_labor_percentage(connection)?;
     ensure_contract_migration(connection)?;
+    ensure_contractors_migration(connection)?;
 
     connection.execute_batch(include_str!("../../migrations/0003_materials.sql"))?;
 
-    // Mark as done (ignore if already set by concurrent call)
-    let _ = MIGRATIONS_DONE.set(());
+    Ok(())
+}
+
+fn ensure_contractors_migration(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
+    connection.execute_batch(
+        "CREATE TABLE IF NOT EXISTS contractors (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );",
+    )?;
+
+    let columns = {
+        let mut statement = connection.prepare("PRAGMA table_info(contracts)")?;
+        statement
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+    };
+
+    if !columns.iter().any(|column| column == "contractor_id") {
+        connection.execute(
+            "ALTER TABLE contracts ADD COLUMN contractor_id TEXT REFERENCES contractors(id)",
+            [],
+        )?;
+    }
+
     Ok(())
 }
 

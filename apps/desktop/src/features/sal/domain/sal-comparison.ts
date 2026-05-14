@@ -1,6 +1,6 @@
 import type { SalLineView } from "../types";
 
-export type DiffStatus = "unchanged" | "added" | "removed" | "modified";
+type DiffStatus = "unchanged" | "added" | "removed" | "modified";
 
 export type DiffResult = {
   code: string;
@@ -36,7 +36,8 @@ export function diffSalLines(
   const results: DiffResult[] = [];
 
   for (const line of after) {
-    const prev = beforeMap.get(line.voice.id);
+    const voiceId = line.voice.id;
+    const prev = beforeMap.get(voiceId);
     if (!prev) {
       results.push({
         code: line.voice.code,
@@ -46,7 +47,7 @@ export function diffSalLines(
         qtyDiff: line.quantity,
         totalDiff: line.totalAmount,
         status: "added",
-        voiceId: line.voice.id,
+        voiceId: voiceId,
         surchargeChanged: false,
         unitPriceDiff: 0,
       });
@@ -67,7 +68,7 @@ export function diffSalLines(
           qtyDiff: 0,
           totalDiff: 0,
           status: "unchanged",
-          voiceId: line.voice.id,
+          voiceId: voiceId,
           surchargeChanged: false,
           unitPriceDiff: 0,
         });
@@ -82,7 +83,7 @@ export function diffSalLines(
           qtyDiff,
           totalDiff,
           status: "modified",
-          voiceId: line.voice.id,
+          voiceId: voiceId,
           surchargeChanged,
           unitPriceDiff,
         });

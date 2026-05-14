@@ -10,6 +10,48 @@ type DragDropReorderProps<T> = {
   uniqueId: (item: T) => string;
 };
 
+type DraggableItemProps<T> = {
+  item: T;
+  index: number;
+  renderItem: (item: T, index: number) => ReactNode;
+  uniqueId: (item: T) => string;
+};
+
+function DraggableItem<T>({ item, index, renderItem, uniqueId }: DraggableItemProps<T>) {
+  return (
+    <Draggable draggableId={uniqueId(item)} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          style={provided.draggableProps.style}
+        >
+          <div
+            className={cn(
+              "group flex items-stretch rounded-lg",
+              snapshot.isDragging &&
+                "shadow-[0_8px_28px_-6px_rgba(0,0,0,0.15),0_0_0_1px_var(--border-subtle)]",
+              snapshot.dropAnimation &&
+                "transition-transform duration-[0.25s] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            )}
+          >
+            <div
+              {...provided.dragHandleProps}
+              className={cn(
+                "flex w-7 shrink-0 cursor-grab items-center justify-center rounded-l-[12px] text-[var(--text-secondary)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-[var(--text-primary)] active:cursor-grabbing",
+                snapshot.isDragging && "opacity-100 text-[var(--text-primary)]",
+              )}
+            >
+              <GripVertical className="size-3.5" />
+            </div>
+            <div className="min-w-0 flex-1">{renderItem(item, index)}</div>
+          </div>
+        </div>
+      )}
+    </Draggable>
+  );
+}
+
 function DragDropReorderInner<T>({
   items,
   onReorder,
@@ -36,36 +78,13 @@ function DragDropReorderInner<T>({
         {(provided) => (
           <div ref={provided.innerRef} {...provided.droppableProps}>
             {items.map((item, index) => (
-              <Draggable key={uniqueId(item)} draggableId={uniqueId(item)} index={index}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    style={provided.draggableProps.style}
-                  >
-                    <div
-                      className={cn(
-                        "group flex items-stretch rounded-lg",
-                        snapshot.isDragging &&
-                          "shadow-[0_8px_28px_-6px_rgba(0,0,0,0.15),0_0_0_1px_var(--border-subtle)]",
-                        snapshot.dropAnimation &&
-                          "transition-transform duration-[0.25s] ease-[cubic-bezier(0.22,1,0.36,1)]",
-                      )}
-                    >
-                      <div
-                        {...provided.dragHandleProps}
-                        className={cn(
-                          "flex w-7 shrink-0 cursor-grab items-center justify-center rounded-l-[12px] text-[var(--text-secondary)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-[var(--text-primary)] active:cursor-grabbing",
-                          snapshot.isDragging && "opacity-100 text-[var(--text-primary)]",
-                        )}
-                      >
-                        <GripVertical className="size-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">{renderItem(item, index)}</div>
-                    </div>
-                  </div>
-                )}
-              </Draggable>
+              <DraggableItem
+                item={item}
+                index={index}
+                key={uniqueId(item)}
+                renderItem={renderItem}
+                uniqueId={uniqueId}
+              />
             ))}
             {provided.placeholder}
           </div>

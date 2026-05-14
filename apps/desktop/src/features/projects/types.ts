@@ -40,22 +40,6 @@ export type ContractorFolder = {
 
 export type MigrationAction = "commit" | "export" | "idle" | "import" | "template";
 
-export type ProjectEditState = {
-  contractId: string;
-  values: {
-    applicationContractCode: string;
-    contractorName: string;
-    contractualAmount: string;
-    frameworkAgreementCode: string;
-    tenderDiscountPercent: string;
-    tariffBookIds: string[];
-    title: string;
-    osExcludedAmount: string;
-    budgetIvaPercent: string;
-    osIvaPercent: string;
-  };
-};
-
 export type PriorityItem = {
   deadline: string;
   detail: string;

@@ -1,8 +1,8 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { BUTTER_EASE } from "@/components/shared/easings";
+import { MOTION_DURATION, MOTION_VARIANTS, SPRING_EASE } from "@/components/shared/easings";
 import { cn } from "@/lib/utils";
 
 const MENU_WIDTH = 224;
@@ -19,7 +19,7 @@ export function DropdownItem({
   tone?: "danger" | "neutral";
 }) {
   return (
-    <motion.button
+    <m.button
       className={cn(
         "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-13px font-semibold transition-colors",
         tone === "danger"
@@ -31,7 +31,7 @@ export function DropdownItem({
         onClick();
       }}
       type="button"
-      transition={{ duration: 0.32, ease: BUTTER_EASE }}
+      transition={{ duration: MOTION_DURATION.base, ease: SPRING_EASE }}
     >
       <span
         className={cn(
@@ -44,7 +44,7 @@ export function DropdownItem({
         <Icon className="size-4" strokeWidth={1.9} />
       </span>
       <span className="truncate">{label}</span>
-    </motion.button>
+    </m.button>
   );
 }
 
@@ -86,15 +86,15 @@ export function DropdownMenu({
         onClick={onClose}
         type="button"
       />
-      <motion.div
+      <m.div
         className="fixed z-[140] w-56 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]"
-        initial={{ opacity: 0, y: -4, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={MOTION_VARIANTS.popover.initial}
+        animate={MOTION_VARIANTS.popover.animate}
         style={{ left: position.left, top: position.top }}
-        transition={{ duration: 0.22, ease: BUTTER_EASE }}
+        transition={MOTION_VARIANTS.popover.transition}
       >
         {children}
-      </motion.div>
+      </m.div>
     </>,
     document.body,
   );

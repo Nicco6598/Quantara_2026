@@ -1,15 +1,15 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Check, ChevronDown, Copy, Download, MoreHorizontal, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useRef, useState } from "react";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
-import { BUTTER_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { InlineEdit } from "@/components/shared/InlineEdit";
 import { Currency } from "@/components/shared/Currency";
 import { StatusPill } from "@/components/shared/StatusPill";
 export { Currency };
 import { cn } from "@/lib/utils";
-import type { SalEconomicSummary, SalLineDraft, SalLineView, SalVerificationCheck } from "../types";
+import type { SalEconomicSummary, SalLineDraft, SalLineView } from "../types";
 
 export function NumberValue({ value }: { value: number }) {
   return (
@@ -334,21 +334,23 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
           value={line.notes}
           onChange={(e) => {
             onNotesChange(line.id, e.target.value);
-            e.currentTarget.style.height = "auto";
-            e.currentTarget.style.height = `${Math.max(e.currentTarget.scrollHeight, 80)}px`;
+            const style = e.currentTarget.style;
+            style.height = "auto";
+            style.height = `${Math.max(e.currentTarget.scrollHeight, 80)}px`;
           }}
           ref={(el) => {
             if (el && el.dataset.init !== "true") {
               el.dataset.init = "true";
-              el.style.height = "auto";
-              el.style.height = `${Math.max(el.scrollHeight, 80)}px`;
+              const style = el.style;
+              style.height = "auto";
+              style.height = `${Math.max(el.scrollHeight, 80)}px`;
             }
           }}
         />
       </GridCell>
       <GridCell align="center">
         <div className="flex items-center justify-center gap-1">
-          <motion.button
+          <m.button
             aria-label={isCopied ? "Copiata" : "Copia voce"}
             className={cn(
               "flex size-7 items-center justify-center rounded-md transition-all",
@@ -359,19 +361,19 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             onClick={onCopy}
             type="button"
             title={isCopied ? "Voce copiata - premi Ctrl+V per incollare" : "Copia voce"}
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
+            transition={{ duration: 0.42, ease: SPRING_EASE }}
           >
             {isCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          </motion.button>
-          <motion.button
+          </m.button>
+          <m.button
             aria-label={`Rimuovi ${line.voice.code}`}
             className="flex size-7 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
             onClick={() => onRemove(line.id)}
             type="button"
-            transition={{ duration: 0.42, ease: BUTTER_EASE }}
+            transition={{ duration: 0.42, ease: SPRING_EASE }}
           >
             <Trash2 className="size-3.5" />
-          </motion.button>
+          </m.button>
         </div>
       </GridCell>
     </div>
@@ -424,7 +426,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   return (
     <div className="overflow-x-auto rounded-2xl bg-[var(--bg-muted)]/50">
       <div className="min-w-[1100px]">
-        <div className="grid-col-fade sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] gap-3 bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] px-3 py-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
+        <div className="grid-col-fade sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] gap-3 bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] p-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
           <span />
           <span>Tariffario</span>
           <span>Codice</span>
@@ -441,12 +443,12 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
           const expanded = expandedId === line.id;
           return (
             <div className="border-t border-[var(--border-subtle)]/50" key={line.id}>
-              <motion.button
+              <m.button
                 aria-expanded={expanded}
-                className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] items-center px-3 py-3 text-left text-13px hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] items-center p-3 text-left text-13px hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => setExpandedId(expanded ? null : line.id)}
                 type="button"
-                transition={{ duration: 0.42, ease: BUTTER_EASE }}
+                transition={{ duration: 0.42, ease: SPRING_EASE }}
               >
                 <ChevronDown
                   className={cn(
@@ -474,7 +476,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                   {line.status === "complete" ? "Completa" : "Da completare"}
                 </StatusPill>
                 <MoreHorizontal className="size-5 text-[var(--text-secondary)]" />
-              </motion.button>
+              </m.button>
               {expanded ? (
                 <div className="grid gap-3 border-t border-[var(--border-subtle)] bg-[var(--bg-muted)]/20 p-3 lg:grid-cols-[1.25fr_1fr]">
                   <NestedTable
@@ -483,7 +485,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                   >
                     {line.measurementRows.length === 0 ? (
                       <tr>
-                        <td className="px-3 py-3 text-[var(--text-secondary)]" colSpan={7}>
+                        <td className="p-3 text-[var(--text-secondary)]" colSpan={7}>
                           Nessuna misura inserita.
                         </td>
                       </tr>
@@ -515,7 +517,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                   >
                     {line.linkedCharges.length === 0 ? (
                       <tr>
-                        <td className="px-3 py-3 text-[var(--text-secondary)]" colSpan={5}>
+                        <td className="p-3 text-[var(--text-secondary)]" colSpan={5}>
                           Nessuna maggiorazione attiva.
                         </td>
                       </tr>
@@ -547,9 +549,11 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   );
 }
 
+const DOC_PREVIEW_EMPTY_LINES: SalLineView[] = [];
+
 export function DocumentPreview({
   compact = false,
-  lines = [],
+  lines = DOC_PREVIEW_EMPTY_LINES,
   summary,
 }: {
   compact?: boolean;
@@ -686,26 +690,6 @@ export function OutputRow({
         {disabled ? "Non disponibile" : "Pronto per export"}
       </span>
       <Download className="size-4 text-[var(--text-secondary)]" />
-    </div>
-  );
-}
-
-export function CheckRow({ check }: { check: SalVerificationCheck }) {
-  return (
-    <div className="grid grid-cols-[minmax(220px,1fr)_120px_minmax(220px,1.4fr)] items-center border-b border-[var(--border-subtle)] px-3 py-3 text-13px last:border-b-0">
-      <span className="flex items-center gap-2 font-semibold">
-        <span
-          className={cn(
-            "size-4 rounded-full",
-            check.tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-            check.tone === "danger" && "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-            check.tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-          )}
-        />
-        {check.label}
-      </span>
-      <StatusPill tone={check.tone}>{check.result}</StatusPill>
-      <span className="text-xs text-[var(--text-secondary)]">{check.detail}</span>
     </div>
   );
 }

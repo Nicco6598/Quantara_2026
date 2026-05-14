@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { useMemo } from "react";
-import { SOFT_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/components/shared/easings";
 import type { PortfolioProject } from "@/features/projects/types";
 
 import { Currency } from "@/components/shared/Currency";
@@ -70,11 +70,11 @@ function TimelineDot({ event, index }: { event: TimelineEvent; index: number }) 
         : Clock;
 
   return (
-    <motion.div
+    <m.div
       animate={{ opacity: 1, x: 0 }}
       className="relative flex items-start gap-3"
       initial={{ opacity: 0, x: -12 }}
-      transition={{ delay: index * STAGGER, duration: 0.3, ease: SOFT_EASE }}
+      transition={{ delay: index * STAGGER, duration: 0.3, ease: SPRING_EASE }}
     >
       {/* Dot */}
       <div
@@ -119,6 +119,6 @@ function TimelineDot({ event, index }: { event: TimelineEvent; index: number }) 
           {event.date}
         </div>
       </div>
-    </motion.div>
+    </m.div>
   );
 }

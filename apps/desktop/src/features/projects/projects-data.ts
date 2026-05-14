@@ -9,7 +9,6 @@ import type {
 } from "./types";
 
 export type { ActivityItem, ApprovalItem, PortfolioFocus, PriorityItem };
-export { Bell, CheckCircle2, eur, FileText, HardHat, Wrench };
 
 export const portfolioProjects: PortfolioProject[] = [
   {

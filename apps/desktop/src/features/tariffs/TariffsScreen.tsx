@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   ArrowUp,
   Building2,
@@ -17,11 +17,11 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { BUTTER_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/components/shared/easings";
 
 import { ScreenHero } from "@/components/shared/ScreenHero";
 
@@ -64,7 +64,80 @@ import {
 } from "./tariffs-data";
 import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
 import { groupTariffVoices } from "./utils/tariff-grouping";
+import {
+  buildImportPreviewToolbarSummary,
+  buildLinkedProjectCountByTariffBookId,
+  buildTariffMetrics,
+  filterTariffBooks,
+  getMetadataKey,
+  getProjectTariffBookIds,
+} from "./utils/tariffs-screen-model";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
+
+type ImportFile = {
+  fileName: string;
+  index: number;
+  total: number;
+  status: "pending" | "processing" | "done" | "error";
+  error?: string;
+};
+
+type ImportMetaState = {
+  phase: "idle" | "loading" | "preview";
+  previews: TariffPdfMetadata[];
+  previewIndex: number;
+  files: ImportFile[];
+};
+
+const initialImportMeta: ImportMetaState = {
+  phase: "idle",
+  previews: [],
+  previewIndex: 0,
+  files: [],
+};
+
+type ImportMetaAction =
+  | { type: "START_LOADING" }
+  | { type: "UPDATE_FILE"; file: ImportFile }
+  | { type: "SHOW_PREVIEW"; previews: TariffPdfMetadata[] }
+  | { type: "SET_PREVIEWS"; previews: TariffPdfMetadata[] }
+  | { type: "SET_INDEX"; index: number }
+  | { type: "SET_PHASE"; phase: ImportMetaState["phase"] }
+  | { type: "CLEAR" };
+
+function areNumberSetsEqual(left: Set<number>, right: Set<number>) {
+  if (left.size !== right.size) return false;
+  for (const value of left) {
+    if (!right.has(value)) return false;
+  }
+  return true;
+}
+
+function importMetaReducer(state: ImportMetaState, action: ImportMetaAction): ImportMetaState {
+  switch (action.type) {
+    case "START_LOADING":
+      return { ...state, phase: "loading", files: [] };
+    case "UPDATE_FILE":
+      return {
+        ...state,
+        files: state.files.some((f) => f.index === action.file.index)
+          ? state.files.map((f) => (f.index === action.file.index ? { ...f, ...action.file } : f))
+          : [...state.files, action.file],
+      };
+    case "SHOW_PREVIEW":
+      return { ...state, phase: "preview", previews: action.previews, previewIndex: 0 };
+    case "SET_PREVIEWS":
+      return { ...state, previews: action.previews };
+    case "SET_INDEX":
+      return { ...state, previewIndex: action.index };
+    case "SET_PHASE":
+      return { ...state, phase: action.phase };
+    case "CLEAR":
+      return { ...initialImportMeta };
+    default:
+      return state;
+  }
+}
 
 function getScrollableAncestor(element: HTMLElement | null) {
   let current = element?.parentElement ?? null;
@@ -95,18 +168,9 @@ export function TariffsScreen() {
   const [query, setQuery] = useState("");
   const [selectedTariffBookId, setSelectedTariffBookId] = useState(fallbackTariffBook.id);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [importPreviews, setImportPreviews] = useState<TariffPdfMetadata[]>([]);
-  const [editPreviewBookIdMap, setEditPreviewBookIdMap] = useState<Map<string, string>>(new Map());
-  const [importFiles, setImportFiles] = useState<
-    {
-      fileName: string;
-      index: number;
-      total: number;
-      status: "pending" | "processing" | "done" | "error";
-      error?: string;
-    }[]
-  >([]);
-  const [importPhase, setImportPhase] = useState<"idle" | "loading" | "preview">("idle");
+  const editPreviewBookIdMap = useRef<Map<string, string>>(new Map());
+  const [importMeta, dispatchImport] = useReducer(importMetaReducer, initialImportMeta);
+  const { phase: importPhase, previews: importPreviews, files: importFiles } = importMeta;
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [detailBookId, setDetailBookId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditTariffBookForm>({
@@ -125,47 +189,45 @@ export function TariffsScreen() {
     message: "Runtime browser: voci dimostrative.",
     source: "fallback",
   });
-  const [favoriteBookIds, setFavoriteBookIds] = useState<string[]>([]);
-  const [activeCatalogTab, setActiveCatalogTab] = useState<"all" | "favorites">("all");
-  const [voiceCountByBookId, setVoiceCountByBookId] = useState<Record<string, number>>({});
-  const [isVoicesExplorerOpen, setIsVoicesExplorerOpen] = useState(false);
-  const [importPreviewIndex, setImportPreviewIndex] = useState(0);
-  const [previewValidationCanConfirm, setPreviewValidationCanConfirm] = useState(false);
-  const [reviewedFiles, setReviewedFiles] = useState<Set<number>>(() => new Set());
-  const [draftedImportFiles, setDraftedImportFiles] = useState<Set<number>>(() => new Set());
-  const [yearFilter, setYearFilter] = useState("all");
-  const [savedVoiceMap, setSavedVoiceMap] = useState<Map<string, DesktopTariffVoice[]>>(new Map());
-  const catalogRef = useRef<HTMLDivElement>(null);
-  const screenRef = useRef<HTMLElement>(null);
-
-  function getMetadataKey(meta: TariffPdfMetadata) {
-    return `${meta.name}||${meta.sourceName}||${meta.year}`;
-  }
-
-  function getExistingBookIds() {
-    return importPreviews.map((m) => editPreviewBookIdMap.get(getMetadataKey(m)));
-  }
-  const setTariffImportToolbar = useAppStore((state) => state.setTariffImportToolbar);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const rawValue = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
-    if (!rawValue) {
-      return;
-    }
-
+  const [favoriteBookIds, setFavoriteBookIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
     try {
-      const parsed = JSON.parse(rawValue);
-      if (Array.isArray(parsed) && parsed.every((value) => typeof value === "string")) {
-        setFavoriteBookIds(parsed);
+      const rawValue = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+      if (rawValue) {
+        const parsed = JSON.parse(rawValue);
+        if (Array.isArray(parsed) && parsed.every((value) => typeof value === "string")) {
+          return parsed;
+        }
       }
     } catch {
       window.localStorage.removeItem(FAVORITES_STORAGE_KEY);
     }
+    return [];
+  });
+  const [activeCatalogTab, setActiveCatalogTab] = useState<"all" | "favorites">("all");
+  const [voiceCountByBookId, setVoiceCountByBookId] = useState<Record<string, number>>({});
+  const [isVoicesExplorerOpen, setIsVoicesExplorerOpen] = useState(false);
+  const { previewIndex: importPreviewIndex } = importMeta;
+  const previewValidationCanConfirm = useRef(false);
+  const [reviewedFiles, setReviewedFiles] = useState<Set<number>>(() => new Set());
+  const [draftedImportFiles, setDraftedImportFiles] = useState<Set<number>>(() => new Set());
+  const [yearFilter, setYearFilter] = useState("all");
+  const savedVoiceMap = useRef<Map<string, DesktopTariffVoice[]>>(new Map());
+  const catalogRef = useRef<HTMLDivElement>(null);
+  const screenRef = useRef<HTMLElement>(null);
+
+  function getExistingBookIds() {
+    return importPreviews
+      .map((m) => editPreviewBookIdMap.current.get(getMetadataKey(m)))
+      .filter(Boolean) as string[];
+  }
+  const updateReviewedFiles = useCallback((next: Set<number>) => {
+    setReviewedFiles((current) => (areNumberSetsEqual(current, next) ? current : next));
   }, []);
+  const updateDraftedImportFiles = useCallback((next: Set<number>) => {
+    setDraftedImportFiles((current) => (areNumberSetsEqual(current, next) ? current : next));
+  }, []);
+  const setTariffImportToolbar = useAppStore((state) => state.setTariffImportToolbar);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -178,53 +240,56 @@ export function TariffsScreen() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([
-      listDesktopTariffBooks(fallbackTariffBooks),
-      listDesktopContracts(fallbackContracts),
-    ])
-      .then(([tariffBooks, contracts]) => {
-        if (!active) {
-          return;
-        }
+    const loadData = async () => {
+      try {
+        const [tariffBooks, contracts] = await Promise.all([
+          listDesktopTariffBooks(fallbackTariffBooks),
+          listDesktopContracts(fallbackContracts),
+        ]);
+        if (!active) return;
 
         setTariffBooksState(tariffBooks);
         setContractsState(contracts);
         setSelectedTariffBookId(tariffBooks.data[0]?.id ?? fallbackTariffBook.id);
-      })
-      .catch(() => {
+
+        try {
+          const voiceCountResult = await listDesktopTariffVoiceCounts(
+            tariffBooks.data,
+            fallbackTariffVoices,
+          );
+          if (!active) return;
+
+          const counts = new Map(
+            voiceCountResult.data.map((entry) => [entry.tariffBookId, entry.count]),
+          );
+          const entries = tariffBooks.data.map(
+            (book) => [book.id, counts.get(book.id) ?? 0] as const,
+          );
+          setVoiceCountByBookId(Object.fromEntries(entries));
+        } catch {
+          /* voice count failure is non-critical, silently ignore */
+        }
+      } catch {
         if (!active) return;
         notify({
           message: "Impossibile caricare tariffari e contratti.",
           title: "Caricamento fallito",
           tone: "danger",
         });
-      });
+      }
+    };
+
+    loadData();
 
     return () => {
       active = false;
     };
   }, [notify]);
 
-  const tariffMetrics = useMemo<TariffMetrics>(() => {
-    const sourceNames = new Set<string>();
-    const years = new Set<number>();
-    let activeCount = 0;
-
-    for (const book of tariffBooksState.data) {
-      sourceNames.add(book.sourceName);
-      years.add(book.year);
-      if (book.status === "active" || book.status === "validated") {
-        activeCount += 1;
-      }
-    }
-
-    return {
-      activeCount,
-      sourceCount: sourceNames.size,
-      tariffCount: tariffBooksState.data.length,
-      years: [...years].sort((a, b) => b - a),
-    };
-  }, [tariffBooksState.data]);
+  const tariffMetrics = useMemo<TariffMetrics>(
+    () => buildTariffMetrics(tariffBooksState.data),
+    [tariffBooksState.data],
+  );
 
   const realContracts = useMemo(
     () => (contractsState.source === "desktop" ? contractsState.data : []),
@@ -240,30 +305,15 @@ export function TariffsScreen() {
     }
   }, [projectFilter, realContracts]);
 
-  const linkedProjectCountByTariffBookId = useMemo(() => {
-    const counts = new Map<string, number>();
+  const linkedProjectCountByTariffBookId = useMemo(
+    () => buildLinkedProjectCountByTariffBookId(realContracts),
+    [realContracts],
+  );
 
-    for (const contract of realContracts) {
-      const linkedBookIds = new Set(
-        contract.tariffPriorities.map((priority) => priority.tariffBookId),
-      );
-
-      for (const tariffBookId of linkedBookIds) {
-        counts.set(tariffBookId, (counts.get(tariffBookId) ?? 0) + 1);
-      }
-    }
-
-    return counts;
-  }, [realContracts]);
-
-  const projectTariffBookIds = useMemo(() => {
-    if (projectFilter === "all") {
-      return null;
-    }
-
-    const contract = realContracts.find((item) => item.id === projectFilter);
-    return new Set(contract?.tariffPriorities.map((priority) => priority.tariffBookId) ?? []);
-  }, [projectFilter, realContracts]);
+  const projectTariffBookIds = useMemo(
+    () => getProjectTariffBookIds(projectFilter, realContracts),
+    [projectFilter, realContracts],
+  );
 
   const availableYears = tariffMetrics.years;
 
@@ -288,23 +338,17 @@ export function TariffsScreen() {
     [realContracts],
   );
 
-  const baseFilteredTariffBooks = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const selectedYear = Number(yearFilter);
-
-    return tariffBooksState.data.filter((book) => {
-      const matchesQuery =
-        normalizedQuery.length === 0 ||
-        `${book.name} ${book.sourceName} ${book.year} ${book.id}`
-          .toLowerCase()
-          .includes(normalizedQuery);
-      const matchesYear = yearFilter === "all" || book.year === selectedYear;
-      const matchesStatus = statusFilter === "all" || book.status === statusFilter;
-      const matchesProject = projectTariffBookIds == null || projectTariffBookIds.has(book.id);
-
-      return matchesQuery && matchesYear && matchesStatus && matchesProject;
-    });
-  }, [projectTariffBookIds, query, statusFilter, tariffBooksState.data, yearFilter]);
+  const baseFilteredTariffBooks = useMemo(
+    () =>
+      filterTariffBooks({
+        projectTariffBookIds,
+        query,
+        statusFilter,
+        tariffBooks: tariffBooksState.data,
+        yearFilter,
+      }),
+    [projectTariffBookIds, query, statusFilter, tariffBooksState.data, yearFilter],
+  );
 
   const favoriteBookIdSet = useMemo(() => new Set(favoriteBookIds), [favoriteBookIds]);
   const favoriteCount = useMemo(
@@ -328,7 +372,7 @@ export function TariffsScreen() {
   useEffect(() => {
     let active = true;
 
-    const saved = savedVoiceMap.get(selectedTariffBook.id);
+    const saved = savedVoiceMap.current.get(selectedTariffBook.id);
     if (saved) {
       setVoicesState({ data: saved, source: "desktop" });
       return;
@@ -352,7 +396,7 @@ export function TariffsScreen() {
     return () => {
       active = false;
     };
-  }, [selectedTariffBook.id, notify, savedVoiceMap]);
+  }, [selectedTariffBook.id, notify]);
 
   useEffect(() => {
     let active = true;
@@ -379,24 +423,22 @@ export function TariffsScreen() {
 
   const groupedVoices = useMemo(() => groupTariffVoices(voicesState.data), [voicesState.data]);
 
+  const importPreviewToolbarSummary = useMemo(
+    () => buildImportPreviewToolbarSummary(importPreviews, reviewedFiles),
+    [importPreviews, reviewedFiles],
+  );
+
   const handlePdfImport = useCallback(async () => {
-    setImportPhase("loading");
-    setImportFiles([]);
+    dispatchImport({ type: "START_LOADING" });
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 
     try {
       const { selectMultipleTariffPdfMetadatas } = await import("@/lib/desktopData");
       const results = await selectMultipleTariffPdfMetadatas((progress) => {
-        setImportFiles((current) => {
-          const existing = current.find((f) => f.index === progress.index);
-          if (existing) {
-            return current.map((f) => (f.index === progress.index ? { ...f, ...progress } : f));
-          }
-          return [...current, progress];
-        });
+        dispatchImport({ type: "UPDATE_FILE", file: progress });
       });
 
-      setImportPhase("idle");
+      dispatchImport({ type: "SET_PHASE", phase: "idle" });
 
       if (results.length === 0) {
         notify({
@@ -409,9 +451,9 @@ export function TariffsScreen() {
 
       const withVoices = results.filter((m) => m.voices.length > 0);
       if (withVoices.length > 0) {
-        setImportPreviews(results);
-        setEditPreviewBookIdMap(new Map());
-        setImportPhase("preview");
+        dispatchImport({ type: "SET_PREVIEWS", previews: results });
+        editPreviewBookIdMap.current = new Map();
+        dispatchImport({ type: "SET_PHASE", phase: "preview" });
         notify({
           message: `${withVoices.length} file pronti per la preview.`,
           title: "Importazione completata",
@@ -425,7 +467,7 @@ export function TariffsScreen() {
         });
       }
     } catch (error) {
-      setImportPhase("idle");
+      dispatchImport({ type: "SET_PHASE", phase: "idle" });
       notify({
         message: error instanceof Error ? error.message : String(error),
         title: "Import tariffario non riuscito",
@@ -436,7 +478,7 @@ export function TariffsScreen() {
 
   async function handleEditVoices(book: DesktopTariffBook) {
     try {
-      const saved = savedVoiceMap.get(book.id);
+      const saved = savedVoiceMap.current.get(book.id);
       const voiceData =
         saved ?? (await listDesktopTariffVoices(book.id, fallbackTariffVoices)).data;
       const metadata: TariffPdfMetadata = {
@@ -446,13 +488,11 @@ export function TariffsScreen() {
         voices: voiceData,
       };
       const key = getMetadataKey(metadata);
-      setImportPreviews([metadata]);
-      setEditPreviewBookIdMap(new Map([[key, book.id]]));
+      editPreviewBookIdMap.current = new Map([[key, book.id]]);
       setReviewedFiles(new Set());
       setDraftedImportFiles(new Set());
-      setImportPreviewIndex(0);
-      setPreviewValidationCanConfirm(false);
-      setImportPhase("preview");
+      previewValidationCanConfirm.current = false;
+      dispatchImport({ type: "SHOW_PREVIEW", previews: [metadata] });
     } catch (error) {
       notify({
         message: error instanceof Error ? error.message : String(error),
@@ -470,31 +510,32 @@ export function TariffsScreen() {
         return;
       }
 
-      const map = new Map<string, string>();
-      const metadatas: TariffPdfMetadata[] = [];
+      const results = await Promise.all(
+        draftBooks.map(async (book) => {
+          const saved = savedVoiceMap.current.get(book.id);
+          const voiceData =
+            saved ?? (await listDesktopTariffVoices(book.id, fallbackTariffVoices)).data;
+          return { book, voiceData };
+        }),
+      );
 
-      for (const book of draftBooks) {
-        const saved = savedVoiceMap.get(book.id);
-        const voiceData =
-          saved ?? (await listDesktopTariffVoices(book.id, fallbackTariffVoices)).data;
+      const map = new Map<string, string>();
+      const metadatas: TariffPdfMetadata[] = results.map(({ book, voiceData }) => {
         const metadata: TariffPdfMetadata = {
           name: book.name,
           sourceName: book.sourceName,
           year: book.year,
           voices: voiceData,
         };
-        const key = getMetadataKey(metadata);
-        map.set(key, book.id);
-        metadatas.push(metadata);
-      }
+        map.set(getMetadataKey(metadata), book.id);
+        return metadata;
+      });
 
-      setImportPreviews(metadatas);
-      setEditPreviewBookIdMap(map);
+      editPreviewBookIdMap.current = map;
       setReviewedFiles(new Set());
       setDraftedImportFiles(new Set());
-      setImportPreviewIndex(0);
-      setPreviewValidationCanConfirm(false);
-      setImportPhase("preview");
+      previewValidationCanConfirm.current = false;
+      dispatchImport({ type: "SHOW_PREVIEW", previews: metadatas });
     } catch (error) {
       notify({
         message: error instanceof Error ? error.message : String(error),
@@ -505,45 +546,30 @@ export function TariffsScreen() {
   }
 
   useEffect(() => {
-    setReviewedFiles(new Set());
-    setImportPreviewIndex(0);
-    setPreviewValidationCanConfirm(false);
-  }, []);
-
-  useEffect(() => {
     const isPreview = importPhase === "preview" && importPreviews.length > 0;
+    const canConfirmPreview =
+      isPreview &&
+      previewValidationCanConfirm.current &&
+      importPreviews.every((_, index) => reviewedFiles.has(index) || draftedImportFiles.has(index));
 
     setTariffImportToolbar({
       activeIndex: isPreview ? importPreviewIndex : 0,
       activeDrafted: isPreview ? draftedImportFiles.has(importPreviewIndex) : false,
       activeReviewed: isPreview ? reviewedFiles.has(importPreviewIndex) : false,
-      canConfirm:
-        isPreview &&
-        importPreviews.length > 0 &&
-        importPreviews.every(
-          (_, index) => reviewedFiles.has(index) || draftedImportFiles.has(index),
-        ) &&
-        previewValidationCanConfirm,
+      canConfirm: canConfirmPreview,
       draftedCount: isPreview ? draftedImportFiles.size : 0,
-      fileLabels: isPreview ? importPreviews.map((metadata) => metadata.name) : [],
+      fileLabels: isPreview ? importPreviewToolbarSummary.fileLabels : [],
       phase: isPreview ? "preview" : "idle",
       reviewedCount: isPreview ? reviewedFiles.size : 0,
-      reviewedVoiceCount: isPreview
-        ? importPreviews.reduce(
-            (sum, metadata, index) => sum + (reviewedFiles.has(index) ? metadata.voices.length : 0),
-            0,
-          )
-        : 0,
-      totalVoices: isPreview
-        ? importPreviews.reduce((sum, metadata) => sum + metadata.voices.length, 0)
-        : 0,
+      reviewedVoiceCount: isPreview ? importPreviewToolbarSummary.reviewedVoiceCount : 0,
+      totalVoices: isPreview ? importPreviewToolbarSummary.totalVoices : 0,
     });
   }, [
     importPhase,
     importPreviewIndex,
     importPreviews,
+    importPreviewToolbarSummary,
     draftedImportFiles,
-    previewValidationCanConfirm,
     reviewedFiles,
     setTariffImportToolbar,
   ]);
@@ -567,7 +593,7 @@ export function TariffsScreen() {
 
   useEffect(
     () => () => {
-      setEditPreviewBookIdMap(new Map());
+      editPreviewBookIdMap.current = new Map();
       setTariffImportToolbar({
         activeIndex: 0,
         activeDrafted: false,
@@ -591,81 +617,78 @@ export function TariffsScreen() {
     let totalVoices = 0;
     const allSavedVoices: DesktopTariffVoice[] = [];
 
-    for (const metadata of metadatas) {
-      if (metadata.voices.length === 0) continue;
+    const ops = metadatas
+      .filter((m) => m.voices.length > 0)
+      .map(async (metadata) => {
+        const existingBookId = metadata.existingBookId;
+        const tariffBookId = existingBookId ?? createTariffBookId(metadata);
+        const voices = metadata.voices.map((voice) => ({
+          ...voice,
+          id: `voice_${tariffBookId}_${sanitizeIdentifier(voice.officialCode)}`,
+          tariffBookId,
+        }));
 
-      const existingBookId = metadata.existingBookId;
-      const tariffBookId = existingBookId ?? createTariffBookId(metadata);
-      const voices = metadata.voices.map((voice) => ({
-        ...voice,
-        id: `voice_${tariffBookId}_${sanitizeIdentifier(voice.officialCode)}`,
-        tariffBookId,
-      }));
+        try {
+          if (existingBookId) {
+            const updated = await updateDesktopTariffBook(existingBookId, {
+              name: metadata.name,
+              sourceName: metadata.sourceName,
+              status: metadata.importStatus,
+              voices,
+              year: metadata.year,
+            });
 
-      try {
-        if (existingBookId) {
-          const updated = await updateDesktopTariffBook(existingBookId, {
-            name: metadata.name,
-            sourceName: metadata.sourceName,
-            status: metadata.importStatus,
-            voices,
-            year: metadata.year,
-          });
+            setTariffBooksState((current) => ({
+              data: current.data.map((b) => (b.id === existingBookId ? updated : b)),
+              ...(current.source === "fallback"
+                ? { message: "Runtime browser: modifica in anteprima.", source: "fallback" }
+                : { source: "desktop" }),
+            }));
+            setSelectedTariffBookId(existingBookId);
+          } else {
+            const book = await createDesktopTariffBook({
+              id: tariffBookId,
+              name: metadata.name,
+              sourceName: metadata.sourceName,
+              status: metadata.importStatus,
+              voices,
+              year: metadata.year,
+            });
 
-          setTariffBooksState((current) => ({
-            data: current.data.map((b) => (b.id === existingBookId ? updated : b)),
-            ...(current.source === "fallback"
-              ? { message: "Runtime browser: modifica in anteprima.", source: "fallback" }
-              : { source: "desktop" }),
-          }));
-          setSelectedTariffBookId(existingBookId);
+            setTariffBooksState((current) => ({
+              data: [book, ...current.data.filter((item) => item.id !== book.id)],
+              ...(current.source === "fallback"
+                ? { message: "Runtime browser: import in anteprima.", source: "fallback" }
+                : { source: "desktop" }),
+            }));
+            setSelectedTariffBookId(book.id);
+          }
+
+          return { tariffBookId, voices };
+        } catch (error) {
           notify({
-            message: `${metadata.name} revisionato e salvato come "${metadata.importStatus === "active" ? "Attivo" : "Bozza"}".`,
-            title: "Tariffario aggiornato",
-            tone: "success",
+            message: `${metadata.name}: ${error instanceof Error ? error.message : String(error)}`,
+            title: existingBookId ? "Aggiornamento non riuscito" : "Importazione non riuscita",
+            tone: "danger",
           });
-        } else {
-          const book = await createDesktopTariffBook({
-            id: tariffBookId,
-            name: metadata.name,
-            sourceName: metadata.sourceName,
-            status: metadata.importStatus,
-            voices,
-            year: metadata.year,
-          });
-
-          setTariffBooksState((current) => ({
-            data: [book, ...current.data.filter((item) => item.id !== book.id)],
-            ...(current.source === "fallback"
-              ? { message: "Runtime browser: import in anteprima.", source: "fallback" }
-              : { source: "desktop" }),
-          }));
-          setSelectedTariffBookId(book.id);
+          return null;
         }
+      });
 
-        setSavedVoiceMap((prev) => {
-          const next = new Map(prev);
-          next.set(tariffBookId, voices);
-          return next;
-        });
+    const results = await Promise.all(ops);
+
+    for (const result of results) {
+      if (result) {
+        const { tariffBookId, voices } = result;
+        savedVoiceMap.current = new Map(savedVoiceMap.current).set(tariffBookId, voices);
         catalogRef.current?.scrollTo({ top: 0, behavior: "smooth" });
         importedCount++;
         totalVoices += voices.length;
         allSavedVoices.push(...voices);
-      } catch (error) {
-        notify({
-          message: `${metadata.name}: ${error instanceof Error ? error.message : String(error)}`,
-          title: existingBookId ? "Aggiornamento non riuscito" : "Importazione non riuscita",
-          tone: "danger",
-        });
       }
     }
 
-    setImportPhase("idle");
-    setImportPreviews([]);
-    setEditPreviewBookIdMap(new Map());
-    setReviewedFiles(new Set());
-    setDraftedImportFiles(new Set());
+    clearImport();
 
     if (importedCount > 0) {
       if (allSavedVoices.length > 0) {
@@ -679,50 +702,55 @@ export function TariffsScreen() {
     }
   }
 
-  useEffect(() => {
-    const handleWorkflowAction = (event: Event) => {
+  const clearImport = useCallback(() => {
+    dispatchImport({ type: "CLEAR" });
+    editPreviewBookIdMap.current = new Map();
+    setReviewedFiles(new Set());
+    setDraftedImportFiles(new Set());
+  }, []);
+
+  const handleWorkflowAction = useCallback(
+    (event: Event) => {
       const customEvent = event as CustomEvent<string>;
 
       if (customEvent.detail === "import") {
-        setEditPreviewBookIdMap(new Map());
+        editPreviewBookIdMap.current = new Map();
         setDraftedImportFiles(new Set());
         setReviewedFiles(new Set());
         void handlePdfImport();
       }
-    };
-
-    window.addEventListener("tariff-workflow-action", handleWorkflowAction);
-    return () => window.removeEventListener("tariff-workflow-action", handleWorkflowAction);
-  }, [handlePdfImport]);
+    },
+    [handlePdfImport],
+  );
 
   useEffect(() => {
-    const handlePreviewAction = (event: Event) => {
+    window.addEventListener("tariff-workflow-action", handleWorkflowAction);
+    return () => window.removeEventListener("tariff-workflow-action", handleWorkflowAction);
+  }, [handleWorkflowAction]);
+
+  const handlePreviewAction = useCallback(
+    (event: Event) => {
       const actionId = (event as CustomEvent<string>).detail;
 
       if (actionId === "tariff-import-cancel") {
-        setImportPhase("idle");
-        setImportPreviews([]);
-        setEditPreviewBookIdMap(new Map());
-        setReviewedFiles(new Set());
-        setDraftedImportFiles(new Set());
-        return;
-      }
-
-      if (actionId === "tariff-import-toggle-reviewed") {
+        clearImport();
         return;
       }
 
       if (actionId.startsWith("tariff-import-select-")) {
         const nextIndex = Number.parseInt(actionId.replace("tariff-import-select-", ""), 10);
         if (Number.isInteger(nextIndex) && importPreviews[nextIndex]) {
-          setImportPreviewIndex(nextIndex);
+          dispatchImport({ type: "SET_INDEX", index: nextIndex });
         }
       }
-    };
+    },
+    [importPreviews, clearImport],
+  );
 
+  useEffect(() => {
     window.addEventListener("tariff-preview-action", handlePreviewAction);
     return () => window.removeEventListener("tariff-preview-action", handlePreviewAction);
-  }, [importPreviews]);
+  }, [handlePreviewAction]);
 
   function scrollPreviewToTop() {
     const host = getScrollableAncestor(screenRef.current);
@@ -823,11 +851,8 @@ export function TariffsScreen() {
       const deletedBook = tariffBooksState.data.find((book) => book.id === bookId);
 
       await deleteDesktopTariffBook(bookId);
-      setSavedVoiceMap((prev) => {
-        const next = new Map(prev);
-        next.delete(bookId);
-        return next;
-      });
+      savedVoiceMap.current = new Map(savedVoiceMap.current);
+      savedVoiceMap.current.delete(bookId);
       setTariffBooksState((current) => ({
         data: current.data.filter((book) => book.id !== bookId),
         ...(current.source === "fallback"
@@ -864,105 +889,42 @@ export function TariffsScreen() {
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(circle_at_14%_10%,color-mix(in_srgb,var(--info-base)_13%,transparent),transparent_34%),radial-gradient(circle_at_90%_18%,color-mix(in_srgb,var(--accent-primary)_15%,transparent),transparent_32%)]" />
 
       {importPhase === "preview" && importPreviews.length > 0 ? (
-        <div className="-mx-4 -mt-4 flex flex-col md:-mx-6">
-          <div className="px-6 py-6">
-            <section className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <div className="min-w-0">
-                <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                  Preview importazione
-                </div>
-                <h2 className="mt-2 truncate text-28px font-semibold leading-tight text-[var(--text-primary)]">
-                  {importPreviews[importPreviewIndex]?.name ?? "Tariffario da importare"}
-                </h2>
-                <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
-                  Revisiona descrizioni, codici e prezzi; i comandi principali sono nella toolbar.
-                </p>
-              </div>
-              <div
-                className={cn(
-                  "flex items-center gap-2 rounded-full px-3 py-2 text-12px font-bold ring-1",
-                  draftedImportFiles.has(importPreviewIndex)
-                    ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[var(--warning-base)]/30"
-                    : reviewedFiles.has(importPreviewIndex)
-                      ? "bg-[var(--success-soft)] text-[var(--success-base)] ring-[var(--success-base)]/30"
-                      : "bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-[var(--border-subtle)]",
-                )}
-              >
-                {draftedImportFiles.has(importPreviewIndex) ? (
-                  <Save className="size-4" />
-                ) : (
-                  <CheckCircle2
-                    className={cn(
-                      "size-4",
-                      reviewedFiles.has(importPreviewIndex)
-                        ? "text-[var(--success-base)]"
-                        : "text-[var(--text-secondary)]",
-                    )}
-                  />
-                )}
-                {draftedImportFiles.has(importPreviewIndex)
-                  ? "Salvato in bozza"
-                  : reviewedFiles.has(importPreviewIndex)
-                    ? "File revisionato"
-                    : "Da revisionare"}
-              </div>
-            </section>
-            <TariffImportPreviewModal
-              activeIndex={importPreviewIndex}
-              existingBookIds={getExistingBookIds()}
-              isBusy={false}
-              metadatas={importPreviews}
-              onCancel={() => {
-                setImportPhase("idle");
-                setImportPreviews([]);
-                setEditPreviewBookIdMap(new Map());
-                setReviewedFiles(new Set());
-                setDraftedImportFiles(new Set());
-              }}
-              onConfirm={handleConfirmImport}
-              onDraftedFilesChange={setDraftedImportFiles}
-              onMetadatasChange={(nextMetadatas) => {
-                setImportPreviews(nextMetadatas);
-                setEditPreviewBookIdMap((prev) => {
-                  if (prev.size === 0) return prev;
-                  const next = new Map<string, string>();
-                  for (const meta of nextMetadatas) {
-                    const k = getMetadataKey(meta);
-                    const bookId = prev.get(k);
-                    if (bookId) next.set(k, bookId);
-                  }
-                  return next;
-                });
-                setImportPreviewIndex((current) =>
-                  nextMetadatas.length === 0 ? 0 : Math.min(current, nextMetadatas.length - 1),
-                );
-                if (nextMetadatas.length === 0) {
-                  setImportPhase("idle");
-                }
-              }}
-              onPageCanConfirmChange={setPreviewValidationCanConfirm}
-              onReviewedFilesChange={setReviewedFiles}
-              pageView
-            />
-          </div>
-          <motion.button
-            id="fab-back-to-top"
-            className="group fixed bottom-6 right-6 z-[120] flex h-11 w-11 items-center justify-start gap-2 overflow-hidden rounded-full bg-[var(--accent-primary)] px-3 text-[var(--text-inverse)] shadow-lg outline-none ring-1 ring-white/10 transition-[width,box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:w-40 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-            initial={{ opacity: 0, scale: 0.8, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            onClick={scrollPreviewToTop}
-            transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-            type="button"
-            title="Torna su"
-          >
-            <span className="flex size-5 shrink-0 items-center justify-center">
-              <ArrowUp className="size-5" />
-            </span>
-            <span className="whitespace-nowrap text-12px font-bold opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-              Torna in cima
-            </span>
-          </motion.button>
-        </div>
+        <TariffImportPreviewPanel
+          draftedImportFiles={draftedImportFiles}
+          getExistingBookIds={getExistingBookIds}
+          importPreviewIndex={importPreviewIndex}
+          importPreviews={importPreviews}
+          onCancel={clearImport}
+          onConfirm={handleConfirmImport}
+          onDraftedFilesChange={updateDraftedImportFiles}
+          onMetadatasChange={(nextMetadatas) => {
+            dispatchImport({ type: "SET_PREVIEWS", previews: nextMetadatas });
+            const prev = editPreviewBookIdMap.current;
+            if (prev.size > 0) {
+              const next = new Map<string, string>();
+              for (const meta of nextMetadatas) {
+                const k = getMetadataKey(meta);
+                const bookId = prev.get(k);
+                if (bookId) next.set(k, bookId);
+              }
+              editPreviewBookIdMap.current = next;
+            }
+            const nextIndex =
+              nextMetadatas.length === 0
+                ? 0
+                : Math.min(importPreviewIndex, nextMetadatas.length - 1);
+            dispatchImport({ type: "SET_INDEX", index: nextIndex });
+            if (nextMetadatas.length === 0) {
+              dispatchImport({ type: "SET_PHASE", phase: "idle" });
+            }
+          }}
+          onPageCanConfirmChange={(v: boolean) => {
+            previewValidationCanConfirm.current = v;
+          }}
+          onReviewedFilesChange={updateReviewedFiles}
+          reviewedFiles={reviewedFiles}
+          scrollPreviewToTop={scrollPreviewToTop}
+        />
       ) : (
         <>
           <ScreenHero
@@ -1266,7 +1228,7 @@ function TariffBookPreviewCard({
   const displayVoiceCount = voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT");
 
   return (
-    <motion.article
+    <m.article
       className={cn(
         "relative min-h-[168px] rounded-14px border p-4 text-left transition-colors duration-200",
         isSelected
@@ -1274,7 +1236,7 @@ function TariffBookPreviewCard({
           : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
       )}
       initial={{ opacity: 0, y: 10 }}
-      transition={{ duration: 0.42, ease: BUTTER_EASE }}
+      transition={{ duration: 0.42, ease: SPRING_EASE }}
       viewport={{ amount: 0.18, once: true }}
       whileInView={{ opacity: 1, y: 0 }}
     >
@@ -1294,7 +1256,7 @@ function TariffBookPreviewCard({
               <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-white">
                 PDF
               </span>
-              <div className="space-y-1.5 text-slate-300">
+              <div className="space-y-1.5 text-[var(--text-tertiary)]">
                 <div className="h-1 w-9 rounded bg-current" />
                 <div className="h-1 w-7 rounded bg-current" />
                 <div className="h-1 w-10 rounded bg-current" />
@@ -1323,7 +1285,7 @@ function TariffBookPreviewCard({
                   Anno {book.year}
                 </span>
               </div>
-              <h3 className="mt-3 truncate text-16px font-bold leading-tight text-[var(--text-primary)]">
+              <h3 className="mt-3 truncate text-16px font-semibold leading-tight text-[var(--text-primary)]">
                 {book.name}
               </h3>
               <p className="mt-2 truncate text-13px text-[var(--text-secondary)]">
@@ -1457,11 +1419,11 @@ function TariffBookPreviewCard({
             </div>
           </div>
         ) : showDetails ? (
-          <motion.div
+          <m.div
             className="mt-4 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/40 p-3"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.32, ease: BUTTER_EASE }}
+            transition={{ duration: 0.32, ease: SPRING_EASE }}
           >
             <div className="grid gap-2 text-12px font-medium text-[var(--text-secondary)]">
               <DetailLine label="ID" value={book.id} />
@@ -1470,7 +1432,7 @@ function TariffBookPreviewCard({
               <DetailLine label="Progetti collegati" value={`${linkedProjectCount}`} />
               <DetailLine label="Sottovoci" value={displayVoiceCount} />
             </div>
-          </motion.div>
+          </m.div>
         ) : null}
       </div>
       {isSelected ? (
@@ -1478,7 +1440,113 @@ function TariffBookPreviewCard({
           <CheckCircle2 className="size-4" strokeWidth={3} />
         </span>
       ) : null}
-    </motion.article>
+    </m.article>
+  );
+}
+
+function TariffImportPreviewPanel({
+  draftedImportFiles,
+  getExistingBookIds,
+  importPreviewIndex,
+  importPreviews,
+  onCancel,
+  onConfirm,
+  onDraftedFilesChange,
+  onMetadatasChange,
+  onPageCanConfirmChange,
+  onReviewedFilesChange,
+  reviewedFiles,
+  scrollPreviewToTop,
+}: {
+  draftedImportFiles: Set<number>;
+  getExistingBookIds: () => string[];
+  importPreviewIndex: number;
+  importPreviews: TariffPdfMetadata[];
+  onCancel: () => void;
+  onConfirm: (metadatas: TariffImportPreviewResult[]) => Promise<void>;
+  onDraftedFilesChange: (next: Set<number>) => void;
+  onMetadatasChange: (metadatas: TariffPdfMetadata[]) => void;
+  onPageCanConfirmChange: (v: boolean) => void;
+  onReviewedFilesChange: (next: Set<number>) => void;
+  reviewedFiles: Set<number>;
+  scrollPreviewToTop: () => void;
+}) {
+  return (
+    <div className="-mx-4 -mt-4 flex flex-col md:-mx-6">
+      <div className="p-6">
+        <section className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div className="min-w-0">
+            <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+              Preview importazione
+            </div>
+            <h2 className="mt-2 truncate text-28px font-semibold leading-tight text-[var(--text-primary)]">
+              {importPreviews[importPreviewIndex]?.name ?? "Tariffario da importare"}
+            </h2>
+            <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
+              Revisiona descrizioni, codici e prezzi; i comandi principali sono nella toolbar.
+            </p>
+          </div>
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-full px-3 py-2 text-12px font-bold ring-1",
+              draftedImportFiles.has(importPreviewIndex)
+                ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[var(--warning-base)]/30"
+                : reviewedFiles.has(importPreviewIndex)
+                  ? "bg-[var(--success-soft)] text-[var(--success-base)] ring-[var(--success-base)]/30"
+                  : "bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-[var(--border-subtle)]",
+            )}
+          >
+            {draftedImportFiles.has(importPreviewIndex) ? (
+              <Save className="size-4" />
+            ) : (
+              <CheckCircle2
+                className={cn(
+                  "size-4",
+                  reviewedFiles.has(importPreviewIndex)
+                    ? "text-[var(--success-base)]"
+                    : "text-[var(--text-secondary)]",
+                )}
+              />
+            )}
+            {draftedImportFiles.has(importPreviewIndex)
+              ? "Salvato in bozza"
+              : reviewedFiles.has(importPreviewIndex)
+                ? "File revisionato"
+                : "Da revisionare"}
+          </div>
+        </section>
+        <TariffImportPreviewModal
+          activeIndex={importPreviewIndex}
+          existingBookIds={getExistingBookIds()}
+          isBusy={false}
+          metadatas={importPreviews}
+          onCancel={onCancel}
+          onConfirm={onConfirm}
+          onDraftedFilesChange={onDraftedFilesChange}
+          onMetadatasChange={onMetadatasChange}
+          onPageCanConfirmChange={onPageCanConfirmChange}
+          onReviewedFilesChange={onReviewedFilesChange}
+          pageView
+        />
+      </div>
+      <m.button
+        id="fab-back-to-top"
+        className="group fixed bottom-6 right-6 z-[120] flex h-11 w-11 items-center justify-start gap-2 overflow-hidden rounded-full bg-[var(--accent-primary)] px-3 text-[var(--text-inverse)] shadow-lg outline-none ring-1 ring-white/10 transition-[width,box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:w-40 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+        initial={{ opacity: 0, scale: 0.8, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        onClick={scrollPreviewToTop}
+        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        type="button"
+        title="Torna su"
+      >
+        <span className="flex size-5 shrink-0 items-center justify-center">
+          <ArrowUp className="size-5" />
+        </span>
+        <span className="whitespace-nowrap text-12px font-bold opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          Torna in cima
+        </span>
+      </m.button>
+    </div>
   );
 }
 

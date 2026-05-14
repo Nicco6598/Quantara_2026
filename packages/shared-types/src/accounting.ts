@@ -37,6 +37,8 @@ export type DesktopTariffPriorityRecord = {
 export type DesktopContractRecord = {
   applicationContractCode: string;
   contractualAmount: Money;
+  contractorId?: string | null;
+  contractorName?: string | null;
   frameworkAgreementCode: string;
   id: string;
   tenderDiscountPercent: number;
@@ -48,6 +50,7 @@ export type DesktopContractRecord = {
 export type CreateDesktopContractRecordRequest = {
   applicationContractCode: string;
   contractualAmount: number;
+  contractorName?: string | null;
   frameworkAgreementCode: string;
   id: string;
   tenderDiscountPercent: number;

@@ -16,8 +16,8 @@ import {
   WaveSine,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
-import { motion } from "framer-motion";
-import { useCallback, useEffect, useState } from "react";
+import { m } from "framer-motion";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primitives";
 import { APP_VERSION } from "@/generated/appVersion";
@@ -32,25 +32,569 @@ type UpdateViewState = { kind: "idle" } | UpdateCheckResult;
 
 const updaterReady = import.meta.env.PROD;
 
-export function SettingsScreen() {
+// ── Reducer ──────────────────────────────────────────────
+
+type AsyncOpState = {
+  isCheckingUpdates: boolean;
+  updateState: UpdateViewState;
+  isBackupRunning: boolean;
+  backupResult: string | null;
+  isIntegrityRunning: boolean;
+  integrityResult: string | null;
+};
+
+type AsyncOpAction =
+  | { type: "CHECK_UPDATE_START" }
+  | { type: "CHECK_UPDATE_DONE"; state: UpdateViewState }
+  | { type: "BACKUP_START" }
+  | { type: "BACKUP_DONE"; result: string | null }
+  | { type: "RESTORE_DONE"; result: string }
+  | { type: "INTEGRITY_START" }
+  | { type: "INTEGRITY_DONE"; result: string | null };
+
+function asyncOpReducer(state: AsyncOpState, action: AsyncOpAction): AsyncOpState {
+  switch (action.type) {
+    case "CHECK_UPDATE_START":
+      return { ...state, isCheckingUpdates: true };
+    case "CHECK_UPDATE_DONE":
+      return { ...state, isCheckingUpdates: false, updateState: action.state };
+    case "BACKUP_START":
+      return { ...state, isBackupRunning: true, backupResult: null };
+    case "BACKUP_DONE":
+      return { ...state, isBackupRunning: false, backupResult: action.result };
+    case "RESTORE_DONE":
+      return { ...state, backupResult: action.result };
+    case "INTEGRITY_START":
+      return { ...state, isIntegrityRunning: true, integrityResult: null };
+    case "INTEGRITY_DONE":
+      return { ...state, isIntegrityRunning: false, integrityResult: action.result };
+  }
+}
+
+const initialAsyncState: AsyncOpState = {
+  isCheckingUpdates: false,
+  updateState: { kind: "idle" },
+  isBackupRunning: false,
+  backupResult: null,
+  isIntegrityRunning: false,
+  integrityResult: null,
+};
+
+// ── Client-date (hydration-safe) ─────────────────────────
+
+function ClientDate({ timestamp }: { timestamp: string }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  return (
+    <>
+      {new Date(timestamp).toLocaleDateString("it-IT")}
+      <br />
+      {new Date(timestamp).toLocaleTimeString("it-IT", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}
+    </>
+  );
+}
+
+// ── Card sub-components ──────────────────────────────────
+
+function ThemeCard() {
+  const { setThemeMode, themeMode } = useThemeState();
+  return (
+    <BezelSurface innerClassName="p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+          <Palette className="size-5" weight="light" />
+        </span>
+        <div>
+          <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+            Interfaccia
+          </div>
+          <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">Tema</h3>
+        </div>
+      </div>
+      <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+        Trattamento cromatico della shell.
+      </p>
+      <div className="mt-4 grid gap-2">
+        <ThemeOption
+          active={themeMode === "light"}
+          description="Superfici chiare"
+          icon={Sun}
+          label="Chiaro"
+          onClick={() => setThemeMode("light")}
+        />
+        <ThemeOption
+          active={themeMode === "dark"}
+          description="Superfici scure"
+          icon={Moon}
+          label="Scuro"
+          onClick={() => setThemeMode("dark")}
+        />
+      </div>
+    </BezelSurface>
+  );
+}
+
+function MotionCard() {
+  const { motionMode, setMotionMode } = usePreferenceState();
+  return (
+    <BezelSurface innerClassName="p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+          <WaveSine className="size-5" weight="light" />
+        </span>
+        <div>
+          <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+            Esperienza
+          </div>
+          <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">Movimento</h3>
+        </div>
+      </div>
+      <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+        Transizioni e micro-animazioni della shell.
+      </p>
+      <div className="mt-4 grid gap-2">
+        <ThemeOption
+          active={motionMode === "full"}
+          description="Tutte le transizioni"
+          icon={Sparkle}
+          label="Completo"
+          onClick={() => setMotionMode("full")}
+        />
+        <ThemeOption
+          active={motionMode === "reduced"}
+          description="Effetti ridotti"
+          icon={MagicWand}
+          label="Ridotto"
+          onClick={() => setMotionMode("reduced")}
+        />
+      </div>
+    </BezelSurface>
+  );
+}
+
+function UpdateCheckCard({
+  isCheckingUpdates,
+  updateState,
+  onCheckForUpdates,
+}: {
+  isCheckingUpdates: boolean;
+  updateState: UpdateViewState;
+  onCheckForUpdates: () => void;
+}) {
+  const releaseStatus = getReleaseStatus(updateState);
+  return (
+    <BezelSurface innerClassName="p-5">
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-full",
+            releaseStatus.tone === "success"
+              ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+              : releaseStatus.tone === "warning"
+                ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                : "bg-[var(--info-soft)] text-[var(--info-base)]",
+          )}
+        >
+          <ArrowsClockwise className="size-5" weight="light" />
+        </span>
+        <div>
+          <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+            Aggiornamenti
+          </div>
+          <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">Check release</h3>
+        </div>
+      </div>
+      <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+        {releaseStatus.description}
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <ProjectControlButton
+          disabled={isCheckingUpdates}
+          onClick={onCheckForUpdates}
+          variant="primary"
+        >
+          <svg
+            aria-hidden="true"
+            className={cn("size-4", isCheckingUpdates ? "animate-spin" : "")}
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M12 4V2m0 20v-2m8-10h2M2 12h2m15.07-7.07l1.41-1.41M5.64 17.66l-1.41 1.41"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth={2}
+            />
+            <circle
+              cx="12"
+              cy="12"
+              r="6"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth={2}
+            />
+          </svg>
+          {isCheckingUpdates ? "Verifica in corso\u2026" : "Verifica disponibilita"}
+        </ProjectControlButton>
+        {releaseStatus.notes ? (
+          <span className="rounded-full bg-[var(--warning-soft)] px-2.5 py-1 text-10px font-semibold text-[var(--warning-base)]">
+            {releaseStatus.notes}
+          </span>
+        ) : null}
+      </div>
+      {releaseStatus.checkedAt ? (
+        <div className="mt-3 flex items-center gap-1.5 text-11px font-medium text-[var(--text-secondary)]">
+          <Clock className="size-3.5" weight="light" />
+          Ultimo controllo {formatTimestamp(releaseStatus.checkedAt)}
+        </div>
+      ) : null}
+    </BezelSurface>
+  );
+}
+
+function BackupRestoreCard({
+  dbInfo,
+  isBackupRunning,
+  backupResult,
+  onBackup,
+  onRestore,
+}: {
+  dbInfo: DatabaseInfo | null;
+  isBackupRunning: boolean;
+  backupResult: string | null;
+  onBackup: () => void;
+  onRestore: () => void;
+}) {
+  return (
+    <BezelSurface innerClassName="p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+          <FloppyDisk className="size-5" weight="light" />
+        </span>
+        <div>
+          <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+            Backup
+          </div>
+          <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+            Backup e ripristino
+          </h3>
+        </div>
+      </div>
+      <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+        Crea un backup completo del database o ripristina da un file .qbk esistente.
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+          <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+            Dimensione DB
+          </div>
+          <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
+            {dbInfo ? formatFileSize(dbInfo.sizeBytes) : "\u2014"}
+          </div>
+        </div>
+        <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+          <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+            Directory
+          </div>
+          <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
+            {dbInfo ? "Locale" : "\u2014"}
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <ProjectControlButton disabled={isBackupRunning} onClick={onBackup} variant="primary">
+          <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
+            <path
+              d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+            />
+          </svg>
+          {isBackupRunning ? "Backup in corso\u2026" : "Crea backup"}
+        </ProjectControlButton>
+        <ProjectControlButton onClick={onRestore} variant="ghost">
+          <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
+            <path
+              d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+            />
+          </svg>
+          Ripristina
+        </ProjectControlButton>
+      </div>
+      {isBackupRunning ? (
+        <div className="mt-3 flex items-center gap-2 text-12px text-[var(--text-secondary)]">
+          <ArrowsClockwise className="size-4 animate-spin" weight="bold" />
+          Backup in corso\u2026
+        </div>
+      ) : null}
+      {backupResult && backupResult !== "annullato" ? (
+        <div className="mt-3 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-12px font-medium text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20">
+          <CheckCircle className="mr-1.5 inline size-3.5" weight="bold" />
+          {backupResult}
+        </div>
+      ) : null}
+    </BezelSurface>
+  );
+}
+
+function IntegrityCheckCard({
+  dbInfo,
+  isIntegrityRunning,
+  integrityResult,
+  onIntegrityCheck,
+}: {
+  dbInfo: DatabaseInfo | null;
+  isIntegrityRunning: boolean;
+  integrityResult: string | null;
+  onIntegrityCheck: () => void;
+}) {
+  return (
+    <BezelSurface innerClassName="p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+          <ShieldCheck className="size-5" weight="light" />
+        </span>
+        <div>
+          <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+            Integrita
+          </div>
+          <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+            Verifica database
+          </h3>
+        </div>
+      </div>
+      <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
+        Controlla lo stato del database locale, dimensione e accessibilita dei dati.
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+          <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+            Esistenza
+          </div>
+          <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
+            {dbInfo ? (dbInfo.exists ? "Presente" : "Assente") : "\u2014"}
+          </div>
+        </div>
+        <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
+          <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+            Dimensione
+          </div>
+          <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
+            {dbInfo ? formatFileSize(dbInfo.sizeBytes) : "\u2014"}
+          </div>
+        </div>
+      </div>
+      <div className="mt-4">
+        <ProjectControlButton
+          disabled={isIntegrityRunning}
+          onClick={onIntegrityCheck}
+          variant="neutral"
+        >
+          <svg
+            aria-hidden="true"
+            className={cn("size-4", isIntegrityRunning ? "animate-spin" : "")}
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M9 12l2 2 4-4"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+            />
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth={2}
+            />
+          </svg>
+          {isIntegrityRunning ? "Verifica in corso\u2026" : "Esegui verifica"}
+        </ProjectControlButton>
+      </div>
+      {integrityResult ? (
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-12px font-medium text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20">
+          <CheckCircle className="size-3.5 shrink-0" weight="bold" />
+          {integrityResult}
+        </div>
+      ) : null}
+    </BezelSurface>
+  );
+}
+
+function BuildInfoCard() {
+  const { pendingReleaseNotes } = usePendingReleaseNotes();
+  return (
+    <BezelSurface innerClassName="p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+          <GitBranch className="size-5" weight="light" />
+        </span>
+        <div>
+          <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+            Build
+          </div>
+          <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+            Catena versione
+          </h3>
+        </div>
+      </div>
+      <div className="mt-4 space-y-3">
+        <div className="flex items-start gap-3 rounded-lg bg-[var(--bg-muted)] p-3 ring-1 ring-[var(--border-subtle)]">
+          <CheckCircle
+            className="mt-0.5 size-4 shrink-0 text-[var(--success-base)]"
+            weight="light"
+          />
+          <div>
+            <div className="text-13px font-semibold text-[var(--text-primary)]">
+              Catena di versione attiva
+            </div>
+            <p className="mt-1 text-12px leading-5 text-[var(--text-secondary)]">
+              APP_VERSION rigenerata dal flusso pnpm version:sync. Riallinea root, workspace desktop
+              e metadati Tauri.
+            </p>
+          </div>
+        </div>
+        {pendingReleaseNotes ? (
+          <div className="inline-flex rounded-full bg-[var(--warning-soft)] px-3 py-1 text-11px font-semibold text-[var(--warning-base)]">
+            Note release v{pendingReleaseNotes.version} in sospeso
+          </div>
+        ) : null}
+      </div>
+    </BezelSurface>
+  );
+}
+
+function ReleaseRulesCard() {
   const {
     autoCheckUpdatesOnLaunch,
-    motionMode,
     setAutoCheckUpdatesOnLaunch,
-    setMotionMode,
     setShowReleaseNotesAfterUpdate,
     showReleaseNotesAfterUpdate,
   } = usePreferenceState();
-  const { setThemeMode, themeMode } = useThemeState();
-  const { pendingReleaseNotes } = usePendingReleaseNotes();
-  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
-  const [updateState, setUpdateState] = useState<UpdateViewState>({ kind: "idle" });
-  const [dbInfo, setDbInfo] = useState<DatabaseInfo | null>(null);
-  const [isBackupRunning, setIsBackupRunning] = useState(false);
-  const [backupResult, setBackupResult] = useState<string | null>(null);
-  const [isIntegrityRunning, setIsIntegrityRunning] = useState(false);
-  const [integrityResult, setIntegrityResult] = useState<string | null>(null);
+  return (
+    <BezelSurface innerClassName="p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+          <BellRinging className="size-5" weight="light" />
+        </span>
+        <div>
+          <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+            Release
+          </div>
+          <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+            Regole aggiornamento
+          </h3>
+        </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        <ToggleRow
+          checked={autoCheckUpdatesOnLaunch}
+          description="Check automatico all'avvio della build desktop."
+          label="Auto-check all'avvio"
+          onChange={setAutoCheckUpdatesOnLaunch}
+        />
+        <ToggleRow
+          checked={showReleaseNotesAfterUpdate}
+          description="Mostra conferma di installazione dopo il riavvio."
+          label="Feedback post-update"
+          onChange={setShowReleaseNotesAfterUpdate}
+        />
+      </div>
+    </BezelSurface>
+  );
+}
+
+function AuditLogCard() {
   const auditEntries = useAuditLogStore((state) => state.entries);
+  return (
+    <BezelSurface innerClassName="p-5">
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-full",
+            auditEntries.length > 0
+              ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+              : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+          )}
+        >
+          <Clock className="size-5" weight="light" />
+        </span>
+        <div>
+          <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+            Audit
+          </div>
+          <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
+            Registro attivita
+          </h3>
+        </div>
+      </div>
+      <div className="mt-4 max-h-[260px] space-y-1 overflow-y-auto">
+        {auditEntries.length === 0 ? (
+          <p className="py-4 text-center text-13px text-[var(--text-secondary)]">
+            Nessuna attivita registrata.
+          </p>
+        ) : (
+          auditEntries.slice(0, 20).map((entry) => (
+            <div
+              className="flex items-center justify-between gap-3 rounded-lg bg-[var(--bg-muted)]/50 px-3 py-2 text-12px"
+              key={entry.id}
+            >
+              <div className="min-w-0">
+                <span className="font-semibold text-[var(--text-primary)]">{entry.action}</span>
+                <span className="ml-1.5 text-[var(--text-secondary)]">{entry.entityType}</span>
+                <div className="mt-0.5 text-11px text-[var(--text-secondary)]">{entry.details}</div>
+              </div>
+              <div className="shrink-0 text-right text-11px text-[var(--text-secondary)]">
+                <ClientDate timestamp={entry.timestamp} />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      {auditEntries.length > 0 ? (
+        <button
+          className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-12px font-semibold text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
+          onClick={() => useAuditLogStore.getState().clearAll()}
+          type="button"
+        >
+          <Trash className="size-4" />
+          Cancella registro
+        </button>
+      ) : null}
+    </BezelSurface>
+  );
+}
+
+// ── Main component ───────────────────────────────────────
+
+export function SettingsScreen() {
+  const { showReleaseNotesAfterUpdate } = usePreferenceState();
+  const [
+    {
+      isCheckingUpdates,
+      updateState,
+      isBackupRunning,
+      backupResult,
+      isIntegrityRunning,
+      integrityResult,
+    },
+    dispatch,
+  ] = useReducer(asyncOpReducer, initialAsyncState);
+  const [dbInfo, setDbInfo] = useState<DatabaseInfo | null>(null);
 
   useEffect(() => {
     getDatabaseInfo()
@@ -59,17 +603,15 @@ export function SettingsScreen() {
   }, []);
 
   const handleCheckForUpdates = useCallback(async () => {
-    setIsCheckingUpdates(true);
+    dispatch({ type: "CHECK_UPDATE_START" });
     const result = await runAppUpdateCheck({ promptForInstall: true, showReleaseNotesAfterUpdate });
-    setUpdateState(result);
-    setIsCheckingUpdates(false);
+    dispatch({ type: "CHECK_UPDATE_DONE", state: result });
   }, [showReleaseNotesAfterUpdate]);
 
   const handleBackup = useCallback(async () => {
-    setIsBackupRunning(true);
+    dispatch({ type: "BACKUP_START" });
     const result = await backupDatabase();
-    setBackupResult(result);
-    setIsBackupRunning(false);
+    dispatch({ type: "BACKUP_DONE", result });
     if (result !== "annullato") {
       getDatabaseInfo()
         .then(setDbInfo)
@@ -80,7 +622,7 @@ export function SettingsScreen() {
   const handleRestore = useCallback(async () => {
     const result = await restoreDatabase();
     if (result !== "annullato") {
-      setBackupResult(result);
+      dispatch({ type: "RESTORE_DONE", result });
       getDatabaseInfo()
         .then(setDbInfo)
         .catch(() => {});
@@ -88,8 +630,7 @@ export function SettingsScreen() {
   }, []);
 
   const handleIntegrityCheck = useCallback(async () => {
-    setIsIntegrityRunning(true);
-    setIntegrityResult(null);
+    dispatch({ type: "INTEGRITY_START" });
     await new Promise((r) => setTimeout(r, 400));
     try {
       const info = await getDatabaseInfo();
@@ -97,17 +638,14 @@ export function SettingsScreen() {
       if (info.exists) {
         checks.push(info.sizeBytes > 0 ? "Database integro" : "Database vuoto");
         checks.push(info.sizeBytes > 1024 ? "Dimensione adeguata" : "Dimensione ridotta");
-        setIntegrityResult(checks.join(" · "));
+        dispatch({ type: "INTEGRITY_DONE", result: checks.join(" · ") });
       } else {
-        setIntegrityResult("Nessun database locale trovato");
+        dispatch({ type: "INTEGRITY_DONE", result: "Nessun database locale trovato" });
       }
     } catch {
-      setIntegrityResult("Verifica non riuscita");
+      dispatch({ type: "INTEGRITY_DONE", result: "Verifica non riuscita" });
     }
-    setIsIntegrityRunning(false);
   }, []);
-
-  const releaseStatus = getReleaseStatus(updateState);
 
   return (
     <main className="relative w-full max-w-full overflow-x-hidden px-4 pb-10 pt-4 md:px-6">
@@ -147,432 +685,41 @@ export function SettingsScreen() {
       />
 
       <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-        <BezelSurface innerClassName="p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <Palette className="size-5" weight="light" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Interfaccia
-              </div>
-              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">Tema</h3>
-            </div>
-          </div>
-          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
-            Trattamento cromatico della shell.
-          </p>
-          <div className="mt-4 grid gap-2">
-            <ThemeOption
-              active={themeMode === "light"}
-              description="Superfici chiare"
-              icon={Sun}
-              label="Chiaro"
-              onClick={() => setThemeMode("light")}
-            />
-            <ThemeOption
-              active={themeMode === "dark"}
-              description="Superfici scure"
-              icon={Moon}
-              label="Scuro"
-              onClick={() => setThemeMode("dark")}
-            />
-          </div>
-        </BezelSurface>
-
-        <BezelSurface innerClassName="p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <WaveSine className="size-5" weight="light" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Esperienza
-              </div>
-              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">Movimento</h3>
-            </div>
-          </div>
-          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
-            Transizioni e micro-animazioni della shell.
-          </p>
-          <div className="mt-4 grid gap-2">
-            <ThemeOption
-              active={motionMode === "full"}
-              description="Tutte le transizioni"
-              icon={Sparkle}
-              label="Completo"
-              onClick={() => setMotionMode("full")}
-            />
-            <ThemeOption
-              active={motionMode === "reduced"}
-              description="Effetti ridotti"
-              icon={MagicWand}
-              label="Ridotto"
-              onClick={() => setMotionMode("reduced")}
-            />
-          </div>
-        </BezelSurface>
-
-        <BezelSurface innerClassName="p-5">
-          <div className="flex items-center gap-3">
-            <span
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-full",
-                releaseStatus.tone === "success"
-                  ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-                  : releaseStatus.tone === "warning"
-                    ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-                    : "bg-[var(--info-soft)] text-[var(--info-base)]",
-              )}
-            >
-              <ArrowsClockwise className="size-5" weight="light" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Aggiornamenti
-              </div>
-              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
-                Check release
-              </h3>
-            </div>
-          </div>
-          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
-            {releaseStatus.description}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <ProjectControlButton
-              disabled={isCheckingUpdates}
-              onClick={handleCheckForUpdates}
-              variant="primary"
-            >
-              <svg
-                aria-hidden="true"
-                className={cn("size-4", isCheckingUpdates ? "animate-spin" : "")}
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M12 4V2m0 20v-2m8-10h2M2 12h2m15.07-7.07l1.41-1.41M5.64 17.66l-1.41 1.41"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeWidth={2}
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="6"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeWidth={2}
-                />
-              </svg>
-              {isCheckingUpdates ? "Verifica in corso..." : "Verifica disponibilita"}
-            </ProjectControlButton>
-            {releaseStatus.notes ? (
-              <span className="rounded-full bg-[var(--warning-soft)] px-2.5 py-1 text-10px font-semibold text-[var(--warning-base)]">
-                {releaseStatus.notes}
-              </span>
-            ) : null}
-          </div>
-          {releaseStatus.checkedAt ? (
-            <div className="mt-3 flex items-center gap-1.5 text-11px font-medium text-[var(--text-secondary)]">
-              <Clock className="size-3.5" weight="light" />
-              Ultimo controllo {formatTimestamp(releaseStatus.checkedAt)}
-            </div>
-          ) : null}
-        </BezelSurface>
+        <ThemeCard />
+        <MotionCard />
+        <UpdateCheckCard
+          isCheckingUpdates={isCheckingUpdates}
+          updateState={updateState}
+          onCheckForUpdates={handleCheckForUpdates}
+        />
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <BezelSurface innerClassName="p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <FloppyDisk className="size-5" weight="light" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Backup
-              </div>
-              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
-                Backup e ripristino
-              </h3>
-            </div>
-          </div>
-          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
-            Crea un backup completo del database o ripristina da un file .qbk esistente.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
-              <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-                Dimensione DB
-              </div>
-              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-                {dbInfo ? formatFileSize(dbInfo.sizeBytes) : "—"}
-              </div>
-            </div>
-            <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
-              <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-                Directory
-              </div>
-              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-                {dbInfo ? "Locale" : "—"}
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ProjectControlButton
-              disabled={isBackupRunning}
-              onClick={handleBackup}
-              variant="primary"
-            >
-              <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
-                <path
-                  d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.8}
-                />
-              </svg>
-              {isBackupRunning ? "Backup in corso..." : "Crea backup"}
-            </ProjectControlButton>
-            <ProjectControlButton onClick={handleRestore} variant="ghost">
-              <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
-                <path
-                  d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.8}
-                />
-              </svg>
-              Ripristina
-            </ProjectControlButton>
-          </div>
-          {isBackupRunning ? (
-            <div className="mt-3 flex items-center gap-2 text-12px text-[var(--text-secondary)]">
-              <ArrowsClockwise className="size-4 animate-spin" weight="bold" />
-              Backup in corso...
-            </div>
-          ) : null}
-          {backupResult && backupResult !== "annullato" ? (
-            <div className="mt-3 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-12px font-medium text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20">
-              <CheckCircle className="mr-1.5 inline size-3.5" weight="bold" />
-              {backupResult}
-            </div>
-          ) : null}
-        </BezelSurface>
-
-        <BezelSurface innerClassName="p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <ShieldCheck className="size-5" weight="light" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Integrita
-              </div>
-              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
-                Verifica database
-              </h3>
-            </div>
-          </div>
-          <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
-            Controlla lo stato del database locale, dimensione e accessibilita dei dati.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
-              <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-                Esistenza
-              </div>
-              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-                {dbInfo ? (dbInfo.exists ? "Presente" : "Assente") : "—"}
-              </div>
-            </div>
-            <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
-              <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-                Dimensione
-              </div>
-              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-                {dbInfo ? formatFileSize(dbInfo.sizeBytes) : "—"}
-              </div>
-            </div>
-          </div>
-          <div className="mt-4">
-            <ProjectControlButton
-              disabled={isIntegrityRunning}
-              onClick={handleIntegrityCheck}
-              variant="neutral"
-            >
-              <svg
-                aria-hidden="true"
-                className={cn("size-4", isIntegrityRunning ? "animate-spin" : "")}
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M9 12l2 2 4-4"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeWidth={2}
-                />
-              </svg>
-              {isIntegrityRunning ? "Verifica in corso..." : "Esegui verifica"}
-            </ProjectControlButton>
-          </div>
-          {integrityResult ? (
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-12px font-medium text-[var(--success-base)] ring-1 ring-[var(--success-base)]/20">
-              <CheckCircle className="size-3.5 shrink-0" weight="bold" />
-              {integrityResult}
-            </div>
-          ) : null}
-        </BezelSurface>
+        <BackupRestoreCard
+          dbInfo={dbInfo}
+          isBackupRunning={isBackupRunning}
+          backupResult={backupResult}
+          onBackup={handleBackup}
+          onRestore={handleRestore}
+        />
+        <IntegrityCheckCard
+          dbInfo={dbInfo}
+          isIntegrityRunning={isIntegrityRunning}
+          integrityResult={integrityResult}
+          onIntegrityCheck={handleIntegrityCheck}
+        />
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-        <BezelSurface innerClassName="p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <GitBranch className="size-5" weight="light" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Build
-              </div>
-              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
-                Catena versione
-              </h3>
-            </div>
-          </div>
-          <div className="mt-4 space-y-3">
-            <div className="flex items-start gap-3 rounded-lg bg-[var(--bg-muted)] p-3 ring-1 ring-[var(--border-subtle)]">
-              <CheckCircle
-                className="mt-0.5 size-4 shrink-0 text-[var(--success-base)]"
-                weight="light"
-              />
-              <div>
-                <div className="text-13px font-semibold text-[var(--text-primary)]">
-                  Catena di versione attiva
-                </div>
-                <p className="mt-1 text-12px leading-5 text-[var(--text-secondary)]">
-                  APP_VERSION rigenerata dal flusso pnpm version:sync. Riallinea root, workspace
-                  desktop e metadati Tauri.
-                </p>
-              </div>
-            </div>
-            {pendingReleaseNotes ? (
-              <div className="inline-flex rounded-full bg-[var(--warning-soft)] px-3 py-1 text-11px font-semibold text-[var(--warning-base)]">
-                Note release v{pendingReleaseNotes.version} in sospeso
-              </div>
-            ) : null}
-          </div>
-        </BezelSurface>
-
-        <BezelSurface innerClassName="p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <BellRinging className="size-5" weight="light" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Release
-              </div>
-              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
-                Regole aggiornamento
-              </h3>
-            </div>
-          </div>
-          <div className="mt-4 space-y-2">
-            <ToggleRow
-              checked={autoCheckUpdatesOnLaunch}
-              description="Check automatico all'avvio della build desktop."
-              label="Auto-check all'avvio"
-              onChange={setAutoCheckUpdatesOnLaunch}
-            />
-            <ToggleRow
-              checked={showReleaseNotesAfterUpdate}
-              description="Mostra conferma di installazione dopo il riavvio."
-              label="Feedback post-update"
-              onChange={setShowReleaseNotesAfterUpdate}
-            />
-          </div>
-        </BezelSurface>
-
-        <BezelSurface innerClassName="p-5">
-          <div className="flex items-center gap-3">
-            <span
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-full",
-                auditEntries.length > 0
-                  ? "bg-[var(--info-soft)] text-[var(--info-base)]"
-                  : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-              )}
-            >
-              <Clock className="size-5" weight="light" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Audit
-              </div>
-              <h3 className="mt-1 text-15px font-semibold text-[var(--text-primary)]">
-                Registro attivita
-              </h3>
-            </div>
-          </div>
-          <div className="mt-4 max-h-[260px] overflow-y-auto space-y-1">
-            {auditEntries.length === 0 ? (
-              <p className="py-4 text-center text-13px text-[var(--text-secondary)]">
-                Nessuna attivita registrata.
-              </p>
-            ) : (
-              auditEntries.slice(0, 20).map((entry) => (
-                <div
-                  className="flex items-center justify-between gap-3 rounded-lg bg-[var(--bg-muted)]/50 px-3 py-2 text-12px"
-                  key={entry.id}
-                >
-                  <div className="min-w-0">
-                    <span className="font-semibold text-[var(--text-primary)]">{entry.action}</span>
-                    <span className="ml-1.5 text-[var(--text-secondary)]">{entry.entityType}</span>
-                    <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
-                      {entry.details}
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right text-11px text-[var(--text-secondary)]">
-                    {new Date(entry.timestamp).toLocaleDateString("it-IT")}
-                    <br />
-                    {new Date(entry.timestamp).toLocaleTimeString("it-IT", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          {auditEntries.length > 0 ? (
-            <button
-              className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-12px font-semibold text-[var(--danger-base)] transition-colors hover:bg-[var(--danger-soft)]"
-              onClick={() => useAuditLogStore.getState().clearAll()}
-              type="button"
-            >
-              <Trash className="size-4" />
-              Cancella registro
-            </button>
-          ) : null}
-        </BezelSurface>
+        <BuildInfoCard />
+        <ReleaseRulesCard />
+        <AuditLogCard />
       </div>
     </main>
   );
 }
+
+// ── Shared helpers ───────────────────────────────────────
 
 function ThemeOption({
   active,
@@ -588,7 +735,7 @@ function ThemeOption({
   onClick: () => void;
 }) {
   return (
-    <motion.button
+    <m.button
       aria-pressed={active}
       className={cn(
         "group flex min-h-14 items-center gap-3 rounded-xl p-2.5 text-left outline-none ring-1 transition-all duration-200",
@@ -618,7 +765,7 @@ function ThemeOption({
           Attivo
         </span>
       ) : null}
-    </motion.button>
+    </m.button>
   );
 }
 
@@ -639,7 +786,7 @@ function ToggleRow({
         <div className="text-13px font-semibold text-[var(--text-primary)]">{label}</div>
         <p className="mt-1 text-12px leading-5 text-[var(--text-secondary)]">{description}</p>
       </div>
-      <motion.button
+      <m.button
         aria-checked={checked}
         className={cn(
           "relative mt-0.5 flex h-7 w-12 shrink-0 items-center rounded-full p-1 outline-none ring-1 transition-colors duration-200",
@@ -651,12 +798,12 @@ function ToggleRow({
         role="switch"
         type="button"
       >
-        <motion.span
+        <m.span
           animate={{ x: checked ? 20 : 0 }}
           className="block size-5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.12)]"
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         />
-      </motion.button>
+      </m.button>
     </div>
   );
 }

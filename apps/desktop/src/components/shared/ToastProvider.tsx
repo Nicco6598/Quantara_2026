@@ -1,10 +1,10 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { CheckCircle2, Info, TriangleAlert, X, XCircle } from "lucide-react";
 import {
   createContext,
   type ReactNode,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -22,17 +22,9 @@ type ToastInput = {
   tone?: ToastTone;
 };
 
-export type QuantaraToastEventDetail = ToastInput;
+type QuantaraToastEventDetail = ToastInput;
 
-export const QUANTARA_TOAST_EVENT = "quantara-toast";
-
-export function emitToast(toast: ToastInput) {
-  window.dispatchEvent(
-    new CustomEvent<QuantaraToastEventDetail>(QUANTARA_TOAST_EVENT, {
-      detail: toast,
-    }),
-  );
-}
+const QUANTARA_TOAST_EVENT = "quantara-toast";
 
 type ToastItem = ToastInput & {
   id: string;
@@ -204,7 +196,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           const Icon = toneIcons[toast.tone];
 
           return (
-            <motion.div
+            <m.div
               className={cn(
                 "pointer-events-auto rounded-18px bg-[var(--surface-base)] p-3.5 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.15),inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 backdrop-blur-md",
                 toneBorder[toast.tone],
@@ -256,7 +248,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <X className="size-4" />
                 </button>
               </div>
-            </motion.div>
+            </m.div>
           );
         })}
       </div>
@@ -265,7 +257,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 export function useToast() {
-  const context = useContext(ToastContext);
+  const context = use(ToastContext);
 
   if (!context) {
     throw new Error("useToast must be used inside ToastProvider");

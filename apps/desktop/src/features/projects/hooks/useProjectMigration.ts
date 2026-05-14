@@ -46,7 +46,10 @@ export function useProjectMigration({
       const { serializeQuantaraMigrationWorkbook } = await import("@quantara/excel-import");
 
       await waitForUiPaint();
-      downloadWorkbook(serializeQuantaraMigrationWorkbook(data), "quantara-projects-export.xlsx");
+      downloadWorkbook(
+        await serializeQuantaraMigrationWorkbook(data),
+        "quantara-projects-export.xlsx",
+      );
       notify({
         message:
           data.projects.length > 0
@@ -73,7 +76,7 @@ export function useProjectMigration({
       const { parseQuantaraMigrationWorkbook, validateQuantaraMigrationWorkbook } = await import(
         "@quantara/excel-import"
       );
-      const data = parseQuantaraMigrationWorkbook(await file.arrayBuffer());
+      const data = await parseQuantaraMigrationWorkbook(await file.arrayBuffer());
       const validation = validateQuantaraMigrationWorkbook(data);
 
       notify({

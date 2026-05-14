@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { ArrowRight, Minus, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
-import { SOFT_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { cn } from "@/lib/utils";
 import { type DiffResult, diffSalLines } from "../domain/sal-comparison";
 import type { SalLineView } from "../types";
@@ -203,12 +203,12 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
   const total = side === "before" ? (diff.oldTotal ?? 0) : diff.newTotal;
 
   return (
-    <motion.div
+    <m.div
       animate={{ opacity: 1, x: 0 }}
       className={cn("px-4 py-3 text-12px", bgClass)}
       exit={{ opacity: 0, x: -12 }}
       initial={{ opacity: 0, x: -8 }}
-      transition={{ duration: 0.2, ease: SOFT_EASE }}
+      transition={{ duration: 0.2, ease: SPRING_EASE }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -315,6 +315,6 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
           )}
         </div>
       )}
-    </motion.div>
+    </m.div>
   );
 }

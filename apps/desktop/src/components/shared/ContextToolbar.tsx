@@ -1,7 +1,7 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { Download, Trash2, XCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import { SOFT_EASE } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { useSelectionStore } from "@/store/selection-store";
 
 type BulkAction = {
@@ -22,12 +22,12 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
   return (
     <AnimatePresence>
       {count > 0 && (
-        <motion.div
-          animate={{ opacity: 1, y: 0, scale: 1 }}
+        <m.div
+          animate={MOTION_VARIANTS.popover.animate}
           className="flex items-center gap-3 rounded-2xl bg-[var(--surface-base)] px-3.5 py-2.5 shadow-[0_8px_28px_-12px_rgba(0,0,0,0.12)] ring-1 ring-[var(--border-subtle)]"
           exit={{ opacity: 0, y: -6, scale: 0.98 }}
-          initial={{ opacity: 0, y: -6, scale: 0.98 }}
-          transition={{ duration: 0.22, ease: SOFT_EASE }}
+          initial={MOTION_VARIANTS.popover.initial}
+          transition={MOTION_VARIANTS.popover.transition}
         >
           <span className="inline-flex items-center gap-1.5 text-13px font-semibold text-[var(--text-primary)]">
             <span className="flex size-6 items-center justify-center rounded-md bg-[var(--accent-primary)] text-11px font-bold text-white">
@@ -40,7 +40,7 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
 
           <div className="flex items-center gap-1.5">
             {actions.map((action) => (
-              <motion.button
+              <m.button
                 className={
                   "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-12px font-bold ring-1 transition-colors focus-visible:outline-2 focus-visible:outline-[var(--ring-focus)] focus-visible:outline-offset-2 " +
                   (action.tone === "danger"
@@ -53,19 +53,19 @@ export function ContextToolbar({ actions, entityLabel = "elementi" }: ContextToo
               >
                 {action.icon}
                 {action.label}
-              </motion.button>
+              </m.button>
             ))}
           </div>
 
-          <motion.button
+          <m.button
             className="ml-auto flex size-9 items-center justify-center rounded-full text-[var(--text-secondary)] ring-1 ring-transparent transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] hover:ring-[var(--border-subtle)]"
             onClick={() => useSelectionStore.getState().clear()}
             title="Deseleziona tutto"
             type="button"
           >
             <XCircle className="size-4" />
-          </motion.button>
-        </motion.div>
+          </m.button>
+        </m.div>
       )}
     </AnimatePresence>
   );

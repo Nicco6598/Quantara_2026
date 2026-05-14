@@ -13,8 +13,8 @@ import {
   Trash,
   UploadSimple,
 } from "@phosphor-icons/react";
-import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, m } from "framer-motion";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import { type QuantaraRoute, useNavigationState, usePreferenceState } from "@/store/app-store";
 
@@ -122,11 +122,11 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
   const meta = routeMetaMap[activeRoute];
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
   const isTariffPreview = activeRoute === "tariffs" && tariffImportToolbar.phase === "preview";
-  const [isMac, setIsMac] = useState(false);
-
-  useEffect(() => {
-    setIsMac(/Mac OS X|Macintosh/.test(navigator.userAgent));
-  }, []);
+  const isMac = useSyncExternalStore(
+    () => () => {},
+    () => /Mac OS X|Macintosh/.test(navigator.userAgent),
+    () => false,
+  );
 
   return (
     <header
@@ -178,7 +178,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-1 py-1 ring-1 ring-[var(--border-subtle)]/50">
+      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-1 ring-1 ring-[var(--border-subtle)]/50">
         <div className="relative hidden min-w-0 items-center gap-1 xl:flex">
           <button
             className={cn(
@@ -230,7 +230,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
                   onClick={() => setIsFileMenuOpen(false)}
                   type="button"
                 />
-                <motion.div
+                <m.div
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   className="absolute right-0 top-full z-50 mt-3 w-[360px] overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--bg-muted-strong)_72%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
                   exit={{ opacity: 0, scale: 0.96, y: -8 }}
@@ -265,12 +265,12 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
                       );
                     })}
                   </div>
-                </motion.div>
+                </m.div>
               </>
             ) : null}
           </AnimatePresence>
         </div>
-        <motion.button
+        <m.button
           className={cn(
             "flex size-9 items-center justify-center rounded-full transition-colors",
             fileCount > 0
@@ -283,7 +283,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
           type="button"
         >
           <Trash size={14} weight="bold" />
-        </motion.button>
+        </m.button>
       </div>
 
       <div className="inline-flex items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3 py-1 text-10px font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)]">
@@ -322,8 +322,8 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         </div>
       </div>
 
-      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-1 py-1 ring-1 ring-[var(--border-subtle)]/50">
-        <motion.button
+      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-1 ring-1 ring-[var(--border-subtle)]/50">
+        <m.button
           className={cn(
             "group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold transition-colors",
             tariffImportToolbar.activeReviewed
@@ -344,8 +344,8 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
             <CheckCircle size={11} weight="bold" />
           </span>
           <span>{tariffImportToolbar.activeReviewed ? "Revisionato" : "Revisiona"}</span>
-        </motion.button>
-        <motion.button
+        </m.button>
+        <m.button
           className={cn(
             "group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold transition-colors",
             tariffImportToolbar.activeDrafted
@@ -367,10 +367,10 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
             <FloppyDisk size={11} weight="bold" />
           </span>
           <span>{tariffImportToolbar.activeDrafted ? "Salvato in bozza" : "Salva bozza"}</span>
-        </motion.button>
+        </m.button>
       </div>
 
-      <motion.button
+      <m.button
         className={cn(
           "inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90",
           !tariffImportToolbar.canConfirm && "cursor-not-allowed opacity-45 grayscale",
@@ -381,7 +381,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
       >
         <CheckCircle size={14} weight="bold" />
         <span>Approva import</span>
-      </motion.button>
+      </m.button>
     </div>
   );
 }
@@ -391,7 +391,7 @@ function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-1 py-1 ring-1 ring-[var(--border-subtle)]/50">
+      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-1 ring-1 ring-[var(--border-subtle)]/50">
         <SalStepNav onAction={onAction} />
       </div>
       <div className="inline-flex items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3.5 py-1.5 text-11px font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)]">
@@ -415,7 +415,7 @@ function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void
           </>
         ) : null}
       </div>
-      <motion.button
+      <m.button
         className="top-toolbar-action group flex h-10 items-center gap-2 rounded-full border border-[var(--warning-base)]/30 bg-[color-mix(in_srgb,var(--warning-base)_12%,var(--surface-base)_88%)] px-3.5 text-12px font-bold text-[var(--warning-base)] transition-colors hover:bg-[color-mix(in_srgb,var(--warning-base)_20%,var(--surface-base)_80%)]"
         onClick={() => onAction("sal-save-draft")}
         title="Salva bozza SAL"
@@ -425,7 +425,7 @@ function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void
           <FloppyDisk size={12} weight="bold" />
         </span>
         <span>Salva bozza</span>
-      </motion.button>
+      </m.button>
     </div>
   );
 }
@@ -435,7 +435,7 @@ function ProjectToolbarControls({ onAction }: { onAction: (actionId: string) => 
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-1 py-1 ring-1 ring-[var(--border-subtle)]/50">
+      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-1 ring-1 ring-[var(--border-subtle)]/50">
         {[1, 2].map((stepNum) => {
           const isCurrent = projectToolbar.currentStep === stepNum;
           const isCompleted = projectToolbar.currentStep > stepNum;
@@ -670,7 +670,7 @@ function HistoryNavigator() {
               onClick={() => setIsHistoryOpen(false)}
               type="button"
             />
-            <motion.div
+            <m.div
               animate={{ opacity: 1, scale: 1, y: 0 }}
               className="top-toolbar-history-menu absolute left-0 top-full z-50 mt-2 w-[260px] overflow-hidden rounded-18px p-1.5"
               exit={{ opacity: 0, scale: 0.97, y: -6 }}
@@ -717,7 +717,7 @@ function HistoryNavigator() {
                   );
                 })}
               </div>
-            </motion.div>
+            </m.div>
           </>
         ) : null}
       </AnimatePresence>
@@ -743,7 +743,7 @@ function HistoryButton({
   onPointerLeave?: () => void;
 }) {
   return (
-    <motion.button
+    <m.button
       className={cn(
         "top-toolbar-history-button flex size-9 items-center justify-center rounded-lg",
         disabled
@@ -762,7 +762,7 @@ function HistoryButton({
       type="button"
     >
       {children}
-    </motion.button>
+    </m.button>
   );
 }
 
@@ -787,12 +787,12 @@ function PageActions({
         }
 
         return (
-          <motion.button
+          <m.button
             className={cn(
               "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold",
               action.variant === "outline"
                 ? "top-toolbar-action-outline text-[var(--text-primary)]"
-                : "top-toolbar-action-primary text-[var(--text-inverse)]",
+                : "quantara-button top-toolbar-action-primary text-[var(--text-inverse)]",
             )}
             key={`${action.actionId}-${action.variant}`}
             onClick={() => onAction(action.actionId)}
@@ -809,7 +809,7 @@ function PageActions({
                 className="opacity-60 transition-transform duration-[440ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
               />
             ) : null}
-          </motion.button>
+          </m.button>
         );
       })}
     </div>
@@ -828,12 +828,12 @@ function PageActionMenu({
 
   return (
     <div className="relative">
-      <motion.button
+      <m.button
         aria-expanded={isOpen}
         className={cn(
           "top-toolbar-action group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold",
           isPrimary
-            ? "top-toolbar-action-primary text-[var(--text-inverse)]"
+            ? "quantara-button top-toolbar-action-primary text-[var(--text-inverse)]"
             : "top-toolbar-action-outline text-[var(--text-primary)]",
         )}
         onClick={() => setIsOpen((current) => !current)}
@@ -851,7 +851,7 @@ function PageActionMenu({
             isOpen && "rotate-180",
           )}
         />
-      </motion.button>
+      </m.button>
       <AnimatePresence>
         {isOpen ? (
           <>
@@ -861,7 +861,7 @@ function PageActionMenu({
               onClick={() => setIsOpen(false)}
               type="button"
             />
-            <motion.div
+            <m.div
               animate={{ opacity: 1, scale: 1, y: 0 }}
               className="absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
               exit={{ opacity: 0, scale: 0.96, y: -10 }}
@@ -875,9 +875,9 @@ function PageActionMenu({
               <div className="rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
                 {action.menuItems?.map((item, index) => {
                   return (
-                    <motion.button
+                    <m.button
                       animate={{ opacity: 1, x: 0 }}
-                      className="flex w-full items-start gap-3 rounded-18px px-3 py-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)]"
+                      className="flex w-full items-start gap-3 rounded-18px p-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)]"
                       initial={{ opacity: 0, x: -12 }}
                       key={item.actionId}
                       onClick={() => {
@@ -902,11 +902,11 @@ function PageActionMenu({
                           {item.description}
                         </span>
                       </span>
-                    </motion.button>
+                    </m.button>
                   );
                 })}
               </div>
-            </motion.div>
+            </m.div>
           </>
         ) : null}
       </AnimatePresence>
@@ -934,13 +934,13 @@ function UtilityButton({
   onClick?: () => void;
 }) {
   return (
-    <motion.button
+    <m.button
       className="top-toolbar-icon-button relative flex size-9 items-center justify-center rounded-full text-[var(--text-secondary)]"
       onClick={onClick}
       title={label}
       type="button"
     >
       {children}
-    </motion.button>
+    </m.button>
   );
 }

@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   AlertTriangle,
   Building2,
@@ -40,7 +40,7 @@ export function PriorityActions({ items }: { items: PortfolioProject[] }) {
     <BezelSurface innerClassName="p-4">
       <div className="space-y-3">
         {items.slice(0, 4).map((project) => (
-          <motion.div
+          <m.div
             className="flex items-start gap-3 rounded-14px p-3 transition-colors hover:bg-[var(--bg-muted)]"
             initial={{ opacity: 0, x: -8 }}
             key={project.id}
@@ -68,7 +68,7 @@ export function PriorityActions({ items }: { items: PortfolioProject[] }) {
             <span className="shrink-0 text-11px font-semibold text-[var(--text-secondary)]">
               {project.progress.toFixed(0)}%
             </span>
-          </motion.div>
+          </m.div>
         ))}
       </div>
       {items.length > 4 ? (
@@ -147,7 +147,7 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
             const isHovered = hoveredBar?.id === bar.id;
 
             return (
-              <motion.div
+              <m.div
                 className={cn(
                   "group grid min-h-[58px] grid-cols-[minmax(150px,210px)_minmax(420px,1fr)] transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
                   isHovered
@@ -199,7 +199,7 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
                   </div>
 
                   <div className="relative h-8 rounded-10px bg-[color-mix(in_srgb,var(--bg-muted-strong)_52%,var(--surface-base)_48%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_42%,transparent)]">
-                    <motion.button
+                    <m.button
                       aria-label={`${bar.label}, ${progress.toFixed(0)}%, ${bar.days} giorni`}
                       className={cn(
                         "absolute top-1 bottom-1 overflow-hidden rounded-10px text-left shadow-[0_10px_22px_color-mix(in_srgb,var(--text-primary)_9%,transparent)] outline-none transition-[filter,box-shadow] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
@@ -220,7 +220,7 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
                       whileHover={{ y: -1 }}
                       whileInView={{ scaleX: 1 }}
                     >
-                      <motion.span
+                      <m.span
                         className="absolute inset-y-0 left-0 rounded-10px bg-white/24"
                         initial={{ scaleX: 0, transformOrigin: "left center" }}
                         style={{ width: `${progress}%` }}
@@ -241,17 +241,17 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
                           </span>
                         ) : null}
                       </span>
-                    </motion.button>
+                    </m.button>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             );
           })}
         </div>
       </div>
 
       {hoveredBar ? (
-        <motion.div
+        <m.div
           animate={{ opacity: 1, y: 0, scale: 1 }}
           className="absolute right-3 top-12 z-20 hidden max-w-[280px] rounded-14px border border-[color-mix(in_srgb,var(--border-subtle)_66%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_94%,transparent)] px-3 py-2 text-10px font-semibold text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl md:block"
           initial={{ opacity: 0, y: 4, scale: 0.98 }}
@@ -270,7 +270,7 @@ export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
             {" · "}
             {hoveredBar.days} giorni · {hoveredBar.progress.toFixed(0)}%
           </div>
-        </motion.div>
+        </m.div>
       ) : null}
 
       {bars.length > 0 ? (
@@ -428,7 +428,7 @@ function ProjectRow({
         : "bg-[var(--success-soft)] text-[var(--success-base)]";
 
   return (
-    <motion.article
+    <m.article
       className="group cursor-pointer rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_56%,transparent)] bg-[var(--surface-base)] p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_8%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_14%,transparent)]"
       initial={{ opacity: 0, y: 10 }}
       transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
@@ -523,7 +523,7 @@ function ProjectRow({
           </div>
         </div>
       </div>
-    </motion.article>
+    </m.article>
   );
 }
 

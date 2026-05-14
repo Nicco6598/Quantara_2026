@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Trash2, X } from "lucide-react";
 import {
   type ChangeEvent,
@@ -15,7 +15,7 @@ import {
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { BUTTER_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { ProjectControlButton } from "@/components/shared/ui-primitives";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
 import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
@@ -35,6 +35,7 @@ import {
   type DesktopDataResult,
   listDesktopContracts,
   listDesktopTariffBooks,
+  updateDesktopContract,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { type PendingWorkflowAction, useAppStore, useNavigationState } from "@/store/app-store";
@@ -258,6 +259,43 @@ export function ProjectsScreen() {
     const unassignedProjectsCount = activeProjects.filter(
       (project) => createContractorId(project.contractor) === deletedId,
     ).length;
+    const contractsToUnassign = contractsState.data.filter((contract) => {
+      const contractor = contract.contractorName ?? projectContractors[contract.id] ?? "";
+      return createContractorId(contractor) === deletedId;
+    });
+
+    try {
+      const updatedContracts = await Promise.all(
+        contractsToUnassign.map((contract) =>
+          updateDesktopContract(contract.id, {
+            applicationContractCode: contract.applicationContractCode,
+            contractorName: null,
+            contractualAmount: contract.contractualAmount.amount,
+            frameworkAgreementCode: contract.frameworkAgreementCode,
+            id: contract.id,
+            osExcludedAmount: contract.osExcludedAmount ?? null,
+            tenderDiscountPercent: contract.tenderDiscountPercent,
+            tariffPriorities: contract.tariffPriorities,
+            title: contract.title,
+          }),
+        ),
+      );
+
+      if (updatedContracts.length > 0) {
+        const updatedById = new Map(updatedContracts.map((contract) => [contract.id, contract]));
+        setContractsState((current) => ({
+          ...current,
+          data: current.data.map((contract) => updatedById.get(contract.id) ?? contract),
+        }));
+      }
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Eliminazione non riuscita",
+        tone: "danger",
+      });
+      return;
+    }
 
     setContractorRegistry((current) =>
       current.filter((contractor) => createContractorId(contractor) !== deletedId),
@@ -269,6 +307,13 @@ export function ProjectsScreen() {
         ),
       ),
     );
+    useSalWorkflowStore.setState((state) => ({
+      projects: state.projects.map((project) =>
+        createContractorId(project.client) === deletedId
+          ? { ...project, client: "Senza appaltatore" }
+          : project,
+      ),
+    }));
     if (selectedContractorId === deletedId) {
       navigateBack();
     }
@@ -561,15 +606,15 @@ function ContractorDeleteDialog({
         onClick={onClose}
         type="button"
       />
-      <motion.section
+      <m.section
         className="relative w-full max-w-sm rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: BUTTER_EASE }}
+        transition={{ duration: 0.28, ease: SPRING_EASE }}
       >
         <div className="rounded-22px bg-[var(--surface-base)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-center justify-between">
-            <h3 className="text-16px font-bold text-[var(--text-primary)]">
+            <h3 className="text-16px font-semibold text-[var(--text-primary)]">
               Elimina {contractor.contractor}?
             </h3>
             <button
@@ -582,8 +627,8 @@ function ContractorDeleteDialog({
           </div>
           <p className="mt-3 text-13px leading-6 text-[var(--text-secondary)]">
             {contractor.projectCount > 0
-              ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato.`
-              : "La cartella verra rimossa dal registro appaltatori."}
+              ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato. Anche i SAL collegati non ricreeranno la cartella.`
+              : "La cartella verra rimossa dal registro appaltatori e dai SAL collegati."}
           </p>
           <div className="mt-5 flex justify-end gap-3">
             <ProjectControlButton onClick={onClose} variant="ghost">
@@ -599,7 +644,7 @@ function ContractorDeleteDialog({
             </ProjectControlButton>
           </div>
         </div>
-      </motion.section>
+      </m.section>
     </div>
   );
 }

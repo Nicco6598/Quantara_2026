@@ -3,19 +3,15 @@ import type {
   CreateDesktopTariffBookRecordRequest,
   DesktopContractRecord,
   DesktopTariffBookRecord,
-  DesktopTariffPriorityRecord,
   DesktopTariffVoiceCountRecord,
   DesktopTariffVoiceRecord,
-  Money,
   TariffPdfMetadataRecord,
   TariffWarning,
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
-import { formatDesktopError, invokeWithFallback, isTauriRuntime } from "./tauri-wrapper";
+import { invokeWithFallback, isTauriRuntime } from "./tauri-wrapper";
 
-export type DesktopMoney = Money;
-export type DesktopTariffPriority = DesktopTariffPriorityRecord;
 export type DesktopContract = DesktopContractRecord;
 export type CreateDesktopContractRequest = CreateDesktopContractRecordRequest;
 export type DesktopTariffBook = DesktopTariffBookRecord;
@@ -84,6 +80,8 @@ export async function createDesktopContract(
       amount: request.contractualAmount,
       currency: "EUR",
     },
+    contractorId: request.contractorName ? `contractor_${request.contractorName}` : null,
+    contractorName: request.contractorName ?? null,
     frameworkAgreementCode: request.frameworkAgreementCode,
     id: request.id,
     tenderDiscountPercent: request.tenderDiscountPercent,
@@ -170,6 +168,12 @@ function isDesktopContract(value: unknown): value is DesktopContract {
     typeof contract.frameworkAgreementCode === "string" &&
     typeof contract.contractualAmount?.amount === "number" &&
     typeof contract.contractualAmount.currency === "string" &&
+    (contract.contractorId === undefined ||
+      contract.contractorId === null ||
+      typeof contract.contractorId === "string") &&
+    (contract.contractorName === undefined ||
+      contract.contractorName === null ||
+      typeof contract.contractorName === "string") &&
     typeof contract.tenderDiscountPercent === "number" &&
     Array.isArray(contract.tariffPriorities)
   );
@@ -261,40 +265,6 @@ export async function listDesktopTariffVoiceCounts(
     `tariff-voice-counts:${fallbackBooks.length}:${fallbackVoices.length}`,
     () => invokeWithFallback("list_tariff_voice_counts", {}, counts, "conteggi dimostrativi"),
   );
-}
-
-export async function selectTariffPdfMetadata({
-  onFileSelected,
-  onPreviewStart,
-}: {
-  onFileSelected?: (path: string) => void;
-  onPreviewStart?: (metadata: TariffPdfMetadata) => void;
-} = {}): Promise<TariffPdfMetadata | null> {
-  if (!isTauriRuntime()) {
-    return null;
-  }
-
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  const selectedPath = await open({
-    filters: [{ extensions: ["pdf", "json"], name: "Tariffario PDF o JSON parser" }],
-    multiple: false,
-  });
-
-  if (typeof selectedPath !== "string") {
-    return null;
-  }
-
-  const fallback = inferTariffMetadataFromPath(selectedPath);
-  onFileSelected?.(selectedPath);
-  onPreviewStart?.(fallback);
-
-  try {
-    return await invoke<TariffPdfMetadata>("import_tariff_pdf_preview", { path: selectedPath });
-  } catch (error) {
-    throw new Error(
-      `Import tariffario non riuscito per ${fallback.name}: ${formatDesktopError(error)}`,
-    );
-  }
 }
 
 export async function selectMultipleTariffPdfMetadatas(
@@ -434,26 +404,6 @@ export type CreateDesktopMaterialRequest = {
   notes: string;
 };
 
-export type UpdateDesktopMaterialRequest = {
-  code: string;
-  description: string;
-  category: string;
-  unit: string;
-  minQuantity: number;
-  notes: string;
-};
-
-export type DesktopMaterialTransaction = {
-  id: string;
-  materialId: string;
-  quantityChange: number;
-  quantityAfter: number;
-  transactionType: string;
-  referenceId: string | null;
-  description: string;
-  createdAt: string;
-};
-
 export async function listDesktopMaterials(
   fallback: DesktopMaterial[],
 ): Promise<DesktopDataResult<DesktopMaterial[]>> {
@@ -474,62 +424,10 @@ export async function createDesktopMaterial(
   return invoke<DesktopMaterial>("create_material", { request });
 }
 
-export async function updateDesktopMaterial(
-  materialId: string,
-  request: UpdateDesktopMaterialRequest,
-): Promise<DesktopMaterial> {
-  if (!isTauriRuntime()) {
-    return { id: materialId, quantity: 0, ...request };
-  }
-
-  return invoke<DesktopMaterial>("update_material", { materialId, request });
-}
-
 export async function deleteDesktopMaterial(materialId: string): Promise<void> {
   if (!isTauriRuntime()) {
     return;
   }
 
   await invoke<void>("delete_material", { materialId });
-}
-
-export async function adjustDesktopMaterialStock(
-  materialId: string,
-  newQuantity: number,
-  description: string,
-): Promise<DesktopMaterial> {
-  if (!isTauriRuntime()) {
-    return {
-      id: materialId,
-      code: "",
-      description: "",
-      category: "",
-      unit: "",
-      notes: "",
-      minQuantity: 0,
-      quantity: newQuantity,
-    };
-  }
-
-  return invoke<DesktopMaterial>("adjust_material_stock", { materialId, newQuantity, description });
-}
-
-export async function deductDesktopMaterials(
-  deductions: Array<[string, number, string]>,
-): Promise<DesktopMaterial[]> {
-  if (!isTauriRuntime()) {
-    return [];
-  }
-
-  return invoke<DesktopMaterial[]>("deduct_materials", { deductions });
-}
-
-export async function listDesktopMaterialTransactions(
-  materialId: string,
-): Promise<DesktopMaterialTransaction[]> {
-  if (!isTauriRuntime()) {
-    return [];
-  }
-
-  return invoke<DesktopMaterialTransaction[]>("list_material_transactions", { materialId });
 }

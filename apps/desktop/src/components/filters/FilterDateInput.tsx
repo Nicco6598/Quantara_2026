@@ -12,7 +12,7 @@ export function FilterDateInput({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleClick() {
+  function handleDatePickerClick() {
     inputRef.current?.showPicker();
   }
 
@@ -26,7 +26,7 @@ export function FilterDateInput({
   return (
     <label
       className="flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-12px font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-      onClick={handleClick}
+      onClick={handleDatePickerClick}
       onKeyDown={handleKeyDown}
     >
       <Calendar className="size-3.5 shrink-0" />

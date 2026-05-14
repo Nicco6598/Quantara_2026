@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import {
   Activity,
   Check,
@@ -20,11 +20,11 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 
 import { useToast } from "@/components/shared/ToastProvider";
 import { StatusPill } from "@/components/shared/StatusPill";
@@ -34,7 +34,6 @@ import { BezelSurface, ProjectControlButton } from "@/components/shared/ui-primi
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { PortfolioProject } from "@/features/projects/types";
 
-import { formatDueWindow, formatForecastDelta } from "@/features/projects/utils/projects-helpers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
@@ -54,13 +53,55 @@ import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useSelectionStore } from "@/store/selection-store";
 
 import { ProjectTimeline } from "./components/ProjectTimeline";
+import {
+  buildMilestoneRows,
+  buildProjectDetail,
+  buildProjectTeam,
+  buildRecentActivities,
+} from "./domain/project-detail-model";
+type ProjectState = {
+  contracts: DesktopContract[];
+  tariffBooks: DesktopTariffBook[];
+  projects: PortfolioProject[];
+};
+
+type ProjectAction =
+  | {
+      type: "INIT";
+      contracts: DesktopContract[];
+      tariffBooks: DesktopTariffBook[];
+      projects: PortfolioProject[];
+    }
+  | { type: "UPDATE_CONTRACT"; contract: DesktopContract };
+
+function projectReducer(state: ProjectState, action: ProjectAction): ProjectState {
+  switch (action.type) {
+    case "INIT":
+      return {
+        contracts: action.contracts,
+        tariffBooks: action.tariffBooks,
+        projects: action.projects,
+      };
+    case "UPDATE_CONTRACT":
+      return {
+        ...state,
+        contracts: state.contracts.map((c) => (c.id === action.contract.id ? action.contract : c)),
+      };
+    default:
+      return state;
+  }
+}
+
 export function ProjectDetailScreen() {
   const { notify } = useToast();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<PortfolioProject[]>([]);
-  const [contracts, setContracts] = useState<DesktopContract[]>([]);
-  const [tariffBooks, setTariffBooks] = useState<DesktopTariffBook[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [state, dispatch] = useReducer(projectReducer, {
+    contracts: [],
+    tariffBooks: [],
+    projects: [],
+  });
+  const { contracts, tariffBooks, projects } = state;
+  const isLoadingRef = useRef(true);
   const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
   const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
 
@@ -74,14 +115,15 @@ export function ProjectDetailScreen() {
         }
 
         const projectContractors = readStringRecord("quantara.projectContractors.v1");
-        setContracts(contractsResult.data);
-        setTariffBooks(tariffBooksResult.data);
-        setProjects(
-          contractsResult.data.map((contract) =>
+        dispatch({
+          type: "INIT",
+          contracts: contractsResult.data,
+          tariffBooks: tariffBooksResult.data,
+          projects: contractsResult.data.map((contract) =>
             mapContractToProject(contract, projectContractors[contract.id]),
           ),
-        );
-        setIsLoading(false);
+        });
+        isLoadingRef.current = false;
       })
       .catch(() => {
         if (!active) return;
@@ -90,7 +132,7 @@ export function ProjectDetailScreen() {
           title: "Caricamento fallito",
           tone: "danger",
         });
-        setIsLoading(false);
+        isLoadingRef.current = false;
       });
 
     return () => {
@@ -107,6 +149,10 @@ export function ProjectDetailScreen() {
 
     return projects[0] ?? null;
   }, [projects]);
+  const salDocumentById = useMemo(
+    () => new Map(salDocuments.map((document) => [document.id, document])),
+    [salDocuments],
+  );
 
   const selectedContract = useMemo(
     () => contracts.find((c) => c.id === selectedProject?.id) ?? null,
@@ -122,24 +168,33 @@ export function ProjectDetailScreen() {
     if (!selectedProject) {
       return [];
     }
-    return salDocuments
-      .filter((document) => document.projectId === selectedProject.id)
-      .map((document) => buildSalDocumentView(document, tariffVoices))
-      .sort((left, right) => {
-        const leftDate = left.closedAt ?? left.date;
-        const rightDate = right.closedAt ?? right.date;
-        return rightDate.localeCompare(leftDate);
-      });
+    const views: ReturnType<typeof buildSalDocumentView>[] = [];
+    for (const document of salDocuments) {
+      if (document.projectId === selectedProject.id) {
+        views.push(buildSalDocumentView(document, tariffVoices));
+      }
+    }
+    views.sort((left, right) => {
+      const leftDate = left.closedAt ?? left.date;
+      const rightDate = right.closedAt ?? right.date;
+      return rightDate.localeCompare(leftDate);
+    });
+    return views;
   }, [salDocuments, selectedProject, tariffVoices]);
 
   const financials = useMemo(() => {
     const contractual = selectedProject?.budget.amount ?? 0;
-    const approvedAmount = salViews
-      .filter((row) => row.status === "closed" || row.status === "approved")
-      .reduce((sum, row) => sum + row.total, 0);
-    const draftAmount = salViews
-      .filter((row) => row.status === "draft" || row.status === "in-review")
-      .reduce((sum, row) => sum + row.total, 0);
+    let approvedAmount = 0;
+    let draftAmount = 0;
+
+    for (const row of salViews) {
+      if (row.status === "closed" || row.status === "approved") {
+        approvedAmount += row.total;
+      } else if (row.status === "draft" || row.status === "in-review") {
+        draftAmount += row.total;
+      }
+    }
+
     const committed = approvedAmount + draftAmount;
     const residual = contractual - committed;
     const progress = contractual > 0 ? Math.min(100, (committed / contractual) * 100) : 0;
@@ -162,6 +217,7 @@ export function ProjectDetailScreen() {
     () =>
       salViews.map((row) => ({
         amount: row.total,
+        cardStatus: row.status,
         date: row.closedAt ?? row.date,
         id: row.id,
         isClosed: row.status === "closed",
@@ -247,7 +303,7 @@ export function ProjectDetailScreen() {
 
   const handleDeleteSal = useCallback(
     (salId: string) => {
-      const sal = salDocuments.find((d) => d.id === salId);
+      const sal = salDocumentById.get(salId);
       deleteSal(salId);
       setDeleteTargetId(null);
       notify({
@@ -256,7 +312,7 @@ export function ProjectDetailScreen() {
         tone: "success",
       });
     },
-    [deleteSal, notify, salDocuments],
+    [deleteSal, notify, salDocumentById],
   );
 
   const handleSaveTariffBooks = useCallback(
@@ -270,6 +326,7 @@ export function ProjectDetailScreen() {
         }));
         const updated = await updateDesktopContract(selectedContract.id, {
           applicationContractCode: selectedContract.applicationContractCode,
+          contractorName: selectedContract.contractorName ?? null,
           contractualAmount: selectedContract.contractualAmount.amount,
           frameworkAgreementCode: selectedContract.frameworkAgreementCode,
           id: selectedContract.id,
@@ -278,7 +335,7 @@ export function ProjectDetailScreen() {
           title: selectedContract.title,
           osExcludedAmount: selectedContract.osExcludedAmount ?? null,
         });
-        setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+        dispatch({ type: "UPDATE_CONTRACT", contract: updated });
         notify({
           message: "Tariffari del progetto aggiornati.",
           title: "Tariffari aggiornati",
@@ -297,7 +354,7 @@ export function ProjectDetailScreen() {
 
   const handleSetSalStatus = useCallback(
     (salId: string, status: "in-review" | "approved" | "closed") => {
-      const sal = salDocuments.find((d) => d.id === salId);
+      const sal = salDocumentById.get(salId);
       setSalStatus(salId, status);
       notify({
         message:
@@ -308,13 +365,13 @@ export function ProjectDetailScreen() {
         tone: "success",
       });
     },
-    [setSalStatus, notify, salDocuments],
+    [setSalStatus, notify, salDocumentById],
   );
 
-  if (isLoading) {
+  if (isLoadingRef.current) {
     return (
       <div className="pt-4 text-sm font-medium text-[var(--text-secondary)]">
-        Caricamento progetto...
+        Caricamento progetto…
       </div>
     );
   }
@@ -402,12 +459,12 @@ export function ProjectDetailScreen() {
               <span className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
                 Avanzamento finanziario
               </span>
-              <span className="text-22px font-bold tabular-nums text-[var(--text-primary)]">
+              <span className="text-22px font-semibold tabular-nums text-[var(--text-primary)]">
                 {detail.progress}%
               </span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-              <motion.div
+              <m.div
                 className="h-full rounded-full bg-[var(--accent-primary)]"
                 initial={{ width: 0 }}
                 animate={{ width: `${detail.progress}%` }}
@@ -622,12 +679,9 @@ export function ProjectDetailScreen() {
               {filteredSalRows.map((row) => (
                 <SalCard
                   key={row.id}
+                  cardStatus={row.cardStatus}
                   date={row.date}
                   id={row.id}
-                  isApproved={row.isApproved}
-                  isClosed={row.isClosed}
-                  isDraft={row.isDraft}
-                  isReview={row.isReview}
                   onClose={() =>
                     handleSetSalStatus(
                       row.id,
@@ -693,7 +747,7 @@ export function ProjectDetailScreen() {
             <div className="flex items-center justify-between">
               <PanelTitle icon={FileText}>Tariffari associati</PanelTitle>
               {projectTariffBookIds.length > 0 ? (
-                <span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-11px font-bold text-[var(--info-base)]">
+                <span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-11px font-semibold text-[var(--info-base)]">
                   {projectTariffBookIds.length}
                 </span>
               ) : null}
@@ -726,7 +780,7 @@ export function ProjectDetailScreen() {
                     const book = tariffBooks.find((b) => b.id === bookId);
                     if (!book) return null;
                     return (
-                      <motion.div
+                      <m.div
                         key={bookId}
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -759,13 +813,13 @@ export function ProjectDetailScreen() {
                             </span>
                           </div>
                         </div>
-                      </motion.div>
+                      </m.div>
                     );
                   })}
                 </div>
               )}
               {projectTariffBookIds.length > 0 ? (
-                <motion.button
+                <m.button
                   className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[color-mix(in_srgb,var(--info-base)_8%,transparent)] px-3 py-2 text-11px font-semibold text-[var(--info-base)] ring-1 ring-[var(--info-base)]/20 transition-colors hover:bg-[color-mix(in_srgb,var(--info-base)_16%,transparent)]"
                   onClick={() => {
                     setPendingTariffIds([...projectTariffBookIds]);
@@ -775,176 +829,22 @@ export function ProjectDetailScreen() {
                 >
                   <Plus className="size-3.5" />
                   Gestisci
-                </motion.button>
+                </m.button>
               ) : null}
             </div>
           </Panel>
 
-          <AnimatePresence>
-            {isTariffPanelOpen ? (
-              <motion.div
-                className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <button
-                  aria-label="Chiudi"
-                  className="absolute inset-0 cursor-default"
-                  onClick={() => setIsTariffPanelOpen(false)}
-                  type="button"
-                />
-                <motion.div
-                  className="relative w-full max-w-lg rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-                  initial={{ opacity: 0, y: 20, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.97 }}
-                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <div className="rounded-2xl bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-                    <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
-                      <div>
-                        <h3 className="text-16px font-semibold text-[var(--text-primary)]">
-                          Tariffari del progetto
-                        </h3>
-                        <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
-                          {pendingTariffIds.length} selezionat
-                          {pendingTariffIds.length !== 1 ? "i" : "o"} · {tariffBooks.length}{" "}
-                          disponibili
-                        </p>
-                      </div>
-                      <button
-                        aria-label="Chiudi"
-                        className="flex size-8 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
-                        onClick={() => setIsTariffPanelOpen(false)}
-                        type="button"
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </div>
-
-                    <div className="px-5 py-3">
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
-                        <input
-                          className="h-10 w-full rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                          onChange={(e) => setTariffSearchQuery(e.target.value)}
-                          placeholder="Cerca per nome, ente o anno..."
-                          value={tariffSearchQuery}
-                        />
-                        {tariffSearchQuery ? (
-                          <button
-                            className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-                            onClick={() => setTariffSearchQuery("")}
-                            type="button"
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="max-h-[340px] overflow-y-auto border-t border-[var(--border-subtle)]/50 px-5 py-2">
-                      {filteredTariffBooks.length === 0 ? (
-                        <p className="py-6 text-center text-12px font-medium text-[var(--text-tertiary)]">
-                          {tariffSearchQuery
-                            ? "Nessun tariffario corrisponde alla ricerca."
-                            : "Nessun tariffario disponibile."}
-                        </p>
-                      ) : (
-                        <div className="space-y-1">
-                          {filteredTariffBooks.map((book, index) => {
-                            const isSelected = pendingTariffIds.includes(book.id);
-                            return (
-                              <motion.button
-                                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
-                                  isSelected
-                                    ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)]"
-                                    : "border-transparent bg-[var(--bg-muted)]/40 hover:border-[var(--border-subtle)]"
-                                }`}
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{
-                                  delay: index * 0.025,
-                                  duration: 0.2,
-                                  ease: [0.22, 1, 0.36, 1],
-                                }}
-                                key={book.id}
-                                onClick={() =>
-                                  setPendingTariffIds((prev) =>
-                                    isSelected
-                                      ? prev.filter((id) => id !== book.id)
-                                      : [...prev, book.id],
-                                  )
-                                }
-                                type="button"
-                              >
-                                <span
-                                  className={`flex size-6 shrink-0 items-center justify-center rounded-lg border transition-all ${
-                                    isSelected
-                                      ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
-                                      : "border-[var(--border-subtle)]"
-                                  }`}
-                                >
-                                  {isSelected && <Check className="size-3.5" strokeWidth={3} />}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
-                                    {book.name}
-                                  </div>
-                                  <div className="flex items-center gap-2 text-11px text-[var(--text-tertiary)]">
-                                    <span>Anno {book.year}</span>
-                                    <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                                    <span>{book.sourceName}</span>
-                                    <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                                    <span
-                                      className={
-                                        book.status === "active"
-                                          ? "text-[var(--success-base)]"
-                                          : "text-[var(--warning-base)]"
-                                      }
-                                    >
-                                      {book.status === "active"
-                                        ? "Attivo"
-                                        : book.status === "draft"
-                                          ? "Bozza"
-                                          : book.status}
-                                    </span>
-                                  </div>
-                                </div>
-                              </motion.button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4">
-                      <button
-                        className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-                        onClick={() => setIsTariffPanelOpen(false)}
-                        type="button"
-                      >
-                        Annulla
-                      </button>
-                      <button
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
-                        onClick={() => {
-                          void handleSaveTariffBooks(pendingTariffIds);
-                          setIsTariffPanelOpen(false);
-                        }}
-                        type="button"
-                      >
-                        <Check className="size-4" />
-                        Salva
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+          <TariffPanelDialog
+            filteredTariffBooks={filteredTariffBooks}
+            isOpen={isTariffPanelOpen}
+            onClose={() => setIsTariffPanelOpen(false)}
+            onSave={handleSaveTariffBooks}
+            pendingTariffIds={pendingTariffIds}
+            onPendingTariffIdsChange={setPendingTariffIds}
+            searchQuery={tariffSearchQuery}
+            onSearchQueryChange={setTariffSearchQuery}
+            tariffBooks={tariffBooks}
+          />
 
           <Panel>
             <PanelTitle icon={UsersRound}>Team progetto</PanelTitle>
@@ -1005,56 +905,11 @@ export function ProjectDetailScreen() {
         </aside>
       </section>
 
-      {deleteTargetId ? (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
-          <button
-            aria-label="Chiudi"
-            className="absolute inset-0 cursor-default"
-            onClick={() => setDeleteTargetId(null)}
-            type="button"
-          />
-          <motion.div
-            className="relative w-full max-w-sm rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            transition={{ duration: 0.5, ease: SPRING_EASE }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-          >
-            <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-              <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
-                  <Trash2 className="size-5" />
-                </span>
-                <div>
-                  <div className="text-14px font-semibold text-[var(--text-primary)]">
-                    Eliminare questa SAL?
-                  </div>
-                  <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
-                    L'operazione rimuove definitivamente il documento. I dati non possono essere
-                    recuperati.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-                  onClick={() => setDeleteTargetId(null)}
-                  type="button"
-                >
-                  Annulla
-                </button>
-                <button
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--danger-base)] px-5 text-13px font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
-                  onClick={() => handleDeleteSal(deleteTargetId)}
-                  type="button"
-                >
-                  <Trash2 className="size-4" />
-                  Elimina
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      ) : null}
+      <DeleteConfirmDialog
+        deleteTargetId={deleteTargetId}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={handleDeleteSal}
+      />
     </main>
   );
 }
@@ -1112,7 +967,7 @@ function MetricCard({
         </div>
         <div
           className={cn(
-            "mt-1.5 truncate text-19px font-bold leading-none",
+            "mt-1.5 truncate text-19px font-semibold leading-none",
             (!tone || tone === "blue" || tone === "info") && "text-[var(--text-primary)]",
             tone === "success" && "text-[var(--success-base)]",
             tone === "warning" && "text-[var(--warning-base)]",
@@ -1201,12 +1056,9 @@ function InfoBlock({ label, note, value }: { label: string; note?: string; value
 }
 
 function SalCard({
+  cardStatus,
   date,
   id,
-  isApproved = false,
-  isClosed = false,
-  isDraft = false,
-  isReview = false,
   onClose,
   onContinue,
   onDelete,
@@ -1216,12 +1068,9 @@ function SalCard({
   tone,
   value,
 }: {
+  cardStatus: string;
   date: string;
   id: string;
-  isApproved?: boolean;
-  isClosed?: boolean;
-  isDraft?: boolean;
-  isReview?: boolean;
   onClose: () => void;
   onContinue?: (() => void) | undefined;
   onDelete: () => void;
@@ -1231,6 +1080,10 @@ function SalCard({
   tone: "danger" | "info" | "success" | "warning";
   value: string;
 }) {
+  const isDraft = cardStatus === "draft";
+  const isReview = cardStatus === "in-review";
+  const isApproved = cardStatus === "approved";
+  const isClosed = cardStatus === "closed";
   const isSelected = useSelectionStore((state) => state.ids.has(id));
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLDivElement>(null);
@@ -1259,7 +1112,7 @@ function SalCard({
       />
 
       <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-3">
-        <motion.button
+        <m.button
           aria-checked={isSelected}
           className={cn(
             "flex size-[20px] shrink-0 items-center justify-center rounded-5px border transition-all",
@@ -1290,7 +1143,7 @@ function SalCard({
               />
             </svg>
           )}
-        </motion.button>
+        </m.button>
 
         <span
           className={cn(
@@ -1405,6 +1258,254 @@ function SalCard({
   );
 }
 
+function TariffPanelDialog({
+  filteredTariffBooks,
+  isOpen,
+  onClose,
+  onSave,
+  pendingTariffIds,
+  onPendingTariffIdsChange,
+  searchQuery,
+  onSearchQueryChange,
+  tariffBooks,
+}: {
+  filteredTariffBooks: DesktopTariffBook[];
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (ids: string[]) => Promise<void>;
+  pendingTariffIds: string[];
+  onPendingTariffIdsChange: Dispatch<SetStateAction<string[]>>;
+  searchQuery: string;
+  onSearchQueryChange: Dispatch<SetStateAction<string>>;
+  tariffBooks: DesktopTariffBook[];
+}) {
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <m.div
+          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <button
+            aria-label="Chiudi"
+            className="absolute inset-0 cursor-default"
+            onClick={onClose}
+            type="button"
+          />
+          <m.div
+            className="relative w-full max-w-lg rounded-3xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+            initial={MOTION_VARIANTS.dialog.initial}
+            animate={MOTION_VARIANTS.dialog.animate}
+            exit={{ opacity: 0, y: 10, scale: 0.97 }}
+            transition={MOTION_VARIANTS.dialog.transition}
+          >
+            <div className="rounded-2xl bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+              <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
+                <div>
+                  <h3 className="text-16px font-semibold text-[var(--text-primary)]">
+                    Tariffari del progetto
+                  </h3>
+                  <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
+                    {pendingTariffIds.length} selezionat
+                    {pendingTariffIds.length !== 1 ? "i" : "o"} · {tariffBooks.length} disponibili
+                  </p>
+                </div>
+                <button
+                  aria-label="Chiudi"
+                  className="flex size-8 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
+                  onClick={onClose}
+                  type="button"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              <div className="px-5 py-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
+                  <input
+                    className="h-10 w-full rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                    onChange={(e) => onSearchQueryChange(e.target.value)}
+                    placeholder="Cerca per nome, ente o anno…"
+                    value={searchQuery}
+                  />
+                  {searchQuery ? (
+                    <button
+                      className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                      onClick={() => onSearchQueryChange("")}
+                      type="button"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="max-h-[340px] overflow-y-auto border-t border-[var(--border-subtle)]/50 px-5 py-2">
+                {filteredTariffBooks.length === 0 ? (
+                  <p className="py-6 text-center text-12px font-medium text-[var(--text-tertiary)]">
+                    {searchQuery
+                      ? "Nessun tariffario corrisponde alla ricerca."
+                      : "Nessun tariffario disponibile."}
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredTariffBooks.map((book, index) => {
+                      const isSelected = pendingTariffIds.includes(book.id);
+                      return (
+                        <m.button
+                          className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
+                            isSelected
+                              ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)]"
+                              : "border-transparent bg-[var(--bg-muted)]/40 hover:border-[var(--border-subtle)]"
+                          }`}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{
+                            delay: index * 0.025,
+                            duration: 0.2,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                          key={book.id}
+                          onClick={() =>
+                            onPendingTariffIdsChange((prev) =>
+                              isSelected ? prev.filter((id) => id !== book.id) : [...prev, book.id],
+                            )
+                          }
+                          type="button"
+                        >
+                          <span
+                            className={`flex size-6 shrink-0 items-center justify-center rounded-lg border transition-all ${
+                              isSelected
+                                ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+                                : "border-[var(--border-subtle)]"
+                            }`}
+                          >
+                            {isSelected && <Check className="size-3.5" strokeWidth={3} />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
+                              {book.name}
+                            </div>
+                            <div className="flex items-center gap-2 text-11px text-[var(--text-tertiary)]">
+                              <span>Anno {book.year}</span>
+                              <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+                              <span>{book.sourceName}</span>
+                              <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+                              <span
+                                className={
+                                  book.status === "active"
+                                    ? "text-[var(--success-base)]"
+                                    : "text-[var(--warning-base)]"
+                                }
+                              >
+                                {book.status === "active"
+                                  ? "Attivo"
+                                  : book.status === "draft"
+                                    ? "Bozza"
+                                    : book.status}
+                              </span>
+                            </div>
+                          </div>
+                        </m.button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4">
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+                  onClick={onClose}
+                  type="button"
+                >
+                  Annulla
+                </button>
+                <button
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
+                  onClick={() => {
+                    void onSave(pendingTariffIds);
+                    onClose();
+                  }}
+                  type="button"
+                >
+                  <Check className="size-4" />
+                  Salva
+                </button>
+              </div>
+            </div>
+          </m.div>
+        </m.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function DeleteConfirmDialog({
+  deleteTargetId,
+  onClose,
+  onConfirm,
+}: {
+  deleteTargetId: string | null;
+  onClose: () => void;
+  onConfirm: (salId: string) => void;
+}) {
+  return deleteTargetId ? (
+    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 backdrop-blur-md">
+      <button
+        aria-label="Chiudi"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <m.div
+        className="relative w-full max-w-sm rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        initial={MOTION_VARIANTS.dialog.initial}
+        transition={MOTION_VARIANTS.dialog.transition}
+        animate={MOTION_VARIANTS.dialog.animate}
+      >
+        <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
+              <Trash2 className="size-5" />
+            </span>
+            <div>
+              <div className="text-14px font-semibold text-[var(--text-primary)]">
+                Eliminare questa SAL?
+              </div>
+              <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
+                L'operazione rimuove definitivamente il documento. I dati non possono essere
+                recuperati.
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--bg-muted)] px-5 text-13px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+              onClick={onClose}
+              type="button"
+            >
+              Annulla
+            </button>
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[var(--danger-base)] px-5 text-13px font-semibold text-white transition-colors hover:bg-[var(--danger-base)]/90"
+              onClick={() => onConfirm(deleteTargetId)}
+              type="button"
+            >
+              <Trash2 className="size-4" />
+              Elimina
+            </button>
+          </div>
+        </div>
+      </m.div>
+    </div>
+  ) : null;
+}
+
 function readSelectedProjectId(): string | null {
   try {
     const rawValue = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
@@ -1418,104 +1519,4 @@ function readSelectedProjectId(): string | null {
   } catch {
     return null;
   }
-}
-
-function buildProjectDetail(
-  project: PortfolioProject,
-  financials: {
-    approvedAmount: number;
-    committed: number;
-    contractual: number;
-    currentSalAmount: number;
-    draftAmount: number;
-    progress: number;
-    residual: number;
-  },
-  currentSalLabel: string,
-) {
-  const costPerformance =
-    financials.committed > 0 ? financials.approvedAmount / financials.committed : 1;
-
-  return {
-    budget: {
-      approvedAmount: financials.approvedAmount,
-      committed: financials.committed,
-      contractual: financials.contractual,
-      draftAmount: financials.draftAmount,
-    },
-    cpi: costPerformance.toLocaleString("it-IT", {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-    }),
-    endDate:
-      project.forecastDeltaDays === 0
-        ? "In linea con piano"
-        : `${formatForecastDelta(project.forecastDeltaDays)} forecast`,
-    forecastImpact: project.variance,
-    health: project.healthLabel,
-    healthTone: project.tone,
-    lastUpdate: "Aggiornato da registro progetti",
-    location: project.location,
-    lot: project.lot,
-    manager: project.manager,
-    materialRisk: project.materialRisk,
-    name: project.title,
-    nextMilestone: project.nextMilestone,
-    progress: Number(financials.progress.toFixed(1)),
-    sal: {
-      amount: financials.currentSalAmount,
-      current: currentSalLabel,
-    },
-    startDate: "Dossier operativo",
-  };
-}
-
-function buildMilestoneRows(project: PortfolioProject, salCount: number) {
-  const completed = Math.max(1, Math.min(3, Math.floor(project.progress / 30)));
-  const labels = ["Avvio lotto", project.phase, project.nextMilestone, "Chiusura contabilita"];
-
-  return labels.map((label, index) => ({
-    date:
-      index === 0
-        ? "Completata"
-        : index === completed && salCount > 0
-          ? formatDueWindow(project.salDays)
-          : formatForecastDelta(project.forecastDeltaDays),
-    label,
-    status: index < completed ? "complete" : index === completed ? "active" : "planned",
-  }));
-}
-
-function buildProjectTeam(project: PortfolioProject) {
-  return [
-    { initials: getInitials(project.manager), name: project.manager, role: "Project Manager" },
-    { initials: "DL", name: "Direzione Lavori", role: "Validazione SAL" },
-    { initials: "CC", name: "Controllo Costi", role: "Forecast e budget" },
-    { initials: "PR", name: "Procurement", role: project.materialRisk },
-  ];
-}
-
-function buildRecentActivities(
-  project: PortfolioProject,
-  salRows: Array<{ date: string; sal: string; status: string }>,
-) {
-  const latestSal = salRows[0];
-  return [
-    {
-      date: latestSal?.date ?? "N/A",
-      text: `${latestSal?.sal ?? "Nessuna SAL"} su ${project.title}`,
-    },
-    { date: formatDueWindow(project.salDays), text: project.nextMilestone },
-    { date: "Ultimo aggiornamento", text: project.materialRisk },
-    { date: "Registro", text: `Avanzamento fisico al ${project.progress}%` },
-  ];
-}
-
-function getInitials(value: string) {
-  return value
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 }

@@ -1,6 +1,4 @@
-import type { DesktopContract, DesktopTariffVoice } from "@/lib/desktopData";
-
-export type { DesktopContract, DesktopTariffVoice };
+import type { DesktopTariffVoice } from "@/lib/desktopData";
 
 export type TariffMetrics = {
   activeCount: number;

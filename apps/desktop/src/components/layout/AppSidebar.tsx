@@ -8,7 +8,7 @@ import {
   SquaresFour,
   Users,
 } from "@phosphor-icons/react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
@@ -57,7 +57,7 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   const [contracts, setContracts] = useState<DesktopContract[]>([]);
   const [projects, setProjects] = useState<{ id: string; contractor: string }[]>([]);
   const [contractorCount, setContractorCount] = useState(0);
-  const debounceRef = useRef<number | undefined>(undefined);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const loadProjects = useCallback(() => {
     let active = true;
@@ -95,7 +95,7 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
       setContracts(result.data);
       const projectRows = result.data.map((c) => {
         const p = mapContractToProject(c);
-        const contractor = registry[c.id];
+        const contractor = c.contractorName ?? registry[c.id];
         return contractor ? { ...p, contractor } : p;
       });
 
@@ -216,12 +216,12 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   const sidebarWidth = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
   return (
-    <motion.aside
+    <m.aside
       animate={{ width: sidebarWidth }}
       className="relative z-40 flex h-full shrink-0 select-none overflow-hidden bg-transparent [font-family:var(--font-sans)] text-[var(--text-primary)]"
       transition={{ type: "tween", duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="sidebar-rail relative flex min-h-0 w-full flex-col overflow-hidden px-3 py-3">
+      <div className="sidebar-rail relative flex min-h-0 w-full flex-col overflow-hidden p-3">
         <div className="shrink-0">
           <SidebarHeader collapsed={collapsed} />
         </div>
@@ -252,7 +252,7 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
           <SidebarFooter collapsed={collapsed} />
         </div>
       </div>
-    </motion.aside>
+    </m.aside>
   );
 }
 

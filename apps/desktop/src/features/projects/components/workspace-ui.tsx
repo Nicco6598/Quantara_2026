@@ -5,7 +5,5 @@ export {
   EmptyState,
   FocusChip,
   MetricCard,
-  PortfolioMetric,
   ProjectControlButton,
-  ProjectSurface,
 } from "@/components/shared/ui-primitives";

@@ -36,22 +36,24 @@ export function getImportValidation(voices: DesktopTariffVoice[]): ImportValidat
     }
   }
 
-  const duplicateExamples = [...codeCounts.entries()]
-    .filter(([, count]) => count > 1)
-    .map(([code]) => code)
-    .slice(0, 4);
+  const duplicateExamples: string[] = [];
+  for (const [code, count] of codeCounts) {
+    if (count > 1) {
+      duplicateExamples.push(code);
+      if (duplicateExamples.length >= 4) break;
+    }
+  }
   const duplicateCount = [...codeCounts.values()].reduce(
     (sum, count) => sum + Math.max(0, count - 1),
     0,
   );
-  const duplicateRows = voices
-    .map((voice, index) => ({ code: voice.officialCode.trim(), index }))
-    .filter((row) => row.code.length > 0 && (codeCounts.get(row.code) ?? 0) > 1)
-    .map((row) => ({
-      field: "officialCode" as const,
-      index: row.index,
-      label: "codice duplicato",
-    }));
+  const duplicateRows: Array<{ field: "officialCode"; index: number; label: string }> = [];
+  for (const [index, voice] of voices.entries()) {
+    const code = voice.officialCode.trim();
+    if (code.length > 0 && (codeCounts.get(code) ?? 0) > 1) {
+      duplicateRows.push({ field: "officialCode", index, label: "codice duplicato" });
+    }
+  }
 
   return {
     duplicateCount,
@@ -65,12 +67,14 @@ export function getImportValidation(voices: DesktopTariffVoice[]): ImportValidat
   };
 }
 
+const percentFormatter = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 });
+
 export function formatPercent(value: null | number | undefined): string {
   if (value == null || !Number.isFinite(value)) {
     return "-";
   }
 
-  return `${new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value)}%`;
+  return `${percentFormatter.format(value)}%`;
 }
 
 export function formatEditablePercent(value: null | number | undefined): string {

@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Clock3, FileText, LoaderCircle, Sparkles, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { BUTTER_EASE } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { ProjectControlButton } from "@/components/shared/ui-primitives";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
 
@@ -34,11 +34,11 @@ export function UpdateExperienceDialog({
         onClick={onClose}
         type="button"
       />
-      <motion.div
+      <m.div
         className="relative flex max-h-[75dvh] w-full max-w-4xl min-w-0 flex-col overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        initial={{ opacity: 0, y: 16, scale: 0.96 }}
-        transition={{ duration: 0.4, ease: BUTTER_EASE }}
+        animate={MOTION_VARIANTS.dialog.animate}
+        initial={MOTION_VARIANTS.dialog.initial}
+        transition={MOTION_VARIANTS.dialog.transition}
       >
         <div className="flex min-h-0 flex-col overflow-hidden rounded-[18px] bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
@@ -88,7 +88,7 @@ export function UpdateExperienceDialog({
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] px-4 py-4 text-center text-13px text-[var(--text-secondary)]">
+                  <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] p-4 text-center text-13px text-[var(--text-secondary)]">
                     Nessuna nota release disponibile per questa build.
                   </div>
                 )}
@@ -122,7 +122,7 @@ export function UpdateExperienceDialog({
                   {isBusy ? (
                     <span className="flex items-center gap-2">
                       <LoaderCircle className="size-4 animate-spin" />
-                      Installazione in corso...
+                      Installazione in corso…
                     </span>
                   ) : (
                     <span className="flex items-center gap-2.5">
@@ -163,7 +163,7 @@ export function UpdateExperienceDialog({
             </div>
           </div>
         </div>
-      </motion.div>
+      </m.div>
     </div>,
     document.body,
   );
@@ -194,18 +194,19 @@ function MetricPill({
 }
 
 function normalizeNotes(notes: string) {
-  const values = notes
-    .split("\n")
-    .map((line) => line.trim())
-    .map((line) =>
-      line
-        .replace(/^#{1,6}\s+/, "")
-        .replace(/^[-*]\s+/, "")
-        .replace(/\*\*(.+?)\*\*/g, "$1")
-        .replace(/`([^`]+)`/g, "$1")
-        .trim(),
-    )
-    .filter((line) => line.length > 0 && !line.startsWith("```") && !line.startsWith("---"));
+  const values: string[] = [];
+  for (const raw of notes.split("\n")) {
+    const line = raw
+      .trim()
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/^[-*]\s+/, "")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .trim();
+    if (line.length > 0 && !line.startsWith("```") && !line.startsWith("---")) {
+      values.push(line);
+    }
+  }
 
   const seen = new Map<string, number>();
 

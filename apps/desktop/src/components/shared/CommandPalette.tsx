@@ -15,7 +15,7 @@ import {
   Sun,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import type { QuantaraRoute } from "@/store/app-store";
@@ -51,6 +51,37 @@ type CommandPaletteProps = {
   onPageAction: (actionId: string) => void;
   onRouteChange: (route: QuantaraRoute) => void;
 };
+
+type PaletteState = {
+  query: string;
+  selectedIndex: number;
+  dataResults: DataResult[];
+  isSearching: boolean;
+};
+
+type PaletteAction =
+  | { type: "RESET" }
+  | { type: "SET_QUERY"; query: string }
+  | { type: "SET_SELECTED_INDEX"; index: number }
+  | { type: "SET_DATA_RESULTS"; results: DataResult[] }
+  | { type: "SET_SEARCHING"; searching: boolean };
+
+function paletteReducer(state: PaletteState, action: PaletteAction): PaletteState {
+  switch (action.type) {
+    case "RESET":
+      return { query: "", selectedIndex: 0, dataResults: [], isSearching: false };
+    case "SET_QUERY":
+      return { ...state, query: action.query };
+    case "SET_SELECTED_INDEX":
+      return { ...state, selectedIndex: action.index };
+    case "SET_DATA_RESULTS":
+      return { ...state, dataResults: action.results };
+    case "SET_SEARCHING":
+      return { ...state, isSearching: action.searching };
+    default:
+      return state;
+  }
+}
 
 const routeCommands: Array<{
   icon: LucideIcon;
@@ -92,6 +123,134 @@ const routeCommands: Array<{
   },
 ];
 
+type UniformItem = ({ type: "command" } & PaletteCommand) | ({ type: "data" } & DataResult);
+
+function PaletteInput({
+  popoverLeft,
+  popoverTop,
+  popoverWidth,
+  query,
+  onQueryChange,
+  inputRef,
+}: {
+  popoverLeft: number;
+  popoverTop: number;
+  popoverWidth: number;
+  query: string;
+  onQueryChange: (value: string) => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+}) {
+  return (
+    <div
+      className="flex h-10 items-center gap-2 rounded-18px border border-primary bg-card pl-10 pr-2 text-sm text-foreground shadow-panel ring-2 ring-ring"
+      style={{
+        left: popoverLeft,
+        top: popoverTop,
+        width: popoverWidth,
+        position: "absolute",
+      }}
+    >
+      <Search className="pointer-events-none absolute left-3 top-5 size-4 -translate-y-1/2 text-primary" />
+      <input
+        className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-secondary"
+        placeholder="Cerca in Quantara..."
+        ref={inputRef}
+        type="search"
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
+      <kbd className="rounded-10px border border-subtle bg-muted px-2 py-1 text-xs font-semibold text-secondary">
+        Esc
+      </kbd>
+    </div>
+  );
+}
+
+function PaletteResultsRow({
+  item,
+  isSelected,
+  onSelect,
+  onMouseEnter,
+}: {
+  item: UniformItem;
+  isSelected: boolean;
+  onSelect: () => void;
+  onMouseEnter: () => void;
+}) {
+  const Icon = item.icon;
+  const desc = item.type === "data" ? item.description : item.group;
+  return (
+    <button
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left",
+        isSelected ? "bg-primary/10 text-foreground" : "text-secondary hover:bg-muted",
+      )}
+      onClick={onSelect}
+      onMouseEnter={onMouseEnter}
+      type="button"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-14px bg-muted text-primary">
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-foreground">{item.label}</span>
+        <span className="block text-xs text-secondary">{desc}</span>
+      </span>
+    </button>
+  );
+}
+
+function PaletteResults({
+  items,
+  safeIndex,
+  onSelectItem,
+  onHoverItem,
+}: {
+  items: UniformItem[];
+  safeIndex: number;
+  onSelectItem: (item: UniformItem) => void;
+  onHoverItem: (index: number) => void;
+}) {
+  const groups = useMemo(() => {
+    const g = new Map<string, UniformItem[]>();
+    for (const item of items) {
+      const list = g.get(item.group) ?? [];
+      list.push(item);
+      g.set(item.group, list);
+    }
+    return g;
+  }, [items]);
+
+  let globalIndex = 0;
+  const elements: React.ReactElement[] = [];
+
+  for (const [groupName, groupItems] of groups) {
+    elements.push(
+      <div
+        key={`header-${groupName}`}
+        className="px-3 pb-1 pt-2 text-9px font-700 uppercase tracking-0_14em text-secondary"
+      >
+        {groupName}
+      </div>,
+    );
+
+    for (const item of groupItems) {
+      const currentIndex = globalIndex++;
+      elements.push(
+        <PaletteResultsRow
+          isSelected={currentIndex === safeIndex}
+          item={item}
+          key={item.id}
+          onMouseEnter={() => onHoverItem(currentIndex)}
+          onSelect={() => onSelectItem(item)}
+        />,
+      );
+    }
+  }
+
+  return <>{elements}</>;
+}
+
 export function CommandPalette({
   anchorRect,
   isOpen,
@@ -99,15 +258,21 @@ export function CommandPalette({
   onPageAction,
   onRouteChange,
 }: CommandPaletteProps) {
-  const [query, setQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [dataResults, setDataResults] = useState<DataResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [state, dispatch] = useReducer(paletteReducer, {
+    query: "",
+    selectedIndex: 0,
+    dataResults: [],
+    isSearching: false,
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const paletteRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<number | undefined>(undefined);
-  const queryRef = useRef(query);
-  queryRef.current = query;
+  const queryRef = useRef(state.query);
+  queryRef.current = state.query;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const onRouteChangeRef = useRef(onRouteChange);
+  onRouteChangeRef.current = onRouteChange;
   const { themeMode, toggleTheme } = useThemeState();
 
   const commands = useMemo<PaletteCommand[]>(
@@ -154,7 +319,7 @@ export function CommandPalette({
     [onPageAction, onRouteChange, themeMode, toggleTheme],
   );
 
-  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedQuery = state.query.trim().toLowerCase();
 
   const filteredCommands = useMemo(
     () =>
@@ -171,13 +336,13 @@ export function CommandPalette({
   const filteredData = useMemo(
     () =>
       normalizedQuery.length >= 2
-        ? dataResults.filter((item) =>
+        ? state.dataResults.filter((item) =>
             `${item.label} ${item.description} ${item.group}`
               .toLowerCase()
               .includes(normalizedQuery),
           )
-        : dataResults,
-    [dataResults, normalizedQuery],
+        : state.dataResults,
+    [state.dataResults, normalizedQuery],
   );
 
   const allResults = useMemo(() => {
@@ -193,20 +358,17 @@ export function CommandPalette({
 
     const handleMouseDown = (event: MouseEvent) => {
       if (paletteRef.current && !paletteRef.current.contains(event.target as Node)) {
-        onClose();
+        onCloseRef.current();
       }
     };
 
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    setQuery("");
-    setSelectedIndex(0);
-    setDataResults([]);
-    setIsSearching(false);
+    dispatch({ type: "RESET" });
     const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => clearTimeout(timer);
   }, [isOpen]);
@@ -216,14 +378,14 @@ export function CommandPalette({
       clearTimeout(debounceRef.current);
     }
 
-    const q = query.trim();
+    const q = state.query.trim();
     if (q.length < 2) {
-      setDataResults([]);
-      setIsSearching(false);
+      dispatch({ type: "SET_DATA_RESULTS", results: [] });
+      dispatch({ type: "SET_SEARCHING", searching: false });
       return;
     }
 
-    setIsSearching(true);
+    dispatch({ type: "SET_SEARCHING", searching: true });
 
     const firedQuery = q;
 
@@ -242,10 +404,9 @@ export function CommandPalette({
         const items: DataResult[] = [];
 
         for (const c of contractsRes.data) {
-          if (
-            c.title.toLowerCase().includes(ql) ||
-            c.applicationContractCode?.toLowerCase().includes(ql)
-          ) {
+          const title = c.title.toLowerCase();
+          const code = (c.applicationContractCode ?? "").toLowerCase();
+          if (title.includes(ql) || code.includes(ql)) {
             items.push({
               id: `contract-${c.id}`,
               group: "Progetti",
@@ -253,19 +414,18 @@ export function CommandPalette({
               description: c.applicationContractCode || "",
               icon: Building2,
               run: () => {
-                onRouteChange("projects");
-                onClose();
+                onRouteChangeRef.current("projects");
+                onCloseRef.current();
               },
             });
           }
         }
 
         for (const m of materialsRes.data) {
-          if (
-            m.code.toLowerCase().includes(ql) ||
-            m.description.toLowerCase().includes(ql) ||
-            m.category.toLowerCase().includes(ql)
-          ) {
+          const code = m.code.toLowerCase();
+          const description = m.description.toLowerCase();
+          const category = m.category.toLowerCase();
+          if (code.includes(ql) || description.includes(ql) || category.includes(ql)) {
             items.push({
               id: `material-${m.id}`,
               group: "Materiali",
@@ -273,15 +433,17 @@ export function CommandPalette({
               description: m.description,
               icon: Package,
               run: () => {
-                onRouteChange("materials");
-                onClose();
+                onRouteChangeRef.current("materials");
+                onCloseRef.current();
               },
             });
           }
         }
 
         for (const t of tariffBooksRes.data) {
-          if (t.name.toLowerCase().includes(ql) || t.sourceName?.toLowerCase().includes(ql)) {
+          const name = t.name.toLowerCase();
+          const source = (t.sourceName ?? "").toLowerCase();
+          if (name.includes(ql) || source.includes(ql)) {
             items.push({
               id: `tariff-${t.id}`,
               group: "Tariffari",
@@ -289,8 +451,8 @@ export function CommandPalette({
               description: t.sourceName || String(t.year || ""),
               icon: BookOpen,
               run: () => {
-                onRouteChange("tariffs");
-                onClose();
+                onRouteChangeRef.current("tariffs");
+                onCloseRef.current();
               },
             });
           }
@@ -299,12 +461,12 @@ export function CommandPalette({
         const currentQuery2 = queryRef.current.trim().toLowerCase();
         if (currentQuery2 !== firedQuery.toLowerCase()) return;
 
-        setDataResults(items);
-        setIsSearching(false);
+        dispatch({ type: "SET_DATA_RESULTS", results: items });
+        dispatch({ type: "SET_SEARCHING", searching: false });
       } catch {
         const currentQuery2 = queryRef.current.trim().toLowerCase();
         if (currentQuery2 !== firedQuery.toLowerCase()) return;
-        setIsSearching(false);
+        dispatch({ type: "SET_SEARCHING", searching: false });
       }
     }, 250);
 
@@ -313,13 +475,13 @@ export function CommandPalette({
         clearTimeout(debounceRef.current);
       }
     };
-  }, [query, onRouteChange, onClose]);
+  }, [state.query]);
 
   if (!isOpen) {
     return null;
   }
 
-  const safeIndex = Math.min(selectedIndex, Math.max(0, allResults.length - 1));
+  const safeIndex = Math.min(state.selectedIndex, Math.max(0, allResults.length - 1));
   const selectedResult = allResults[safeIndex];
   const popoverWidth = anchorRect?.width ?? 220;
   const resultsWidth = Math.min(480, window.innerWidth - 24);
@@ -339,13 +501,16 @@ export function CommandPalette({
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setSelectedIndex((index) => Math.min(index + 1, allResults.length - 1));
+      dispatch({
+        type: "SET_SELECTED_INDEX",
+        index: Math.min(state.selectedIndex + 1, allResults.length - 1),
+      });
       return;
     }
 
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setSelectedIndex((index) => Math.max(index - 1, 0));
+      dispatch({ type: "SET_SELECTED_INDEX", index: Math.max(state.selectedIndex - 1, 0) });
       return;
     }
 
@@ -356,68 +521,28 @@ export function CommandPalette({
     }
   };
 
-  function renderItems() {
-    type UniformItem = ({ type: "command" } & PaletteCommand) | ({ type: "data" } & DataResult);
+  const handleQueryChange = (value: string) => {
+    dispatch({ type: "SET_QUERY", query: value });
+    dispatch({ type: "SET_SELECTED_INDEX", index: 0 });
+  };
 
+  const renderItems = () => {
     const items: UniformItem[] = normalizedQuery
       ? (allResults as UniformItem[])
       : commands.map((c) => ({ ...c, type: "command" as const }));
 
-    const groups = new Map<string, UniformItem[]>();
-    for (const item of items) {
-      const g = groups.get(item.group) ?? [];
-      g.push(item);
-      groups.set(item.group, g);
-    }
-
-    let globalIndex = 0;
-    const elements: React.ReactElement[] = [];
-
-    for (const [groupName, groupItems] of groups) {
-      elements.push(
-        <div
-          key={`header-${groupName}`}
-          className="px-3 pb-1 pt-2 text-9px font-700 uppercase tracking-0_14em text-secondary"
-        >
-          {groupName}
-        </div>,
-      );
-
-      for (const item of groupItems) {
-        const currentIndex = globalIndex++;
-        const Icon = item.icon;
-        const desc = item.type === "data" ? item.description : item.group;
-
-        elements.push(
-          <button
-            className={cn(
-              "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left",
-              currentIndex === safeIndex
-                ? "bg-primary/10 text-foreground"
-                : "text-secondary hover:bg-muted",
-            )}
-            key={item.id}
-            onClick={() => {
-              (item as UniformItem).run();
-              onClose();
-            }}
-            onMouseEnter={() => setSelectedIndex(currentIndex)}
-            type="button"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-14px bg-muted text-primary">
-              <Icon className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-foreground">{item.label}</span>
-              <span className="block text-xs text-secondary">{desc}</span>
-            </span>
-          </button>,
-        );
-      }
-    }
-
-    return elements;
-  }
+    return (
+      <PaletteResults
+        items={items}
+        safeIndex={safeIndex}
+        onSelectItem={(item) => {
+          item.run();
+          onClose();
+        }}
+        onHoverItem={(index) => dispatch({ type: "SET_SELECTED_INDEX", index })}
+      />
+    );
+  };
 
   return createPortal(
     <div className="fixed inset-0 z-[200] pointer-events-none" ref={paletteRef}>
@@ -426,40 +551,23 @@ export function CommandPalette({
         className="pointer-events-auto"
         onKeyDown={handleKeyDown}
       >
-        <div
-          className="flex h-10 items-center gap-2 rounded-18px border border-primary bg-card pl-10 pr-2 text-sm text-foreground shadow-panel ring-2 ring-ring"
-          style={{
-            left: popoverLeft,
-            top: popoverTop,
-            width: popoverWidth,
-            position: "absolute",
-          }}
-        >
-          <Search className="pointer-events-none absolute left-3 top-5 size-4 -translate-y-1/2 text-primary" />
-          <input
-            className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-secondary"
-            placeholder="Cerca in Quantara..."
-            ref={inputRef}
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSelectedIndex(0);
-            }}
-          />
-          <kbd className="rounded-10px border border-subtle bg-muted px-2 py-1 text-xs font-semibold text-secondary">
-            Esc
-          </kbd>
-        </div>
+        <PaletteInput
+          popoverLeft={popoverLeft}
+          popoverTop={popoverTop}
+          popoverWidth={popoverWidth}
+          query={state.query}
+          onQueryChange={handleQueryChange}
+          inputRef={inputRef}
+        />
 
         <div
           className="fixed max-h-[420px] overflow-y-auto rounded-18px border border-subtle bg-card p-2 shadow-panel"
           style={{ left: resultsLeft, top: popoverTop + resultsTop, width: resultsWidth }}
         >
-          {isSearching ? (
+          {state.isSearching ? (
             <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-secondary">
               <span className="size-3 animate-spin rounded-full border-2 border-primary border-r-transparent" />
-              Ricerca in corso...
+              Ricerca in corso…
             </div>
           ) : allResults.length > 0 ? (
             renderItems()

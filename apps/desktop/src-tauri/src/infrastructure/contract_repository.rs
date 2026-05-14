@@ -20,6 +20,8 @@ pub struct TariffPriorityRecord {
 pub struct CreateContractRequest {
     pub application_contract_code: String,
     pub contractual_amount: f64,
+    #[serde(default)]
+    pub contractor_name: Option<String>,
     pub framework_agreement_code: String,
     pub id: String,
     pub tender_discount_percent: f64,
@@ -36,6 +38,8 @@ pub type UpdateContractRequest = CreateContractRequest;
 pub struct ContractRecord {
     pub application_contract_code: String,
     pub contractual_amount: Money,
+    pub contractor_id: Option<String>,
+    pub contractor_name: Option<String>,
     pub framework_agreement_code: String,
     pub id: String,
     pub tender_discount_percent: f64,
@@ -49,10 +53,11 @@ pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, Ap
 
     let mut statement = connection
         .prepare(
-            "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
-             , tender_discount_percent, os_excluded_amount_cents
+            "SELECT contracts.id, contracts.title, contracts.application_contract_code, contracts.framework_agreement_code, contracts.contractual_amount_cents
+             , contracts.tender_discount_percent, contracts.os_excluded_amount_cents, contracts.contractor_id, contractors.name
              FROM contracts
-             ORDER BY updated_at DESC, title ASC",
+             LEFT JOIN contractors ON contractors.id = contracts.contractor_id
+             ORDER BY contracts.updated_at DESC, contracts.title ASC",
         )
         .map_err(to_database_error)?;
 
@@ -79,10 +84,11 @@ pub fn get_contract(
 
     let mut contract = connection
         .query_row(
-            "SELECT id, title, application_contract_code, framework_agreement_code, contractual_amount_cents
-             , tender_discount_percent, os_excluded_amount_cents
+            "SELECT contracts.id, contracts.title, contracts.application_contract_code, contracts.framework_agreement_code, contracts.contractual_amount_cents
+             , contracts.tender_discount_percent, contracts.os_excluded_amount_cents, contracts.contractor_id, contractors.name
              FROM contracts
-             WHERE id = ?1",
+             LEFT JOIN contractors ON contractors.id = contracts.contractor_id
+             WHERE contracts.id = ?1",
             [contract_id],
             map_contract_row,
         )
@@ -105,6 +111,7 @@ pub fn create_contract(
 
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
+    let contractor_id = upsert_contractor(&transaction, request.contractor_name.as_deref())?;
 
     let os_cents = request
         .os_excluded_amount
@@ -120,8 +127,9 @@ pub fn create_contract(
                 framework_agreement_code,
                 contractual_amount_cents,
                 tender_discount_percent,
-                os_excluded_amount_cents
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                os_excluded_amount_cents,
+                contractor_id
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 request.id,
                 request.title,
@@ -129,7 +137,8 @@ pub fn create_contract(
                 request.framework_agreement_code,
                 amount_cents,
                 request.tender_discount_percent,
-                os_cents
+                os_cents,
+                contractor_id
             ],
         )
         .map_err(to_database_error)?;
@@ -165,6 +174,7 @@ pub fn update_contract(
 
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
+    let contractor_id = upsert_contractor(&transaction, request.contractor_name.as_deref())?;
 
     let os_cents = request
         .os_excluded_amount
@@ -180,8 +190,9 @@ pub fn update_contract(
                  contractual_amount_cents = ?4,
                  tender_discount_percent = ?5,
                  os_excluded_amount_cents = ?6,
+                 contractor_id = ?7,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?7",
+             WHERE id = ?8",
             params![
                 request.title,
                 request.application_contract_code,
@@ -189,6 +200,7 @@ pub fn update_contract(
                 amount_cents,
                 request.tender_discount_percent,
                 os_cents,
+                contractor_id,
                 contract_id
             ],
         )
@@ -287,6 +299,8 @@ fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord>
             amount: cents_to_money(amount_cents),
             currency: "EUR",
         },
+        contractor_id: row.get(7)?,
+        contractor_name: row.get(8)?,
         framework_agreement_code: row.get(3)?,
         id: row.get(0)?,
         tender_discount_percent,
@@ -294,6 +308,47 @@ fn map_contract_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ContractRecord>
         title: row.get(1)?,
         os_excluded_amount: os_cents.map(cents_to_money),
     })
+}
+
+fn upsert_contractor(
+    transaction: &rusqlite::Transaction<'_>,
+    contractor_name: Option<&str>,
+) -> Result<Option<String>, AppError> {
+    let Some(name) = contractor_name.map(str::trim).filter(|name| !name.is_empty()) else {
+        return Ok(None);
+    };
+
+    let contractor_id = create_contractor_id(name);
+    transaction
+        .execute(
+            "INSERT INTO contractors (id, name)
+             VALUES (?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = CURRENT_TIMESTAMP",
+            params![contractor_id, name],
+        )
+        .map_err(to_database_error)?;
+
+    Ok(Some(contractor_id))
+}
+
+fn create_contractor_id(name: &str) -> String {
+    let slug = name
+        .to_lowercase()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+
+    format!("contractor_{}", slug)
 }
 
 fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppError> {
@@ -357,6 +412,7 @@ mod tests {
         let created = create_contract(&mut connection, request).expect("contract created");
 
         assert_eq!(created.id, "contract_milano_verona");
+        assert_eq!(created.contractor_name.as_deref(), Some("RFI"));
         assert_eq!(created.contractual_amount.amount, 26_150_000.25);
         assert!((created.tender_discount_percent - 18.25).abs() < f64::EPSILON);
         assert_eq!(created.tariff_priorities.len(), 2);
@@ -418,6 +474,7 @@ mod tests {
     fn sample_contract() -> CreateContractRequest {
         CreateContractRequest {
             application_contract_code: "CA-MV-001".into(),
+            contractor_name: Some("RFI".into()),
             contractual_amount: 26_150_000.25,
             framework_agreement_code: "AQ-RFI-2026".into(),
             id: "contract_milano_verona".into(),

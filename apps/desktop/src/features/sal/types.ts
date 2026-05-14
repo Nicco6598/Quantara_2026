@@ -10,10 +10,6 @@ export type {
   SalTariffVoice,
 } from "@quantara/shared-types";
 
-export type SalCreationStep = 1 | 2 | 3 | 4 | 5;
-
-export type SalDataSource = "desktop" | "local";
-
 export type SalProjectContext = {
   applicationContractCode: string;
   contractor: string;

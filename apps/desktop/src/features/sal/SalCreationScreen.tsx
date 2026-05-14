@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   ArrowRight,
   Building2,
@@ -17,7 +17,9 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
+  useEffectEvent,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -46,10 +48,15 @@ import {
   summarizeSalLines,
 } from "./domain/sal-calculations";
 import {
-  buildSalDocumentView,
-  type SalDocument,
-  type SalSurchargeKind,
-} from "./domain/sal-workflow";
+  clearSalCreationDraft,
+  clearSalCreationDraftBySalId,
+  lineDraftsFromStoredSal,
+  loadSalCreationDraft,
+  loadSalCreationDraftBySalId,
+  saveSalCreationDraft,
+  saveSalCreationDraftBySalId,
+} from "./domain/sal-creation-draft";
+import { buildSalDocumentView, type SalSurchargeKind } from "./domain/sal-workflow";
 import { useSalCreationData } from "./hooks/useSalCreationData";
 import { getNextPhase, type SalWorkflowPhase } from "./state/workflow";
 import type {
@@ -63,94 +70,41 @@ import type {
 } from "./types";
 
 const PHASE_ORDER: SalWorkflowPhase[] = ["context", "voices", "review", "confirm", "completed"];
-const DRAFT_STORAGE_KEY = "quantara.salCreationDraft.v1";
 const CREATED_FLAG_KEY = "quantara.salCreated.v1";
-
-type SalCreationDraft = {
-  economicRules: SalEconomicRules;
-  lines: SalLineDraft[];
-  phase: SalWorkflowPhase;
-  projectId: string;
-  salTitle: string;
-  selectedTariffBookIds: string[];
-};
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function saveDraft(projectId: string, data: Omit<SalCreationDraft, "projectId">) {
-  try {
-    const existing: Record<string, Omit<SalCreationDraft, "projectId">> = JSON.parse(
-      localStorage.getItem(DRAFT_STORAGE_KEY) ?? "{}",
-    );
-    existing[projectId] = data;
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(existing));
-  } catch {
-    /* no-op */
-  }
-}
-
-function saveDraftBySalId(salId: string, data: Omit<SalCreationDraft, "projectId">) {
-  saveDraft(`sal:${salId}`, data);
-}
-
-function loadDraft(projectId: string): Omit<SalCreationDraft, "projectId"> | null {
-  try {
-    const all: Record<string, Omit<SalCreationDraft, "projectId">> = JSON.parse(
-      localStorage.getItem(DRAFT_STORAGE_KEY) ?? "{}",
-    );
-    return all[projectId] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function loadDraftBySalId(salId: string): Omit<SalCreationDraft, "projectId"> | null {
-  return loadDraft(`sal:${salId}`);
-}
-
-function clearDraft(projectId: string) {
-  try {
-    const all: Record<string, Omit<SalCreationDraft, "projectId">> = JSON.parse(
-      localStorage.getItem(DRAFT_STORAGE_KEY) ?? "{}",
-    );
-    delete all[projectId];
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(all));
-  } catch {
-    /* no-op */
-  }
-}
-
-function clearDraftBySalId(salId: string) {
-  clearDraft(`sal:${salId}`);
-}
-
-function lineDraftsFromStoredSal(
-  sal: SalDocument,
-  voices: readonly SalVoiceDraft[],
-): SalLineDraft[] {
-  const voiceById = new Map(voices.map((voice) => [voice.id, voice]));
-
-  return sal.lines.flatMap((line) => {
-    const voice = voiceById.get(line.voiceId);
-    if (!voice) return [];
-
-    return [
-      {
-        id: line.id,
-        factor1: line.quantity,
-        factor2: 1,
-        factor3: 1,
-        notes: "",
-        quantity: line.quantity,
-        surchargePercent: line.surcharge === "night" ? 20 : line.surcharge === "day" ? 10 : 0,
-        voice,
-      },
-    ];
-  });
-}
 
 function surchargeKindFromPercent(percent: number): SalSurchargeKind {
   return percent >= 20 ? "night" : percent > 0 ? "day" : "none";
 }
+
+/* ── Form state reducer ── */
+type SalFormState = {
+  lines: SalLineDraft[];
+  economicRules: SalEconomicRules;
+  salTitle: string;
+  phase: SalWorkflowPhase;
+};
+type SalFormAction =
+  | { type: "LINES"; lines: SalLineDraft[] }
+  | { type: "ECONOMIC_RULES"; economicRules: SalEconomicRules }
+  | { type: "SAL_TITLE"; salTitle: string }
+  | { type: "PHASE"; phase: SalWorkflowPhase }
+  | { type: "ALL"; partial: Partial<SalFormState> };
+
+function salFormReducer(state: SalFormState, action: SalFormAction): SalFormState {
+  switch (action.type) {
+    case "LINES":
+      return { ...state, lines: action.lines };
+    case "ECONOMIC_RULES":
+      return { ...state, economicRules: action.economicRules };
+    case "SAL_TITLE":
+      return { ...state, salTitle: action.salTitle };
+    case "PHASE":
+      return { ...state, phase: action.phase };
+    case "ALL":
+      return { ...state, ...action.partial };
+  }
+}
+/* ── ── */
 
 export function SalCreationScreen() {
   const { notify } = useToast();
@@ -164,8 +118,50 @@ export function SalCreationScreen() {
     salDocuments,
     tariffVoices,
   } = useSalWorkflowService();
-  const [phase, setPhase] = useState<SalWorkflowPhase>("context");
-  const [editingDraftSalId, setEditingDraftSalId] = useState<string | null>(null);
+  const [formState, dispatch] = useReducer(salFormReducer, {
+    lines: [],
+    economicRules: defaultSalEconomicRules,
+    salTitle: "",
+    phase: "context",
+  });
+  const formStateRef = useRef(formState);
+  formStateRef.current = formState;
+  const { lines, economicRules, salTitle, phase } = formState;
+
+  const setLines = useCallback(
+    (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => {
+      const prev = formStateRef.current.lines;
+      dispatch({ type: "LINES", lines: typeof updater === "function" ? updater(prev) : updater });
+    },
+    [],
+  );
+  const setEconomicRules = useCallback(
+    (updater: SalEconomicRules | ((prev: SalEconomicRules) => SalEconomicRules)) => {
+      const prev = formStateRef.current.economicRules;
+      dispatch({
+        type: "ECONOMIC_RULES",
+        economicRules: typeof updater === "function" ? updater(prev) : updater,
+      });
+    },
+    [],
+  );
+  const setSalTitle = useCallback((updater: string | ((prev: string) => string)) => {
+    const prev = formStateRef.current.salTitle;
+    dispatch({
+      type: "SAL_TITLE",
+      salTitle: typeof updater === "function" ? updater(prev) : updater,
+    });
+  }, []);
+  const setPhase = useCallback(
+    (updater: SalWorkflowPhase | ((prev: SalWorkflowPhase) => SalWorkflowPhase)) => {
+      const prev = formStateRef.current.phase;
+      dispatch({ type: "PHASE", phase: typeof updater === "function" ? updater(prev) : updater });
+    },
+    [],
+  );
+
+  const editingDraftSalId = useRef<string | null>(null);
+  const idCounter = useRef(0);
 
   // Guard: if SAL was already created in this session, redirect to project-detail
   useEffect(() => {
@@ -184,7 +180,7 @@ export function SalCreationScreen() {
     const draftSal = salDocuments.find(
       (sal) => sal.id === resumeSalId && sal.projectId === project.id && sal.status === "draft",
     );
-    const draft = loadDraftBySalId(resumeSalId) ?? loadDraft(project.id);
+    const draft = loadSalCreationDraftBySalId(resumeSalId) ?? loadSalCreationDraft(project.id);
 
     if (!draft && draftSal && draftSal.lines.length > 0 && data.voices.length === 0) {
       return;
@@ -193,19 +189,29 @@ export function SalCreationScreen() {
     sessionStorage.removeItem("quantara.salResumeDraft.v1");
 
     if (draft) {
-      setEditingDraftSalId(resumeSalId);
-      setLines(draft.lines);
-      setEconomicRules(draft.economicRules);
-      setSalTitle(draft.salTitle || draftSal?.title || project.salTitle);
-      setPhase(draft.phase);
+      editingDraftSalId.current = resumeSalId;
+      dispatch({
+        type: "ALL",
+        partial: {
+          lines: draft.lines,
+          economicRules: draft.economicRules,
+          salTitle: draft.salTitle || draftSal?.title || project.salTitle,
+          phase: draft.phase,
+        },
+      });
       return;
     }
 
     if (draftSal) {
-      setEditingDraftSalId(resumeSalId);
-      setLines(lineDraftsFromStoredSal(draftSal, data.voices));
-      setSalTitle(draftSal.title || project.salTitle);
-      setPhase(draftSal.lines.length > 0 ? "voices" : "context");
+      editingDraftSalId.current = resumeSalId;
+      dispatch({
+        type: "ALL",
+        partial: {
+          lines: lineDraftsFromStoredSal(draftSal, data.voices),
+          salTitle: draftSal.title || project.salTitle,
+          phase: draftSal.lines.length > 0 ? "voices" : "context",
+        },
+      });
     }
   }, [data.project, data.voices, salDocuments]);
 
@@ -227,17 +233,14 @@ export function SalCreationScreen() {
       }
     });
     return unsub;
-  }, []);
+  }, [setPhase]);
 
   useEffect(() => {
     const stepIndex = PHASE_ORDER.indexOf(phase);
     useAppStore.getState().setSalCurrentStep(stepIndex < 4 ? stepIndex + 1 : 4);
   }, [phase]);
 
-  const [lines, setLines] = useState<SalLineDraft[]>([]);
-  const [economicRules, setEconomicRules] = useState<SalEconomicRules>(defaultSalEconomicRules);
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
-  const [salTitle, setSalTitle] = useState("");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [compareLines, setCompareLines] = useState<SalLineView[] | null>(null);
 
@@ -252,15 +255,25 @@ export function SalCreationScreen() {
         discountPercent: project.tenderDiscountPercent,
       }));
     }
-  }, [data.project]);
+  }, [data.project, setEconomicRules, setSalTitle]);
 
-  const previousProgressiveAmount = useMemo(() => {
+  const closedProjectSals = useMemo(() => {
     const projectId = data.project?.id;
-    if (!projectId) return 0;
+    if (!projectId) return [];
+
     return salDocuments
       .filter((sal) => sal.projectId === projectId && sal.status === "closed")
-      .reduce((sum, sal) => sum + buildSalDocumentView(sal, tariffVoices).total, 0);
-  }, [data.project?.id, salDocuments, tariffVoices]);
+      .sort((a, b) => (b.closedAt ?? b.date).localeCompare(a.closedAt ?? a.date));
+  }, [data.project?.id, salDocuments]);
+
+  const previousProgressiveAmount = useMemo(
+    () =>
+      closedProjectSals.reduce(
+        (sum, sal) => sum + buildSalDocumentView(sal, tariffVoices).total,
+        0,
+      ),
+    [closedProjectSals, tariffVoices],
+  );
 
   // Line views computed on every edit (needed for real-time display)
   const lineViews = useMemo(() => buildLineViews(lines, economicRules), [lines, economicRules]);
@@ -279,21 +292,16 @@ export function SalCreationScreen() {
   const hasDangerChecks = checks.some((check) => check.tone === "danger");
 
   const previousSalLines = useMemo(() => {
-    const projectId = data.project?.id;
-    if (!projectId || voicesMap.size === 0) return [];
-    // Latest closed SAL for this project
-    const closed = [...salDocuments]
-      .filter((s) => s.projectId === projectId && s.status === "closed")
-      .sort((a, b) => (b.closedAt ?? b.date).localeCompare(a.closedAt ?? a.date));
-    if (closed.length === 0) return [];
-    const latest = closed[0];
+    if (voicesMap.size === 0) return [];
+    const latest = closedProjectSals[0];
     if (!latest) return [];
     return buildLineViews(
-      latest.lines
-        .map((l) => {
+      (() => {
+        const result: SalLineDraft[] = [];
+        for (const l of latest.lines) {
           const voice = voicesMap.get(l.voiceId);
-          if (!voice) return null;
-          return {
+          if (!voice) continue;
+          result.push({
             id: l.id,
             factor1: l.quantity,
             factor2: 1,
@@ -302,12 +310,13 @@ export function SalCreationScreen() {
             quantity: l.quantity,
             surchargePercent: l.surcharge === "night" ? 25 : l.surcharge === "day" ? 10 : 0,
             voice,
-          } as SalLineDraft;
-        })
-        .filter((l): l is SalLineDraft => l !== null),
+          });
+        }
+        return result;
+      })(),
       defaultSalEconomicRules,
     );
-  }, [data.project?.id, voicesMap, salDocuments]);
+  }, [closedProjectSals, voicesMap]);
 
   const upsertLine = useCallback(
     (voice: SalVoiceDraft) => {
@@ -342,14 +351,17 @@ export function SalCreationScreen() {
         });
       }
     },
-    [lines, notify],
+    [lines, notify, setLines],
   );
 
-  const setSurcharge = useCallback((lineId: string, pct: number) => {
-    setLines((current) =>
-      current.map((l) => (l.id === lineId ? { ...l, surchargePercent: pct } : l)),
-    );
-  }, []);
+  const setSurcharge = useCallback(
+    (lineId: string, pct: number) => {
+      setLines((current) =>
+        current.map((l) => (l.id === lineId ? { ...l, surchargePercent: pct } : l)),
+      );
+    },
+    [setLines],
+  );
 
   const setFactor = useCallback(
     (lineId: string, field: "factor1" | "factor2" | "factor3", value: number) => {
@@ -370,7 +382,7 @@ export function SalCreationScreen() {
         ),
       );
     },
-    [],
+    [setLines],
   );
 
   const removeLine = useCallback(
@@ -384,16 +396,19 @@ export function SalCreationScreen() {
           tone: "warning",
         });
     },
-    [lines, notify],
+    [lines, notify, setLines],
   );
 
-  const setNotes = useCallback((lineId: string, notes: string) => {
-    setLines((current) => current.map((l) => (l.id === lineId ? { ...l, notes } : l)));
-  }, []);
+  const setNotes = useCallback(
+    (lineId: string, notes: string) => {
+      setLines((current) => current.map((l) => (l.id === lineId ? { ...l, notes } : l)));
+    },
+    [setLines],
+  );
 
   const handlePasteLine = useCallback(
     (draft: SalLineDraft) => {
-      const newId = `draft-${draft.voice.id}-${Date.now()}`;
+      const newId = `draft-${draft.voice.id}-${idCounter.current++}`;
       setLines((current) => [
         ...current,
         { ...draft, id: newId, quantity: draft.factor1 * draft.factor2 * draft.factor3 },
@@ -404,27 +419,26 @@ export function SalCreationScreen() {
         tone: "success",
       });
     },
-    [notify],
+    [notify, setLines],
   );
 
   const handleApplyTemplate = useCallback(
     (template: SalTemplate) => {
-      const newLines: SalLineDraft[] = template.voiceEntries
-        .map((entry) => {
-          const voice = voicesMap.get(entry.voiceId);
-          if (!voice) return null;
-          return {
-            id: `draft-${entry.voiceId}`,
-            factor1: entry.factor1,
-            factor2: entry.factor2,
-            factor3: entry.factor3,
-            notes: "",
-            quantity: entry.factor1 * entry.factor2 * entry.factor3,
-            surchargePercent: entry.surchargePercent,
-            voice,
-          };
-        })
-        .filter((l): l is SalLineDraft => l !== null);
+      const newLines: SalLineDraft[] = [];
+      for (const entry of template.voiceEntries) {
+        const voice = voicesMap.get(entry.voiceId);
+        if (!voice) continue;
+        newLines.push({
+          id: `draft-${entry.voiceId}`,
+          factor1: entry.factor1,
+          factor2: entry.factor2,
+          factor3: entry.factor3,
+          notes: "",
+          quantity: entry.factor1 * entry.factor2 * entry.factor3,
+          surchargePercent: entry.surchargePercent,
+          voice,
+        });
+      }
 
       if (newLines.length === 0) {
         notify({
@@ -448,7 +462,7 @@ export function SalCreationScreen() {
         tone: "success",
       });
     },
-    [voicesMap, notify],
+    [voicesMap, notify, setLines, setEconomicRules],
   );
 
   function goPrimary() {
@@ -529,17 +543,17 @@ export function SalCreationScreen() {
       })),
     };
 
-    if (editingDraftSalId) {
-      updateSalDraft(editingDraftSalId, finalSalPayload);
-      closeSal(editingDraftSalId);
+    if (editingDraftSalId.current) {
+      updateSalDraft(editingDraftSalId.current, finalSalPayload);
+      closeSal(editingDraftSalId.current);
     } else {
       createSal(finalSalPayload);
     }
 
     setCreatedSalTitle(salTitle.trim() || data.project.salTitle);
-    clearDraft(data.project.id);
-    if (editingDraftSalId) {
-      clearDraftBySalId(editingDraftSalId);
+    clearSalCreationDraft(data.project.id);
+    if (editingDraftSalId.current) {
+      clearSalCreationDraftBySalId(editingDraftSalId.current);
     }
     sessionStorage.setItem(CREATED_FLAG_KEY, "1");
     setPhase("completed");
@@ -554,7 +568,7 @@ export function SalCreationScreen() {
     const project = data.project;
     const pid = project?.id;
     if (!project || !pid) return;
-    saveDraft(pid, {
+    saveSalCreationDraft(pid, {
       economicRules,
       lines,
       phase,
@@ -594,13 +608,13 @@ export function SalCreationScreen() {
         unitPrice: l.voice.unitPrice,
       })),
     };
-    const draftSal = editingDraftSalId
-      ? updateSalDraft(editingDraftSalId, draftPayload)
+    const draftSal = editingDraftSalId.current
+      ? updateSalDraft(editingDraftSalId.current, draftPayload)
       : createSal(draftPayload);
-    const draftSalId = draftSal?.id ?? editingDraftSalId;
+    const draftSalId = draftSal?.id ?? editingDraftSalId.current;
     if (draftSalId) {
-      setEditingDraftSalId(draftSalId);
-      saveDraftBySalId(draftSalId, {
+      editingDraftSalId.current = draftSalId;
+      saveSalCreationDraftBySalId(draftSalId, {
         economicRules,
         lines,
         phase,
@@ -634,30 +648,34 @@ export function SalCreationScreen() {
     lineViews,
     createSalProject,
     createSal,
-    editingDraftSalId,
     updateSalDraft,
     navigate,
     summary.total,
   ]);
 
-  useEffect(() => {
-    useAppStore.getState().setSalToolbar({
+  const toolbarConfig = useMemo(
+    () => ({
       budgetResidual: summary.budgetResidual,
       discountAmount: summary.discountAmount,
       lineCount: lineViews.length,
       salTitle: salTitle.trim() || data.project?.salTitle || "Nuovo SAL",
       total: summary.total,
       voicesCount: data.voices.length,
-    });
-  }, [
-    data.project?.salTitle,
-    data.voices.length,
-    lineViews.length,
-    salTitle,
-    summary.budgetResidual,
-    summary.discountAmount,
-    summary.total,
-  ]);
+    }),
+    [
+      data.project?.salTitle,
+      data.voices.length,
+      lineViews.length,
+      salTitle,
+      summary.budgetResidual,
+      summary.discountAmount,
+      summary.total,
+    ],
+  );
+
+  useEffect(() => {
+    useAppStore.getState().setSalToolbar(toolbarConfig);
+  }, [toolbarConfig]);
 
   useEffect(() => {
     const handleSalToolbarAction = (event: Event) => {
@@ -695,71 +713,41 @@ export function SalCreationScreen() {
             summary={summary}
           />
         ) : (
-          <>
-            {data.error ? (
-              <FeedbackBanner tone="danger" title="Caricamento fallito" message={data.error} />
-            ) : null}
-            {phase === "context" ? (
-              <SetupStep
-                contracts={data.contracts}
-                economicRules={economicRules}
-                onSelectContract={data.setContract}
-                project={data.project}
-                salTitle={salTitle}
-                selectedTariffBooks={data.selectedTariffBooks}
-                selectedTariffBook={data.selectedTariffBook}
-                selectTariffBook={async (id) => {
-                  await data.selectTariffBook(id);
-                  const book = data.tariffBookOptions.find((b) => b.id === id);
-                  if (book)
-                    notify({
-                      message: `${book.name} (${book.year}) selezionato.`,
-                      title: "Tariffario",
-                      tone: "success",
-                    });
-                }}
-                setSalTitle={setSalTitle}
-                summary={summary}
-                tariffBooks={data.tariffBookOptions}
-                voicesCount={data.voices.length}
-                onPrimary={goPrimary}
-              />
-            ) : null}
-            {phase === "voices" ? (
-              <VoicesStep
-                lineViews={lineViews}
-                lines={lines}
-                onFactorChange={setFactor}
-                onNotesChange={setNotes}
-                onPasteLine={handlePasteLine}
-                onPrimary={goPrimary}
-                onReorder={setLines}
-                onRemove={removeLine}
-                onSurcharge={setSurcharge}
-                onToggle={upsertLine}
-                summary={summary}
-                voices={data.voices}
-                onApplyTemplate={handleApplyTemplate}
-                onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
-                tariffBookId={data.selectedTariffBook?.id ?? ""}
-              />
-            ) : null}
-            {phase === "review" ? (
-              <ReviewStep
-                checks={checks}
-                economicRules={economicRules}
-                lineViews={lineViews}
-                onPrimary={goPrimary}
-                summary={summary}
-                previousSalLines={previousSalLines}
-                compareLines={compareLines}
-                onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
-              />
-            ) : null}
-            {phase === "confirm" ? (
-              <ConfirmStep economicRules={economicRules} onPrimary={goPrimary} summary={summary} />
-            ) : null}
-          </>
+          <SalEditorContent
+            checks={checks}
+            compareLines={compareLines}
+            contracts={data.contracts}
+            dataError={data.error}
+            dataSetContract={data.setContract}
+            dataTariffBookOptions={data.tariffBookOptions}
+            dataVoices={data.voices}
+            dataVoicesLength={data.voices.length}
+            dataSelectedTariffBooks={data.selectedTariffBooks}
+            dataSelectedTariffBook={data.selectedTariffBook}
+            dataSelectTariffBook={data.selectTariffBook}
+            economicRules={economicRules}
+            goPrimary={goPrimary}
+            handleApplyTemplate={handleApplyTemplate}
+            handlePasteLine={handlePasteLine}
+            lineViews={lineViews}
+            lines={lines}
+            notify={notify}
+            onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
+            previousSalLines={previousSalLines}
+            removeLine={removeLine}
+            salTitle={salTitle}
+            setFactor={setFactor}
+            setIsTemplateDialogOpen={setIsTemplateDialogOpen}
+            setLines={setLines}
+            setNotes={setNotes}
+            setSalTitle={setSalTitle}
+            setSurcharge={setSurcharge}
+            summary={summary}
+            upsertLine={upsertLine}
+            phase={phase}
+            project={data.project}
+            tariffBookId={data.selectedTariffBook?.id ?? ""}
+          />
         )}
       </div>
       {isTemplateDialogOpen && (
@@ -777,6 +765,145 @@ export function SalCreationScreen() {
         />
       )}
     </main>
+  );
+}
+
+/* ── Editor content ── */
+function SalEditorContent({
+  checks,
+  compareLines,
+  contracts,
+  dataError,
+  dataSetContract,
+  dataTariffBookOptions,
+  dataVoices,
+  dataVoicesLength,
+  dataSelectedTariffBooks,
+  dataSelectedTariffBook,
+  dataSelectTariffBook,
+  project,
+  economicRules,
+  goPrimary,
+  handleApplyTemplate,
+  handlePasteLine,
+  lineViews,
+  lines,
+  notify,
+  onToggleCompare,
+  previousSalLines,
+  phase,
+  removeLine,
+  salTitle,
+  setFactor,
+  setIsTemplateDialogOpen,
+  setLines,
+  setNotes,
+  setSalTitle,
+  setSurcharge,
+  summary,
+  tariffBookId,
+  upsertLine,
+}: {
+  checks: ReturnType<typeof buildVerificationChecks>;
+  compareLines: SalLineView[] | null;
+  contracts: { id: string; title: string; contractor?: string }[];
+  dataError: string | null;
+  dataSetContract: ((id: string) => void) | undefined;
+  dataTariffBookOptions: SalTariffBookOption[];
+  dataVoices: SalVoiceDraft[];
+  dataVoicesLength: number;
+  dataSelectedTariffBooks: SalTariffBookOption[];
+  dataSelectedTariffBook: SalTariffBookOption | null;
+  dataSelectTariffBook: (id: string) => Promise<void>;
+  project: SalProjectContext | null;
+  economicRules: SalEconomicRules;
+  goPrimary: () => void;
+  handleApplyTemplate: (t: SalTemplate) => void;
+  handlePasteLine: (d: SalLineDraft) => void;
+  lineViews: SalLineView[];
+  lines: SalLineDraft[];
+  notify: ReturnType<typeof useToast>["notify"];
+  onToggleCompare: () => void;
+  previousSalLines: SalLineView[];
+  phase: SalWorkflowPhase;
+  removeLine: (lineId: string) => void;
+  salTitle: string;
+  setFactor: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
+  setIsTemplateDialogOpen: Dispatch<SetStateAction<boolean>>;
+  setLines: (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => void;
+  setNotes: (lineId: string, notes: string) => void;
+  setSalTitle: (updater: string | ((prev: string) => string)) => void;
+  setSurcharge: (lineId: string, p: number) => void;
+  summary: SalEconomicSummary;
+  tariffBookId: string;
+  upsertLine: (v: SalVoiceDraft) => void;
+}) {
+  return (
+    <>
+      {dataError ? (
+        <FeedbackBanner tone="danger" title="Caricamento fallito" message={dataError} />
+      ) : null}
+      {phase === "context" ? (
+        <SetupStep
+          contracts={contracts}
+          economicRules={economicRules}
+          onSelectContract={dataSetContract}
+          project={project}
+          salTitle={salTitle}
+          selectedTariffBooks={dataSelectedTariffBooks}
+          selectedTariffBook={dataSelectedTariffBook}
+          selectTariffBook={async (id) => {
+            await dataSelectTariffBook(id);
+            const book = dataTariffBookOptions.find((b) => b.id === id);
+            if (book)
+              notify({
+                message: `${book.name} (${book.year}) selezionato.`,
+                title: "Tariffario",
+                tone: "success",
+              });
+          }}
+          setSalTitle={setSalTitle}
+          summary={summary}
+          tariffBooks={dataTariffBookOptions}
+          voicesCount={dataVoicesLength}
+          onPrimary={goPrimary}
+        />
+      ) : null}
+      {phase === "voices" ? (
+        <VoicesStep
+          lineViews={lineViews}
+          lines={lines}
+          onFactorChange={setFactor}
+          onNotesChange={setNotes}
+          onPasteLine={handlePasteLine}
+          onPrimary={goPrimary}
+          onReorder={setLines}
+          onRemove={removeLine}
+          onSurcharge={setSurcharge}
+          onToggle={upsertLine}
+          summary={summary}
+          voices={dataVoices}
+          onApplyTemplate={handleApplyTemplate}
+          onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
+          tariffBookId={tariffBookId}
+        />
+      ) : null}
+      {phase === "review" ? (
+        <ReviewStep
+          checks={checks}
+          economicRules={economicRules}
+          lineViews={lineViews}
+          onPrimary={goPrimary}
+          summary={summary}
+          previousSalLines={previousSalLines}
+          compareLines={compareLines}
+          onToggleCompare={onToggleCompare}
+        />
+      ) : null}
+      {phase === "confirm" ? (
+        <ConfirmStep economicRules={economicRules} onPrimary={goPrimary} summary={summary} />
+      ) : null}
+    </>
   );
 }
 
@@ -829,10 +956,10 @@ function SetupStep({
 
   return (
     <div className="space-y-6 rounded-2xl bg-[var(--surface-base)]/80 p-4 ring-1 ring-[var(--border-subtle)]/70 md:p-6">
-      <div className="rounded-xl bg-[var(--surface-base)] px-5 py-5 ring-1 ring-[var(--border-subtle)]/70">
+      <div className="rounded-xl bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
         {showContractSelector ? (
           <div className="relative">
-            <motion.button
+            <m.button
               className="flex w-full items-center gap-5 text-left"
               onClick={() => setProjectOpen(!projectOpen)}
               type="button"
@@ -867,7 +994,7 @@ function SetupStep({
                   className={cn("size-3 transition-transform", projectOpen && "rotate-180")}
                 />
               </span>
-            </motion.button>
+            </m.button>
             {projectOpen && (
               <>
                 <button
@@ -880,7 +1007,7 @@ function SetupStep({
                   {contracts.map((c) => {
                     const isActive = c.id === project.id;
                     return (
-                      <motion.button
+                      <m.button
                         className={cn(
                           "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-all",
                           isActive
@@ -917,7 +1044,7 @@ function SetupStep({
                             <Check className="size-3.5" strokeWidth={3} />
                           </span>
                         )}
-                      </motion.button>
+                      </m.button>
                     );
                   })}
                 </div>
@@ -966,7 +1093,7 @@ function SetupStep({
       <div className="border-t border-[var(--border-subtle)]/70 pt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-17px font-bold text-[var(--text-primary)]">
+            <h3 className="text-17px font-semibold text-[var(--text-primary)]">
               Tariffari del progetto
             </h3>
             <div className="mt-1 flex items-center gap-1.5 text-12px text-[var(--text-secondary)]">
@@ -994,7 +1121,7 @@ function SetupStep({
             {tariffBooks.map((book) => {
               const isSelected = selectedTariffBooks.some((b) => b.id === book.id);
               return (
-                <motion.button
+                <m.button
                   className={cn(
                     "inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-12px font-semibold transition-all",
                     isSelected
@@ -1013,7 +1140,7 @@ function SetupStep({
                   )}
                   <span>{book.name}</span>
                   <span className="text-11px text-[var(--text-secondary)]">{book.year}</span>
-                </motion.button>
+                </m.button>
               );
             })}
           </div>
@@ -1025,81 +1152,103 @@ function SetupStep({
         </div>
       </div>
 
-      <div className="border-t border-[var(--border-subtle)]/70 pt-5">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
-              <Wallet className="size-5" />
-            </span>
-            <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
-              Budget totale
-            </div>
-            <div className="mt-1 text-18px font-black text-[var(--text-primary)]">
-              <Currency value={project.contractAmount} />
-            </div>
-          </div>
-          <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
-              <Calculator className="size-5" />
-            </span>
-            <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
-              Residuo stimato
-            </div>
-            <div className="mt-1 text-18px font-black text-[var(--success-base)]">
-              <Currency value={summary.budgetResidual} />
-            </div>
-          </div>
-          <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--accent-primary)]">
-              <Calculator className="size-5" />
-            </span>
-            <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
-              Ribasso gara
-            </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-18px font-black text-[var(--text-primary)]">
-                {economicRules.discountPercent.toLocaleString("it-IT")}%
-              </span>
-              {!economicRules.discountEnabled && (
-                <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-bold text-[var(--warning-base)]">
-                  Disattivato
-                </span>
-              )}
-            </div>
-            {economicRules.discountEnabled && (
-              <div className="mt-3 text-12px font-medium text-[var(--danger-base)]">
-                Sconto: -<Currency value={summary.discountAmount} />
-              </div>
-            )}
-            <div className="mt-2 text-11px text-[var(--text-secondary)]">
-              Dal contratto · non modificabile in SAL
-            </div>
-          </div>
-          <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
-              <FileText className="size-5" />
-            </span>
-            <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
-              Voci disponibili
-            </div>
-            <div className="mt-1 text-18px font-black text-[var(--info-base)]">{voicesCount}</div>
-            <div className="mt-2 text-11px text-[var(--text-secondary)]">
-              nel tariffario selezionato
-            </div>
-          </div>
-        </div>
-        <EconomicEquation className="mt-4" summary={summary} />
-      </div>
+      <SetupMetricsCards
+        economicRules={economicRules}
+        project={project}
+        summary={summary}
+        voicesCount={voicesCount}
+      />
 
       <div className="flex items-center justify-end">
-        <motion.button
+        <m.button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
           Continua <ArrowRight className="size-4" />
-        </motion.button>
+        </m.button>
       </div>
+    </div>
+  );
+}
+
+/* ── Setup metrics cards ── */
+function SetupMetricsCards({
+  economicRules,
+  project,
+  summary,
+  voicesCount,
+}: {
+  economicRules: SalEconomicRules;
+  project: SalProjectContext;
+  summary: SalEconomicSummary;
+  voicesCount: number;
+}) {
+  return (
+    <div className="border-t border-[var(--border-subtle)]/70 pt-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
+          <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
+            <Wallet className="size-5" />
+          </span>
+          <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
+            Budget totale
+          </div>
+          <div className="mt-1 text-18px font-black text-[var(--text-primary)]">
+            <Currency value={project.contractAmount} />
+          </div>
+        </div>
+        <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
+          <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
+            <Calculator className="size-5" />
+          </span>
+          <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
+            Residuo stimato
+          </div>
+          <div className="mt-1 text-18px font-black text-[var(--success-base)]">
+            <Currency value={summary.budgetResidual} />
+          </div>
+        </div>
+        <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
+          <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--accent-primary)]">
+            <Calculator className="size-5" />
+          </span>
+          <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
+            Ribasso gara
+          </div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-18px font-black text-[var(--text-primary)]">
+              {economicRules.discountPercent.toLocaleString("it-IT")}%
+            </span>
+            {!economicRules.discountEnabled && (
+              <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-bold text-[var(--warning-base)]">
+                Disattivato
+              </span>
+            )}
+          </div>
+          {economicRules.discountEnabled && (
+            <div className="mt-3 text-12px font-medium text-[var(--danger-base)]">
+              Sconto: -<Currency value={summary.discountAmount} />
+            </div>
+          )}
+          <div className="mt-2 text-11px text-[var(--text-secondary)]">
+            Dal contratto · non modificabile in SAL
+          </div>
+        </div>
+        <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
+          <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
+            <FileText className="size-5" />
+          </span>
+          <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
+            Voci disponibili
+          </div>
+          <div className="mt-1 text-18px font-black text-[var(--info-base)]">{voicesCount}</div>
+          <div className="mt-2 text-11px text-[var(--text-secondary)]">
+            nel tariffario selezionato
+          </div>
+        </div>
+      </div>
+      <EconomicEquation className="mt-4" summary={summary} />
     </div>
   );
 }
@@ -1166,6 +1315,7 @@ function VoicesStep({
   );
   const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
   const lastInteractedRef = useRef<string | null>(null);
+  const idCounter = useRef(0);
 
   const handleCopyLine = useCallback(
     (lineId: string) => {
@@ -1185,57 +1335,58 @@ function VoicesStep({
     [lineViews],
   );
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement;
-      const isInput =
-        activeEl?.tagName === "INPUT" ||
-        activeEl?.tagName === "TEXTAREA" ||
-        (activeEl as HTMLElement | null)?.isContentEditable;
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    const activeEl = document.activeElement;
+    const isInput =
+      activeEl?.tagName === "INPUT" ||
+      activeEl?.tagName === "TEXTAREA" ||
+      (activeEl as HTMLElement | null)?.isContentEditable;
 
-      if (isInput) return;
+    if (isInput) return;
 
-      const key = e.key.toLowerCase();
-      const mod = e.ctrlKey || e.metaKey;
+    const key = e.key.toLowerCase();
+    const mod = e.ctrlKey || e.metaKey;
 
-      if (mod && key === "c" && lastInteractedRef.current) {
-        const lineId = lastInteractedRef.current;
-        const line = lineViews.find((l) => l.id === lineId);
-        if (line) {
-          e.preventDefault();
-          setCopiedLine({
-            id: line.id,
-            factor1: line.factor1,
-            factor2: line.factor2,
-            factor3: line.factor3,
-            notes: "",
-            quantity: line.quantity,
-            surchargePercent: line.surchargePercent,
-            voice: line.voice,
-          });
-        }
-      }
-
-      if (mod && key === "v" && copiedLine) {
+    if (mod && key === "c" && lastInteractedRef.current) {
+      const lineId = lastInteractedRef.current;
+      const line = lineViews.find((l) => l.id === lineId);
+      if (line) {
         e.preventDefault();
-        const uniqueVoice = {
-          ...copiedLine.voice,
-          id: `${copiedLine.voice.id}-copy-${Date.now()}`,
-        };
-        const pastedLine: SalLineDraft = {
-          ...copiedLine,
-          id: `draft-${uniqueVoice.id}`,
-          voice: uniqueVoice,
+        setCopiedLine({
+          id: line.id,
+          factor1: line.factor1,
+          factor2: line.factor2,
+          factor3: line.factor3,
           notes: "",
-          quantity: copiedLine.factor1 * copiedLine.factor2 * copiedLine.factor3,
-        };
-        onPasteLine(pastedLine);
-        setCopiedLine(null);
+          quantity: line.quantity,
+          surchargePercent: line.surchargePercent,
+          voice: line.voice,
+        });
       }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [copiedLine, onPasteLine, lineViews]);
+    }
+
+    if (mod && key === "v" && copiedLine) {
+      e.preventDefault();
+      const uniqueVoice = {
+        ...copiedLine.voice,
+        id: `${copiedLine.voice.id}-copy-${idCounter.current++}`,
+      };
+      const pastedLine: SalLineDraft = {
+        ...copiedLine,
+        id: `draft-${uniqueVoice.id}`,
+        voice: uniqueVoice,
+        notes: "",
+        quantity: copiedLine.factor1 * copiedLine.factor2 * copiedLine.factor3,
+      };
+      onPasteLine(pastedLine);
+      setCopiedLine(null);
+    }
+  });
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div
@@ -1262,13 +1413,13 @@ function VoicesStep({
           <div className="flex flex-wrap items-center gap-2">
             <TemplatePicker onApply={onApplyTemplate} tariffBookId={tariffBookId} />
             {lines.length > 0 && (
-              <motion.button
+              <m.button
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--surface-base)] px-3 text-11px font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
                 onClick={onOpenTemplateDialog}
                 type="button"
               >
                 Salva template
-              </motion.button>
+              </m.button>
             )}
           </div>
         </div>
@@ -1284,7 +1435,7 @@ function VoicesStep({
                     const exists = lines.some((l) => l.voice.id === v.id);
                     if (exists) {
                       onPasteLine({
-                        id: `draft-${v.id}-${Date.now()}`,
+                        id: `draft-${v.id}-${idCounter.current++}`,
                         factor1: 1,
                         factor2: 1,
                         factor3: 1,
@@ -1348,13 +1499,13 @@ function VoicesStep({
             </>
           )}
         </div>
-        <motion.button
+        <m.button
           className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-5 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
           Continua <ArrowRight className="size-4" />
-        </motion.button>
+        </m.button>
       </div>
     </div>
   );
@@ -1397,7 +1548,7 @@ function ReviewStep({
           ))}
         </div>
         {previousSalLines.length > 0 && (
-          <motion.button
+          <m.button
             className={cn(
               "shrink-0 inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-12px font-semibold ring-1 transition-colors",
               compareLines
@@ -1409,7 +1560,7 @@ function ReviewStep({
           >
             <ArrowRight className={cn("size-3.5", compareLines && "rotate-180")} />
             {compareLines ? "Nascondi confronto" : "Confronta con SAL precedente"}
-          </motion.button>
+          </m.button>
         )}
       </div>
 
@@ -1488,13 +1639,13 @@ function ReviewStep({
         </div>
       </details>
       <div className="flex justify-end">
-        <motion.button
+        <m.button
           className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
           Continua <ArrowRight className="size-4" />
-        </motion.button>
+        </m.button>
       </div>
     </div>
   );
@@ -1599,14 +1750,14 @@ function ConfirmStep({
         />
       </div>
       <div className="flex justify-end">
-        <motion.button
+        <m.button
           className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onPrimary}
           type="button"
         >
           <CheckCircle2 className="size-4" />
           Conferma SAL
-        </motion.button>
+        </m.button>
       </div>
     </div>
   );
@@ -1642,20 +1793,20 @@ function CompletedView({
         <StepMetric label="Stato" value="Confermata" />
       </div>
       <div className="flex justify-end gap-2">
-        <motion.button
+        <m.button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-12px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
           onClick={onClose}
           type="button"
         >
           Chiudi
-        </motion.button>
-        <motion.button
+        </m.button>
+        <m.button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-12px font-bold text-white transition-colors hover:bg-[var(--accent-primary)]/90"
           onClick={onNew}
           type="button"
         >
           Nuova revisione
-        </motion.button>
+        </m.button>
       </div>
     </div>
   );
@@ -1708,7 +1859,7 @@ function EquationAmount({
   value: ReactNode;
 }) {
   return (
-    <div className="min-w-0 rounded-11px bg-[var(--surface-base)] px-3 py-3">
+    <div className="min-w-0 rounded-11px bg-[var(--surface-base)] p-3">
       <div className="text-11px font-semibold text-[var(--text-secondary)]">{label}</div>
       <div
         className={cn(

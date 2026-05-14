@@ -75,6 +75,185 @@
   transform: scale(0.96);
 }
 
+.quantara-button,
+.projects-control-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.quantara-button::before,
+.projects-control-button::before {
+  content: "";
+  position: absolute;
+  inset: 1px 1px auto;
+  z-index: -1;
+  height: 48%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, color-mix(in srgb, white 28%, transparent), transparent);
+  opacity: 0.56;
+  pointer-events: none;
+}
+
+.quantara-button::after,
+.projects-control-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
+  pointer-events: none;
+}
+
+.quantara-button-primary,
+.projects-control-button-primary {
+  border: 1px solid color-mix(in srgb, #8edcff 34%, #1f79d8 66%);
+  background:
+    radial-gradient(
+      ellipse at 50% -28%,
+      color-mix(in srgb, white 20%, transparent),
+      transparent 48%
+    ),
+    linear-gradient(180deg, #43a9f7 0%, #268fec 48%, #1f73d0 100%);
+  box-shadow:
+    0 14px 30px color-mix(in srgb, #1f73d0 22%, transparent),
+    0 3px 10px color-mix(in srgb, #45bdfd 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 30%, transparent),
+    inset 0 -10px 22px color-mix(in srgb, #125ead 18%, transparent);
+}
+
+.quantara-button-primary:hover,
+.projects-control-button-primary:hover {
+  background:
+    radial-gradient(
+      ellipse at 50% -24%,
+      color-mix(in srgb, white 22%, transparent),
+      transparent 50%
+    ),
+    linear-gradient(180deg, #4aaef9 0%, #2b94ef 48%, #2178d8 100%);
+  box-shadow:
+    0 15px 32px color-mix(in srgb, #1f73d0 24%, transparent),
+    0 3px 10px color-mix(in srgb, #45bdfd 15%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 32%, transparent),
+    inset 0 -10px 22px color-mix(in srgb, #125ead 16%, transparent);
+}
+
+.quantara-button-neutral,
+.quantara-button-ghost,
+.projects-control-button-neutral,
+.projects-control-button-ghost {
+  border: 1px solid color-mix(in srgb, #b7ddf2 22%, var(--border-subtle) 78%);
+  background:
+    radial-gradient(
+      ellipse at 50% -32%,
+      color-mix(in srgb, white 30%, transparent),
+      transparent 52%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 88%, #79c8f4 12%),
+      color-mix(in srgb, var(--surface-base) 78%, var(--bg-muted) 22%)
+    );
+  box-shadow:
+    0 10px 22px color-mix(in srgb, var(--text-primary) 6%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 34%, transparent);
+}
+
+.quantara-button-neutral:hover,
+.quantara-button-ghost:hover,
+.projects-control-button-neutral:hover,
+.projects-control-button-ghost:hover {
+  border-color: color-mix(in srgb, #86c9ee 36%, var(--accent-primary) 24%);
+  background:
+    radial-gradient(
+      ellipse at 50% -30%,
+      color-mix(in srgb, white 32%, transparent),
+      transparent 54%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 84%, #7fcdf6 16%),
+      color-mix(in srgb, var(--surface-base) 74%, var(--bg-muted) 26%)
+    );
+  box-shadow:
+    0 11px 24px color-mix(in srgb, var(--text-primary) 7%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 36%, transparent);
+}
+
+.quantara-button-soft,
+.projects-control-button-soft {
+  border: 1px solid color-mix(in srgb, #84ccec 28%, var(--accent-primary) 32%);
+  background:
+    radial-gradient(
+      ellipse at 50% -26%,
+      color-mix(in srgb, white 24%, transparent),
+      transparent 50%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, #75c8f4 18%, var(--info-soft) 82%),
+      color-mix(in srgb, var(--info-soft) 66%, var(--surface-base) 34%)
+    );
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--accent-primary) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 28%, transparent);
+}
+
+[data-theme="dark"] .quantara-button-primary,
+[data-theme="dark"] .projects-control-button-primary {
+  border-color: color-mix(in srgb, #9ee8ff 34%, var(--accent-primary) 48%);
+  background:
+    radial-gradient(
+      ellipse at 50% -28%,
+      color-mix(in srgb, white 18%, transparent),
+      transparent 48%
+    ),
+    linear-gradient(180deg, #5bb8ff 0%, #368ff0 46%, #226fc9 100%);
+  box-shadow:
+    0 18px 42px color-mix(in srgb, #1e8cff 28%, transparent),
+    0 5px 16px color-mix(in srgb, #73ddff 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 28%, transparent),
+    inset 0 -12px 26px color-mix(in srgb, #03182f 26%, transparent);
+}
+
+[data-theme="dark"] .quantara-button-neutral,
+[data-theme="dark"] .quantara-button-ghost,
+[data-theme="dark"] .projects-control-button-neutral,
+[data-theme="dark"] .projects-control-button-ghost {
+  border-color: color-mix(in srgb, #8de5ff 16%, var(--border-subtle) 84%);
+  background:
+    radial-gradient(ellipse at 50% -34%, color-mix(in srgb, white 9%, transparent), transparent 52%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 86%, #2877ad 14%),
+      color-mix(in srgb, var(--surface-base) 90%, #102842 10%)
+    );
+  box-shadow:
+    0 16px 34px rgb(0 0 0 / 28%),
+    0 4px 14px color-mix(in srgb, #52cfff 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 10%, transparent);
+}
+
+[data-theme="dark"] .quantara-button-soft,
+[data-theme="dark"] .projects-control-button-soft {
+  border-color: color-mix(in srgb, #8de5ff 22%, var(--accent-primary) 34%);
+  background:
+    radial-gradient(
+      ellipse at 50% -30%,
+      color-mix(in srgb, white 10%, transparent),
+      transparent 52%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--info-soft) 74%, #2b88d8 26%),
+      color-mix(in srgb, var(--surface-base) 80%, #12395f 20%)
+    );
+  box-shadow:
+    0 16px 34px color-mix(in srgb, #1e8cff 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 12%, transparent);
+}
+
 main {
   max-width: 100%;
   width: 100%;
@@ -768,55 +947,6 @@ body {
     ),
     linear-gradient(180deg, color-mix(in srgb, white 18%, transparent), transparent 48%);
   opacity: 0.42;
-}
-
-.projects-control-button {
-  transition:
-    background-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    color 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.projects-control-button-neutral,
-.projects-control-button-ghost {
-  border: 1px solid color-mix(in srgb, var(--border-subtle) 48%, transparent);
-  background: color-mix(in srgb, var(--surface-base) 70%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
-}
-
-.projects-control-button-neutral:hover,
-.projects-control-button-ghost:hover {
-  border-color: color-mix(in srgb, var(--accent-primary) 18%, var(--border-subtle));
-  background: color-mix(in srgb, var(--surface-base) 88%, var(--bg-muted) 12%);
-  color: var(--text-primary);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 24%, transparent),
-    0 12px 26px color-mix(in srgb, var(--text-primary) 5%, transparent);
-}
-
-.projects-control-button-primary {
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 54%, var(--accent-primary-hover) 18%);
-  background:
-    radial-gradient(circle at 30% 0%, color-mix(in srgb, white 15%, transparent), transparent 42%),
-    linear-gradient(180deg, var(--accent-primary), var(--accent-primary-hover));
-  box-shadow:
-    0 12px 24px color-mix(in srgb, var(--accent-primary) 20%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 22%, transparent);
-  color: var(--text-inverse);
-}
-
-.projects-control-button-primary:hover {
-  box-shadow:
-    0 16px 32px color-mix(in srgb, var(--accent-primary) 26%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 28%, transparent);
-  color: var(--text-inverse);
-}
-
-.projects-control-button-soft {
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 18%, var(--border-subtle));
-  background: color-mix(in srgb, var(--info-soft) 56%, transparent);
 }
 
 .projects-control-button:focus-visible {
@@ -1673,18 +1803,51 @@ body {
 }
 
 .top-toolbar-action-primary {
-  border: 0;
-  background: linear-gradient(180deg, var(--accent-primary), var(--accent-primary-hover));
+  border: 1px solid color-mix(in srgb, #8edcff 34%, #1f79d8 66%);
+  background:
+    radial-gradient(
+      ellipse at 50% -28%,
+      color-mix(in srgb, white 20%, transparent),
+      transparent 48%
+    ),
+    linear-gradient(180deg, #43a9f7 0%, #268fec 48%, #1f73d0 100%);
   box-shadow:
-    0 8px 18px color-mix(in srgb, var(--accent-primary) 18%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
+    0 14px 30px color-mix(in srgb, #1f73d0 22%, transparent),
+    0 3px 10px color-mix(in srgb, #45bdfd 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 30%, transparent),
+    inset 0 -10px 22px color-mix(in srgb, #125ead 18%, transparent);
 }
 
 .top-toolbar-action-primary:hover {
   transform: translate3d(0, -1px, 0);
+  background:
+    radial-gradient(
+      ellipse at 50% -24%,
+      color-mix(in srgb, white 22%, transparent),
+      transparent 50%
+    ),
+    linear-gradient(180deg, #4aaef9 0%, #2b94ef 48%, #2178d8 100%);
   box-shadow:
-    0 16px 32px color-mix(in srgb, var(--accent-primary) 26%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 30%, transparent);
+    0 15px 32px color-mix(in srgb, #1f73d0 24%, transparent),
+    0 3px 10px color-mix(in srgb, #45bdfd 15%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 32%, transparent),
+    inset 0 -10px 22px color-mix(in srgb, #125ead 16%, transparent);
+}
+
+[data-theme="dark"] .top-toolbar-action-primary {
+  border-color: color-mix(in srgb, #9ee8ff 34%, var(--accent-primary) 48%);
+  background:
+    radial-gradient(
+      ellipse at 50% -28%,
+      color-mix(in srgb, white 18%, transparent),
+      transparent 48%
+    ),
+    linear-gradient(180deg, #5bb8ff 0%, #368ff0 46%, #226fc9 100%);
+  box-shadow:
+    0 18px 42px color-mix(in srgb, #1e8cff 28%, transparent),
+    0 5px 16px color-mix(in srgb, #73ddff 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 28%, transparent),
+    inset 0 -12px 26px color-mix(in srgb, #03182f 26%, transparent);
 }
 
 .top-toolbar-action:active,

@@ -62,7 +62,6 @@ export function useSalCreationData() {
     let active = true;
 
     async function load() {
-      setState((current) => ({ ...current, error: null, isLoading: true }));
       try {
         const [contractsResult, tariffBooksResult] = await Promise.all([
           listDesktopContracts([]),
@@ -77,11 +76,12 @@ export function useSalCreationData() {
         const defaultContract = contracts.find((c) => c.id === savedId) ?? contracts[0] ?? null;
         const defaultId = defaultContract?.id ?? "";
         const orderedBooks = mapTariffBooksForContract(tariffBooks, defaultContract);
-        const defaultSelectedIds =
-          orderedBooks
-            .filter((book) => book.isPriority)
-            .map((book) => book.id)
-            .slice(0, 3) ?? [];
+        const defaultSelectedIds = orderedBooks
+          .reduce((ids, book) => {
+            if (book.isPriority) ids.push(book.id);
+            return ids;
+          }, [] as string[])
+          .slice(0, 3);
         const selectedTariffBookIds =
           defaultSelectedIds.length > 0
             ? defaultSelectedIds
@@ -185,8 +185,10 @@ export function useSalCreationData() {
     if (!contract) return;
     writeSelectedProjectId(contractId);
     const bookIds = mapTariffBooksForContract(state.tariffBooks, contract)
-      .filter((b) => b.isPriority)
-      .map((b) => b.id)
+      .reduce((ids, b) => {
+        if (b.isPriority) ids.push(b.id);
+        return ids;
+      }, [] as string[])
       .slice(0, 3);
     setState((current) => ({
       ...current,
@@ -232,9 +234,11 @@ async function loadVoicesForBooks(
   tariffBooks: readonly DesktopTariffBook[],
 ): Promise<SalVoiceDraft[]> {
   const bookMap = new Map(tariffBooks.map((book) => [book.id, book]));
-  const selectedBooks = tariffBookIds
-    .map((id) => bookMap.get(id))
-    .filter((book): book is DesktopTariffBook => book != null);
+  const selectedBooks = tariffBookIds.reduce<DesktopTariffBook[]>((books, id) => {
+    const book = bookMap.get(id);
+    if (book != null) books.push(book);
+    return books;
+  }, []);
   const results = await Promise.all(
     selectedBooks.map(async (book) => {
       const voicesResult = await listDesktopTariffVoices(book.id, []);

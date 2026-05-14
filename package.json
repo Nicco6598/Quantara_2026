@@ -3,15 +3,16 @@
   "version": "0.2.63",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.1.1",
   "engines": {
     "node": "24.11.0",
-    "pnpm": "10.33.0"
+    "pnpm": "11.1.1"
   },
   "scripts": {
     "build": "pnpm version:sync && pnpm --filter @quantara/desktop build",
     "build:analyze": "pnpm --filter @quantara/desktop build && node scripts/report-desktop-bundle.mjs",
     "check": "pnpm version:sync && pnpm typecheck && pnpm lint && pnpm test",
+    "deps:dead": "pnpm --filter @quantara/desktop exec knip --reporter compact",
     "format": "biome format --write .",
     "format:check": "echo '--- FORMAT ---' && biome format . && echo '--- TYPECHECK ---' && pnpm -r typecheck && echo '--- LINT ---' && biome lint . && echo '--- TESTS ---' && vitest run && echo '--- BOUNDARIES ---' && node scripts/check-feature-boundaries.mjs",
     "lint": "biome lint .",

@@ -167,8 +167,9 @@ export function SavedViewSelector({
                           </div>
                           <div className="mt-0.5 truncate text-11px text-[var(--text-secondary)]">
                             {Object.entries(view.filters)
-                              .filter(([, v]) => v && v !== "all" && v !== "Tutti")
-                              .map(([k, v]) => `${k}: ${v}`)
+                              .flatMap(([k, v]) =>
+                                v && v !== "all" && v !== "Tutti" ? [`${k}: ${v}`] : [],
+                              )
                               .join(" · ") || "nessun filtro"}
                           </div>
                         </button>
@@ -186,7 +187,7 @@ export function SavedViewSelector({
                 </div>
                 <div className="border-t border-[var(--border-subtle)]/50 px-3 py-2">
                   <button
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-12px font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--info-soft)]/30"
+                    className="flex w-full items-center gap-2 rounded-lg p-2 text-12px font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--info-soft)]/30"
                     onClick={() => setIsSaving(true)}
                     type="button"
                   >

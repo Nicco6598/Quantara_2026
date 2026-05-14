@@ -54,7 +54,7 @@ export function storePendingReleaseNotes(notes: PendingReleaseNotes) {
   void writeViaTauri(notes);
 }
 
-export function clearPendingReleaseNotes() {
+function clearPendingReleaseNotes() {
   void clearViaTauri();
 }
 

@@ -1,1 +1,0 @@
-export { ProjectDetailScreen } from "./ProjectDetailScreen";

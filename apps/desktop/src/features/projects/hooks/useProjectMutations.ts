@@ -53,7 +53,7 @@ export function useProjectMutations({
 
     const values = {
       applicationContractCode: contract.applicationContractCode,
-      contractorName: projectContractors[contract.id] ?? "",
+      contractorName: contract.contractorName ?? projectContractors[contract.id] ?? "",
       contractualAmount: String(amount),
       frameworkAgreementCode: contract.frameworkAgreementCode,
       tenderDiscountPercent: String(contract.tenderDiscountPercent ?? 0),

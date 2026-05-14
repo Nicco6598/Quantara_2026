@@ -1,32 +1,8 @@
-import { type HTMLMotionProps, motion } from "framer-motion";
+import { type HTMLMotionProps, m } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { SPRING_EASE } from "@/components/shared/easings";
-import type { StatusTone } from "@/components/shared/StatusBadge";
+import { MOTION_DURATION, SPRING_EASE } from "@/components/shared/easings";
 import { cn } from "@/lib/utils";
-
-export function ProjectSurface({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <motion.section
-      className={cn(
-        "projects-surface rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
-        className,
-      )}
-      initial={{ opacity: 0, y: 14, scale: 0.994 }}
-      transition={{ duration: 0.58, ease: SPRING_EASE }}
-      viewport={{ amount: 0.16, once: true }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-    >
-      {children}
-    </motion.section>
-  );
-}
 
 export function ProjectControlButton({
   children,
@@ -40,9 +16,9 @@ export function ProjectControlButton({
   variant?: "ghost" | "icon" | "neutral" | "primary" | "soft";
 }) {
   return (
-    <motion.button
+    <m.button
       className={cn(
-        "micro-interact projects-control-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-12px font-semibold outline-none",
+        "micro-interact projects-control-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-12px font-semibold outline-none",
         variant === "primary" && "projects-control-button-primary text-[var(--text-inverse)]",
         variant === "neutral" && "projects-control-button-neutral text-[var(--text-primary)]",
         variant === "soft" && "projects-control-button-soft text-[var(--accent-primary)]",
@@ -51,12 +27,14 @@ export function ProjectControlButton({
           "projects-control-button-neutral size-10 px-0 text-[var(--text-secondary)]",
         className,
       )}
+      transition={{ duration: MOTION_DURATION.fast, ease: SPRING_EASE }}
       type="button"
+      whileTap={{ scale: 0.98 }}
       {...props}
     >
       {Icon ? <Icon className="size-4" strokeWidth={1.8} /> : null}
       {children}
-    </motion.button>
+    </m.button>
   );
 }
 
@@ -70,20 +48,20 @@ export function BezelSurface({
   innerClassName?: string;
 }) {
   return (
-    <motion.section
+    <m.section
       className={cn(
         "min-w-0 rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
         className,
       )}
       initial={{ opacity: 0, y: 18, scale: 0.992 }}
-      transition={{ duration: 0.72, ease: SPRING_EASE }}
+      transition={{ duration: MOTION_DURATION.reveal, ease: SPRING_EASE }}
       viewport={{ amount: 0.18, once: true }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
     >
       <div className={cn("h-full rounded-22px bg-[var(--surface-base)]", innerClassName)}>
         {children}
       </div>
-    </motion.section>
+    </m.section>
   );
 }
 
@@ -140,55 +118,6 @@ export function MetricCard({
   );
 }
 
-export function PortfolioMetric({
-  detail,
-  icon: Icon,
-  label,
-  tone,
-  value,
-}: {
-  detail?: string;
-  icon?: LucideIcon;
-  label: string;
-  tone?: StatusTone;
-  value: string;
-}) {
-  const toneClass = {
-    danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-    info: "bg-[var(--info-soft)] text-[var(--info-base)]",
-    neutral: "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-    success: "bg-[var(--success-soft)] text-[var(--success-base)]",
-    warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-  }[tone ?? "neutral"];
-
-  return (
-    <ProjectSurface className="group min-h-[130px] p-5">
-      <div className="flex items-start gap-4">
-        {Icon ? (
-          <div
-            className={`flex size-11 shrink-0 items-center justify-center rounded-full ${toneClass}`}
-          >
-            <Icon className="size-5" />
-          </div>
-        ) : null}
-        <div className="min-w-0">
-          <div className="text-11px font-medium uppercase tracking-0_18em text-[var(--text-secondary)]">
-            {label}
-          </div>
-          <div className="mt-2 text-22px font-semibold leading-none tracking-neg-0_03em text-[var(--text-primary)]">
-            {value}
-          </div>
-          {detail ? (
-            <div className="mt-3 text-12px font-medium leading-5 text-[var(--text-secondary)]">
-              {detail}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </ProjectSurface>
-  );
-}
-
 export function FocusChip({
   active,
   count,
@@ -201,7 +130,7 @@ export function FocusChip({
   onClick: () => void;
 }) {
   return (
-    <motion.button
+    <m.button
       className={cn(
         "micro-interact inline-flex items-center gap-2 rounded-full border px-4 py-2 text-13px font-medium outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
         active
@@ -222,7 +151,7 @@ export function FocusChip({
       >
         {count}
       </span>
-    </motion.button>
+    </m.button>
   );
 }
 

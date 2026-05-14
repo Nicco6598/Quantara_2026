@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Save, X } from "lucide-react";
 import { useState } from "react";
-import { SOFT_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/components/shared/easings";
 import type { TemplateVoiceEntry } from "@/store/template-store";
 
 import { useTemplateStore } from "@/store/template-store";
@@ -41,12 +41,12 @@ export function SaveAsTemplateDialog({
         onClick={onClose}
         type="button"
       />
-      <motion.div
+      <m.div
         animate={{ opacity: 1, y: 0, scale: 1 }}
         className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-[var(--surface-base)] p-5 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.2)] ring-1 ring-[var(--border-subtle)]"
         exit={{ opacity: 0, y: 12, scale: 0.96 }}
         initial={{ opacity: 0, y: 12, scale: 0.96 }}
-        transition={{ duration: 0.35, ease: SOFT_EASE }}
+        transition={{ duration: 0.35, ease: SPRING_EASE }}
       >
         {saved ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -114,7 +114,7 @@ export function SaveAsTemplateDialog({
             </div>
           </>
         )}
-      </motion.div>
+      </m.div>
     </div>
   );
 }

@@ -13,13 +13,13 @@ export type QuantaraRoute =
   | "accounting"
   | "team"
   | "settings";
-export type MotionMode = "full" | "reduced";
-export type ThemeMode = "light" | "dark";
+type MotionMode = "full" | "reduced";
+type ThemeMode = "light" | "dark";
 
 type WorkflowAction = "new-project" | "new-sal" | "import-tariff" | null;
 export type PendingWorkflowAction = WorkflowAction;
 
-export type TariffImportToolbarState = {
+type TariffImportToolbarState = {
   activeIndex: number;
   activeDrafted: boolean;
   activeReviewed: boolean;
@@ -32,7 +32,7 @@ export type TariffImportToolbarState = {
   totalVoices: number;
 };
 
-export type SalToolbarState = {
+type SalToolbarState = {
   budgetResidual: number;
   discountAmount: number;
   lineCount: number;
@@ -41,7 +41,7 @@ export type SalToolbarState = {
   voicesCount: number;
 };
 
-export type ProjectToolbarState = {
+type ProjectToolbarState = {
   currentStep: number;
   canGoNext: boolean;
   canSubmit: boolean;
@@ -55,6 +55,25 @@ type NavEntry = {
   route: QuantaraRoute;
   context?: string;
 };
+
+function areTariffImportToolbarsEqual(
+  left: TariffImportToolbarState,
+  right: TariffImportToolbarState,
+) {
+  return (
+    left.activeIndex === right.activeIndex &&
+    left.activeDrafted === right.activeDrafted &&
+    left.activeReviewed === right.activeReviewed &&
+    left.canConfirm === right.canConfirm &&
+    left.draftedCount === right.draftedCount &&
+    left.phase === right.phase &&
+    left.reviewedCount === right.reviewedCount &&
+    left.reviewedVoiceCount === right.reviewedVoiceCount &&
+    left.totalVoices === right.totalVoices &&
+    left.fileLabels.length === right.fileLabels.length &&
+    left.fileLabels.every((label, index) => label === right.fileLabels[index])
+  );
+}
 
 type NavigationSlice = {
   activeContext: string | undefined;
@@ -237,8 +256,12 @@ export const useAppStore = create<AppStore>()(
           salToolbar,
         }),
       setTariffImportToolbar: (tariffImportToolbar) =>
-        set({
-          tariffImportToolbar,
+        set((state) => {
+          if (areTariffImportToolbarsEqual(state.tariffImportToolbar, tariffImportToolbar)) {
+            return state;
+          }
+
+          return { tariffImportToolbar };
         }),
       setAutoCheckUpdatesOnLaunch: (autoCheckUpdatesOnLaunch) =>
         set({

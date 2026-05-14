@@ -1,7 +1,8 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { BUTTER_EASE } from "@/components/shared/easings";
+import { useEffect, useState } from "react";
+import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { ProjectControlButton } from "@/components/shared/ui-primitives";
 import type { PendingReleaseNotes } from "@/lib/updateReleaseNotes";
 
@@ -12,6 +13,10 @@ type UpdateReleaseNotesDialogProps = {
 
 export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesDialogProps) {
   const bodyNotes = normalizeBodyNotes(notes.body);
+  const [installedAt, setInstalledAt] = useState("");
+  useEffect(() => {
+    setInstalledAt(new Date(notes.installedAt).toLocaleString("it-IT"));
+  }, [notes.installedAt]);
 
   return createPortal(
     <div
@@ -25,11 +30,11 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
         onClick={onClose}
         type="button"
       />
-      <motion.div
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+      <m.div
+        animate={MOTION_VARIANTS.dialog.animate}
         className="relative flex max-h-[75dvh] w-full max-w-2xl min-w-0 flex-col overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-        initial={{ opacity: 0, y: 16, scale: 0.96 }}
-        transition={{ duration: 0.4, ease: BUTTER_EASE }}
+        initial={MOTION_VARIANTS.dialog.initial}
+        transition={MOTION_VARIANTS.dialog.transition}
       >
         <div className="flex min-h-0 flex-col overflow-hidden rounded-[18px] bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="shrink-0 p-5 pb-4">
@@ -46,8 +51,8 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
                     Quantara v{notes.version} e attiva
                   </h2>
                   <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
-                    Riavvio completato il {new Date(notes.installedAt).toLocaleString("it-IT")}.
-                    Puoi continuare a lavorare dalla versione aggiornata.
+                    Riavvio completato il {installedAt}. Puoi continuare a lavorare dalla versione
+                    aggiornata.
                   </p>
                 </div>
               </div>
@@ -83,7 +88,7 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
             </div>
           </div>
         </div>
-      </motion.div>
+      </m.div>
     </div>,
     document.body,
   );
@@ -95,14 +100,14 @@ function normalizeBodyNotes(body: string) {
   return body
     .trim()
     .split("\n")
-    .map((line) =>
-      line
+    .flatMap((line) => {
+      const cleaned = line
         .replace(/^[-*]\s+/, "")
         .replace(/\*\*(.+?)\*\*/g, "$1")
         .replace(/`([^`]+)`/g, "$1")
-        .trim(),
-    )
-    .filter(Boolean)
+        .trim();
+      return cleaned ? [cleaned] : [];
+    })
     .map((text) => {
       const current = seen.get(text) ?? 0;
       seen.set(text, current + 1);

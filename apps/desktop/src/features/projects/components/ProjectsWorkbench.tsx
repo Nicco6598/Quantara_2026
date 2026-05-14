@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   Calendar,
   Eye,
@@ -165,7 +165,7 @@ function WorkbenchRow({
       : 0;
 
   return (
-    <motion.article
+    <m.article
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className={cn(
         "group relative cursor-pointer overflow-hidden rounded-26px p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
@@ -237,7 +237,7 @@ function WorkbenchRow({
           />
         </div>
       </div>
-    </motion.article>
+    </m.article>
   );
 }
 
@@ -350,7 +350,7 @@ function SalCockpit({ project, salProgress }: { project: PortfolioProject; salPr
         </div>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--border-subtle)_64%,transparent)]">
-        <motion.div
+        <m.div
           className="h-full rounded-18px bg-[var(--accent-primary)]"
           initial={{ scaleX: 0 }}
           style={{ originX: 0 }}

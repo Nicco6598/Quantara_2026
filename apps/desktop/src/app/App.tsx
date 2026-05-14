@@ -9,7 +9,8 @@ import {
   SunDim,
   X,
 } from "@phosphor-icons/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, useEffectEvent } from "react";
+import { LazyMotion, domAnimation } from "framer-motion";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopToolbar } from "@/components/layout/TopToolbar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
@@ -27,6 +28,7 @@ import {
   runAppUpdateCheck,
   type UpdateInstallState,
 } from "@/lib/appUpdater";
+import { migrateLegacyContractorsToDb } from "@/lib/contractorMigration";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 import { RouteRenderer } from "@/routes/RouteRenderer";
@@ -68,38 +70,45 @@ function ThemeApplier() {
   return null;
 }
 
+function StartupMigrations() {
+  useEffect(() => {
+    void migrateLegacyContractorsToDb();
+  }, []);
+
+  return null;
+}
+
 function WindowTitleBar({
   activeRoute,
-  isCommandPaletteOpen,
   isFullscreen,
   isSidebarCollapsed,
-  isMacOs,
+  variant,
   onCheckUpdates,
   onOpenCommandPalette,
   onRouteChange,
   onToggleSidebar,
+  closeRouteMenuKey,
 }: {
   activeRoute: QuantaraRoute;
-  isCommandPaletteOpen: boolean;
   isFullscreen: boolean;
   isSidebarCollapsed: boolean;
-  isMacOs: boolean;
+  variant: "macos" | "windows";
   onCheckUpdates: () => void;
   onOpenCommandPalette: (anchorRect: DOMRect) => void;
   onRouteChange: (route: QuantaraRoute, context?: string) => void;
   onToggleSidebar: () => void;
+  closeRouteMenuKey: number;
 }) {
   const [isRouteMenuOpen, setIsRouteMenuOpen] = useState(false);
-
-  useEffect(() => {
-    if (isCommandPaletteOpen) {
-      setIsRouteMenuOpen(false);
-    }
-  }, [isCommandPaletteOpen]);
   const commandButtonRef = useRef<HTMLButtonElement>(null);
   const { themeMode, toggleTheme } = useThemeState();
   const activeRouteItem =
     TITLEBAR_ROUTES.find((item) => item.route === activeRoute) ?? TITLEBAR_ROUTES[0];
+
+  useEffect(() => {
+    setIsRouteMenuOpen(false);
+    void closeRouteMenuKey;
+  }, [closeRouteMenuKey]);
 
   const handleWindowAction = useCallback(async (action: "close" | "maximize" | "minimize") => {
     if (!("__TAURI_INTERNALS__" in window)) {
@@ -121,6 +130,8 @@ function WindowTitleBar({
 
     await currentWindow.close();
   }, []);
+
+  const isMacOs = variant === "macos";
 
   const windowControls = (
     <div
@@ -282,6 +293,7 @@ function WindowTitleBar({
           data-command-palette-anchor
           onClick={(event) => {
             event.stopPropagation();
+            setIsRouteMenuOpen(false);
             const anchorRect = commandButtonRef.current?.getBoundingClientRect();
             if (anchorRect) {
               onOpenCommandPalette(anchorRect);
@@ -333,12 +345,117 @@ function WindowTitleBar({
   );
 }
 
+type CommandState = {
+  isCommandPaletteOpen: boolean;
+  commandPaletteAnchor: DOMRect | null;
+  isShortcutHelpOpen: boolean;
+};
+
+type CommandAction =
+  | { type: "OPEN_PALETTE"; anchor: DOMRect | null }
+  | { type: "CLOSE_PALETTE" }
+  | { type: "OPEN_SHORTCUT_HELP" }
+  | { type: "CLOSE_SHORTCUT_HELP" }
+  | { type: "CLOSE_ALL" };
+
+function commandReducer(state: CommandState, action: CommandAction): CommandState {
+  switch (action.type) {
+    case "OPEN_PALETTE":
+      return { ...state, isCommandPaletteOpen: true, commandPaletteAnchor: action.anchor };
+    case "CLOSE_PALETTE":
+      return { ...state, isCommandPaletteOpen: false, commandPaletteAnchor: null };
+    case "OPEN_SHORTCUT_HELP":
+      return { ...state, isShortcutHelpOpen: true };
+    case "CLOSE_SHORTCUT_HELP":
+      return { ...state, isShortcutHelpOpen: false };
+    case "CLOSE_ALL":
+      return {
+        ...state,
+        isCommandPaletteOpen: false,
+        isShortcutHelpOpen: false,
+        commandPaletteAnchor: null,
+      };
+  }
+}
+
+type UpdateState = {
+  available: AvailableAppUpdate | null;
+  install: UpdateInstallState | { message: string; phase: "error" } | { phase: "idle" };
+};
+
+function TitleBarSection({
+  activeRoute,
+  isSidebarCollapsed,
+  onCheckUpdates,
+  onOpenCommandPalette,
+  onRouteChange,
+  onToggleSidebar,
+  closeRouteMenuKey,
+}: {
+  activeRoute: QuantaraRoute;
+  isSidebarCollapsed: boolean;
+  onCheckUpdates: () => void;
+  onOpenCommandPalette: (anchorRect: DOMRect) => void;
+  onRouteChange: (route: QuantaraRoute, context?: string) => void;
+  onToggleSidebar: () => void;
+  closeRouteMenuKey: number;
+}) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMacOs, setIsMacOs] = useState(false);
+
+  useEffect(() => {
+    const platform = `${navigator.platform} ${navigator.userAgent}`.toLowerCase();
+    setIsMacOs(platform.includes("mac"));
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    const setup = async () => {
+      if (!("__TAURI_INTERNALS__" in window)) return;
+
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      const appWindow = getCurrentWindow();
+
+      const update = async () => {
+        setIsFullscreen(await appWindow.isFullscreen());
+      };
+
+      await update();
+      unlisten = await appWindow.onResized(update);
+    };
+
+    setup();
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
+  return (
+    <WindowTitleBar
+      activeRoute={activeRoute}
+      isFullscreen={isFullscreen}
+      isSidebarCollapsed={isSidebarCollapsed}
+      variant={isMacOs ? "macos" : "windows"}
+      onCheckUpdates={onCheckUpdates}
+      onOpenCommandPalette={onOpenCommandPalette}
+      onRouteChange={onRouteChange}
+      onToggleSidebar={onToggleSidebar}
+      closeRouteMenuKey={closeRouteMenuKey}
+    />
+  );
+}
+
 export function App() {
   return (
-    <ToastProvider>
-      <ThemeApplier />
-      <AppShell />
-    </ToastProvider>
+    <LazyMotion features={domAnimation}>
+      <ToastProvider>
+        <ThemeApplier />
+        <StartupMigrations />
+        <AppShell />
+      </ToastProvider>
+    </LazyMotion>
   );
 }
 
@@ -358,16 +475,17 @@ function AppShell() {
   const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();
   const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMacOs, setIsMacOs] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [commandPaletteAnchor, setCommandPaletteAnchor] = useState<DOMRect | null>(null);
-  const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
-  const [availableUpdate, setAvailableUpdate] = useState<AvailableAppUpdate | null>(null);
-  const [installState, setInstallState] = useState<
-    UpdateInstallState | { message: string; phase: "error" } | { phase: "idle" }
-  >({
-    phase: "idle",
+  const [closeRouteMenuKey, setCloseRouteMenuKey] = useState(0);
+
+  const [commandState, dispatchCommand] = useReducer(commandReducer, {
+    isCommandPaletteOpen: false,
+    commandPaletteAnchor: null,
+    isShortcutHelpOpen: false,
+  });
+
+  const [updateState, setUpdateState] = useState<UpdateState>({
+    available: null,
+    install: { phase: "idle" },
   });
 
   useEffect(() => {
@@ -465,17 +583,17 @@ function AppShell() {
               tone: "success",
             });
           } else if (result.kind === "available") {
-            setAvailableUpdate(result);
-            setInstallState({
-              phase: "idle",
+            setUpdateState({
+              available: result,
+              install: { phase: "idle" },
             });
             notify({
               actionLabel: "Apri dettagli",
               message: `${result.version} disponibile per installazione.`,
               onAction: () => {
-                setAvailableUpdate(result);
-                setInstallState({
-                  phase: "idle",
+                setUpdateState({
+                  available: result,
+                  install: { phase: "idle" },
                 });
               },
               title: "Nuova release",
@@ -495,18 +613,18 @@ function AppShell() {
     [navigate, notify],
   );
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const isTyping =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable === true;
-      const key = event.key.toLowerCase();
+  const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    const isTyping =
+      target?.tagName === "INPUT" ||
+      target?.tagName === "TEXTAREA" ||
+      target?.isContentEditable === true;
+    const key = event.key.toLowerCase();
 
-      if (import.meta.env.DEV && event.ctrlKey && event.shiftKey && key === "u") {
-        event.preventDefault();
-        setAvailableUpdate({
+    if (import.meta.env.DEV && event.ctrlKey && event.shiftKey && key === "u") {
+      event.preventDefault();
+      setUpdateState({
+        available: {
           checkedAt: new Date().toISOString(),
           currentVersion: "0.1.43",
           notes: [
@@ -568,176 +686,147 @@ function AppShell() {
             "Release notes: voce finale di stress test per controllare che il bottone Continua o Aggiorna e riavvia resti raggiungibile anche quando il contenuto supera abbondantemente l'altezza della finestra.",
           ].join("\n"),
           version: "0.1.44",
-        });
-        setInstallState({
-          phase: "idle",
-        });
-        return;
-      }
+        },
+        install: { phase: "idle" },
+      });
+      return;
+    }
 
-      if ((event.ctrlKey || event.metaKey) && key === "k") {
-        event.preventDefault();
-        const searchTrigger = document.querySelector<HTMLButtonElement>(
-          "[data-command-palette-anchor]",
-        );
-        setCommandPaletteAnchor(searchTrigger?.getBoundingClientRect() ?? null);
-        setIsCommandPaletteOpen(true);
-        return;
-      }
+    if ((event.ctrlKey || event.metaKey) && key === "k") {
+      event.preventDefault();
+      setCloseRouteMenuKey((k) => k + 1);
+      const searchTrigger = document.querySelector<HTMLButtonElement>(
+        "[data-command-palette-anchor]",
+      );
+      dispatchCommand({
+        type: "OPEN_PALETTE",
+        anchor: searchTrigger?.getBoundingClientRect() ?? null,
+      });
+      return;
+    }
 
-      if ((event.ctrlKey || event.metaKey) && event.key === "/" && !isCommandPaletteOpen) {
-        event.preventDefault();
-        setIsShortcutHelpOpen(true);
-        return;
-      }
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key === "/" &&
+      !commandState.isCommandPaletteOpen
+    ) {
+      event.preventDefault();
+      dispatchCommand({ type: "OPEN_SHORTCUT_HELP" });
+      return;
+    }
 
-      if ((event.ctrlKey || event.metaKey) && key === "n") {
-        event.preventDefault();
-        handleTopbarAction("new-project");
-        return;
-      }
+    if ((event.ctrlKey || event.metaKey) && key === "n") {
+      event.preventDefault();
+      handleTopbarAction("new-project");
+      return;
+    }
 
-      if (event.altKey && event.key === "ArrowLeft" && canGoBack && !isTyping) {
+    if (event.altKey && event.key === "ArrowLeft" && canGoBack && !isTyping) {
+      event.preventDefault();
+      navigateBack();
+      return;
+    }
+
+    if (event.altKey && event.key === "ArrowRight" && canGoForward && !isTyping) {
+      event.preventDefault();
+      navigateForward();
+    }
+
+    if (event.key === "Escape") {
+      const isAnyModalOpen =
+        commandState.isCommandPaletteOpen ||
+        commandState.isShortcutHelpOpen ||
+        updateState.available !== null ||
+        pendingReleaseNotes !== null;
+      if (!isAnyModalOpen && canGoBack && !isTyping) {
         event.preventDefault();
         navigateBack();
-        return;
       }
-
-      if (event.altKey && event.key === "ArrowRight" && canGoForward && !isTyping) {
-        event.preventDefault();
-        navigateForward();
-      }
-
-      if (event.key === "Escape") {
-        const isAnyModalOpen =
-          isCommandPaletteOpen ||
-          isShortcutHelpOpen ||
-          availableUpdate !== null ||
-          pendingReleaseNotes !== null;
-        if (!isAnyModalOpen && canGoBack && !isTyping) {
-          event.preventDefault();
-          navigateBack();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    canGoBack,
-    canGoForward,
-    handleTopbarAction,
-    isCommandPaletteOpen,
-    navigateBack,
-    navigateForward,
-    pendingReleaseNotes,
-    isShortcutHelpOpen,
-    availableUpdate,
-  ]);
+    }
+  });
 
   useEffect(() => {
-    const handleUpdateAvailable = (event: Event) => {
-      const customEvent = event as CustomEvent<AvailableAppUpdate>;
-      setAvailableUpdate(customEvent.detail);
-      setInstallState({
-        phase: "idle",
-      });
-    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
+  const handleUpdateAvailable = useEffectEvent((event: Event) => {
+    const customEvent = event as CustomEvent<AvailableAppUpdate>;
+    setUpdateState({
+      available: customEvent.detail,
+      install: { phase: "idle" },
+    });
+  });
+
+  useEffect(() => {
     window.addEventListener(APP_UPDATE_AVAILABLE_EVENT, handleUpdateAvailable);
     return () => window.removeEventListener(APP_UPDATE_AVAILABLE_EVENT, handleUpdateAvailable);
   }, []);
 
   const handleCloseUpdater = () => {
-    if (installState.phase === "downloading" || installState.phase === "installing") {
+    if (updateState.install.phase === "downloading" || updateState.install.phase === "installing") {
       return;
     }
 
     dismissPendingAppUpdate();
-    setAvailableUpdate(null);
-    setInstallState({
-      phase: "idle",
+    setUpdateState({
+      available: null,
+      install: { phase: "idle" },
     });
   };
 
   const handleInstallUpdate = async () => {
-    setInstallState({
-      phase: "installing",
-    });
+    setUpdateState((prev) => ({
+      ...prev,
+      install: { phase: "installing" as const },
+    }));
 
     try {
       await installPendingAppUpdate({
-        onStateChange: setInstallState,
+        onStateChange: (install) => {
+          setUpdateState((prev) => ({ ...prev, install }));
+        },
         showReleaseNotesAfterUpdate,
       });
     } catch (error) {
-      setInstallState({
-        message:
-          error instanceof Error
-            ? error.message
-            : "Installazione update non completata correttamente.",
-        phase: "error",
-      });
+      setUpdateState((prev) => ({
+        ...prev,
+        install: {
+          message:
+            error instanceof Error
+              ? error.message
+              : "Installazione update non completata correttamente.",
+          phase: "error" as const,
+        },
+      }));
     }
   };
 
   const toggleSidebar = useCallback(() => setIsSidebarCollapsed((current) => !current), []);
-
-  useEffect(() => {
-    const platform = `${navigator.platform} ${navigator.userAgent}`.toLowerCase();
-    setIsMacOs(platform.includes("mac"));
-  }, []);
-
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-
-    const setup = async () => {
-      if (!("__TAURI_INTERNALS__" in window)) return;
-
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const appWindow = getCurrentWindow();
-
-      const update = async () => {
-        setIsFullscreen(await appWindow.isFullscreen());
-      };
-
-      await update();
-      unlisten = await appWindow.onResized(update);
-    };
-
-    setup();
-
-    return () => {
-      unlisten?.();
-    };
-  }, []);
 
   return (
     <div
       className="app-window-frame relative flex h-screen overflow-hidden bg-[var(--bg-app-accent)] [font-family:var(--font-sans)] text-[var(--text-primary)]"
       style={{ fontFamily: "var(--font-sans)" }}
     >
-      <WindowTitleBar
+      <TitleBarSection
         activeRoute={activeRoute}
-        isCommandPaletteOpen={isCommandPaletteOpen}
-        isFullscreen={isFullscreen}
         isSidebarCollapsed={isSidebarCollapsed}
-        isMacOs={isMacOs}
         onCheckUpdates={() => handleTopbarAction("check-updates")}
         onOpenCommandPalette={(anchorRect) => {
-          setCommandPaletteAnchor(anchorRect);
-          setIsCommandPaletteOpen(true);
+          dispatchCommand({ type: "OPEN_PALETTE", anchor: anchorRect });
         }}
         onRouteChange={navigate}
         onToggleSidebar={toggleSidebar}
+        closeRouteMenuKey={closeRouteMenuKey}
       />
 
-      {availableUpdate ? (
+      {updateState.available ? (
         <UpdateExperienceDialog
-          installState={installState}
+          installState={updateState.install}
           onClose={handleCloseUpdater}
           onInstall={handleInstallUpdate}
-          update={availableUpdate}
+          update={updateState.available}
         />
       ) : null}
 
@@ -749,15 +838,15 @@ function AppShell() {
       ) : null}
 
       <CommandPalette
-        anchorRect={commandPaletteAnchor}
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
+        anchorRect={commandState.commandPaletteAnchor}
+        isOpen={commandState.isCommandPaletteOpen}
+        onClose={() => dispatchCommand({ type: "CLOSE_PALETTE" })}
         onPageAction={handleTopbarAction}
         onRouteChange={navigate}
       />
 
-      {isShortcutHelpOpen ? (
-        <ShortcutHelpDialog onClose={() => setIsShortcutHelpOpen(false)} />
+      {commandState.isShortcutHelpOpen ? (
+        <ShortcutHelpDialog onClose={() => dispatchCommand({ type: "CLOSE_SHORTCUT_HELP" })} />
       ) : null}
 
       <AppSidebar

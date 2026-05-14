@@ -32,6 +32,8 @@ export function AutocompleteInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
+  const measureRef = useRef<() => void>(() => {});
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -66,6 +68,7 @@ export function AutocompleteInput({
     const l = Math.min(Math.max(rect.left, 12), viewportW - w - 12);
     setFloating({ left: l, top: rect.bottom + 8, width: w });
   }, []);
+  measureRef.current = measure;
 
   const showResults = isOpen && filtered.length > 0;
 
@@ -74,14 +77,16 @@ export function AutocompleteInput({
       setFloating(null);
       return;
     }
-    measure();
-    window.addEventListener("scroll", measure, true);
-    window.addEventListener("resize", measure);
+    measureRef.current();
+    const onScroll = () => measureRef.current();
+    const onResize = () => measureRef.current();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
     return () => {
-      window.removeEventListener("scroll", measure, true);
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
     };
-  }, [showResults, measure]);
+  }, [showResults]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (isOpen && filtered.length > 0) {
@@ -116,6 +121,10 @@ export function AutocompleteInput({
   }
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     if (!listRef.current) return;
     const active = listRef.current.querySelector<HTMLButtonElement>(
       `[data-index="${activeIndex}"]`,
@@ -130,7 +139,6 @@ export function AutocompleteInput({
         <input
           ref={inputRef}
           aria-autocomplete="list"
-          aria-expanded={showResults}
           aria-label={placeholder}
           autoComplete="off"
           className="h-full min-w-0 flex-1 bg-transparent px-3 text-13px outline-none"
@@ -145,7 +153,6 @@ export function AutocompleteInput({
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          role="combobox"
           value={query}
         />
         {query && (
@@ -175,7 +182,7 @@ export function AutocompleteInput({
               top: floating.top,
               width: floating.width,
               maxHeight: RESULTS_MAX_HEIGHT,
-              zIndex: 9999,
+              zIndex: 50,
             }}
           >
             <div className="overflow-y-auto" style={{ maxHeight: RESULTS_MAX_HEIGHT }}>
@@ -186,6 +193,7 @@ export function AutocompleteInput({
                       "flex w-full items-start gap-3 rounded-14px px-3 py-3 text-left text-13px transition-colors duration-[180ms]",
                       index === activeIndex ? "bg-[var(--bg-muted)]" : "hover:bg-[var(--bg-muted)]",
                     )}
+                    aria-selected={index === activeIndex}
                     data-index={index}
                     key={option.value}
                     onClick={() => handleSelect(option)}

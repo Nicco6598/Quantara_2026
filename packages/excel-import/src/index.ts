@@ -1,4 +1,5 @@
-import * as XLSX from "xlsx";
+import readXlsxFile, { type Sheet as ReadSheet } from "read-excel-file/universal";
+import writeXlsxFile, { type Sheet } from "write-excel-file/browser";
 
 export type ExcelImportStage = "queued" | "parsed" | "validated" | "committed";
 
@@ -46,6 +47,8 @@ export type QuantaraMigrationWorkbook = {
   projects: ProjectMigrationRow[];
   sal: SalMigrationRow[];
 };
+
+export type QuantaraMigrationWorkbookFile = Sheet<Blob>[];
 
 export type MigrationSheetName = keyof QuantaraMigrationWorkbook;
 
@@ -105,7 +108,7 @@ const materialColumns = [
   "supplier",
 ] as const;
 
-export function createQuantaraMigrationTemplate(): XLSX.WorkBook {
+export function createQuantaraMigrationTemplate(): QuantaraMigrationWorkbookFile {
   return buildQuantaraMigrationWorkbook({
     materials: [],
     projects: [],
@@ -113,38 +116,34 @@ export function createQuantaraMigrationTemplate(): XLSX.WorkBook {
   });
 }
 
-export function buildQuantaraMigrationWorkbook(data: QuantaraMigrationWorkbook): XLSX.WorkBook {
-  const workbook = XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(data.projects, { header: [...projectColumns] }),
-    sheetNames.projects,
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(data.sal, { header: [...salColumns] }),
-    sheetNames.sal,
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(data.materials, { header: [...materialColumns] }),
-    sheetNames.materials,
-  );
-
-  return workbook;
+export function buildQuantaraMigrationWorkbook(
+  data: QuantaraMigrationWorkbook,
+): QuantaraMigrationWorkbookFile {
+  return [
+    buildJsonSheet(sheetNames.projects, projectColumns, data.projects),
+    buildJsonSheet(sheetNames.sal, salColumns, data.sal),
+    buildJsonSheet(sheetNames.materials, materialColumns, data.materials),
+  ];
 }
 
-export function serializeQuantaraMigrationWorkbook(data: QuantaraMigrationWorkbook): Uint8Array {
+export async function serializeQuantaraMigrationWorkbook(
+  data: QuantaraMigrationWorkbook,
+): Promise<Uint8Array> {
   const workbook = buildQuantaraMigrationWorkbook(data);
+  const blob = await writeXlsxFile(workbook).toBlob();
+  const buffer = await blob.arrayBuffer();
 
-  return XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  return new Uint8Array(buffer);
 }
 
-export function parseQuantaraMigrationWorkbook(
+export async function parseQuantaraMigrationWorkbook(
   input: ArrayBuffer | Uint8Array,
-): QuantaraMigrationWorkbook {
-  const workbook = XLSX.read(input, { type: "array" });
+): Promise<QuantaraMigrationWorkbook> {
+  const workbook = await readXlsxFile(
+    input instanceof Uint8Array
+      ? (input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength) as ArrayBuffer)
+      : input,
+  );
 
   return {
     materials: readSheet<MaterialMigrationRow>(workbook, sheetNames.materials, materialColumns).map(
@@ -180,22 +179,47 @@ export function validateQuantaraMigrationWorkbook(
   };
 }
 
+function buildJsonSheet<T extends Record<string, unknown>>(
+  sheetName: string,
+  columns: readonly (keyof T & string)[],
+  rows: T[],
+): Sheet<Blob> {
+  return {
+    data: [[...columns], ...rows.map((row) => columns.map((column) => row[column] ?? ""))],
+    sheet: sheetName,
+  };
+}
+
 function readSheet<T extends Record<string, unknown>>(
-  workbook: XLSX.WorkBook,
+  workbook: ReadSheet[],
   sheetName: string,
   header: readonly string[],
 ): T[] {
-  const sheet = workbook.Sheets[sheetName];
+  const sheet = workbook.find((item) => item.sheet === sheetName);
 
   if (!sheet) {
     return [];
   }
 
-  return XLSX.utils.sheet_to_json<T>(sheet, {
-    defval: "",
-    header: [...header],
-    range: 1,
+  return sheet.data.slice(1).flatMap((values) => {
+    const item = Object.fromEntries(
+      header.map((column, index) => [column, getCellValue(values[index])]),
+    ) as T;
+
+    return Object.values(item).some((value) => toText(value).length > 0) ? [item] : [];
   });
+}
+
+function getCellValue(value: unknown): unknown {
+  if (value == null) {
+    return "";
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return value;
 }
 
 function normalizeProjectRow(row: ProjectMigrationRow): ProjectMigrationRow {

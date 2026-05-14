@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   AlertTriangle,
   Bell,
@@ -12,9 +12,9 @@ import {
   Warehouse,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch } from "@/components/filters";
-import { BUTTER_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { SeverityBar } from "@/components/shared/SeverityBar";
@@ -59,14 +59,85 @@ function formatQuantity(value: number, unit: string): string {
   return `${n} ${unit}`;
 }
 
+/* ── State reducers ── */
+
+type ScreenState = {
+  searchQuery: string;
+  selectedCategory: string | null;
+  selectedMaterialId: string | null;
+  isCreateModalOpen: boolean;
+  deleteConfirmId: string | null;
+};
+
+type ScreenAction =
+  | { type: "SET_SEARCH_QUERY"; payload: string }
+  | { type: "SET_SELECTED_CATEGORY"; payload: string | null }
+  | { type: "SET_SELECTED_MATERIAL_ID"; payload: string | null }
+  | { type: "SET_CREATE_MODAL"; payload: boolean }
+  | { type: "SET_DELETE_CONFIRM_ID"; payload: string | null };
+
+function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
+  switch (action.type) {
+    case "SET_SEARCH_QUERY":
+      return { ...state, searchQuery: action.payload };
+    case "SET_SELECTED_CATEGORY":
+      return { ...state, selectedCategory: action.payload };
+    case "SET_SELECTED_MATERIAL_ID":
+      return { ...state, selectedMaterialId: action.payload };
+    case "SET_CREATE_MODAL":
+      return { ...state, isCreateModalOpen: action.payload };
+    case "SET_DELETE_CONFIRM_ID":
+      return { ...state, deleteConfirmId: action.payload };
+  }
+}
+
+type FormField = "code" | "description" | "category" | "unit" | "quantity" | "minQuantity";
+
+type FormAction =
+  | { type: "SET_FIELD"; field: FormField; value: string }
+  | { type: "SET_SAVING"; payload: boolean }
+  | { type: "RESET" };
+
+function formReducer(
+  state: {
+    code: string;
+    description: string;
+    category: string;
+    unit: string;
+    quantity: string;
+    minQuantity: string;
+    saving: boolean;
+  },
+  action: FormAction,
+) {
+  switch (action.type) {
+    case "SET_FIELD":
+      return { ...state, [action.field]: action.value };
+    case "SET_SAVING":
+      return { ...state, saving: action.payload };
+    case "RESET":
+      return {
+        code: "",
+        description: "",
+        category: "Armamento",
+        unit: "m",
+        quantity: "0",
+        minQuantity: "0",
+        saving: false,
+      };
+  }
+}
+
 export function MaterialsScreen() {
   const { notify } = useToast();
   const [materials, setMaterials] = useState<DesktopMaterial[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(screenReducer, {
+    searchQuery: "",
+    selectedCategory: null,
+    selectedMaterialId: null,
+    isCreateModalOpen: false,
+    deleteConfirmId: null,
+  });
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -105,8 +176,8 @@ export function MaterialsScreen() {
   }, [loadMaterials]);
 
   const selectedMaterial = useMemo(
-    () => materials.find((m) => m.id === selectedMaterialId) ?? null,
-    [materials, selectedMaterialId],
+    () => materials.find((m) => m.id === state.selectedMaterialId) ?? null,
+    [materials, state.selectedMaterialId],
   );
 
   const categories = useMemo(() => {
@@ -123,17 +194,17 @@ export function MaterialsScreen() {
   }, [materials]);
 
   const filteredMaterials = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = state.searchQuery.toLowerCase().trim();
     return materials.filter((m) => {
       const matchesSearch =
         !q ||
         m.code.toLowerCase().includes(q) ||
         m.description.toLowerCase().includes(q) ||
         m.category.toLowerCase().includes(q);
-      const matchesCategory = !selectedCategory || m.category === selectedCategory;
+      const matchesCategory = !state.selectedCategory || m.category === state.selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [materials, searchQuery, selectedCategory]);
+  }, [materials, state.searchQuery, state.selectedCategory]);
 
   const metrics = useMemo(() => {
     const totalStock = materials.reduce((s, m) => s + m.quantity, 0);
@@ -158,7 +229,9 @@ export function MaterialsScreen() {
         const mat = materials.find((m) => m.id === materialId);
         await deleteDesktopMaterial(materialId);
         dispatchDataChanged();
-        setSelectedMaterialId((current) => (current === materialId ? null : current));
+        if (state.selectedMaterialId === materialId) {
+          dispatch({ type: "SET_SELECTED_MATERIAL_ID", payload: null });
+        }
         notify({
           message: `${mat?.description ?? "Materiale"} eliminato.`,
           title: "Eliminato",
@@ -171,10 +244,10 @@ export function MaterialsScreen() {
           tone: "danger",
         });
       } finally {
-        setDeleteConfirmId(null);
+        dispatch({ type: "SET_DELETE_CONFIRM_ID", payload: null });
       }
     },
-    [materials, notify],
+    [materials, notify, state.selectedMaterialId],
   );
 
   return (
@@ -186,70 +259,15 @@ export function MaterialsScreen() {
         title="Materiali e coperture"
         description={`${materials.length} materiali registrati. Gestisci stock, impegni e soglie minime.`}
         sidePanel={
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                Categorie
-              </span>
-            </div>
-            <div className="mt-3 space-y-1.5">
-              {categories.names.map((cat) => {
-                const count =
-                  cat === "Tutti" ? materials.length : (categories.counts.get(cat) ?? 0);
-                return (
-                  <motion.button
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-13px font-semibold transition-colors",
-                      selectedCategory === cat || (!selectedCategory && cat === "Tutti")
-                        ? "bg-[var(--info-soft)] text-[var(--info-base)]"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-                    )}
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat === "Tutti" ? null : cat)}
-                    type="button"
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span>{cat}</span>
-                    <span className="text-11px font-medium text-[var(--text-secondary)]">
-                      {count}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
+          <SidebarCategories
+            categories={categories}
+            materialsCount={materials.length}
+            selectedCategory={state.selectedCategory}
+            onSelectCategory={(cat) => dispatch({ type: "SET_SELECTED_CATEGORY", payload: cat })}
+          />
         }
       >
-        <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            caption="Quantità totale in magazzino"
-            icon={Warehouse}
-            label="Valore stock"
-            tone="blue"
-            value={`${Math.round(metrics.totalStock)}`}
-          />
-          <MetricCard
-            caption="Sotto la soglia minima"
-            icon={AlertTriangle}
-            label="Critici"
-            tone="danger"
-            value={String(metrics.critical)}
-          />
-          <MetricCard
-            caption="Stock a zero"
-            icon={Bell}
-            label="Esauriti"
-            tone="warning"
-            value={String(metrics.zero)}
-          />
-          <MetricCard
-            caption="Copertura media vs soglia minima"
-            icon={ShieldCheck}
-            label="Copertura media"
-            tone="success"
-            value={`${metrics.avgCoverage}%`}
-          />
-        </div>
+        <MetricsGrid metrics={metrics} />
       </ScreenHero>
 
       <section className="mt-8 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
@@ -263,7 +281,7 @@ export function MaterialsScreen() {
                 detail="Aggiungi un nuovo materiale al catalogo"
                 icon={PackagePlus}
                 label="Carica materiale"
-                onClick={() => setIsCreateModalOpen(true)}
+                onClick={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
                 tone="info"
               />
               <QuickAction
@@ -283,7 +301,7 @@ export function MaterialsScreen() {
                 detail={`${String(metrics.critical)} materiali sotto soglia minima`}
                 icon={AlertTriangle}
                 label="Revisiona critici"
-                onClick={() => setSelectedCategory(null)}
+                onClick={() => dispatch({ type: "SET_SELECTED_CATEGORY", payload: null })}
                 tone="warning"
               />
             </div>
@@ -304,140 +322,44 @@ export function MaterialsScreen() {
         </aside>
 
         <Panel className="min-w-0 overflow-visible p-0">
-          <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                className={cn(
-                  "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
-                  !selectedCategory
-                    ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                    : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-                )}
-                onClick={() => setSelectedCategory(null)}
-                type="button"
-              >
-                Tutti i materiali
-                <span
-                  className={cn(
-                    "ml-2 rounded-full px-2 py-0.5 text-11px font-bold",
-                    !selectedCategory
-                      ? "bg-white/20"
-                      : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
-                  )}
-                >
-                  {materials.length}
-                </span>
-              </button>
-              {CATEGORIES.map((cat) => {
-                const count = categories.counts.get(cat) ?? 0;
-                if (count === 0) return null;
-                return (
-                  <button
-                    className={cn(
-                      "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
-                      selectedCategory === cat
-                        ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                        : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-                    )}
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    type="button"
-                  >
-                    {cat}
-                    <span
-                      className={cn(
-                        "ml-2 rounded-full px-2 py-0.5 text-11px font-bold",
-                        selectedCategory === cat
-                          ? "bg-white/20"
-                          : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
-                      )}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          <CategoryFilterBar
+            categoryNames={CATEGORIES}
+            categoryCounts={categories.counts}
+            materialsCount={materials.length}
+            selectedCategory={state.selectedCategory}
+            searchQuery={state.searchQuery}
+            onSelectCategory={(cat) => dispatch({ type: "SET_SELECTED_CATEGORY", payload: cat })}
+            onSearchChange={(q) => dispatch({ type: "SET_SEARCH_QUERY", payload: q })}
+            onCreateMaterial={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
+          />
 
-            <div className="flex flex-wrap items-center gap-2">
-              <FilterSearch
-                onChange={setSearchQuery}
-                placeholder="Cerca materiale..."
-                value={searchQuery}
-              />
-              {searchQuery || selectedCategory ? (
-                <ClearFiltersButton
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSelectedCategory(null);
-                  }}
-                />
-              ) : null}
-              <ProjectControlButton
-                icon={Plus}
-                onClick={() => setIsCreateModalOpen(true)}
-                variant="primary"
-              >
-                Nuovo materiale
-              </ProjectControlButton>
-            </div>
-          </div>
-
-          {/* Compact list */}
-          <div className="space-y-3 p-4">
-            {filteredMaterials.length > 0 ? (
-              filteredMaterials.map((mat) => (
-                <MaterialCard
-                  key={mat.id}
-                  isSelected={mat.id === selectedMaterialId}
-                  material={mat}
-                  onDelete={() => setDeleteConfirmId(mat.id)}
-                  onSelect={() =>
-                    setSelectedMaterialId(mat.id === selectedMaterialId ? null : mat.id)
-                  }
-                />
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 p-8 text-center">
-                <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                  <Package className="size-4" />
-                </div>
-                <div className="mt-3 text-14px font-bold text-[var(--text-primary)]">
-                  Nessun materiale trovato
-                </div>
-                <p className="mx-auto mt-1 max-w-[320px] text-12px font-medium text-[var(--text-secondary)]">
-                  Modifica i filtri o{" "}
-                  <button
-                    className="font-semibold text-[var(--accent-primary)] underline underline-offset-2 hover:no-underline"
-                    onClick={() => setIsCreateModalOpen(true)}
-                    type="button"
-                  >
-                    crea un nuovo materiale
-                  </button>
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-3">
-            <span className="text-11px font-medium text-[var(--text-secondary)]">
-              {filteredMaterials.length} di {materials.length} materiali
-            </span>
-          </div>
+          <MaterialListSection
+            filteredMaterials={filteredMaterials}
+            totalMaterials={materials.length}
+            selectedMaterialId={state.selectedMaterialId}
+            onSelectMaterial={(id) =>
+              dispatch({
+                type: "SET_SELECTED_MATERIAL_ID",
+                payload: state.selectedMaterialId === id ? null : id,
+              })
+            }
+            onDeleteMaterial={(id) => dispatch({ type: "SET_DELETE_CONFIRM_ID", payload: id })}
+            onCreateMaterial={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
+          />
         </Panel>
       </section>
 
       <AddMaterialModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        isOpen={state.isCreateModalOpen}
+        onClose={() => dispatch({ type: "SET_CREATE_MODAL", payload: false })}
         onCreated={loadMaterials}
       />
 
       <ConfirmDialog
         confirmLabel="Elimina"
-        isOpen={deleteConfirmId !== null}
-        onCancel={() => setDeleteConfirmId(null)}
-        onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+        isOpen={state.deleteConfirmId !== null}
+        onCancel={() => dispatch({ type: "SET_DELETE_CONFIRM_ID", payload: null })}
+        onConfirm={() => state.deleteConfirmId && handleDelete(state.deleteConfirmId)}
         title="Eliminare questo materiale?"
         tone="danger"
       >
@@ -467,7 +389,7 @@ function MaterialCard({
   const catTone = categoryColorMap[material.category] ?? "blue";
 
   return (
-    <motion.article
+    <m.article
       className={cn(
         "relative rounded-10px border px-3 py-2.5 text-left transition-colors duration-200",
         isSelected
@@ -475,7 +397,7 @@ function MaterialCard({
           : "border-[var(--border-subtle)]/60 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
       )}
       initial={{ opacity: 0, y: 6 }}
-      transition={{ duration: 0.32, ease: BUTTER_EASE }}
+      transition={{ duration: 0.32, ease: SPRING_EASE }}
       viewport={{ amount: 0.18, once: true }}
       whileInView={{ opacity: 1, y: 0 }}
     >
@@ -581,7 +503,7 @@ function MaterialCard({
           </svg>
         </span>
       ) : null}
-    </motion.article>
+    </m.article>
   );
 }
 
@@ -652,43 +574,42 @@ function AddMaterialModal({
   onCreated: () => void;
 }) {
   const { notify } = useToast();
-  const [code, setCode] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Armamento");
-  const [unit, setUnit] = useState("m");
-  const [quantity, setQuantity] = useState("0");
-  const [minQuantity, setMinQuantity] = useState("0");
-  const [saving, setSaving] = useState(false);
+  const [form, formDispatch] = useReducer(formReducer, {
+    code: "",
+    description: "",
+    category: "Armamento",
+    unit: "m",
+    quantity: "0",
+    minQuantity: "0",
+    saving: false,
+  });
 
   if (!isOpen) return null;
 
   const handleSave = async () => {
-    const qty = Number.parseFloat(quantity);
-    const minQty = Number.parseFloat(minQuantity);
-    if (!code.trim() || !description.trim() || Number.isNaN(qty)) return;
+    const qty = Number.parseFloat(form.quantity);
+    const minQty = Number.parseFloat(form.minQuantity);
+    if (!form.code.trim() || !form.description.trim() || Number.isNaN(qty)) return;
 
-    setSaving(true);
+    formDispatch({ type: "SET_SAVING", payload: true });
     try {
       const { createDesktopMaterial } = await import("@/lib/desktopData");
       await createDesktopMaterial({
         id: `mat_${Date.now()}`,
-        code: code.trim(),
-        description: description.trim(),
-        category,
-        unit,
+        code: form.code.trim(),
+        description: form.description.trim(),
+        category: form.category,
+        unit: form.unit,
         quantity: qty,
         minQuantity: minQty,
         notes: "",
       });
       dispatchDataChanged();
       onClose();
-      setCode("");
-      setDescription("");
-      setQuantity("0");
-      setMinQuantity("0");
+      formDispatch({ type: "RESET" });
       onCreated();
       notify({
-        message: `${description.trim()} creato.`,
+        message: `${form.description.trim()} creato.`,
         title: "Materiale aggiunto",
         tone: "success",
       });
@@ -699,18 +620,20 @@ function AddMaterialModal({
         tone: "danger",
       });
     } finally {
-      setSaving(false);
+      formDispatch({ type: "SET_SAVING", payload: false });
     }
   };
 
   const units = ["m", "m2", "m3", "cad", "t", "kg", "set", "lt"];
+  const set = (field: FormField) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    formDispatch({ type: "SET_FIELD", field, value: e.target.value });
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
         <div className="rounded-22px bg-[var(--surface-base)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-center justify-between">
-            <h3 className="text-16px font-bold text-[var(--text-primary)]">Nuovo materiale</h3>
+            <h3 className="text-16px font-semibold text-[var(--text-primary)]">Nuovo materiale</h3>
             <button
               className="flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
               onClick={onClose}
@@ -725,18 +648,18 @@ function AddMaterialModal({
               <Field label="Codice">
                 <input
                   className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={set("code")}
                   placeholder="Es. BIN-60E1"
                   type="text"
-                  value={code}
+                  value={form.code}
                 />
               </Field>
               <Field label="Unità">
                 <div className="relative">
                   <select
                     className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                    onChange={(e) => setUnit(e.target.value)}
-                    value={unit}
+                    onChange={set("unit")}
+                    value={form.unit}
                   >
                     {units.map((u) => (
                       <option key={u} value={u}>
@@ -761,10 +684,10 @@ function AddMaterialModal({
             <Field label="Descrizione">
               <input
                 className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={set("description")}
                 placeholder="Descrizione del materiale"
                 type="text"
-                value={description}
+                value={form.description}
               />
             </Field>
 
@@ -772,8 +695,8 @@ function AddMaterialModal({
               <div className="relative">
                 <select
                   className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  onChange={(e) => setCategory(e.target.value)}
-                  value={category}
+                  onChange={set("category")}
+                  value={form.category}
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -799,20 +722,20 @@ function AddMaterialModal({
                 <input
                   className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   min="0"
-                  onChange={(e) => setQuantity(e.target.value)}
+                  onChange={set("quantity")}
                   step="any"
                   type="number"
-                  value={quantity}
+                  value={form.quantity}
                 />
               </Field>
               <Field label="Soglia minima">
                 <input
                   className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                   min="0"
-                  onChange={(e) => setMinQuantity(e.target.value)}
+                  onChange={set("minQuantity")}
                   step="any"
                   type="number"
-                  value={minQuantity}
+                  value={form.minQuantity}
                 />
               </Field>
             </div>
@@ -823,11 +746,11 @@ function AddMaterialModal({
               Annulla
             </ProjectControlButton>
             <ProjectControlButton
-              disabled={saving || !code.trim() || !description.trim()}
+              disabled={form.saving || !form.code.trim() || !form.description.trim()}
               onClick={handleSave}
               variant="primary"
             >
-              {saving ? "Salvataggio..." : "Crea materiale"}
+              {form.saving ? "Salvataggio..." : "Crea materiale"}
             </ProjectControlButton>
           </div>
         </div>
@@ -837,6 +760,245 @@ function AddMaterialModal({
 }
 
 /* ── Shared sub-components ── */
+
+function SidebarCategories({
+  categories,
+  materialsCount,
+  selectedCategory,
+  onSelectCategory,
+}: {
+  categories: { counts: Map<string, number>; names: string[] };
+  materialsCount: number;
+  selectedCategory: string | null;
+  onSelectCategory: (cat: string | null) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
+          Categorie
+        </span>
+      </div>
+      <div className="mt-3 space-y-1.5">
+        {categories.names.map((cat) => {
+          const count = cat === "Tutti" ? materialsCount : (categories.counts.get(cat) ?? 0);
+          return (
+            <m.button
+              className={cn(
+                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-13px font-semibold transition-colors",
+                selectedCategory === cat || (!selectedCategory && cat === "Tutti")
+                  ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+              )}
+              key={cat}
+              onClick={() => onSelectCategory(cat === "Tutti" ? null : cat)}
+              type="button"
+              whileTap={{ scale: 0.98 }}
+            >
+              <span>{cat}</span>
+              <span className="text-11px font-medium text-[var(--text-secondary)]">{count}</span>
+            </m.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MetricsGrid({
+  metrics,
+}: {
+  metrics: { totalStock: number; critical: number; zero: number; avgCoverage: number };
+}) {
+  return (
+    <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <MetricCard
+        caption="Quantità totale in magazzino"
+        icon={Warehouse}
+        label="Valore stock"
+        tone="blue"
+        value={`${Math.round(metrics.totalStock)}`}
+      />
+      <MetricCard
+        caption="Sotto la soglia minima"
+        icon={AlertTriangle}
+        label="Critici"
+        tone="danger"
+        value={String(metrics.critical)}
+      />
+      <MetricCard
+        caption="Stock a zero"
+        icon={Bell}
+        label="Esauriti"
+        tone="warning"
+        value={String(metrics.zero)}
+      />
+      <MetricCard
+        caption="Copertura media vs soglia minima"
+        icon={ShieldCheck}
+        label="Copertura media"
+        tone="success"
+        value={`${metrics.avgCoverage}%`}
+      />
+    </div>
+  );
+}
+
+function CategoryFilterBar({
+  categoryNames,
+  categoryCounts,
+  materialsCount,
+  selectedCategory,
+  searchQuery,
+  onSelectCategory,
+  onSearchChange,
+  onCreateMaterial,
+}: {
+  categoryNames: string[];
+  categoryCounts: Map<string, number>;
+  materialsCount: number;
+  selectedCategory: string | null;
+  searchQuery: string;
+  onSelectCategory: (cat: string | null) => void;
+  onSearchChange: (q: string) => void;
+  onCreateMaterial: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          className={cn(
+            "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
+            !selectedCategory
+              ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+              : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+          )}
+          onClick={() => onSelectCategory(null)}
+          type="button"
+        >
+          Tutti i materiali
+          <span
+            className={cn(
+              "ml-2 rounded-full px-2 py-0.5 text-11px font-bold",
+              !selectedCategory
+                ? "bg-white/20"
+                : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
+            )}
+          >
+            {materialsCount}
+          </span>
+        </button>
+        {categoryNames.map((cat) => {
+          const count = categoryCounts.get(cat) ?? 0;
+          if (count === 0) return null;
+          return (
+            <button
+              className={cn(
+                "h-9 rounded-full px-4 text-12px font-semibold transition-colors 2xl:h-10 2xl:text-13px",
+                selectedCategory === cat
+                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                  : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+              )}
+              key={cat}
+              onClick={() => onSelectCategory(cat)}
+              type="button"
+            >
+              {cat}
+              <span
+                className={cn(
+                  "ml-2 rounded-full px-2 py-0.5 text-11px font-bold",
+                  selectedCategory === cat
+                    ? "bg-white/20"
+                    : "bg-[var(--bg-muted)] text-[var(--text-secondary)]",
+                )}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterSearch
+          onChange={onSearchChange}
+          placeholder="Cerca materiale..."
+          value={searchQuery}
+        />
+        {searchQuery || selectedCategory ? (
+          <ClearFiltersButton
+            onClick={() => {
+              onSearchChange("");
+              onSelectCategory(null);
+            }}
+          />
+        ) : null}
+        <ProjectControlButton icon={Plus} onClick={onCreateMaterial} variant="primary">
+          Nuovo materiale
+        </ProjectControlButton>
+      </div>
+    </div>
+  );
+}
+
+function MaterialListSection({
+  filteredMaterials,
+  totalMaterials,
+  selectedMaterialId,
+  onSelectMaterial,
+  onDeleteMaterial,
+  onCreateMaterial,
+}: {
+  filteredMaterials: DesktopMaterial[];
+  totalMaterials: number;
+  selectedMaterialId: string | null;
+  onSelectMaterial: (id: string) => void;
+  onDeleteMaterial: (id: string) => void;
+  onCreateMaterial: () => void;
+}) {
+  return (
+    <>
+      <div className="space-y-3 p-4">
+        {filteredMaterials.length > 0 ? (
+          filteredMaterials.map((mat) => (
+            <MaterialCard
+              key={mat.id}
+              isSelected={mat.id === selectedMaterialId}
+              material={mat}
+              onDelete={() => onDeleteMaterial(mat.id)}
+              onSelect={() => onSelectMaterial(mat.id)}
+            />
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 p-8 text-center">
+            <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+              <Package className="size-4" />
+            </div>
+            <div className="mt-3 text-14px font-bold text-[var(--text-primary)]">
+              Nessun materiale trovato
+            </div>
+            <p className="mx-auto mt-1 max-w-[320px] text-12px font-medium text-[var(--text-secondary)]">
+              Modifica i filtri o{" "}
+              <button
+                className="font-semibold text-[var(--accent-primary)] underline underline-offset-2 hover:no-underline"
+                onClick={onCreateMaterial}
+                type="button"
+              >
+                crea un nuovo materiale
+              </button>
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-3">
+        <span className="text-11px font-medium text-[var(--text-secondary)]">
+          {filteredMaterials.length} di {totalMaterials} materiali
+        </span>
+      </div>
+    </>
+  );
+}
 
 function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
   return <BezelSurface innerClassName={cn("p-4", className)}>{children}</BezelSurface>;

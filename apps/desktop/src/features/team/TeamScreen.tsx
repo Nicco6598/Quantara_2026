@@ -358,7 +358,7 @@ function TeamMembersPanel({
   return (
     <BezelSurface innerClassName="overflow-hidden p-0">
       <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] p-5 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-14px font-bold uppercase tracking-0_04em text-[var(--text-primary)]">
+        <h2 className="text-14px font-semibold uppercase tracking-0_04em text-[var(--text-primary)]">
           Membri del team
         </h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -584,7 +584,7 @@ function InviteMemberCard() {
   const { notify } = useToast();
   return (
     <BezelSurface innerClassName="p-5">
-      <h2 className="text-14px font-bold uppercase tracking-0_04em text-[var(--text-primary)]">
+      <h2 className="text-14px font-semibold uppercase tracking-0_04em text-[var(--text-primary)]">
         Aggiungi membro
       </h2>
       <p className="mt-1.5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
@@ -629,7 +629,7 @@ function RolesCard({ rolesData }: { rolesData: { role: TeamRole; count: number }
 
   return (
     <BezelSurface innerClassName="p-5">
-      <h2 className="text-14px font-bold uppercase tracking-0_04em text-[var(--text-primary)]">
+      <h2 className="text-14px font-semibold uppercase tracking-0_04em text-[var(--text-primary)]">
         Ruoli e permessi
       </h2>
       <p className="mt-1.5 text-12px font-medium leading-5 text-[var(--text-secondary)]">

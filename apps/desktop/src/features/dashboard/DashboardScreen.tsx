@@ -85,7 +85,11 @@ export function DashboardScreen() {
       .then((contracts) => {
         if (abort.signal.aborted) return;
         const contractors = readStringRecord("quantara.projectContractors.v1");
-        setProjects(contracts.data.map((c) => mapContractToProject(c, contractors[c.id])));
+        setProjects(
+          contracts.data.map((contract) =>
+            mapContractToProject(contract, contractors[contract.id]),
+          ),
+        );
       })
       .catch(() => {
         if (abort.signal.aborted) return;
@@ -102,6 +106,20 @@ export function DashboardScreen() {
   const derived = useMemo(() => {
     const views = buildSalDocumentViews(salDocuments, tariffVoices);
     const salTimeline = buildSalTimeline(projects, views);
+    let totalBudget = 0;
+    let escalationCount = 0;
+
+    for (const project of projects) {
+      totalBudget += project.budget.amount;
+      if (project.tone === "danger") {
+        escalationCount += 1;
+      }
+    }
+
+    let totalSal = 0;
+    for (const view of views) {
+      totalSal += view.total;
+    }
 
     return {
       metrics: buildOverviewMetrics(projects),
@@ -109,9 +127,9 @@ export function DashboardScreen() {
       activities: buildActivityRows(auditEntries),
       priorityActions: buildPriorityActions(projects),
       ganttBars: buildGanttBars(projects, salTimeline),
-      totalBudget: projects.reduce((s, p) => s + p.budget.amount, 0),
-      totalSal: views.reduce((sum, v) => sum + v.total, 0),
-      escalationCount: projects.filter((p) => p.tone === "danger").length,
+      totalBudget,
+      totalSal,
+      escalationCount,
       operationalTotals: buildOperationalTotals(projects, views),
       salTimeline,
     };

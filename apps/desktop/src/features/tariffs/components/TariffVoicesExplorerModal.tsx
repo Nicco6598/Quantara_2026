@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { SPRING_EASE } from "@/components/shared/easings";
@@ -36,24 +36,25 @@ export function TariffVoicesExplorerModal({
       return groups;
     }
 
-    return groups
-      .map((group) => {
-        const groupMatch = `${group.code} ${group.description}`
-          .toLowerCase()
-          .includes(normalizedQuery);
-        if (groupMatch) {
-          return group;
-        }
-
+    const result: TariffVoiceGroup[] = [];
+    for (const group of groups) {
+      const groupMatch = `${group.code} ${group.description}`
+        .toLowerCase()
+        .includes(normalizedQuery);
+      if (groupMatch) {
+        result.push(group);
+      } else {
         const matchedChildren = group.children.filter((voice) =>
           `${voice.officialCode} ${voice.description} ${voice.unitOfMeasure}`
             .toLowerCase()
             .includes(normalizedQuery),
         );
-
-        return matchedChildren.length > 0 ? { ...group, children: matchedChildren } : null;
-      })
-      .filter((group): group is TariffVoiceGroup => group != null);
+        if (matchedChildren.length > 0) {
+          result.push({ ...group, children: matchedChildren });
+        }
+      }
+    }
+    return result;
   }, [groups, normalizedQuery]);
 
   const visibleVoices = useMemo(
@@ -73,7 +74,7 @@ export function TariffVoicesExplorerModal({
         onClick={onClose}
         type="button"
       />
-      <motion.div
+      <m.div
         className="relative flex min-h-0 max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: SPRING_EASE }}
@@ -85,7 +86,7 @@ export function TariffVoicesExplorerModal({
               <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                 Voci tariffarie
               </div>
-              <h3 className="mt-2 text-21px font-bold leading-tight text-[var(--text-primary)]">
+              <h3 className="mt-2 text-21px font-semibold leading-tight text-[var(--text-primary)]">
                 Voci tariffarie complete
               </h3>
               <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
@@ -95,14 +96,14 @@ export function TariffVoicesExplorerModal({
                 {visibleVoices.toLocaleString("it-IT")} di {total.toLocaleString("it-IT")} sottovoci
               </div>
             </div>
-            <motion.button
+            <m.button
               aria-label="Chiudi"
               className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"
               onClick={onClose}
               type="button"
             >
               <X className="size-4" />
-            </motion.button>
+            </m.button>
           </div>
 
           <div className="border-b border-[var(--border-subtle)] px-5 py-3">
@@ -121,7 +122,7 @@ export function TariffVoicesExplorerModal({
           <div className="min-h-0 flex-1 overflow-hidden">
             <AnimatePresence mode="wait">
               {focusedGroup ? (
-                <motion.div
+                <m.div
                   animate={{ opacity: 1, x: 0 }}
                   className="flex h-full flex-col"
                   exit={{ opacity: 0, x: 40 }}
@@ -130,13 +131,13 @@ export function TariffVoicesExplorerModal({
                   transition={{ duration: 0.32, ease: SPRING_EASE }}
                 >
                   <div className="flex items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/40 px-5 py-3">
-                    <motion.button
+                    <m.button
                       className="flex size-8 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
                       onClick={() => setFocusedGroupCode(null)}
                       type="button"
                     >
                       <ArrowLeft className="size-4" />
-                    </motion.button>
+                    </m.button>
                     <div className="min-w-0">
                       <div className="truncate text-13px font-bold text-[var(--text-primary)]">
                         {focusedGroup.code}
@@ -186,9 +187,9 @@ export function TariffVoicesExplorerModal({
                       ))}
                     </div>
                   </div>
-                </motion.div>
+                </m.div>
               ) : filteredGroups.length === 0 ? (
-                <motion.div
+                <m.div
                   animate={{ opacity: 1, x: 0 }}
                   className="px-5 py-8 text-sm font-medium text-[var(--text-secondary)]"
                   exit={{ opacity: 0, x: -40 }}
@@ -199,9 +200,9 @@ export function TariffVoicesExplorerModal({
                   {normalizedQuery
                     ? "Nessun risultato per la ricerca corrente."
                     : "Nessuna voce disponibile."}
-                </motion.div>
+                </m.div>
               ) : (
-                <motion.div
+                <m.div
                   animate={{ opacity: 1, x: 0 }}
                   className="divide-y divide-[var(--border-subtle)]/70"
                   exit={{ opacity: 0, x: -40 }}
@@ -230,12 +231,12 @@ export function TariffVoicesExplorerModal({
                       <ChevronRight className="size-4 shrink-0 text-[var(--text-secondary)]" />
                     </button>
                   ))}
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
           </div>
         </div>
-      </motion.div>
+      </m.div>
     </div>
   );
 }

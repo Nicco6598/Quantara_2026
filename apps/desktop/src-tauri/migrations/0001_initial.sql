@@ -8,8 +8,16 @@ CREATE TABLE IF NOT EXISTS contracts (
   title TEXT NOT NULL,
   application_contract_code TEXT NOT NULL,
   framework_agreement_code TEXT NOT NULL,
+  contractor_id TEXT REFERENCES contractors(id),
   contractual_amount_cents INTEGER NOT NULL,
   tender_discount_percent REAL NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS contractors (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

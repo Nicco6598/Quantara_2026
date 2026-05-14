@@ -89,12 +89,12 @@ describe("migration workbook validation", () => {
     );
   });
 
-  it("round-trips serialized workbook rows through parser normalization", () => {
-    const bytes = serializeQuantaraMigrationWorkbook({
+  it("round-trips serialized workbook rows through parser normalization", async () => {
+    const bytes = await serializeQuantaraMigrationWorkbook({
       ...validWorkbook,
       materials: [{ ...validMaterial, quantity: 7.5 }],
     });
-    const parsed = parseQuantaraMigrationWorkbook(bytes);
+    const parsed = await parseQuantaraMigrationWorkbook(bytes);
 
     expect(parsed.projects[0]?.title).toBe("Progetto A");
     expect(parsed.sal[0]?.quantity).toBe(3);

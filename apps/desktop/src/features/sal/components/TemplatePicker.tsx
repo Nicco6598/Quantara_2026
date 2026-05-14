@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { BookOpen, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { SOFT_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/components/shared/easings";
 import { type SalTemplate, useTemplateStore } from "@/store/template-store";
 
 type TemplatePickerProps = {
@@ -48,12 +48,12 @@ export function TemplatePicker({ onApply, tariffBookId }: TemplatePickerProps) {
             onClick={() => setIsOpen(false)}
             type="button"
           />
-          <motion.div
+          <m.div
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-[0_8px_28px_-8px_rgba(0,0,0,0.15)] ring-1 ring-[var(--border-subtle)]"
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             initial={{ opacity: 0, y: -8, scale: 0.96 }}
-            transition={{ duration: 0.18, ease: SOFT_EASE }}
+            transition={{ duration: 0.18, ease: SPRING_EASE }}
           >
             {filtered.map((template) => (
               <div
@@ -85,7 +85,7 @@ export function TemplatePicker({ onApply, tariffBookId }: TemplatePickerProps) {
                 </button>
               </div>
             ))}
-          </motion.div>
+          </m.div>
         </>
       )}
     </div>

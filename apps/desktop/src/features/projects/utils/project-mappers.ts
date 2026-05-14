@@ -1,5 +1,5 @@
 import { eur } from "@quantara/domain-utils";
-import type { DesktopContract, DesktopTariffVoice } from "@/lib/desktopData";
+import type { DesktopContract } from "@/lib/desktopData";
 import type { PortfolioProject } from "../types";
 import { normalizeContractorName } from "./projects-helpers";
 
@@ -8,7 +8,11 @@ export function mapContractToProject(
   contractorName?: unknown,
 ): PortfolioProject {
   const normalizedContractor =
-    typeof contractorName === "string" ? normalizeContractorName(contractorName) : "";
+    typeof contractorName === "string"
+      ? normalizeContractorName(contractorName)
+      : contract.contractorName
+        ? normalizeContractorName(contract.contractorName)
+        : "";
 
   return {
     budget: contract.contractualAmount,
@@ -29,17 +33,5 @@ export function mapContractToProject(
     title: contract.title,
     tone: "success",
     variance: "0,0%",
-  };
-}
-
-export function mapDesktopVoiceToSalVoice(voice: DesktopTariffVoice, projectYear: number) {
-  return {
-    category: voice.category,
-    code: voice.officialCode,
-    description: voice.description,
-    id: `desktop_${voice.tariffBookId}_${voice.id}`,
-    projectYear,
-    unit: voice.unitOfMeasure,
-    unitPrice: voice.unitPrice,
   };
 }

@@ -67,4 +67,15 @@ describe("contractor folders", () => {
       }),
     ]);
   });
+
+  it("does not recreate a folder from SAL records after the client is unassigned", () => {
+    const folders = buildContractorFolders(
+      [],
+      [],
+      [{ projectId: "sal-project-1", status: "closed" }],
+      new Map([["sal-project-1", { client: "Senza appaltatore" }]]),
+    );
+
+    expect(folders).toEqual([]);
+  });
 });

@@ -9,8 +9,6 @@ import type {
 // Re-export for backward compatibility with existing imports
 export type {
   SalDocument,
-  SalDocumentStatus,
-  SalLine,
   SalProject,
   SalSurchargeKind,
   SalTariffVoice,
@@ -19,7 +17,7 @@ export type {
 import { buildLineViews, defaultSalEconomicRules, summarizeSalLines } from "./sal-calculations";
 import { isSafetyVoice } from "./sal-safety";
 
-export type SalLineView = SalLine & {
+type SalLineView = SalLine & {
   discountAmount: number;
   discountableAmount: number;
   grossAmount: number;
@@ -36,7 +34,7 @@ export type SalDocumentView = Omit<SalDocument, "lines"> & {
   total: number;
 };
 
-export const surchargeOptions: { kind: SalSurchargeKind; label: string; multiplier: number }[] = [
+const surchargeOptions: { kind: SalSurchargeKind; label: string; multiplier: number }[] = [
   { kind: "none", label: "Nessuna", multiplier: 1 },
   { kind: "day", label: "Diurna (+10%)", multiplier: 1.1 },
   { kind: "night", label: "Notturna (+20%)", multiplier: 1.2 },
@@ -187,7 +185,7 @@ function buildSalDocumentViewWithVoiceMap(
   };
 }
 
-export function calculateSalLineTotal(
+function calculateSalLineTotal(
   quantity: number,
   unitPrice: number,
   surchargeMultiplier: number,
@@ -199,7 +197,7 @@ export function calculateSalLineTotal(
   return Math.max(0, quantity) * Math.max(0, unitPrice) * surchargeMultiplier;
 }
 
-export function getSurcharge(kind: SalSurchargeKind) {
+function getSurcharge(kind: SalSurchargeKind) {
   return (
     surchargeOptions.find((option) => option.kind === kind) ?? {
       kind: "none",
@@ -209,17 +207,10 @@ export function getSurcharge(kind: SalSurchargeKind) {
   );
 }
 
-export function getSurchargePercent(kind: SalSurchargeKind): number {
+function getSurchargePercent(kind: SalSurchargeKind): number {
   return kind === "night" ? 20 : kind === "day" ? 10 : 0;
 }
 
-export function surchargeKindFromPercent(percent: number): SalSurchargeKind {
+function surchargeKindFromPercent(percent: number): SalSurchargeKind {
   return percent >= 20 ? "night" : percent > 0 ? "day" : "none";
-}
-
-export function normalizeDecimal(value: string): number {
-  const normalized = value.trim().replace(",", ".");
-  const numericValue = Number(normalized);
-
-  return Number.isFinite(numericValue) ? numericValue : Number.NaN;
 }

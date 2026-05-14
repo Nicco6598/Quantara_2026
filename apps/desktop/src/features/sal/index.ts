@@ -1,1 +1,0 @@
-export { SalCreationScreen } from "./SalCreationScreen";

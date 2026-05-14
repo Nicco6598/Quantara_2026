@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <main className="flex min-h-[400px] items-center justify-center px-4">
           <div className="max-w-md text-center">
             <div className="text-4xl">!!!</div>
-            <h2 className="mt-4 text-lg font-bold text-[var(--text-primary)]">
+            <h2 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">
               Qualcosa non ha funzionato
             </h2>
             <p className="mt-2 text-sm text-[var(--text-secondary)]">

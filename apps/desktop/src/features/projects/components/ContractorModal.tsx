@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Building2, X } from "lucide-react";
 import { useState } from "react";
 import { SPRING_EASE } from "@/components/shared/easings";
@@ -13,7 +13,7 @@ export function ContractorModal({
   onClose: () => void;
   onCreate: (name: string) => void;
 }) {
-  const [name, setName] = useState(contractorDraft);
+  const name = contractorDraft;
   const [contact, setContact] = useState("");
   const isValid = name.trim().length >= 2;
 
@@ -31,7 +31,7 @@ export function ContractorModal({
         onClick={onClose}
         type="button"
       />
-      <motion.section
+      <m.section
         aria-label="Nuovo appaltatore"
         className="relative w-full max-w-md rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
@@ -48,7 +48,7 @@ export function ContractorModal({
                 <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
                   Appaltatori
                 </div>
-                <h3 className="mt-1 text-18px font-bold text-[var(--text-primary)]">
+                <h3 className="mt-1 text-18px font-semibold text-[var(--text-primary)]">
                   Nuovo appaltatore
                 </h3>
               </div>
@@ -75,7 +75,7 @@ export function ContractorModal({
                     ? "border-[var(--danger-base)]/40"
                     : "border-[var(--border-subtle)]",
                 )}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => onChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -144,7 +144,7 @@ export function ContractorModal({
             </button>
           </div>
         </div>
-      </motion.section>
+      </m.section>
     </div>
   );
 }

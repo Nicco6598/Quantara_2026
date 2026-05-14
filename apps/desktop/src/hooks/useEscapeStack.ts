@@ -1,21 +1,21 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 type EscapeHandler = () => void;
 
 const globalStack: EscapeHandler[] = [];
 
-export function pushEscapeHandler(handler: EscapeHandler) {
+function pushEscapeHandler(handler: EscapeHandler) {
   globalStack.push(handler);
 }
 
-export function popEscapeHandler(handler: EscapeHandler) {
+function popEscapeHandler(handler: EscapeHandler) {
   const index = globalStack.indexOf(handler);
   if (index !== -1) {
     globalStack.splice(index, 1);
   }
 }
 
-export function executeEscape(): boolean {
+function executeEscape(): boolean {
   const handler = globalStack.pop();
   if (handler) {
     handler();
@@ -37,7 +37,7 @@ export function useEscapeStack(handler: EscapeHandler, active: boolean) {
 }
 
 export function useGlobalEscapeListener() {
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+  const handlerRef = useRef((event: KeyboardEvent) => {
     if (event.key !== "Escape") return;
     const target = event.target as HTMLElement | null;
     const isTyping =
@@ -48,10 +48,11 @@ export function useGlobalEscapeListener() {
     if (isTyping) return;
     event.preventDefault();
     executeEscape();
-  }, []);
+  });
 
   useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+    const onKeyDown = (event: KeyboardEvent) => handlerRef.current(event);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 }

@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEscapeStack } from "@/hooks/useEscapeStack";
 import { cn } from "@/lib/utils";
@@ -80,7 +80,7 @@ export function InlineEdit({
   }
 
   return (
-    <motion.button
+    <m.button
       className={cn(
         "h-8 w-full min-w-0 rounded-md border border-transparent px-2 text-right text-13px transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)]",
         className,
@@ -95,6 +95,6 @@ export function InlineEdit({
         maximumFractionDigits: 3,
         minimumFractionDigits: 0,
       })}
-    </motion.button>
+    </m.button>
   );
 }

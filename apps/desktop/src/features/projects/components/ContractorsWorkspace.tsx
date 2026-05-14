@@ -17,7 +17,7 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
@@ -403,7 +403,7 @@ function ContractorFoldersPanel({
       ) : filteredFolders.length === 0 ? (
         <NoResultsState query={query} />
       ) : (
-        <motion.div layout className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
+        <m.div layout className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
           <AnimatePresence initial={false}>
             {filteredFolders.map((folder) => (
               <ContractorCard
@@ -414,11 +414,11 @@ function ContractorFoldersPanel({
               />
             ))}
           </AnimatePresence>
-        </motion.div>
+        </m.div>
       )}
 
       {folders.length > 0 ? (
-        <div className="border-t border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] px-4 py-4 text-center">
+        <div className="border-t border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] p-4 text-center">
           <span className="text-12px font-medium text-[var(--text-secondary)]">
             {folders.length} cartelle operative ·{" "}
             <button
@@ -453,7 +453,7 @@ function ContractorCard({
   const exposureLabel = formatMoney({ amount: folder.salExposure, currency: "EUR" });
 
   return (
-    <motion.article
+    <m.article
       layout
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className="group relative min-h-[244px] overflow-hidden rounded-26px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[0_16px_42px_color-mix(in_srgb,var(--text-primary)_7%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_58%,transparent)]"
@@ -529,7 +529,7 @@ function ContractorCard({
             </div>
           </div>
           <div className="mt-3 h-2 overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-            <motion.div
+            <m.div
               className="h-full rounded-18px bg-[var(--accent-primary)]"
               initial={{ scaleX: 0 }}
               style={{ originX: 0 }}
@@ -550,7 +550,7 @@ function ContractorCard({
           </span>
         </div>
       </button>
-    </motion.article>
+    </m.article>
   );
 }
 
@@ -617,7 +617,7 @@ function CockpitMetric({
   value: string;
 }) {
   return (
-    <div className="min-w-0 rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] px-3 py-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)]">
+    <div className="min-w-0 rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)]">
       <dt className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
         {label}
       </dt>

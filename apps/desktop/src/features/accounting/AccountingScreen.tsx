@@ -385,7 +385,7 @@ export function AccountingScreen() {
                       return (
                         <button
                           className={cn(
-                            "flex w-full items-center justify-between gap-4 border-b border-[var(--border-subtle)] px-4 py-4 text-left last:border-b-0 2xl:px-5 2xl:py-5",
+                            "flex w-full items-center justify-between gap-4 border-b border-[var(--border-subtle)] p-4 text-left last:border-b-0 2xl:px-5 2xl:py-5",
                             selected
                               ? "bg-[var(--selection-bg)]"
                               : "transition-colors hover:bg-[var(--bg-muted)]",
