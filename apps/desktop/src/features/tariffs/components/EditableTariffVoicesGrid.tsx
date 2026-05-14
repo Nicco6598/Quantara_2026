@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import type { DesktopTariffVoice, TariffWarning } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 import type { VoiceGroup } from "../utils/tariff-grouping";
@@ -52,6 +53,76 @@ function getDraftKey(index: number, field: keyof DesktopTariffVoice) {
   return `${index}:${field}`;
 }
 
+function WarningTooltip({
+  warnings,
+  anchorRef,
+  onClose,
+}: {
+  warnings: TariffWarning[];
+  anchorRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+}) {
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0, above: true });
+
+  useLayoutEffect(() => {
+    const el = anchorRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const above = spaceAbove > spaceBelow || spaceBelow < 200;
+    setPosition({
+      top: above ? rect.top - 8 : rect.bottom + 8,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - 296)),
+      above,
+    });
+  }, [anchorRef]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      ref={tooltipRef}
+      className="fixed z-[100] w-72 rounded-14px bg-[var(--surface-base)] p-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)] ring-1 ring-[var(--border-subtle)]"
+      style={{
+        left: position.left,
+        top: position.top,
+        transform: position.above ? "translateY(-100%)" : "none",
+      }}
+    >
+      <button
+        className="absolute right-2 top-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        onClick={onClose}
+        type="button"
+      >
+        <X className="size-3" />
+      </button>
+      <div className="max-h-48 space-y-3 overflow-y-auto pr-2">
+        {warnings.map((w) => (
+          <div key={w.id} className="space-y-1">
+            <div className="text-11px font-bold text-[var(--warning-base)]">
+              #{w.id} {w.title}
+            </div>
+            <div className="text-11px font-medium leading-normal text-[var(--text-secondary)]">
+              {w.body}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function ImportCell({
   align = "left",
   draftValue,
@@ -76,6 +147,7 @@ function ImportCell({
   const [showWarnings, setShowWarnings] = useState(false);
   const [localValue, setLocalValue] = useState(draftValue ?? value);
   const isFocusedRef = useRef(false);
+  const infoButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!isFocusedRef.current) {
@@ -118,6 +190,7 @@ function ImportCell({
       {warnings && warnings.length > 0 ? (
         <>
           <button
+            ref={infoButtonRef}
             className="flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--warning-base)] transition-colors hover:bg-[var(--warning-soft)]"
             onClick={() => setShowWarnings(!showWarnings)}
             type="button"
@@ -125,27 +198,11 @@ function ImportCell({
             <Info className="size-3.5" />
           </button>
           {showWarnings ? (
-            <div className="absolute bottom-full left-0 z-50 mb-2 w-72 rounded-14px bg-[var(--surface-base)] p-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)] ring-1 ring-[var(--border-subtle)]">
-              <button
-                className="absolute right-2 top-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                onClick={() => setShowWarnings(false)}
-                type="button"
-              >
-                <X className="size-3" />
-              </button>
-              <div className="max-h-48 space-y-3 overflow-y-auto pr-2">
-                {warnings.map((w) => (
-                  <div key={w.id} className="space-y-1">
-                    <div className="text-11px font-bold text-[var(--warning-base)]">
-                      #{w.id} {w.title}
-                    </div>
-                    <div className="text-11px font-medium leading-normal text-[var(--text-secondary)]">
-                      {w.body}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <WarningTooltip
+              warnings={warnings}
+              anchorRef={infoButtonRef}
+              onClose={() => setShowWarnings(false)}
+            />
           ) : null}
         </>
       ) : null}
@@ -590,54 +647,109 @@ export const EditableTariffVoicesGrid = memo(
           focusRetryRef.current = null;
         }
 
-        const targetIndex = flatItems.findIndex((item) => {
-          if (scrollTarget.type === "category") {
-            return item.type === "category" && item.id === scrollTarget.categoryId;
-          }
-          return item.type === "row" && item.index === scrollTarget.rowIndex;
-        });
+        const ITEM_ESTIMATED_SIZE: Record<FlatGridItem["type"], number> = {
+          add: 72,
+          category: 66,
+          group: 58,
+          voice: 50,
+          columns: 38,
+          row: 48,
+          footer: 54,
+        };
 
+        const findTargetIndex = () =>
+          flatItems.findIndex((item) => {
+            if (scrollTarget.type === "category") {
+              return item.type === "category" && item.id === scrollTarget.categoryId;
+            }
+            return item.type === "row" && item.index === scrollTarget.rowIndex;
+          });
+
+        const targetIndex = findTargetIndex();
         if (targetIndex < 0) return;
 
-        virtualizer.scrollToIndex(targetIndex, {
-          align: scrollTarget.type === "category" ? "start" : "center",
-          behavior: "smooth",
-        });
+        const targetId =
+          scrollTarget.type === "category"
+            ? scrollTarget.categoryId
+            : `import-cell-${scrollTarget.rowIndex}-${scrollTarget.field}`;
 
-        if (scrollTarget.type !== "cell") {
-          handledScrollTargetNonceRef.current = scrollTarget.nonce;
-          return;
+        const scrollParent = scrollParentRef.current;
+
+        // -- Step 1: scroll using virtualizer's precise offset --
+        try {
+          virtualizer.scrollToIndex(targetIndex, {
+            align: scrollTarget.type === "category" ? "start" : "center",
+            behavior: "auto",
+          });
+        } catch {
+          // fallback: estimate Y from flatItems
+          if (scrollParent) {
+            let estimatedOffset = 0;
+            for (let i = 0; i < targetIndex; i++) {
+              const item = flatItems[i];
+              estimatedOffset += item ? ITEM_ESTIMATED_SIZE[item.type] : 48;
+            }
+            scrollParent.scrollTo({
+              top: Math.max(0, estimatedOffset - scrollParent.clientHeight / 2 + 24),
+            });
+          }
         }
 
-        setHighlightedCell({
-          field: scrollTarget.field,
-          rowIndex: scrollTarget.rowIndex,
-        });
-
-        const cellId = `import-cell-${scrollTarget.rowIndex}-${scrollTarget.field}`;
-        const focusCell = () => {
-          const element = document.getElementById(cellId);
+        // -- Step 2: wait for element to appear, then smooth-scrollIntoView --
+        const scrollIntoElement = () => {
+          const element = document.getElementById(targetId);
           if (element instanceof HTMLElement) {
-            element.focus({ preventScroll: true });
+            element.scrollIntoView({
+              behavior: "smooth",
+              block: scrollTarget.type === "category" ? "start" : "center",
+            });
+            if (scrollTarget.type === "cell") {
+              element.focus({ preventScroll: true });
+            }
             handledScrollTargetNonceRef.current = scrollTarget.nonce;
             return true;
           }
           return false;
         };
 
-        if (focusCell()) return;
+        if (scrollIntoElement()) {
+          if (scrollTarget.type === "cell") {
+            setHighlightedCell({ field: scrollTarget.field, rowIndex: scrollTarget.rowIndex });
+          }
+          return;
+        }
 
+        // If after 300ms the element still isn't in DOM, force an approximate scroll
+        // (the virtualizer may have rejected scrollToIndex or items aren't measured yet)
         let attempts = 0;
-        const retryFocus = () => {
+        const retryScroll = () => {
           attempts += 1;
-          if (focusCell() || attempts >= 12) {
+          if (scrollIntoElement()) {
+            if (scrollTarget.type === "cell") {
+              setHighlightedCell({ field: scrollTarget.field, rowIndex: scrollTarget.rowIndex });
+            }
             focusRetryRef.current = null;
             return;
           }
-          focusRetryRef.current = window.setTimeout(retryFocus, 80);
+          if (attempts === 3 && scrollParent) {
+            // Fallback: force scroll to estimated position
+            let estimatedOffset = 0;
+            for (let i = 0; i < targetIndex; i++) {
+              const item = flatItems[i];
+              estimatedOffset += item ? ITEM_ESTIMATED_SIZE[item.type] : 48;
+            }
+            scrollParent.scrollTo({
+              top: Math.max(0, estimatedOffset - scrollParent.clientHeight / 2 + 24),
+            });
+          }
+          if (attempts >= 20) {
+            focusRetryRef.current = null;
+            return;
+          }
+          focusRetryRef.current = window.setTimeout(retryScroll, 100);
         };
 
-        focusRetryRef.current = window.setTimeout(retryFocus, 80);
+        focusRetryRef.current = window.setTimeout(retryScroll, 100);
 
         return () => {
           if (focusRetryRef.current !== null) {

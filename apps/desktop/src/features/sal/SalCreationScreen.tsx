@@ -33,6 +33,7 @@ import type { SalTemplate } from "@/store/template-store";
 import { SalComparisonView } from "./components/SalComparisonView";
 import {
   AccountingRows,
+  BreakdownDetails,
   Currency,
   DocumentPreview,
   NumberValue,
@@ -871,6 +872,7 @@ function SalEditorContent({
       ) : null}
       {phase === "voices" ? (
         <VoicesStep
+          economicRules={economicRules}
           lineViews={lineViews}
           lines={lines}
           onFactorChange={setFactor}
@@ -901,7 +903,12 @@ function SalEditorContent({
         />
       ) : null}
       {phase === "confirm" ? (
-        <ConfirmStep economicRules={economicRules} onPrimary={goPrimary} summary={summary} />
+        <ConfirmStep
+          economicRules={economicRules}
+          lineViews={lineViews}
+          onPrimary={goPrimary}
+          summary={summary}
+        />
       ) : null}
     </>
   );
@@ -1269,6 +1276,7 @@ function disabledReason(
 
 /* ── Voices ── */
 function VoicesStep({
+  economicRules,
   lineViews,
   lines,
   onFactorChange,
@@ -1285,6 +1293,7 @@ function VoicesStep({
   onOpenTemplateDialog,
   tariffBookId,
 }: {
+  economicRules: SalEconomicRules;
   lineViews: SalLineView[];
   lines: SalLineDraft[];
   onFactorChange: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
@@ -1468,7 +1477,10 @@ function VoicesStep({
             />
           </div>
 
-          <EconomicEquation summary={summary} />
+          <div className="space-y-3">
+            <BreakdownDetails economicRules={economicRules} lineViews={lineViews} />
+            <EconomicEquation summary={summary} />
+          </div>
         </div>
       </section>
 
@@ -1531,7 +1543,6 @@ function ReviewStep({
   compareLines: SalLineView[] | null;
   onToggleCompare: () => void;
 }) {
-  const hasDanger = checks.some((c) => c.tone === "danger");
   return (
     <div className="space-y-3">
       {/* Checks + compare button */}
@@ -1579,35 +1590,11 @@ function ReviewStep({
               Totale attuale SAL
             </div>
           </div>
-          <div className="p-5">
-            <EconomicEquation summary={summary} />
-            <dl className="mt-5 space-y-1.5">
-              <SummaryLine
-                label="Totale voci lordo"
-                value={<Currency value={summary.grossAmount} />}
-              />
-              <SummaryLine
-                label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`}
-                value={<Currency value={-summary.discountAmount} />}
-                tone="danger"
-              />
-              <SummaryLine
-                label="Maggiorazioni"
-                value={<Currency value={summary.linkedChargeAmount} />}
-              />
-              <SummaryLine
-                label="Voci OS incluse"
-                value={<Currency value={summary.safetyAmount} />}
-              />
-              <div className="mt-3 border-t border-[var(--border-subtle)]/50 pt-3">
-                <SummaryLine
-                  label="Totale attuale SAL"
-                  value={<Currency value={summary.total} />}
-                  tone={hasDanger ? "danger" : "accent"}
-                  large
-                />
-              </div>
-            </dl>
+          <div className="space-y-4 p-5">
+            <BreakdownDetails economicRules={economicRules} lineViews={lineViews} />
+            <div className="border-t border-[var(--border-subtle)]/40 pt-4">
+              <EconomicEquation summary={summary} />
+            </div>
           </div>
         </div>
         <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
@@ -1654,10 +1641,12 @@ function ReviewStep({
 /* ── Confirm ── */
 function ConfirmStep({
   economicRules,
+  lineViews,
   onPrimary,
   summary,
 }: {
   economicRules: SalEconomicRules;
+  lineViews: SalLineView[];
   onPrimary: () => void;
   summary: SalEconomicSummary;
 }) {
@@ -1707,27 +1696,11 @@ function ConfirmStep({
           </div>
         </div>
       </div>
-      <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-        <EconomicEquation className="mb-5" summary={summary} />
-        <dl className="space-y-2">
-          <SummaryLine
-            label="Importo lordo"
-            value={<Currency value={summary.grossAmount} />}
-            large
-          />
-          <SummaryLine
-            label={`Ribasso (${economicRules.discountEnabled ? economicRules.discountPercent.toLocaleString("it-IT") : "0"}%)`}
-            value={<Currency value={-summary.discountAmount} />}
-            tone="danger"
-            large
-          />
-          <SummaryLine label="Voci OS" value={<Currency value={summary.safetyAmount} />} large />
-          <SummaryLine
-            label="Maggiorazioni"
-            value={<Currency value={summary.linkedChargeAmount} />}
-            large
-          />
-        </dl>
+      <div className="space-y-4 rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+        <BreakdownDetails economicRules={economicRules} lineViews={lineViews} />
+        <div className="border-t border-[var(--border-subtle)]/40 pt-4">
+          <EconomicEquation summary={summary} />
+        </div>
       </div>
       <div
         className="responsive-grid-elastic gap-2"
@@ -1823,62 +1796,58 @@ function EconomicEquation({
   return (
     <div
       className={cn(
-        "grid gap-2 rounded-lg bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-3 ring-1 ring-[var(--border-subtle)]/60 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center",
+        "divide-y divide-[var(--border-subtle)]/50 rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]",
         className,
       )}
     >
-      <EquationAmount label="Totale voci" value={<Currency value={summary.grossAmount} />} />
-      <EquationOperator>-</EquationOperator>
-      <EquationAmount
-        label="Sconto"
-        tone="danger"
-        value={<Currency value={summary.discountAmount} />}
-      />
-      <EquationOperator>=</EquationOperator>
-      <EquationAmount
-        label="Totale attuale SAL"
-        tone="info"
-        value={<Currency value={summary.total} />}
-      />
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+        <span className="text-12px font-medium text-[var(--text-secondary)]">
+          Totale voci lordo
+        </span>
+        <span className="text-13px font-semibold text-[var(--text-primary)]">
+          <Currency value={summary.grossAmount} />
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+        <span className="flex items-center gap-1.5 text-12px font-medium text-[var(--danger-base)]">
+          <span className="flex size-4 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--danger-base)_14%,var(--surface-base)_86%)] text-9px font-bold">
+            −
+          </span>
+          Sconto
+        </span>
+        <span className="text-13px font-semibold text-[var(--danger-base)]">
+          −<Currency value={summary.discountAmount} />
+        </span>
+      </div>
       {summary.linkedChargeAmount > 0 ? (
-        <div className="md:col-span-5 rounded-10px bg-[var(--surface-base)]/70 px-3 py-2 text-11px font-semibold text-[var(--text-secondary)]">
-          Maggiorazioni incluse nel totale attuale: <Currency value={summary.linkedChargeAmount} />
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+          <span className="flex items-center gap-1.5 text-12px font-medium text-[var(--info-base)]">
+            <span className="flex size-4 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--info-base)_14%,var(--surface-base)_86%)] text-9px font-bold">
+              +
+            </span>
+            Maggiorazioni
+          </span>
+          <span className="text-13px font-semibold text-[var(--info-base)]">
+            +<Currency value={summary.linkedChargeAmount} />
+          </span>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function EquationAmount({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone?: "danger" | "info";
-  value: ReactNode;
-}) {
-  return (
-    <div className="min-w-0 rounded-11px bg-[var(--surface-base)] p-3">
-      <div className="text-11px font-semibold text-[var(--text-secondary)]">{label}</div>
-      <div
-        className={cn(
-          "mt-1 truncate text-18px font-black",
-          tone === "danger" && "text-[var(--danger-base)]",
-          tone === "info" && "text-[var(--accent-primary)]",
-          !tone && "text-[var(--text-primary)]",
-        )}
-      >
-        {value}
+      {summary.safetyAmount > 0 ? (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+          <span className="text-12px font-medium text-[var(--text-secondary)]">di cui voci OS</span>
+          <span className="text-12px font-medium text-[var(--text-secondary)]">
+            <Currency value={summary.safetyAmount} />
+          </span>
+        </div>
+      ) : null}
+      <div className="flex items-center justify-between gap-3 rounded-b-xl bg-[color-mix(in_srgb,var(--accent-primary)_6%,var(--surface-base)_94%)] px-4 py-3">
+        <span className="text-13px font-bold text-[var(--accent-primary)]">
+          = Totale attuale SAL
+        </span>
+        <span className="text-16px font-black text-[var(--accent-primary)]">
+          <Currency value={summary.total} />
+        </span>
       </div>
-    </div>
-  );
-}
-
-function EquationOperator({ children }: { children: ReactNode }) {
-  return (
-    <div className="hidden size-9 items-center justify-center rounded-full bg-[var(--surface-base)] text-18px font-black text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/70 md:flex">
-      {children}
     </div>
   );
 }
@@ -1909,45 +1878,6 @@ function StepMetric({
       >
         {value}
       </div>
-    </div>
-  );
-}
-
-function SummaryLine({
-  label,
-  large,
-  tone,
-  value,
-}: {
-  label: string;
-  large?: boolean;
-  tone?: "accent" | "danger" | "info" | "success" | "warning";
-  value: ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span
-        className={cn(
-          "font-medium text-[var(--text-secondary)]",
-          large ? "text-14px" : "text-13px",
-        )}
-      >
-        {label}
-      </span>
-      <strong
-        className={cn(
-          large ? "text-16px" : "text-13px",
-          "font-semibold",
-          tone === "accent" && "text-[var(--accent-primary)]",
-          tone === "danger" && "text-[var(--danger-base)]",
-          tone === "success" && "text-[var(--success-base)]",
-          tone === "warning" && "text-[var(--warning-base)]",
-          tone === "info" && "text-[var(--info-base)]",
-          !tone && "text-[var(--text-primary)]",
-        )}
-      >
-        {value}
-      </strong>
     </div>
   );
 }

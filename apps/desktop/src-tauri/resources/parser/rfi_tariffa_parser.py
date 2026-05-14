@@ -779,6 +779,23 @@ def parse_pdf(input_path: str, debug: bool = False) -> dict:
     }
 
 
+def serve_mode(debug: bool = False):
+    """Read file paths from stdin (one per line), output one JSON result per line to stdout."""
+    for line in sys.stdin:
+        path = line.strip()
+        if not path:
+            continue
+        try:
+            result = parse_pdf(path, debug=debug)
+            if _needs_sanitize(result["records"]) or _needs_sanitize(result["maggiorazioni"]):
+                result = safe_json_value(result)
+            sys.stdout.buffer.write(_dumps(result))
+        except Exception as exc:
+            sys.stdout.buffer.write(_dumps({"error": str(exc)}))
+        sys.stdout.buffer.write(b"\n")
+        sys.stdout.flush()
+
+
 def main():
     debug = "--debug" in sys.argv or bool(os.environ.get("QUANTARA_PARSER_DEBUG", ""))
     args  = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -786,6 +803,10 @@ def main():
     if not args:
         print(json.dumps({"error": "Uso: rfi_tariffa_parser.py <file.pdf|file.json> [--debug]"}), file=sys.stderr)
         sys.exit(1)
+
+    if args[0] == "--serve":
+        serve_mode(debug=debug)
+        return
 
     try:
         result = parse_pdf(args[0], debug=debug)

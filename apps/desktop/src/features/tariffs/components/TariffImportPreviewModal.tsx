@@ -473,16 +473,17 @@ export function TariffImportPreviewModal({
   }, [draftStorageKey, flushGridDraftChanges, onConfirm, buildConfirmableMetadatas]);
   confirmChangesRef.current = confirmChanges;
 
+  const initialSyncRef = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — runs once on mount, subsequent changes handled by individual action handlers
   useEffect(() => {
-    dispatch({ type: "LOAD_DRAFT", loadedDraft, metadatas });
-    setCategorySections([]);
-    setDeleteTarget(null);
+    if (initialSyncRef.current) return;
+    initialSyncRef.current = true;
 
     const newDrafted = new Set(loadedDraft?.draftedFiles ?? []);
     const newReviewed = new Set(loadedDraft?.reviewedFiles ?? (metadatas.length === 1 ? [0] : []));
     onDraftedFilesChangeRef.current?.(newDrafted);
     onReviewedFilesChangeRef.current?.(newReviewed);
-  }, [loadedDraft, metadatas]);
+  }, []);
 
   const saveDraft = useCallback(() => {
     const nextEditableVoicesList = flushGridDraftChanges();

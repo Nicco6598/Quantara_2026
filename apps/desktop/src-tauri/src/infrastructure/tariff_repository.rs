@@ -1,4 +1,10 @@
-use std::{fs::File, io::Read, path::Path, process::Command};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader, BufWriter, Read, Write},
+    path::Path,
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+    sync::{Mutex, OnceLock},
+};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -114,6 +120,8 @@ struct RfiTariffRecord {
 #[derive(Debug, Clone, Deserialize)]
 struct ParserOutput {
     records: Vec<RfiTariffRecord>,
+    #[serde(default)]
+    maggiorazioni: Vec<RfiTariffRecord>,
     #[serde(default)]
     pages_total: i32,
 }
@@ -452,6 +460,14 @@ fn parse_rfi_pdf_with_python_direct(
         return Err("selected file is not a valid PDF".into());
     }
 
+    // Try persistent parser first
+    if let Some(rd) = resource_dir
+        && let Ok(result) = parse_via_persistent_parser(path, rd)
+    {
+        return Ok(result);
+    }
+
+    // Fallback to one-shot subprocess
     let output = run_bundled_rfi_parser_direct(path, resource_dir)?;
 
     if !output.status.success() {
@@ -465,7 +481,9 @@ fn parse_rfi_pdf_with_python_direct(
     let json_str = remove_json_surrogate_escapes(&json_str);
 
     if let Ok(result) = serde_json::from_str::<ParserOutput>(&json_str) {
-        return Ok((result.records, result.pages_total));
+        let mut all_records = result.records;
+        all_records.extend(result.maggiorazioni);
+        return Ok((all_records, result.pages_total));
     }
     let records = serde_json::from_str::<Vec<RfiTariffRecord>>(&json_str)
         .map_err(|e| format!("RFI parser returned invalid JSON: {e}"))?;
@@ -564,7 +582,9 @@ fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
     let parser_json = remove_json_surrogate_escapes(&parser_json);
 
     if let Ok(output) = serde_json::from_str::<ParserOutput>(&parser_json) {
-        return Ok(output.records);
+        let mut all_records = output.records;
+        all_records.extend(output.maggiorazioni);
+        return Ok(all_records);
     }
     serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json).map_err(|error| {
         AppError::Validation(format!(
@@ -651,6 +671,15 @@ fn parse_rfi_pdf_with_python(
         ));
     }
 
+    // Try persistent parser first (keeps Python alive between calls — faster on macOS)
+    if let Some(app) = app
+        && let Ok(resource_dir) = app.path().resource_dir()
+        && let Ok(result) = parse_via_persistent_parser(path, &resource_dir)
+    {
+        return Ok(result);
+    }
+
+    // Fallback to one-shot subprocess
     let output = run_bundled_rfi_parser(path, app).map_err(|error| {
         AppError::Validation(format!("Parser PDF non incluso in questa build. {error}"))
     })?;
@@ -666,7 +695,9 @@ fn parse_rfi_pdf_with_python(
     let parser_json = remove_json_surrogate_escapes(&parser_json);
 
     if let Ok(result) = serde_json::from_str::<ParserOutput>(&parser_json) {
-        return Ok((result.records, result.pages_total));
+        let mut all_records = result.records;
+        all_records.extend(result.maggiorazioni);
+        return Ok((all_records, result.pages_total));
     }
     let records = serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json).map_err(|error| {
         AppError::Validation(format!("RFI parser returned invalid JSON: {error}"))
@@ -764,6 +795,117 @@ fn is_json_surrogate_escape(value: &str) -> bool {
     u32::from_str_radix(&value[2..], 16)
         .map(|code| (0xD800..=0xDFFF).contains(&code))
         .unwrap_or(false)
+}
+
+/// Persistent RFI parser process client.
+/// Keeps a Python/PyInstaller subprocess alive across multiple PDF parses,
+/// avoiding subprocess startup overhead on macOS.
+struct RfiParserClient {
+    stdin: BufWriter<ChildStdin>,
+    stdout: BufReader<ChildStdout>,
+    child: Child,
+}
+
+impl RfiParserClient {
+    fn start(resource_dir: &Path) -> Result<Self, String> {
+        let candidates = parser_executable_candidates(resource_dir);
+
+        for exe in &candidates {
+            if exe.is_file() {
+                return Self::build_command(&mut Command::new(exe));
+            }
+        }
+
+        let python_exe = resource_dir.join("python").join(if cfg!(windows) {
+            "python.exe"
+        } else {
+            "bin/python3"
+        });
+        let script = resource_dir.join("parser").join("rfi_tariffa_parser.py");
+        if python_exe.is_file() && script.is_file() {
+            return Self::build_command(Command::new(python_exe).arg(&script));
+        }
+
+        Err("Bundled parser not found".into())
+    }
+
+    fn build_command(command: &mut Command) -> Result<Self, String> {
+        command.arg("--serve");
+        #[cfg(windows)]
+        command.creation_flags(0x08000000);
+
+        let mut child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+
+        let stdin = BufWriter::new(child.stdin.take().ok_or("stdin not available")?);
+        let stdout = BufReader::new(child.stdout.take().ok_or("stdout not available")?);
+
+        Ok(Self { stdin, stdout, child })
+    }
+
+    fn parse(&mut self, path: &Path) -> Result<ParserOutput, String> {
+        writeln!(self.stdin, "{}", path.display()).map_err(|e| e.to_string())?;
+        self.stdin.flush().map_err(|e| e.to_string())?;
+
+        let mut line = String::new();
+        self.stdout.read_line(&mut line).map_err(|e| e.to_string())?;
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() {
+            return Err("Parser process ended unexpectedly".into());
+        }
+
+        serde_json::from_str::<ParserOutput>(trimmed).map_err(|e| {
+            format!("Invalid JSON from parser: {e}")
+        })
+    }
+}
+
+impl Drop for RfiParserClient {
+    fn drop(&mut self) {
+        let _ = self.stdin.flush();
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// Global persistent parser state.
+/// `OnceLock<Mutex<Option<RfiParserClient>>>` allows lazy init and process restart on crash.
+fn rfi_parser_state() -> &'static Mutex<Option<RfiParserClient>> {
+    static STATE: OnceLock<Mutex<Option<RfiParserClient>>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(None))
+}
+
+fn parse_via_persistent_parser(
+    path: &Path,
+    resource_dir: &Path,
+) -> Result<(Vec<RfiTariffRecord>, i32), String> {
+    let state = rfi_parser_state();
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+
+    if guard.is_none() {
+        *guard = Some(RfiParserClient::start(resource_dir)?);
+    }
+
+    let client = guard.as_mut().unwrap();
+    let result = client.parse(path);
+
+    match result {
+        Ok(output) => {
+            let mut all_records = output.records;
+            all_records.extend(output.maggiorazioni);
+            Ok((all_records, output.pages_total))
+        }
+        Err(e) => {
+            // Process died — drop it so next call restarts
+            drop(guard.take());
+            Err(e)
+        }
+    }
 }
 
 fn run_bundled_rfi_parser(

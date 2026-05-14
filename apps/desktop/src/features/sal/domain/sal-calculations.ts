@@ -17,13 +17,32 @@ export const defaultSalEconomicRules: SalEconomicRules = {
   rounding: "cent",
 };
 
+/* ── MG (maggiorazione percentuale) helpers ── */
+const MG_SEGMENT = "MG";
+
+function isMgCode(code: string): boolean {
+  return code.split(".")[1]?.toUpperCase() === MG_SEGMENT;
+}
+
+function extractMgTariffPrefix(code: string): string | null {
+  const first = code.split(".")[0];
+  return first && first.toUpperCase() !== MG_SEGMENT ? first : null;
+}
+
 export function buildLineViews(
   lines: readonly SalLineDraft[],
   rules: SalEconomicRules,
 ): SalLineView[] {
-  return lines.map((line, index) => {
-    const quantity = normalizeQuantity(line.factor1 * line.factor2 * line.factor3);
-    const grossAmount = roundCurrency(quantity * line.voice.unitPrice);
+  // Phase 1 — build every line; MG lines get zero gross
+  const mgIndexes: number[] = [];
+  const views: SalLineView[] = lines.map((line, index) => {
+    const rawQty = line.factor1 * line.factor2 * line.factor3;
+    const isMg = isMgCode(line.voice.code);
+
+    if (isMg) mgIndexes.push(index);
+
+    const quantity = normalizeQuantity(isMg ? 0 : rawQty);
+    const grossAmount = roundCurrency(isMg ? 0 : quantity * line.voice.unitPrice);
     const linkedCharges = buildLinkedCharges(line, grossAmount);
     const linkedTotal = linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
     const netAmount = roundCurrency(grossAmount + linkedTotal);
@@ -40,13 +59,75 @@ export function buildLineViews(
       discountableAmount: discountable,
       grossAmount,
       linkedCharges,
-      measurementRows: buildMeasurementRows(line, index),
+      measurementRows: buildMeasurementRows(line, quantity, index),
       netAmount,
       quantity,
-      status: quantity > 0 ? "complete" : "incomplete",
+      status: isMg || quantity > 0 ? "complete" : "incomplete",
       totalAmount,
     };
   });
+
+  // Phase 2 — compute MG surcharges and re-apply discount on (gross + MG)
+  for (const idx of mgIndexes) {
+    const mgView = views[idx];
+    if (!mgView) continue;
+    const mgPercent = mgView.voice.unitPrice;
+    if (!mgPercent || mgPercent <= 0) continue;
+
+    const tariffPrefix = extractMgTariffPrefix(mgView.voice.code);
+    const mgRate = mgPercent / 100;
+    const eligibleGross = views.reduce((sum, v, vi) => {
+      if (mgIndexes.includes(vi)) return sum;
+      if (tariffPrefix && !v.voice.code.startsWith(`${tariffPrefix}.`)) return sum;
+      return sum + v.grossAmount;
+    }, 0);
+    if (eligibleGross <= 0) continue;
+    let totalDistributedMg = 0;
+
+    // Distribute MG to each eligible voice and re-compute discount on gross + MG
+    for (let vi = 0; vi < views.length; vi++) {
+      if (mgIndexes.includes(vi)) continue;
+      const ev = views[vi];
+      if (!ev) continue;
+      if (tariffPrefix && !ev.voice.code.startsWith(`${tariffPrefix}.`)) continue;
+      if (ev.grossAmount <= 0) continue;
+
+      const mgShare = roundCurrency(ev.grossAmount * mgRate);
+      if (mgShare <= 0) continue;
+      totalDistributedMg += mgShare;
+
+      // Recompute: (gross + surchargeLinked + mgShare) → discount
+      const surchargeLinkedTotal = ev.linkedCharges.reduce((s, c) => s + c.total, 0);
+      const newNet = roundCurrency(ev.grossAmount + surchargeLinkedTotal + mgShare);
+      const discountable = ev.voice.isSafetyCost && !rules.applyDiscountToSafetyCosts ? 0 : newNet;
+      const newDiscount = rules.discountEnabled
+        ? roundCurrency(discountable * (rules.discountPercent / 100))
+        : 0;
+      ev.netAmount = newNet;
+      ev.discountableAmount = discountable;
+      ev.discountAmount = newDiscount;
+      ev.totalAmount = roundCurrency(newNet - newDiscount);
+    }
+
+    // MG line shows the total surcharge
+    const totalMg = roundCurrency(totalDistributedMg);
+    mgView.linkedCharges.push({
+      baseAmount: eligibleGross,
+      code: `MG.${tariffPrefix ?? "ALL"}`,
+      description: tariffPrefix
+        ? `Maggiorazione MG ${mgPercent}% su voci ${tariffPrefix}`
+        : `Maggiorazione MG ${mgPercent}% su tutte le voci`,
+      id: `${mgView.id}-mg`,
+      percent: mgPercent,
+      total: totalMg,
+    });
+    mgView.netAmount = totalMg;
+    mgView.totalAmount = totalMg;
+    mgView.discountableAmount = 0;
+    mgView.discountAmount = 0;
+  }
+
+  return views;
 }
 
 export function summarizeSalLines(
@@ -56,6 +137,9 @@ export function summarizeSalLines(
 ): SalEconomicSummary {
   const summary = lineViews.reduce(
     (current, line) => {
+      // Skip MG lines — their amounts are already distributed to eligible voices
+      if (isMgCode(line.voice.code)) return current;
+
       const linkedChargeAmount = line.linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
       const hasDiscountableAmount = line.discountableAmount > 0;
       return {
@@ -291,8 +375,12 @@ export function buildVerificationChecks(
   return checks;
 }
 
-function buildMeasurementRows(line: SalLineDraft, index: number): SalMeasurementRow[] {
-  const quantity = normalizeQuantity(line.factor1 * line.factor2 * line.factor3);
+function buildMeasurementRows(
+  line: SalLineDraft,
+  quantity: number,
+  index: number,
+): SalMeasurementRow[] {
+  if (quantity <= 0 && isMgCode(line.voice.code)) return [];
   if (quantity <= 0) {
     return [];
   }

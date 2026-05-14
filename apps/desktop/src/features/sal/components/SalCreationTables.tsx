@@ -9,7 +9,7 @@ import { Currency } from "@/components/shared/Currency";
 import { StatusPill } from "@/components/shared/StatusPill";
 export { Currency };
 import { cn } from "@/lib/utils";
-import type { SalEconomicSummary, SalLineDraft, SalLineView } from "../types";
+import type { SalEconomicRules, SalEconomicSummary, SalLineDraft, SalLineView } from "../types";
 
 export function NumberValue({ value }: { value: number }) {
   return (
@@ -75,24 +75,24 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
       <div className="overflow-x-auto">
         <div ref={scrollRef} className="max-h-[620px] overflow-y-auto">
           <div className="min-w-[1460px]">
-            <div className="sticky top-0 z-20 grid grid-cols-[44px_128px_minmax(300px,1.2fr)_70px_108px_86px_86px_86px_112px_126px_118px_86px_130px_minmax(220px,0.9fr)_76px] border-b border-[var(--border-subtle)] bg-[var(--surface-base)] text-10px font-semibold uppercase tracking-0_12em text-[var(--text-secondary)] shadow-[0_8px_18px_color-mix(in_srgb,var(--text-primary)_6%,transparent)]">
+            <div className="sticky top-0 z-20 grid grid-cols-[44px_128px_minmax(300px,1.2fr)_70px_108px_86px_86px_86px_112px_126px_118px_86px_130px_76px] border-b border-[var(--border-subtle)] bg-[var(--surface-base)] text-10px font-semibold uppercase tracking-0_12em text-[var(--text-secondary)] shadow-[0_8px_18px_color-mix(in_srgb,var(--text-primary)_6%,transparent)]">
               {[
-                "N.",
-                "Codice voce",
-                "Voce / categoria",
-                "UM",
-                "Prezzo unit.",
-                "Fatt. 1",
-                "Fatt. 2",
-                "Fatt. 3",
-                "Qtà calc.",
-                "Importo lordo",
-                "Ribasso",
-                "Magg. %",
-                "Netto SAL",
-                "Note riga",
-                "Azioni",
-              ].map((label) => {
+                { label: "N.", dragSpace: !useVirtual },
+                { label: "Codice voce" },
+                { label: "Voce / categoria" },
+                { label: "UM" },
+                { label: "Prezzo unit." },
+                { label: "Fatt. 1" },
+                { label: "Fatt. 2" },
+                { label: "Fatt. 3" },
+                { label: "Qtà calc." },
+                { label: "Importo lordo" },
+                { label: "Ribasso" },
+                { label: "Magg. %" },
+                { label: "Netto SAL" },
+                { label: "Azioni" },
+              ].map((col) => {
+                const label = col.label;
                 const isRight =
                   label === "Prezzo unit." ||
                   label === "Fatt. 1" ||
@@ -108,6 +108,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
                     className={cn(
                       "flex min-h-9 items-center border-r border-[var(--border-subtle)]/70 px-2 last:border-r-0",
                       isRight && "justify-end text-right",
+                      col.dragSpace && "pl-7",
                     )}
                     key={label}
                   >
@@ -184,6 +185,12 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   );
 });
 
+const MG_SEGMENT = "MG";
+
+function isMgRow(voice: SalLineView["voice"]): boolean {
+  return voice.code.split(".")[1]?.toUpperCase() === MG_SEGMENT;
+}
+
 const SelectedVoiceRow = memo(function SelectedVoiceRow({
   index,
   line,
@@ -205,178 +212,205 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
 }) {
   const linkedTotal = line.linkedCharges.reduce((sum, c) => sum + c.total, 0);
   const laborPct = line.voice.laborPercentage ?? 0;
+  const isMg = isMgRow(line.voice);
+  const mgTariffPrefix = isMg
+    ? line.voice.code?.split(".")[0]?.toUpperCase() === MG_SEGMENT
+      ? null
+      : (line.voice.code?.split(".")[0] ?? null)
+    : null;
 
   return (
-    <div
-      data-line-id={line.id}
-      className={cn(
-        "grid grid-cols-[44px_128px_minmax(300px,1.2fr)_70px_108px_86px_86px_86px_112px_126px_118px_86px_130px_minmax(220px,0.9fr)_76px] border-b border-[var(--border-subtle)]/60 text-12px transition-colors hover:bg-[color-mix(in_srgb,var(--info-soft)_20%,var(--surface-base)_80%)]",
-        index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/24",
-      )}
-    >
-      <GridCell align="center" muted>
-        {index + 1}
-      </GridCell>
-      <GridCell strong title={line.voice.code}>
-        <span className="truncate">{line.voice.code}</span>
-      </GridCell>
-      <GridCell>
-        <div className="flex min-w-0 items-start gap-1.5">
-          <span className="min-w-0 flex-1">
-            <div className="whitespace-normal break-words font-medium leading-snug text-[var(--text-primary)]">
-              {line.voice.description}
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <span className="truncate text-10px text-[var(--text-secondary)]">
-                {line.voice.category}
-              </span>
-              {laborPct > 0 ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] px-1.5 py-0.5 text-10px font-bold text-[var(--accent-primary)]">
-                  <span className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
-                  Man. {laborPct}%
+    <>
+      <div
+        data-line-id={line.id}
+        className={cn(
+          "grid grid-cols-[44px_128px_minmax(300px,1.2fr)_70px_108px_86px_86px_86px_112px_126px_118px_86px_130px_76px] border-b border-[var(--border-subtle)]/60 text-12px transition-colors hover:bg-[color-mix(in_srgb,var(--info-soft)_20%,var(--surface-base)_80%)]",
+          index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/24",
+          isMg && "bg-[color-mix(in_srgb,var(--accent-primary)_6%,var(--surface-base)_94%)]",
+        )}
+      >
+        <GridCell muted>{index + 1}</GridCell>
+        <GridCell strong title={line.voice.code}>
+          <span className="truncate">{line.voice.code}</span>
+        </GridCell>
+        <GridCell>
+          <div className="flex min-w-0 items-start gap-1.5">
+            <span className="min-w-0 flex-1">
+              <div className="whitespace-normal break-words font-medium leading-snug text-[var(--text-primary)]">
+                {line.voice.description}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <span className="truncate text-10px text-[var(--text-secondary)]">
+                  {line.voice.category}
                 </span>
-              ) : null}
-              {line.voice.isSafetyCost ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-[var(--danger-soft)] px-1.5 py-0.5 text-10px font-bold text-[var(--danger-base)]">
-                  OS
-                </span>
-              ) : null}
-            </div>
-          </span>
-        </div>
-      </GridCell>
-      <GridCell muted>{line.voice.unit}</GridCell>
-      <GridCell align="right">
-        <Currency value={line.voice.unitPrice} />
-      </GridCell>
-      <GridCell align="right" editable>
-        <InlineEdit
-          ariaLabel={`Fattore 1 per ${line.voice.code}`}
-          className="w-full"
-          onCommit={(value) => onFactorChange(line.id, "factor1", value)}
-          value={line.factor1}
-        />
-      </GridCell>
-      <GridCell align="right" editable>
-        <InlineEdit
-          ariaLabel={`Fattore 2 per ${line.voice.code}`}
-          className="w-full"
-          onCommit={(value) => onFactorChange(line.id, "factor2", value)}
-          value={line.factor2}
-        />
-      </GridCell>
-      <GridCell align="right" editable>
-        <InlineEdit
-          ariaLabel={`Fattore 3 per ${line.voice.code}`}
-          className="w-full"
-          onCommit={(value) => onFactorChange(line.id, "factor3", value)}
-          value={line.factor3}
-        />
-      </GridCell>
-      <GridCell align="right" strong>
-        <NumberValue value={line.quantity} />
-      </GridCell>
-      <GridCell align="right" strong>
-        <Currency value={line.grossAmount} />
-      </GridCell>
-      <GridCell align="right">
-        <span
-          className={cn(
-            line.discountAmount > 0
-              ? "font-semibold text-[var(--danger-base)]"
-              : "text-[var(--text-secondary)]",
+                {isMg ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--info-base)_12%,var(--surface-base)_88%)] px-1.5 py-0.5 text-10px font-bold text-[var(--info-base)]">
+                    MG{mgTariffPrefix ? ` · solo ${mgTariffPrefix}` : ""}
+                  </span>
+                ) : null}
+                {laborPct > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] px-1.5 py-0.5 text-10px font-bold text-[var(--accent-primary)]">
+                    <span className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
+                    Man. {laborPct}%
+                  </span>
+                ) : null}
+                {line.voice.isSafetyCost ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--danger-soft)] px-1.5 py-0.5 text-10px font-bold text-[var(--danger-base)]">
+                    OS
+                  </span>
+                ) : null}
+              </div>
+            </span>
+          </div>
+        </GridCell>
+        <GridCell muted>{line.voice.unit}</GridCell>
+        <GridCell align="right">
+          {isMg ? (
+            <span className="font-bold text-[var(--info-base)]">{line.voice.unitPrice}%</span>
+          ) : (
+            <Currency value={line.voice.unitPrice} />
           )}
-          title={
-            line.voice.isSafetyCost && line.discountAmount === 0
-              ? "Voce OS esclusa dal ribasso"
-              : "Ribasso gara applicato alla voce"
-          }
-        >
-          {line.discountAmount > 0 ? "-" : ""}
-          <Currency value={line.discountAmount} />
-        </span>
-      </GridCell>
-      <GridCell align="right" editable>
-        <input
-          aria-label={`Maggiorazione % per ${line.voice.code}`}
-          className="h-8 w-full rounded-none border-0 bg-transparent px-1 text-right text-12px font-semibold text-[var(--text-primary)] outline-none transition focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
-          inputMode="decimal"
-          onChange={(event) => {
-            const raw = event.target.value.replace(",", ".");
-            if (raw === "") {
-              onSurcharge(line.id, 0);
-              return;
-            }
-            const val = Number.parseFloat(raw);
-            if (Number.isFinite(val) && val >= 0) {
-              onSurcharge(line.id, val);
-            }
-          }}
-          placeholder="%"
-          type="text"
-          value={line.surchargePercent || ""}
-        />
-      </GridCell>
-      <GridCell align="right" strong>
-        <span className="text-[var(--accent-primary)]">
-          <Currency value={line.totalAmount} />
-        </span>
-      </GridCell>
-      <GridCell editable title={line.notes || undefined}>
-        <textarea
-          className="w-full resize-none overflow-hidden rounded-none border-0 bg-transparent px-1 py-1.5 text-12px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
-          placeholder={
-            linkedTotal > 0
-              ? `Magg. ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`
-              : "Nota..."
-          }
-          style={{ minHeight: "80px" }}
-          value={line.notes}
-          onChange={(e) => {
-            onNotesChange(line.id, e.target.value);
-            const style = e.currentTarget.style;
-            style.height = "auto";
-            style.height = `${Math.max(e.currentTarget.scrollHeight, 80)}px`;
-          }}
-          ref={(el) => {
-            if (el && el.dataset.init !== "true") {
-              el.dataset.init = "true";
-              const style = el.style;
-              style.height = "auto";
-              style.height = `${Math.max(el.scrollHeight, 80)}px`;
-            }
-          }}
-        />
-      </GridCell>
-      <GridCell align="center">
-        <div className="flex items-center justify-center gap-1">
-          <m.button
-            aria-label={isCopied ? "Copiata" : "Copia voce"}
+        </GridCell>
+        <GridCell align="right" editable={!isMg}>
+          {isMg ? (
+            <span className="text-[var(--text-tertiary)]">—</span>
+          ) : (
+            <InlineEdit
+              ariaLabel={`Fattore 1 per ${line.voice.code}`}
+              className="w-full"
+              onCommit={(value) => onFactorChange(line.id, "factor1", value)}
+              value={line.factor1}
+            />
+          )}
+        </GridCell>
+        <GridCell align="right" editable={!isMg}>
+          {isMg ? (
+            <span className="text-[var(--text-tertiary)]">—</span>
+          ) : (
+            <InlineEdit
+              ariaLabel={`Fattore 2 per ${line.voice.code}`}
+              className="w-full"
+              onCommit={(value) => onFactorChange(line.id, "factor2", value)}
+              value={line.factor2}
+            />
+          )}
+        </GridCell>
+        <GridCell align="right" editable={!isMg}>
+          {isMg ? (
+            <span className="text-[var(--text-tertiary)]">—</span>
+          ) : (
+            <InlineEdit
+              ariaLabel={`Fattore 3 per ${line.voice.code}`}
+              className="w-full"
+              onCommit={(value) => onFactorChange(line.id, "factor3", value)}
+              value={line.factor3}
+            />
+          )}
+        </GridCell>
+        <GridCell align="right" strong>
+          <NumberValue value={line.quantity} />
+        </GridCell>
+        <GridCell align="right" strong>
+          <Currency value={line.grossAmount} />
+        </GridCell>
+        <GridCell align="right">
+          <span
             className={cn(
-              "flex size-7 items-center justify-center rounded-md transition-all",
-              isCopied
-                ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-                : "text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+              line.discountAmount > 0
+                ? "font-semibold text-[var(--danger-base)]"
+                : "text-[var(--text-secondary)]",
             )}
-            onClick={onCopy}
-            type="button"
-            title={isCopied ? "Voce copiata - premi Ctrl+V per incollare" : "Copia voce"}
-            transition={{ duration: 0.42, ease: SPRING_EASE }}
+            title={
+              line.voice.isSafetyCost && line.discountAmount === 0
+                ? "Voce OS esclusa dal ribasso"
+                : "Ribasso gara applicato alla voce"
+            }
           >
-            {isCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          </m.button>
-          <m.button
-            aria-label={`Rimuovi ${line.voice.code}`}
-            className="flex size-7 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
-            onClick={() => onRemove(line.id)}
-            type="button"
-            transition={{ duration: 0.42, ease: SPRING_EASE }}
-          >
-            <Trash2 className="size-3.5" />
-          </m.button>
+            {line.discountAmount > 0 ? "-" : ""}
+            <Currency value={line.discountAmount} />
+          </span>
+        </GridCell>
+        <GridCell align="right" editable>
+          <input
+            aria-label={`Maggiorazione % per ${line.voice.code}`}
+            className="h-8 w-full rounded-none border-0 bg-transparent px-1 text-right text-12px font-semibold text-[var(--text-primary)] outline-none transition focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
+            inputMode="decimal"
+            onChange={(event) => {
+              const raw = event.target.value.replace(",", ".");
+              if (raw === "") {
+                onSurcharge(line.id, 0);
+                return;
+              }
+              const val = Number.parseFloat(raw);
+              if (Number.isFinite(val) && val >= 0) {
+                onSurcharge(line.id, val);
+              }
+            }}
+            placeholder="%"
+            type="text"
+            value={line.surchargePercent || ""}
+          />
+        </GridCell>
+        <GridCell align="right" strong>
+          <span className="text-[var(--accent-primary)]">
+            <Currency value={line.totalAmount} />
+          </span>
+        </GridCell>
+        <GridCell align="center">
+          <div className="flex items-center justify-center gap-1">
+            <m.button
+              aria-label={isCopied ? "Copiata" : "Copia voce"}
+              className={cn(
+                "flex size-7 items-center justify-center rounded-md transition-all",
+                isCopied
+                  ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+                  : "text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+              )}
+              onClick={onCopy}
+              type="button"
+              title={isCopied ? "Voce copiata - premi Ctrl+V per incollare" : "Copia voce"}
+              transition={{ duration: 0.42, ease: SPRING_EASE }}
+            >
+              {isCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            </m.button>
+            <m.button
+              aria-label={`Rimuovi ${line.voice.code}`}
+              className="flex size-7 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+              onClick={() => onRemove(line.id)}
+              type="button"
+              transition={{ duration: 0.42, ease: SPRING_EASE }}
+            >
+              <Trash2 className="size-3.5" />
+            </m.button>
+          </div>
+        </GridCell>
+      </div>
+      <div
+        className={cn(
+          "border-b border-[var(--border-subtle)]/60",
+          index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/24",
+        )}
+      >
+        <div className="mx-5 pb-3 pt-1">
+          <textarea
+            className="w-full resize-none overflow-hidden rounded-lg border border-[color-mix(in_srgb,var(--border-subtle)_50%,transparent)] bg-[var(--surface-base)] px-3 py-2 text-12px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            placeholder={
+              linkedTotal > 0
+                ? `Magg. ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`
+                : "Nota..."
+            }
+            rows={1}
+            value={line.notes}
+            onChange={(e) => {
+              onNotesChange(line.id, e.target.value);
+              const style = e.currentTarget.style;
+              style.height = "auto";
+              style.height = `${Math.max(e.currentTarget.scrollHeight, 36)}px`;
+            }}
+          />
         </div>
-      </GridCell>
-    </div>
+      </div>
+    </>
   );
 });
 
@@ -426,7 +460,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   return (
     <div className="overflow-x-auto rounded-2xl bg-[var(--bg-muted)]/50">
       <div className="min-w-[1100px]">
-        <div className="grid-col-fade sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] gap-3 bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] p-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
+        <div className="grid-col-fade sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_60px_36px] gap-3 bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] p-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
           <span />
           <span>Tariffario</span>
           <span>Codice</span>
@@ -445,7 +479,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
             <div className="border-t border-[var(--border-subtle)]/50" key={line.id}>
               <m.button
                 aria-expanded={expanded}
-                className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_54px] items-center p-3 text-left text-13px hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_60px_36px] items-center p-3 text-left text-13px hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => setExpandedId(expanded ? null : line.id)}
                 type="button"
                 transition={{ duration: 0.42, ease: SPRING_EASE }}
@@ -661,6 +695,111 @@ export function DocumentPreview({
             {total.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function BreakdownDetails({
+  lineViews,
+  economicRules,
+}: {
+  lineViews: SalLineView[];
+  economicRules: SalEconomicRules;
+}) {
+  const mgEntries = lineViews.flatMap((line) =>
+    line.linkedCharges
+      .filter((c) => c.code.startsWith("MG."))
+      .map((c) => {
+        const tariffPrefix = c.code.replace("MG.", "");
+        const voiceCount =
+          tariffPrefix === "ALL"
+            ? lineViews.filter((v) => v.linkedCharges.length === 0).length
+            : lineViews.filter((v) => v.voice.code.startsWith(`${tariffPrefix}.`)).length;
+        return {
+          code: c.code,
+          description: c.description,
+          percent: c.percent,
+          baseAmount: c.baseAmount,
+          total: c.total,
+          tariffLabel: tariffPrefix === "ALL" ? "tutte le voci" : `solo voci ${tariffPrefix}`,
+          voiceCount,
+        };
+      }),
+  );
+
+  const discountAmount = lineViews.reduce((s, l) => s + l.discountAmount, 0);
+  const discountableAmount = lineViews.reduce(
+    (s, l) => s + (l.voice.isSafetyCost ? 0 : l.netAmount),
+    0,
+  );
+  const discountedVoiceCount = lineViews.filter((l) => l.discountAmount > 0).length;
+  const hasMg = mgEntries.length > 0;
+  const hasDiscount = discountAmount > 0;
+
+  if (!hasMg && !hasDiscount) return null;
+
+  return (
+    <div className="rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_96%,var(--bg-muted)_4%)] ring-1 ring-[var(--border-subtle)]/70">
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)]/60 px-4 py-3">
+        <span className="text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+          Riepilogo economico
+        </span>
+      </div>
+      <div className="grid gap-px bg-[var(--border-subtle)]/40 md:grid-cols-2">
+        {hasMg
+          ? mgEntries.map((entry) => (
+              <div
+                className="flex flex-col justify-center bg-[color-mix(in_srgb,var(--surface-base)_90%,var(--info-base)_2%)] px-4 py-3"
+                key={entry.code}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--info-base)_12%,var(--surface-base)_88%)] text-12px font-bold text-[var(--info-base)]">
+                      MG
+                    </span>
+                    <span className="truncate text-12px font-semibold text-[var(--text-primary)]">
+                      {entry.percent.toLocaleString("it-IT")}% — {entry.tariffLabel}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-13px font-bold text-[var(--info-base)]">
+                    +<Currency value={entry.total} />
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-2 pl-8 text-11px text-[var(--text-secondary)]">
+                  <span>
+                    su <Currency value={entry.baseAmount} />
+                  </span>
+                  <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+                  <span>{entry.voiceCount} voci</span>
+                </div>
+              </div>
+            ))
+          : null}
+        {hasDiscount ? (
+          <div className="flex flex-col justify-center bg-[color-mix(in_srgb,var(--surface-base)_90%,var(--danger-base)_2%)] px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--danger-base)_12%,var(--surface-base)_88%)] text-12px font-bold text-[var(--danger-base)]">
+                  %
+                </span>
+                <span className="truncate text-12px font-semibold text-[var(--text-primary)]">
+                  Ribasso {economicRules.discountPercent.toLocaleString("it-IT")}%
+                </span>
+              </div>
+              <span className="shrink-0 text-13px font-bold text-[var(--danger-base)]">
+                -<Currency value={discountAmount} />
+              </span>
+            </div>
+            <div className="mt-1 flex items-center gap-2 pl-8 text-11px text-[var(--text-secondary)]">
+              <span>
+                su <Currency value={discountableAmount} />
+              </span>
+              <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+              <span>{discountedVoiceCount} voci</span>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
