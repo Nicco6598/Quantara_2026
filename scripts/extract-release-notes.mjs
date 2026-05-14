@@ -11,7 +11,7 @@ if (!version) {
 }
 
 const changelog = await readFile(resolve(rootDir, "CHANGELOG.md"), "utf8");
-const versionHeading = new RegExp(`^##\\s+${escapeRegExp(version)}\\s+-\\s+.+$`, "m");
+const versionHeading = new RegExp(`^##\\s+${escapeRegExp(version)}\\s+[-—]\\s+.+$`, "m");
 const headingMatch = changelog.match(versionHeading);
 
 if (!headingMatch || headingMatch.index === undefined) {
