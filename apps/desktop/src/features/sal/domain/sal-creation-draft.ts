@@ -8,6 +8,7 @@ type SalCreationDraft = {
   materials?: { code: string; description: string; id: string; unit: string }[];
   phase: "context" | "voices" | "review" | "confirm" | "completed";
   projectId: string;
+  salDate: string;
   salTitle: string;
   selectedTariffBookIds: string[];
 };

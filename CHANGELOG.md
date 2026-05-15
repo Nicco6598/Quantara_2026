@@ -2,6 +2,41 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.2 — 2026-05-15
+
+### Grafici nuovo — andamento economico visivo
+
+- **Andamento portafoglio** — nuovo grafico a curve cumulative che mostra l'evoluzione della spesa di tutti i progetti insieme, progetto per progetto, con filtro temporale (3, 6, 12 mesi o tutto). La linea del budget totale aiuta a capire se si sta andando fuori controllo. Nella Dashboard.
+- **Trend di spesa per progetto** — nuovo grafico nel Dettaglio progetto che confronta la spesa effettiva cumulata con la proiezione budget. Con pochi dati usa una linea retta (sempre sensata), con dati sufficienti usa la curva S logistica standard per costruzioni. Ogni modifica ai costi aggiorna immediatamente la proiezione.
+- **Istogramma spesa mensile** — nuovo grafico a barre che mostra la spesa mese per mese dal primo SAL fino a oggi, con la media sui mesi con attività sovrapposta. Niente più mesi vuoti o medie calcolate su dati inesistenti.
+- **Filtro temporale su ogni grafico** — tutti i grafici hanno un selettore a comparsa (3M, 6M, 1Y, Tutto).
+
+### Scegli tu la data della SAL
+
+- **Data personalizzabile in creazione SAL** — nello step Impostazioni, accanto al nome SAL, trovi un campo "Data SAL" con selettore di calendario. Default sulla data odierna, ma puoi cambiarla per registrare SAL passate o future. La data scelta viene usata in tutta la SAL.
+
+### Quadro economico con dati veri
+
+- **CPI reale** — l'indice nel Dettaglio progetto ora confronta il budget contrattuale con la spesa effettiva (`budget / speso`). Se > 1 sei sotto budget, se < 1 sei sopra. La nota cambia dinamicamente: "Sotto budget", "In linea" o "Sopra budget". Prima era un calcolo senza senso (`approvato / totale`) con nota fissa.
+- **Fine prevista** — non più un numero mockato ma stimata dal progresso reale: `giorni_trascorsi / (speso / budget)`. Mostra "Tra ~X mesi", "In chiusura" o "In linea". Coerente con le barre della Gantt in Dashboard, che ora usano la stessa formula.
+- **Forecast Impact** — ora calcola la differenza economica reale (`speso - budget`) e mostra "€X sopra budget" o "€X sotto budget" a seconda del segno. Prima era una stringa fissa dai dati mock.
+- **Note dinamiche** — il colore e il testo delle voci cambiano in tempo reale in base ai dati.
+
+### Più fluida e robusta
+
+- **Dati che restano dopo refresh** — le voci tariffarie (`tariffVoices`) ora vengono salvate nel localStorage insieme a tutto il resto. Prima un aggiornamento pagina azzerava tutti i grafici e i totali perché le voci non venivano trovate.
+- **Stati hover cantieri e timeline** — il click del mouse sulle righe della Gantt e della lista cantieri ora è più reattivo.
+
+### Accessibilità migliorata
+
+- **Dropdown si chiudono con Escape** — i menu a tendina rispondono al tasto Escape per chiudersi.
+- **Elementi interattivi corretti** — overlay e pulsanti icona ora usano elementi HTML semantici (`<button>`), riconoscibili da screen reader e navigabili da tastiera.
+
+### Correzioni
+
+- **Warning lint risolti** — eliminati avvisi di stile: non-null assertion, chiavi array, import type.
+- **Array gestiti in sicurezza** — accessi con controlli espliciti invece di assertion implicite.
+
 ## 0.3.1 — 2026-05-15
 
 ### Riepilogo costi più chiaro

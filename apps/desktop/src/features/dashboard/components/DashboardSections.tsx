@@ -1,9 +1,7 @@
-import { scaleTime } from "@visx/scale";
 import { m } from "framer-motion";
 import {
   AlertTriangle,
   Building2,
-  CalendarDays,
   ChevronRight,
   FileText,
   FolderKanban,
@@ -13,9 +11,9 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
-import { ModernDonut, SegmentBars } from "@/components/shared/Charts";
+import { ModernDonut, SegmentBars } from "@/components/shared/LegacyCharts";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { MOTION_VARIANTS } from "@/components/shared/easings";
 import type { StatusTone } from "@/components/shared/StatusBadge";
@@ -88,221 +86,313 @@ export function PriorityActions({ items }: { items: PortfolioProject[] }) {
   );
 }
 
-export function TimelineGantt({ bars }: { bars: GanttBar[] }) {
+export function TimelineGantt({
+  bars,
+  projects,
+  operationalByProjectId,
+  onOpen,
+  onDelete,
+}: {
+  bars: GanttBar[];
+  projects: PortfolioProject[];
+  operationalByProjectId: Map<
+    string,
+    { approvedAmount: number; committedAmount: number; progressPercent: number }
+  >;
+  onOpen: (project: PortfolioProject) => void;
+  onDelete: (projectId: string) => void;
+}) {
   const today = new Date();
   const allDates = bars.flatMap((bar) => [bar.startDate, bar.endDate, today]);
   const minDate =
     allDates.length > 0
-      ? startOfMonth(new Date(Math.min(...allDates.map((date) => date.getTime()))))
+      ? startOfMonth(new Date(Math.min(...allDates.map((d) => d.getTime()))))
       : today;
   const maxDate =
     allDates.length > 0
-      ? endOfMonth(new Date(Math.max(...allDates.map((date) => date.getTime()))))
+      ? endOfMonth(new Date(Math.max(...allDates.map((d) => d.getTime()))))
       : today;
-  const [hoveredBar, setHoveredBar] = useState<GanttBar | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const xScale = useMemo(
-    () =>
-      scaleTime({
-        domain: [minDate, maxDate],
-        range: [0, 100],
-      }),
-    [minDate, maxDate],
-  );
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      el.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   const monthTicks = useMemo(() => buildMonthTicks(minDate, maxDate), [minDate, maxDate]);
-  const todayX = xScale(today);
+  const MIN_MONTH_PX = 80;
+
+  const timelineWidth = useMemo(
+    () => Math.max(monthTicks.length * MIN_MONTH_PX + 32, 400),
+    [monthTicks.length],
+  );
+
+  const xScale = useMemo(() => {
+    const tMin = minDate.getTime();
+    const tRange = maxDate.getTime() - tMin || 1;
+    return (d: Date) => ((d.getTime() - tMin) / tRange) * 100;
+  }, [minDate, maxDate]);
+
+  const barStyle = (bar: GanttBar) => {
+    const left = Math.max(xScale(bar.startDate), 0);
+    const right = Math.min(xScale(bar.endDate), 100);
+    const width = Math.max(right - left, 0.5);
+    return { left: `${left}%`, width: `${width}%` };
+  };
+
+  const successCount = bars.filter((b) => b.tone === "success").length;
+  const warningCount = bars.filter((b) => b.tone === "warning").length;
+  const dangerCount = bars.filter((b) => b.tone === "danger").length;
+  const toneTotals = [
+    { color: "var(--success-base)", label: "In linea", count: successCount },
+    { color: "var(--warning-base)", label: "Attenzione", count: warningCount },
+    { color: "var(--danger-base)", label: "Critico", count: dangerCount },
+  ];
+  const avgProgress =
+    bars.length > 0 ? Math.round(bars.reduce((s, b) => s + b.progress, 0) / bars.length) : 0;
+
+  const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+
+  if (bars.length === 0) return null;
 
   return (
-    <div className="relative w-full overflow-hidden">
+    <div className="w-full">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-          <CalendarDays className="size-3.5" />
-          <span>Timeline</span>
+          <HardHat className="size-3.5" />
+          <span>Cantieri operativi</span>
         </div>
         <span className="rounded-full border border-[color-mix(in_srgb,var(--border-subtle)_50%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_72%,transparent)] px-2.5 py-1 text-10px font-bold text-[var(--text-secondary)]">
           {bars.length} cantier{bars.length === 1 ? "e" : "i"}
         </span>
       </div>
 
-      <div className="overflow-hidden rounded-18px border border-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-base)_96%,var(--info-soft)_4%),color-mix(in_srgb,var(--surface-base)_90%,var(--bg-muted)_10%))] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
-        <div className="grid grid-cols-[minmax(150px,210px)_minmax(420px,1fr)] border-b border-[color-mix(in_srgb,var(--border-subtle)_52%,transparent)] bg-[color-mix(in_srgb,var(--surface-highlight)_18%,transparent)]">
-          <div className="px-4 py-3 text-10px font-black uppercase tracking-0_14em text-[var(--text-secondary)]">
+      <div className="flex overflow-hidden rounded-18px border border-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
+        {/* Sticky project column */}
+        <div className="sticky left-0 z-10 shrink-0 w-[260px] border-r border-[var(--border-subtle)]/50 bg-[var(--surface-base)]">
+          <div className="flex items-center px-3 h-7 text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
             Cantiere
           </div>
-          <div className="relative min-w-0 px-4 py-3">
-            <div className="relative h-4">
-              {monthTicks.map((tick) => (
-                <span
-                  className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-9px font-black uppercase tracking-0_08em text-[var(--text-secondary)]/70"
-                  key={tick.toISOString()}
-                  style={{ left: `${xScale(tick)}%` }}
-                >
-                  {tick.toLocaleDateString("it-IT", { month: "short" })}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="divide-y divide-[color-mix(in_srgb,var(--border-subtle)_34%,transparent)]">
-          {bars.map((bar, index) => {
-            const start = Math.max(0, Math.min(100, xScale(bar.startDate)));
-            const end = Math.max(0, Math.min(100, xScale(bar.endDate)));
-            const width = Math.max(1.4, end - start);
-            const progress = Math.max(0, Math.min(100, bar.progress));
-            const toneClass = ganttToneClass(bar.tone);
-            const isHovered = hoveredBar?.id === bar.id;
-
+          {bars.map((bar) => {
+            const project = projectById.get(bar.id);
+            const operational = operationalByProjectId.get(bar.id);
             return (
-              <m.div
-                className={cn(
-                  "group grid min-h-[58px] grid-cols-[minmax(150px,210px)_minmax(420px,1fr)] transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                  isHovered
-                    ? "bg-[color-mix(in_srgb,var(--bg-muted)_58%,transparent)]"
-                    : "hover:bg-[color-mix(in_srgb,var(--bg-muted)_34%,transparent)]",
-                )}
-                initial={MOTION_VARIANTS.row.initial}
+              <div
                 key={bar.id}
-                transition={{
-                  ...MOTION_VARIANTS.row.transition,
-                  delay: index * 0.035,
-                }}
-                viewport={MOTION_VARIANTS.row.viewport}
-                whileInView={MOTION_VARIANTS.row.whileInView}
+                className={cn(
+                  "group relative flex items-start gap-2 border-t border-[var(--border-subtle)]/50 px-3 py-2 transition-colors",
+                  hoveredId === bar.id && "bg-[var(--bg-muted)]/50",
+                )}
+                style={{ height: 52 }}
               >
-                <div className="flex min-w-0 items-center gap-3 px-4 py-3">
-                  <span
-                    className={cn(
-                      "relative size-2.5 shrink-0 rounded-full shadow-[0_0_0_5px_color-mix(in_srgb,currentColor_12%,transparent)]",
-                      bar.tone === "danger" && "bg-[var(--danger-base)] text-[var(--danger-base)]",
-                      bar.tone === "warning" &&
-                        "bg-[var(--warning-base)] text-[var(--warning-base)]",
-                      bar.tone === "success" &&
-                        "bg-[var(--success-base)] text-[var(--success-base)]",
-                    )}
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-12px font-bold leading-none text-[var(--text-primary)]">
+                <span
+                  className="mt-0.5 size-2.5 shrink-0 rounded-full ring-2 ring-[var(--surface-base)]"
+                  style={{ backgroundColor: `var(--${bar.tone}-base)` }}
+                />
+                <div className="min-w-0 flex-1 pr-6">
+                  <div className="flex items-center gap-1.5" title={bar.label}>
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap text-12px font-semibold leading-tight text-[var(--text-primary)]">
                       {bar.label}
-                    </div>
-                    <div className="mt-1.5 truncate text-10px font-semibold leading-none text-[var(--text-secondary)]">
-                      {bar.subtitle || "Impresa non assegnata"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="relative min-w-0 px-4 py-3">
-                  <div className="absolute inset-y-0 left-4 right-4 pointer-events-none">
-                    {monthTicks.map((tick) => (
-                      <span
-                        className="absolute top-0 h-full w-px bg-[color-mix(in_srgb,var(--border-subtle)_32%,transparent)]"
-                        key={tick.toISOString()}
-                        style={{ left: `${xScale(tick)}%` }}
-                      />
-                    ))}
-                    <span
-                      className="absolute top-1 bottom-1 w-px bg-[var(--accent-primary)]/45"
-                      style={{ left: `${todayX}%` }}
-                    >
-                      <span className="absolute -top-1.5 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-[var(--accent-primary)] shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-primary)_12%,transparent)]" />
                     </span>
-                  </div>
-
-                  <div className="relative h-8 rounded-10px bg-[color-mix(in_srgb,var(--bg-muted-strong)_52%,var(--surface-base)_48%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_42%,transparent)]">
-                    <m.button
-                      aria-label={`${bar.label}, ${progress.toFixed(0)}%, ${bar.days} giorni`}
-                      className={cn(
-                        "absolute top-1 bottom-1 overflow-hidden rounded-10px text-left shadow-[0_10px_22px_color-mix(in_srgb,var(--text-primary)_9%,transparent)] outline-none transition-[filter,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
-                        toneClass,
-                      )}
-                      initial={MOTION_VARIANTS.progress.initial}
-                      onBlur={() => setHoveredBar(null)}
-                      onFocus={() => setHoveredBar(bar)}
-                      onMouseEnter={() => setHoveredBar(bar)}
-                      onMouseLeave={() => setHoveredBar(null)}
-                      style={{ left: `${start}%`, width: `${width}%` }}
-                      transition={{
-                        ...MOTION_VARIANTS.progress.transition,
-                        delay: 0.08 + index * 0.035,
-                      }}
-                      type="button"
-                      whileHover={{ y: -1 }}
-                      whileInView={{ scaleX: 1 }}
-                    >
-                      <m.span
-                        className="absolute inset-y-0 left-0 rounded-10px bg-[var(--text-inverse)]/24"
-                        initial={MOTION_VARIANTS.progress.initial}
-                        style={{ width: `${progress}%` }}
-                        transition={{
-                          ...MOTION_VARIANTS.progress.transition,
-                          delay: 0.18 + index * 0.035,
-                        }}
-                        whileInView={{ scaleX: 1 }}
-                      />
-                      <span className="relative z-10 flex h-full min-w-0 items-center justify-between gap-2 px-2.5 text-[var(--text-inverse)]">
-                        <span className="truncate text-10px font-black leading-none drop-shadow-[0_1px_1px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]">
-                          {progress.toFixed(0)}%
-                        </span>
-                        {width > 10 ? (
-                          <span className="shrink-0 text-9px font-bold leading-none text-[var(--text-inverse)]/75">
-                            {bar.days}g
-                          </span>
-                        ) : null}
+                    {bar.days > 0 && (
+                      <span className="shrink-0 rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-9px font-semibold text-[var(--text-secondary)]">
+                        {bar.days}g
                       </span>
-                    </m.button>
+                    )}
                   </div>
+                  <div className="overflow-hidden text-ellipsis whitespace-nowrap text-10px font-medium leading-tight text-[var(--text-secondary)]">
+                    {bar.subtitle || "N.D."}
+                  </div>
+                  {operational && project ? (
+                    <div className="flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap text-10px font-semibold text-[var(--text-tertiary)]">
+                      <span>€{(operational.committedAmount / 1000).toFixed(0)}k</span>
+                      <span className="opacity-30">/</span>
+                      <span>€{(project.budget.amount / 1000).toFixed(0)}k</span>
+                      <span className="mx-0.5 opacity-20">·</span>
+                      <span>
+                        {((operational.committedAmount / project.budget.amount) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
-              </m.div>
+                <button
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-[var(--danger-soft)]/40 p-1 text-[var(--danger-base)] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--danger-soft)]/70 active:scale-[0.92]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteTargetId(bar.id);
+                  }}
+                  type="button"
+                  title="Elimina progetto"
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              </div>
             );
           })}
         </div>
+
+        {/* Scrollable timeline */}
+        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto">
+          <div className="relative" style={{ width: "100%", minWidth: timelineWidth }}>
+            {/* Month header */}
+            <div className="sticky top-0 z-10 flex h-7 items-end border-b border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-2 pb-0.5">
+              {monthTicks.map((tick, i) => {
+                const prevYear = i > 0 ? (monthTicks[i - 1] as Date).getFullYear() : null;
+                const isNewYear = tick.getFullYear() !== prevYear;
+                const left = `${xScale(tick)}%`;
+                return (
+                  <div
+                    key={tick.getTime()}
+                    className="absolute text-center"
+                    style={{ left, transform: "translateX(-50%)" }}
+                  >
+                    <span
+                      className={cn(
+                        "whitespace-nowrap",
+                        isNewYear
+                          ? "text-9px font-bold text-[var(--accent-primary)]"
+                          : "text-8px font-semibold text-[var(--text-secondary)]/50",
+                      )}
+                    >
+                      {tick.toLocaleDateString("it-IT", { month: "short" })}
+                      {isNewYear ? ` '${String(tick.getFullYear()).slice(2)}` : ""}
+                    </span>
+                  </div>
+                );
+              })}
+              {/* Today label */}
+              <div
+                className="absolute top-0 -translate-x-1/2 text-8px font-bold text-[var(--accent-primary)]"
+                style={{ left: `${xScale(today)}%` }}
+              >
+                Oggi
+              </div>
+            </div>
+
+            {/* Rows */}
+            {bars.map((bar) => {
+              const isHovered = hoveredId === bar.id;
+              const progress = Math.max(0, Math.min(100, bar.progress));
+              const bs = barStyle(bar);
+              const project = projectById.get(bar.id);
+
+              return (
+                <button
+                  type="button"
+                  key={bar.id}
+                  className={cn(
+                    "relative flex w-full border-t border-[var(--border-subtle)]/50 transition-colors cursor-pointer",
+                    isHovered && "bg-[var(--bg-muted)]/30",
+                  )}
+                  style={{ height: 52 }}
+                  onMouseEnter={() => setHoveredId(bar.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onClick={() => {
+                    if (project) onOpen(project);
+                  }}
+                >
+                  {/* Timeline bar */}
+                  <div
+                    className="absolute top-1/2 h-5 -translate-y-1/2 rounded-full transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                    style={{
+                      left: bs.left,
+                      width: bs.width,
+                      backgroundColor: `color-mix(in srgb, var(--accent-primary) ${bar.tone === "danger" ? 25 : bar.tone === "warning" ? 40 : 55}%, transparent)`,
+                    }}
+                  >
+                    {/* Progress fill */}
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${progress}%`,
+                        backgroundColor: `color-mix(in srgb, var(--accent-primary) ${bar.tone === "danger" ? 70 : bar.tone === "warning" ? 85 : 100}%, transparent)`,
+                      }}
+                    >
+                      {progress > 10 && (
+                        <span className="absolute inset-0 flex items-center px-2 text-10px font-bold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
+                          {progress.toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Month grid lines */}
+            {monthTicks.map((tick) => (
+              <div
+                key={`grid-${tick.getTime()}`}
+                className="absolute top-0 bottom-0 w-px pointer-events-none"
+                style={{
+                  left: `${xScale(tick)}%`,
+                  borderLeft: "1px dashed var(--text-tertiary)",
+                  opacity: 0.35,
+                }}
+              />
+            ))}
+
+            {/* Today vertical line */}
+            <div
+              className="absolute top-0 bottom-0 pointer-events-none"
+              style={{
+                left: `${xScale(today)}%`,
+              }}
+            >
+              <div className="absolute -top-0.5 left-1/2 size-2 -translate-x-1/2 rounded-full bg-[var(--accent-primary)]" />
+              <div className="h-full w-px bg-[var(--accent-primary)] opacity-60" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {hoveredBar ? (
-        <m.div
-          animate={MOTION_VARIANTS.popover.animate}
-          className="absolute right-3 top-12 z-20 hidden max-w-[280px] rounded-14px border border-[color-mix(in_srgb,var(--border-subtle)_66%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_94%,transparent)] px-3 py-2 text-10px font-semibold text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl md:block"
-          initial={MOTION_VARIANTS.popover.initial}
-          transition={MOTION_VARIANTS.popover.transition}
-        >
-          <div className="text-12px font-bold text-[var(--text-primary)]">{hoveredBar.label}</div>
-          <div className="mt-1">{hoveredBar.subtitle}</div>
-          <div className="mt-1">
-            {hoveredBar.startDate.toLocaleDateString("it-IT", { day: "numeric", month: "short" })}
-            {" - "}
-            {hoveredBar.endDate.toLocaleDateString("it-IT", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-            {" · "}
-            {hoveredBar.days} giorni · {hoveredBar.progress.toFixed(0)}%
-          </div>
-        </m.div>
-      ) : null}
-
+      {/* Legend */}
       {bars.length > 0 ? (
-        <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)]/25 pt-3 text-10px font-medium text-[var(--text-secondary)]/50">
-          <span>
-            {bars.length} cantier{bars.length === 1 ? "e" : "i"}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)]/25 px-1 pt-3">
+          <span className="text-10px font-semibold text-[var(--text-secondary)]/60">
+            {bars.length} cantiere{bars.length === 1 ? "" : "i"} · {avgProgress}% medio avanzamento
           </span>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-[var(--success-base)]" />
-              In linea
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-[var(--warning-base)]" />
-              Attenzione
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-[var(--danger-base)]" />
-              Critico
-            </span>
+          <div className="flex items-center gap-4">
+            {toneTotals
+              .filter((t) => t.count > 0)
+              .map((t) => (
+                <span
+                  className="flex items-center gap-1.5 text-10px font-semibold text-[var(--text-secondary)]/70"
+                  key={t.label}
+                >
+                  <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
+                  {t.label}
+                  <span className="ml-0.5 font-bold text-[var(--text-secondary)]/90">
+                    {t.count}
+                  </span>
+                </span>
+              ))}
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        confirmLabel="Elimina"
+        isOpen={deleteTargetId !== null}
+        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={() => {
+          if (deleteTargetId) onDelete(deleteTargetId);
+          setDeleteTargetId(null);
+        }}
+        title="Eliminare questo progetto?"
+        tone="danger"
+      >
+        Il progetto verrà rimosso definitivamente insieme a tutte le SAL collegate.
+      </ConfirmDialog>
     </div>
   );
 }
@@ -323,16 +413,6 @@ function buildMonthTicks(start: Date, end: Date): Date[] {
     cursor.setMonth(cursor.getMonth() + 1);
   }
   return ticks;
-}
-
-function ganttToneClass(tone: StatusTone): string {
-  if (tone === "danger") {
-    return "bg-[linear-gradient(135deg,var(--danger-base),color-mix(in_srgb,var(--danger-base)_70%,var(--warning-base)_30%))]";
-  }
-  if (tone === "warning") {
-    return "bg-[linear-gradient(135deg,var(--warning-base),color-mix(in_srgb,var(--warning-base)_78%,var(--accent-primary)_22%))]";
-  }
-  return "bg-[linear-gradient(135deg,var(--success-base),color-mix(in_srgb,var(--success-base)_76%,var(--accent-primary)_24%))]";
 }
 
 export function OperationalSites({
@@ -554,7 +634,7 @@ export function RightRail({
   projectCount: number;
 }) {
   return (
-    <aside className="grid gap-4 lg:grid-cols-2 2xl:block 2xl:space-y-4">
+    <aside className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <BezelSurface innerClassName="p-5">
         <div className="mb-4 flex items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
@@ -579,7 +659,7 @@ export function RightRail({
         )}
       </BezelSurface>
 
-      <BezelSurface innerClassName="p-5">
+      <BezelSurface innerClassName="p-5 xl:col-span-2">
         <div className="mb-4 flex items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
             02
@@ -768,12 +848,36 @@ export function buildSalTimeline(
   }
 
   for (const project of projects) {
-    if (!timeline.has(project.id)) {
+    const entry = timeline.get(project.id);
+
+    if (!entry) {
       timeline.set(project.id, {
         firstSalDate: new Date(),
         lastSalDate: new Date(),
         totalSalAmount: 0,
       });
+      continue;
+    }
+
+    // Estimate end date based on progress (same logic as Quadro economico)
+    const budget = project.budget.amount;
+    const remaining = Math.max(0, budget - entry.totalSalAmount);
+
+    if (remaining > 0 && entry.totalSalAmount > 0) {
+      const elapsedMs = entry.lastSalDate.getTime() - entry.firstSalDate.getTime();
+      const elapsedDays = elapsedMs / 86400000;
+
+      if (elapsedDays > 0) {
+        const progress = entry.totalSalAmount / Math.max(budget, 1);
+        const totalDays = Math.round(elapsedDays / Math.min(Math.max(progress, 0.05), 0.95));
+        const remainingDays = Math.max(0, totalDays - elapsedDays);
+        const estimatedEnd = new Date(entry.lastSalDate.getTime() + remainingDays * 86400000);
+
+        timeline.set(project.id, {
+          ...entry,
+          lastSalDate: estimatedEnd,
+        });
+      }
     }
   }
 
@@ -804,6 +908,11 @@ export function buildGanttBars(
           : today;
       const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000));
       const color = statusColorMap[project.tone] ?? "var(--info-base)";
+      const budgetAmount = project.budget.amount;
+      const progress =
+        budgetAmount > 0 && timeline?.totalSalAmount
+          ? Math.min(100, (timeline.totalSalAmount / budgetAmount) * 100)
+          : 0;
 
       return {
         id: project.id,
@@ -814,7 +923,7 @@ export function buildGanttBars(
         days,
         color,
         tone: project.tone,
-        progress: project.progress,
+        progress,
       };
     })
     .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());

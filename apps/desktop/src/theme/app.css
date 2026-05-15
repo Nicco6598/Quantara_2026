@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@quantara/ui-tokens/tokens.css";
+@import "uplot/dist/uPlot.min.css";
 
 /* ── Custom breakpoints ── */
 @theme {

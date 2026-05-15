@@ -15,6 +15,7 @@ import type {
 type CreateSalInput = {
   projectId: string;
   date: string;
+  closedAt?: string;
   description: string;
   notes: string;
   title: string;
@@ -100,7 +101,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           projectId: input.projectId,
           status: isDraft ? "draft" : "closed",
           title: generateSalTitle(input.title, currentCount),
-          ...(isDraft ? {} : { closedAt: new Date().toISOString().slice(0, 10) }),
+          ...(isDraft ? {} : { closedAt: input.closedAt ?? new Date().toISOString().slice(0, 10) }),
           ...(typeof input.total === "number" && Number.isFinite(input.total)
             ? { total: input.total }
             : {}),
@@ -264,12 +265,13 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
     }),
     {
       name: "quantara-sal-workflow",
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         activeProjectId: state.activeProjectId,
         activeSalId: state.activeSalId,
         projects: state.projects,
         salDocuments: state.salDocuments,
+        tariffVoices: state.tariffVoices,
       }),
       migrate(persisted: unknown, version: number) {
         if (version === 0 || version === 1) {
@@ -284,6 +286,22 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
             activeSalId: raw.activeSalId ?? "",
             projects: Array.isArray(raw.projects) ? raw.projects : [],
             salDocuments: Array.isArray(raw.salDocuments) ? raw.salDocuments : [],
+            tariffVoices: [],
+          };
+        }
+        if (version === 2) {
+          const raw = persisted as {
+            activeProjectId?: string;
+            activeSalId?: string;
+            projects?: unknown[];
+            salDocuments?: unknown[];
+          };
+          return {
+            activeProjectId: raw.activeProjectId ?? "",
+            activeSalId: raw.activeSalId ?? "",
+            projects: Array.isArray(raw.projects) ? raw.projects : [],
+            salDocuments: Array.isArray(raw.salDocuments) ? raw.salDocuments : [],
+            tariffVoices: [],
           };
         }
         return persisted as SalWorkflowStore;

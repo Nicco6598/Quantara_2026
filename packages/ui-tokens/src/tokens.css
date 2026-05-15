@@ -369,6 +369,16 @@
   --overlay-bg: rgb(0 0 0 / 0.55);
   --shadow-soft: 0 12px 30px rgb(0 0 0 / 36%);
   --shadow-panel: 0 18px 48px rgb(0 0 0 / 48%);
+  --chart-1: #5a8ae0;
+  --chart-2: #6a9ac8;
+  --chart-3: #4aaa8a;
+  --chart-4: #9a7ac8;
+  --chart-5: #5a6a8a;
+  --chart-6: #d4905a;
+  --chart-7: #6ab0d0;
+  --chart-8: #b080d0;
+  --chart-9: #4ac8a0;
+  --chart-10: #c87878;
 }
 
 @theme inline {

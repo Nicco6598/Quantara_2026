@@ -1,10 +1,9 @@
-import { Calculator, TrendingUp } from "lucide-react";
+import { Calculator } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface } from "@/components/shared/ui-primitives";
 import {
   buildActivityRows,
   buildFocusRows,
@@ -12,7 +11,6 @@ import {
   buildOverviewMetrics,
   buildPriorityActions,
   buildSalTimeline,
-  OperationalSites,
   PriorityActions,
   RightRail,
   TimelineGantt,
@@ -25,6 +23,7 @@ import { useNavigate } from "@/hooks/useNavigate";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { PortfolioBurn } from "@/components/shared/charts";
 import { useAuditLogStore } from "@/store/audit-log-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
@@ -123,6 +122,13 @@ export function DashboardScreen() {
       totalSal += view.total;
     }
 
+    const viewsByProjectId = new Map<string, (typeof views)[number][]>();
+    for (const v of views) {
+      const existing = viewsByProjectId.get(v.projectId) || [];
+      existing.push(v);
+      viewsByProjectId.set(v.projectId, existing);
+    }
+
     return {
       metrics: buildOverviewMetrics(projects),
       distribution: buildFocusRows(projects),
@@ -134,6 +140,7 @@ export function DashboardScreen() {
       escalationCount,
       operationalTotals: buildOperationalTotals(projects, views),
       salTimeline,
+      viewsByProjectId,
     };
   }, [projects, salDocuments, tariffVoices, auditEntries]);
 
@@ -168,74 +175,71 @@ export function DashboardScreen() {
 
   return (
     <ScreenLayout>
-      <div className="grid min-w-0 gap-8 lg:gap-10 2xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-8">
-          <ScreenHero
-            badge={timeGreeting()}
-            title="Portafoglio lavori"
-            description="Monitora avanzamento, SAL e segnali di rischio dei cantieri attivi."
-            sidePanel={
-              <div>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                      Budget totale
-                    </p>
-                    <p className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-                      {derived.totalBudget.toLocaleString("it-IT", {
-                        style: "currency",
-                        currency: "EUR",
-                        minimumFractionDigits: 0,
-                      })}
-                    </p>
-                  </div>
-                  <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                    <Calculator className="size-6" />
-                  </span>
+      <div className="space-y-8">
+        <ScreenHero
+          badge={timeGreeting()}
+          title="Portafoglio lavori"
+          description="Monitora avanzamento, SAL e segnali di rischio dei cantieri attivi."
+          sidePanel={
+            <div>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
+                    Budget totale
+                  </p>
+                  <p className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
+                    {derived.totalBudget.toLocaleString("it-IT", {
+                      style: "currency",
+                      currency: "EUR",
+                      minimumFractionDigits: 0,
+                    })}
+                  </p>
                 </div>
-                <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
-                  {projects.length} cantier{projects.length === 1 ? "e" : "i"} ·{" "}
-                  {derived.totalSal.toLocaleString("it-IT", {
-                    style: "currency",
-                    currency: "EUR",
-                    minimumFractionDigits: 0,
-                  })}{" "}
-                  SAL
-                  {derived.escalationCount > 0 ? ` · ${derived.escalationCount} criticita` : ""}
-                </p>
+                <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+                  <Calculator className="size-6" />
+                </span>
               </div>
-            }
-          />
-
-          <div className="animate-entry grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {derived.metrics.map((metric) => (
-              <MetricCard {...metric} key={metric.label} />
-            ))}
-          </div>
-
-          <PriorityActions items={derived.priorityActions} />
-
-          <BezelSurface innerClassName="p-4">
-            <div className="mb-4 flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--info-base)]">
-              <TrendingUp className="size-4" />
-              Timeline cantieri
-            </div>
-            {derived.ganttBars.length > 0 ? (
-              <TimelineGantt bars={derived.ganttBars} />
-            ) : (
-              <p className="py-6 text-center text-13px text-[var(--text-secondary)]">
-                Nessun cantiere con SAL registrate.
+              <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
+                {projects.length} cantier{projects.length === 1 ? "e" : "i"} ·{" "}
+                {derived.totalSal.toLocaleString("it-IT", {
+                  style: "currency",
+                  currency: "EUR",
+                  minimumFractionDigits: 0,
+                })}{" "}
+                SAL
+                {derived.escalationCount > 0 ? ` · ${derived.escalationCount} criticita` : ""}
               </p>
-            )}
-          </BezelSurface>
+            </div>
+          }
+        />
 
-          <OperationalSites
-            onDeleteProject={handleDeleteProject}
-            onOpenProject={handleOpenProject}
-            operationalByProjectId={derived.operationalTotals}
-            projects={projects}
-          />
+        <div className="animate-entry grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {derived.metrics.map((metric) => (
+            <MetricCard {...metric} key={metric.label} />
+          ))}
         </div>
+
+        <PriorityActions items={derived.priorityActions} />
+
+        {derived.ganttBars.length > 0 ? (
+          <TimelineGantt
+            bars={derived.ganttBars}
+            projects={projects}
+            operationalByProjectId={derived.operationalTotals}
+            onOpen={handleOpenProject}
+            onDelete={handleDeleteProject}
+          />
+        ) : (
+          <p className="py-6 text-center text-13px text-[var(--text-secondary)]">
+            Nessun cantiere con SAL registrate.
+          </p>
+        )}
+
+        <PortfolioBurn
+          projects={projects}
+          viewsByProjectId={derived.viewsByProjectId}
+          totalBudget={derived.totalBudget}
+        />
 
         <RightRail
           activities={derived.activities}

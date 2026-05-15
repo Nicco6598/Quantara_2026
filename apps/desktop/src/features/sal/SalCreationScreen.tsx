@@ -85,6 +85,7 @@ type SalFormState = {
   lines: SalLineDraft[];
   economicRules: SalEconomicRules;
   salTitle: string;
+  salDate: string;
   phase: SalWorkflowPhase;
   materialUsage: Record<string, number>;
   materials: DesktopMaterial[];
@@ -131,13 +132,14 @@ export function SalCreationScreen() {
     lines: [],
     economicRules: defaultSalEconomicRules,
     salTitle: "",
+    salDate: new Date().toISOString().slice(0, 10),
     phase: "context",
     materialUsage: {},
     materials: [],
   });
   const formStateRef = useRef(formState);
   formStateRef.current = formState;
-  const { lines, economicRules, materialUsage, materials, salTitle, phase } = formState;
+  const { lines, economicRules, materialUsage, materials, salTitle, salDate, phase } = formState;
 
   const setLines = useCallback(
     (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => {
@@ -156,6 +158,9 @@ export function SalCreationScreen() {
     },
     [],
   );
+  const setSalDate = useCallback((date: string) => {
+    dispatch({ type: "ALL", partial: { salDate: date } });
+  }, []);
   const setSalTitle = useCallback((updater: string | ((prev: string) => string)) => {
     const prev = formStateRef.current.salTitle;
     dispatch({
@@ -207,6 +212,7 @@ export function SalCreationScreen() {
           lines: draft.lines,
           economicRules: draft.economicRules,
           materialUsage: draft.materialUsage ?? {},
+          salDate: draft.salDate ?? new Date().toISOString().slice(0, 10),
           salTitle: draft.salTitle || draftSal?.title || project.salTitle,
           phase: draft.phase,
         },
@@ -223,6 +229,7 @@ export function SalCreationScreen() {
         type: "ALL",
         partial: {
           lines: lineDraftsFromStoredSal(draftSal, data.voices),
+          salDate: draftSal.date ?? new Date().toISOString().slice(0, 10),
           salTitle: draftSal.title || project.salTitle,
           phase: draftSal.lines.length > 0 ? "voices" : "context",
         },
@@ -550,7 +557,7 @@ export function SalCreationScreen() {
       });
 
     const finalSalPayload = {
-      date: new Date().toISOString().slice(0, 10),
+      date: salDate,
       description: "Periodo corrente",
       lines: lineViews.map((l) => ({
         id: l.id,
@@ -621,6 +628,7 @@ export function SalCreationScreen() {
       lines,
       materialUsage,
       phase,
+      salDate,
       salTitle,
       selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
     });
@@ -629,6 +637,7 @@ export function SalCreationScreen() {
     lines,
     materialUsage,
     phase,
+    salDate,
     salTitle,
     data.project,
     data.selectedTariffBooks,
@@ -649,6 +658,7 @@ export function SalCreationScreen() {
       lines,
       materialUsage,
       phase,
+      salDate,
       salTitle,
       selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
     });
@@ -673,7 +683,7 @@ export function SalCreationScreen() {
         };
       });
     const draftPayload = {
-      date: new Date().toISOString().slice(0, 10),
+      date: salDate,
       description: salTitle.trim() || project.salTitle,
       lines: lineViews.map((l) => ({
         id: l.id,
@@ -709,6 +719,7 @@ export function SalCreationScreen() {
         lines,
         materialUsage,
         phase,
+        salDate,
         salTitle: salTitle.trim() || project.salTitle,
         selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
       });
@@ -738,6 +749,7 @@ export function SalCreationScreen() {
     lines,
     materialUsage,
     materials,
+    salDate,
     phase,
     salTitle,
     notify,
@@ -843,6 +855,8 @@ export function SalCreationScreen() {
             setIsTemplateDialogOpen={setIsTemplateDialogOpen}
             setLines={setLines}
             setNotes={setNotes}
+            setSalDate={setSalDate}
+            salDate={salDate}
             setSalTitle={setSalTitle}
             setSurcharge={setSurcharge}
             summary={summary}
@@ -901,11 +915,13 @@ function SalEditorContent({
   previousSalLines,
   phase,
   removeLine,
+  salDate,
   salTitle,
   setFactor,
   setIsTemplateDialogOpen,
   setLines,
   setNotes,
+  setSalDate,
   setSalTitle,
   setSurcharge,
   summary,
@@ -940,11 +956,13 @@ function SalEditorContent({
   previousSalLines: SalLineView[];
   phase: SalWorkflowPhase;
   removeLine: (lineId: string) => void;
+  salDate: string;
   salTitle: string;
   setFactor: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
   setIsTemplateDialogOpen: Dispatch<SetStateAction<boolean>>;
   setLines: (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => void;
   setNotes: (lineId: string, notes: string) => void;
+  setSalDate: (date: string) => void;
   setSalTitle: (updater: string | ((prev: string) => string)) => void;
   setSurcharge: (lineId: string, p: number) => void;
   summary: SalEconomicSummary;
@@ -962,6 +980,7 @@ function SalEditorContent({
           economicRules={economicRules}
           onSelectContract={dataSetContract}
           project={project}
+          salDate={salDate}
           salTitle={salTitle}
           selectedTariffBooks={dataSelectedTariffBooks}
           selectedTariffBook={dataSelectedTariffBook}
@@ -975,6 +994,7 @@ function SalEditorContent({
                 tone: "success",
               });
           }}
+          setSalDate={setSalDate}
           setSalTitle={setSalTitle}
           summary={summary}
           tariffBooks={dataTariffBookOptions}
@@ -1036,10 +1056,12 @@ function SetupStep({
   contracts,
   economicRules,
   project,
+  salDate,
   salTitle,
   selectedTariffBooks,
   selectedTariffBook,
   selectTariffBook,
+  setSalDate,
   setSalTitle,
   summary,
   tariffBooks,
@@ -1050,10 +1072,12 @@ function SetupStep({
   contracts: { id: string; title: string; contractor?: string }[];
   economicRules: SalEconomicRules;
   project: SalProjectContext | null;
+  salDate: string;
   salTitle: string;
   selectedTariffBooks: SalTariffBookOption[];
   selectedTariffBook: SalTariffBookOption | null;
   selectTariffBook: (id: string) => Promise<void>;
+  setSalDate: (date: string) => void;
   setSalTitle: Dispatch<SetStateAction<string>>;
   summary: SalEconomicSummary;
   tariffBooks: SalTariffBookOption[];
@@ -1198,20 +1222,37 @@ function SetupStep({
         )}
       </div>
 
-      <div>
-        <label
-          className="text-13px font-semibold text-[var(--text-primary)]"
-          htmlFor="sal-title-input"
-        >
-          Nome SAL
-        </label>
-        <input
-          className="mt-2 h-11 w-full rounded-10px border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-          id="sal-title-input"
-          onChange={(e) => setSalTitle(e.target.value)}
-          placeholder={project.salTitle}
-          value={salTitle}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label
+            className="text-13px font-semibold text-[var(--text-primary)]"
+            htmlFor="sal-title-input"
+          >
+            Nome SAL
+          </label>
+          <input
+            className="mt-2 h-11 w-full rounded-10px border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            id="sal-title-input"
+            onChange={(e) => setSalTitle(e.target.value)}
+            placeholder={project.salTitle}
+            value={salTitle}
+          />
+        </div>
+        <div>
+          <label
+            className="text-13px font-semibold text-[var(--text-primary)]"
+            htmlFor="sal-date-input"
+          >
+            Data SAL
+          </label>
+          <input
+            className="mt-2 h-11 w-full rounded-10px border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            id="sal-date-input"
+            onChange={(e) => setSalDate(e.target.value)}
+            type="date"
+            value={salDate}
+          />
+        </div>
       </div>
 
       <div className="border-t border-[var(--border-subtle)]/70 pt-6">

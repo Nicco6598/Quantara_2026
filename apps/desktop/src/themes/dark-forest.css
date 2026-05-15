@@ -47,4 +47,14 @@
   --overlay-bg: rgb(0 0 0 / 0.55);
   --shadow-soft: 0 12px 30px rgb(0 0 0 / 36%);
   --shadow-panel: 0 18px 48px rgb(0 0 0 / 48%);
+  --chart-1: #4aaa6a;
+  --chart-2: #4a8ac8;
+  --chart-3: #4aaa8a;
+  --chart-4: #6aaa6a;
+  --chart-5: #6a7a72;
+  --chart-6: #5aaa5a;
+  --chart-7: #5a9ac0;
+  --chart-8: #8aaa8a;
+  --chart-9: #5ac8a0;
+  --chart-10: #b07868;
 }

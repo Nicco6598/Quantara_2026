@@ -19,6 +19,10 @@ import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
 import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
+import {
+  ContractorTreeView,
+  buildContractorTree,
+} from "@/features/projects/components/ContractorTreeView";
 import { useProjectMigration } from "@/features/projects/hooks/useProjectMigration";
 import { useProjectMutations } from "@/features/projects/hooks/useProjectMutations";
 import { useProjectPortfolioView } from "@/features/projects/hooks/useProjectPortfolioView";
@@ -91,6 +95,7 @@ export function ProjectsScreen() {
   const [selectedContractId, setSelectedContractId] = useState("");
   const [projectDeleteTarget, setProjectDeleteTarget] = useState<string | null>(null);
   const [tariffBooksState, setTariffBooksState] = useState([fallbackProjectTariffBook]);
+  const [isTreeView, setIsTreeView] = useState(false);
   const [focus, setFocus] = useState<PortfolioFocus>("all");
   const [, setMigrationAction] = useState<MigrationAction>("idle");
   const [query, setQuery] = useState("");
@@ -126,6 +131,20 @@ export function ProjectsScreen() {
           })
         : [],
     [contractsState.data, contractsState.source, projectContractors, salDocuments, tariffVoices],
+  );
+  const treeData = useMemo(
+    () =>
+      buildContractorTree(
+        activeProjects,
+        salDocuments.map((sal) => ({
+          date: sal.date,
+          projectId: sal.projectId,
+          status: sal.status,
+          title: sal.title,
+          total: sal.total ?? 0,
+        })),
+      ),
+    [activeProjects, salDocuments],
   );
   const projectSalIndex = useMemo(
     () => new Map(salProjects.map((project) => [project.id, project])),
@@ -415,18 +434,48 @@ export function ProjectsScreen() {
             visibleApprovals={visibleApprovals}
             visibleQueue={visibleQueue}
           />
+        ) : isTreeView ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-15px font-semibold text-[var(--text-primary)]">
+                  Albero appaltatori
+                </h2>
+                <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
+                  {treeData.length} appaltatori · {activeProjects.length} progetti
+                </p>
+              </div>
+              <Button onClick={() => setIsTreeView(false)} size="sm" variant="outline">
+                Vista griglia
+              </Button>
+            </div>
+            <ContractorTreeView
+              contractors={treeData}
+              onOpenProject={(id) => {
+                const p = activeProjects.find((proj) => proj.id === id);
+                if (p) handleOpenProject(p);
+              }}
+            />
+          </div>
         ) : (
-          <ContractorsWorkspace
-            activeProjectsCount={activeProjects.length}
-            folders={contractorFolders}
-            onImport={() => fileInputRef.current?.click()}
-            onDeleteContractor={setContractorDeleteTarget}
-            onOpenCreateContractor={() => setIsContractorModalOpen(true)}
-            onOpenFolder={handleOpenFolder}
-            onOpenNotifications={() => setIsSalModalOpen(true)}
-            recentSalsCount={recentSals.length}
-            totalPortfolioValue={totalPortfolioValue}
-          />
+          <div className="space-y-4">
+            <div className="flex items-center justify-end">
+              <Button onClick={() => setIsTreeView(true)} size="sm" variant="outline">
+                Vista albero
+              </Button>
+            </div>
+            <ContractorsWorkspace
+              activeProjectsCount={activeProjects.length}
+              folders={contractorFolders}
+              onImport={() => fileInputRef.current?.click()}
+              onDeleteContractor={setContractorDeleteTarget}
+              onOpenCreateContractor={() => setIsContractorModalOpen(true)}
+              onOpenFolder={handleOpenFolder}
+              onOpenNotifications={() => setIsSalModalOpen(true)}
+              recentSalsCount={recentSals.length}
+              totalPortfolioValue={totalPortfolioValue}
+            />
+          </div>
         )}
       </ErrorBoundary>
 

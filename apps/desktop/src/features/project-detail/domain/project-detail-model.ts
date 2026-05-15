@@ -1,5 +1,6 @@
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatDueWindow, formatForecastDelta } from "@/features/projects/utils/projects-helpers";
+import { formatEuro } from "@/lib/formatters";
 
 type ProjectFinancials = {
   approvedAmount: number;
@@ -11,13 +12,63 @@ type ProjectFinancials = {
   residual: number;
 };
 
+function estimateEndDate(
+  salRows: Array<{ date: string }>,
+  committed: number,
+  contractual: number,
+): string {
+  if (salRows.length < 2 || contractual <= 0) return "Dati insufficienti";
+
+  const dates = salRows.map((r) => new Date(r.date)).sort((a, b) => a.getTime() - b.getTime());
+  const firstDate = dates[0] as Date;
+  const lastDate = dates[dates.length - 1] as Date;
+  const elapsedMs = lastDate.getTime() - firstDate.getTime();
+  const elapsedDays = elapsedMs / 86400000;
+
+  if (elapsedDays <= 0 || committed <= 0) return "Dati insufficienti";
+
+  const progress = committed / contractual;
+  const totalDays = Math.round(elapsedDays / Math.min(Math.max(progress, 0.05), 0.95));
+  const remainingDays = Math.max(0, totalDays - elapsedDays);
+  const now = Date.now();
+  const endMs = now + remainingDays * 86400000;
+  const endDate = new Date(endMs);
+
+  const monthsRemaining = Math.round(remainingDays / 30);
+
+  if (endDate < new Date(now)) return "In linea con piano";
+  if (monthsRemaining <= 0) return "In chiusura";
+  if (monthsRemaining <= 1) return "Tra ~1 mese";
+  return `Tra ~${monthsRemaining} mesi`;
+}
+
 export function buildProjectDetail(
   project: PortfolioProject,
   financials: ProjectFinancials,
   currentSalLabel: string,
+  salRows?: Array<{ date: string; amount: number }>,
 ) {
-  const costPerformance =
-    financials.committed > 0 ? financials.approvedAmount / financials.committed : 1;
+  const { committed, contractual } = financials;
+  const cpiValue = committed > 0 ? contractual / committed : 1;
+  const cpiFormatted = cpiValue.toLocaleString("it-IT", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  });
+
+  let cpiNote: string;
+  if (cpiValue > 1.05) cpiNote = "Sotto budget";
+  else if (cpiValue >= 0.95) cpiNote = "In linea col budget";
+  else cpiNote = "Sopra budget";
+
+  const budgetDiff = committed - contractual;
+  const forecastImpact =
+    budgetDiff === 0
+      ? "In linea col budget"
+      : budgetDiff > 0
+        ? `${formatEuro(budgetDiff)} sopra budget`
+        : `${formatEuro(Math.abs(budgetDiff))} sotto budget`;
+
+  const endDate = salRows ? estimateEndDate(salRows, committed, contractual) : "Dati insufficienti";
 
   return {
     budget: {
@@ -26,15 +77,10 @@ export function buildProjectDetail(
       contractual: financials.contractual,
       draftAmount: financials.draftAmount,
     },
-    cpi: costPerformance.toLocaleString("it-IT", {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-    }),
-    endDate:
-      project.forecastDeltaDays === 0
-        ? "In linea con piano"
-        : `${formatForecastDelta(project.forecastDeltaDays)} forecast`,
-    forecastImpact: project.variance,
+    cpi: cpiFormatted,
+    cpiNote,
+    endDate,
+    forecastImpact,
     health: project.healthLabel,
     healthTone: project.tone,
     lastUpdate: "Aggiornato da registro progetti",

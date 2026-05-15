@@ -54,6 +54,7 @@ import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 import { useSelectionStore } from "@/store/selection-store";
 
+import { SpendingTrend, SalHistoryBars } from "@/components/shared/charts";
 import { ProjectTimeline } from "./components/ProjectTimeline";
 import {
   buildMilestoneRows,
@@ -254,7 +255,12 @@ export function ProjectDetailScreen() {
   const detail = useMemo(
     () =>
       selectedProject
-        ? buildProjectDetail(selectedProject, financials, salRows[0]?.sal ?? "SAL da creare")
+        ? buildProjectDetail(
+            selectedProject,
+            financials,
+            salRows[0]?.sal ?? "SAL da creare",
+            salRows,
+          )
         : null,
     [financials, salRows, selectedProject],
   );
@@ -546,6 +552,16 @@ export function ProjectDetailScreen() {
         ))}
       </section>
 
+      {salViews.length > 0 ? (
+        <section className="mt-8">
+          <div className="mb-4 flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--info-base)]">
+            <TrendingUp className="size-4" />
+            Andamento spesa
+          </div>
+          <SpendingTrend contractualAmount={financials.contractual} views={salViews} />
+        </section>
+      ) : null}
+
       <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">
           <Panel>
@@ -594,7 +610,7 @@ export function ProjectDetailScreen() {
                     Forecast
                   </div>
                   <InfoBlock label="Fine prevista" value={detail.endDate} />
-                  <InfoBlock label="CPI" value={detail.cpi} note="Sotto budget rispetto al piano" />
+                  <InfoBlock label="CPI" value={detail.cpi} note={detail.cpiNote} />
                 </div>
                 <div className="pt-4 md:pl-4 md:pt-0">
                   <div className="flex items-center justify-between text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
@@ -682,6 +698,11 @@ export function ProjectDetailScreen() {
                   </button>
                 ))}
               </div>
+              {salViews.length > 1 ? (
+                <div className="px-1 pt-4">
+                  <SalHistoryBars views={salViews} />
+                </div>
+              ) : null}
               {filteredSalRows.map((row) => (
                 <SalCard
                   key={row.id}
