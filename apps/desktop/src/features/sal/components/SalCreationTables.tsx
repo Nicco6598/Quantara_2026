@@ -599,108 +599,157 @@ export function DocumentPreview({
   const grossTotal = summary?.grossAmount ?? lines.reduce((sum, line) => sum + line.grossAmount, 0);
   const discountTotal =
     summary?.discountAmount ?? lines.reduce((sum, line) => sum + line.discountAmount, 0);
-  const linkedTotal =
-    summary?.linkedChargeAmount ??
-    lines.reduce(
-      (sum, line) => sum + line.linkedCharges.reduce((inner, charge) => inner + charge.total, 0),
-      0,
-    );
+  const mgTotal = lines.reduce(
+    (sum, line) =>
+      sum +
+      line.linkedCharges.filter((c) => c.code.startsWith("MG.")).reduce((s, c) => s + c.total, 0),
+    0,
+  );
+  const surchargeTotal = lines.reduce(
+    (sum, line) =>
+      sum +
+      line.linkedCharges.filter((c) => !c.code.startsWith("MG.")).reduce((s, c) => s + c.total, 0),
+    0,
+  );
+  const hasMg = mgTotal > 0;
+  const hasSurcharges = surchargeTotal > 0;
   const total = summary?.total ?? lines.reduce((sum, line) => sum + line.totalAmount, 0);
+  const maxLines = compact ? 4 : 7;
+  const truncated = lines.length > maxLines;
+
   return (
-    <div
-      className={cn(
-        "rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-[var(--text-primary)] shadow-inner",
-        compact && "p-3 text-11px",
-      )}
-    >
-      <div className="grid grid-cols-3 border border-[var(--border-subtle)] text-center text-xs font-semibold">
-        <div className="p-3 text-left">
-          COMUNE DI ESEMPIO
-          <br />
-          Ufficio Tecnico
+    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]">
+      {/* Receipt header */}
+      <div className="border-b border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base)_96%)] px-4 py-2.5">
+        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+          Libretto delle misure
         </div>
-        <div className="border-x border-[var(--border-subtle)] p-3">
-          LIBRETTO DELLE MISURE
-          <br />
-          Stato Avanzamento Lavori n. 1
-        </div>
-        <div className="p-3 text-left">
-          Progetto: TEST
-          <br />
-          Codice: QNT-01
-          <br />
-          Anno: 2026
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-12px font-bold text-[var(--text-primary)]">
+            Stato Avanzamento Lavori
+          </span>
+          <span className="text-10px text-[var(--text-tertiary)]">
+            {lines.length} voci ·{" "}
+            {total.toLocaleString("it-IT", {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2,
+            })}
+          </span>
         </div>
       </div>
-      <table className="mt-3 w-full border-collapse text-xs">
-        <thead>
-          <tr className="bg-[var(--bg-muted)]">
-            {["N.", "Codice", "Descrizione", "U.M.", "Qtà", "Prezzo", "Importo"].map((h) => (
-              <th className="border border-[var(--border-subtle)] p-2 text-left" key={h}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {lines.length === 0 ? (
-            <tr>
-              <td
-                className="border border-[var(--border-subtle)] p-3 text-center text-[var(--text-tertiary)]"
-                colSpan={7}
-              >
-                Anteprima dopo l'inserimento delle voci.
-              </td>
-            </tr>
-          ) : (
-            lines.slice(0, compact ? 5 : 8).map((line, idx) => (
-              <tr key={line.id}>
-                <td className="border border-[var(--border-subtle)] p-2">{idx + 1}</td>
-                <td className="border border-[var(--border-subtle)] p-2">{line.voice.code}</td>
-                <td className="border border-[var(--border-subtle)] p-2">
-                  {line.voice.description}
-                </td>
-                <td className="border border-[var(--border-subtle)] p-2">{line.voice.unit}</td>
-                <td className="border border-[var(--border-subtle)] p-2 text-right">
-                  {line.quantity.toLocaleString("it-IT")}
-                </td>
-                <td className="border border-[var(--border-subtle)] p-2 text-right">
-                  {line.voice.unitPrice.toLocaleString("it-IT")}
-                </td>
-                <td className="border border-[var(--border-subtle)] p-2 text-right">
-                  {line.totalAmount.toLocaleString("it-IT")}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-      <div className="mt-3 overflow-hidden rounded-md border border-[var(--border-subtle)] text-xs">
-        <div className="grid grid-cols-[1fr_180px] border-b border-[var(--border-subtle)]">
-          <div className="p-2 font-semibold">Totale voci</div>
-          <div className="border-l border-[var(--border-subtle)] p-2 text-right font-semibold">
-            {grossTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+
+      {/* Receipt items */}
+      <div className="divide-y divide-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)]">
+        {lines.length === 0 ? (
+          <div className="px-4 py-6 text-center text-12px text-[var(--text-tertiary)]">
+            Anteprima dopo l'inserimento delle voci.
           </div>
-        </div>
-        {linkedTotal > 0 ? (
-          <div className="grid grid-cols-[1fr_180px] border-b border-[var(--border-subtle)]">
-            <div className="p-2">Maggiorazioni</div>
-            <div className="border-l border-[var(--border-subtle)] p-2 text-right">
-              {linkedTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+        ) : (
+          <>
+            {lines.slice(0, maxLines).map((line, idx) => (
+              <div key={line.id} className="flex items-center gap-3 px-4 py-1.5 text-11px">
+                <span className="w-5 shrink-0 text-right text-[var(--text-tertiary)]">
+                  {idx + 1}
+                </span>
+                <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                  <span className="shrink-0 font-medium text-[var(--text-primary)]">
+                    {line.voice.code}
+                  </span>
+                  <span className="text-[var(--text-tertiary)]">·</span>
+                  <span className="truncate text-[var(--text-secondary)]">
+                    {line.voice.description}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-baseline gap-2 text-right tabular-nums">
+                  <span className="text-[var(--text-tertiary)]">
+                    {line.quantity.toLocaleString("it-IT")} {line.voice.unit}
+                  </span>
+                  <span className="w-20 font-semibold text-[var(--text-primary)]">
+                    {line.totalAmount.toLocaleString("it-IT", {
+                      maximumFractionDigits: 2,
+                      minimumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {truncated && (
+              <div className="px-4 py-1.5 text-center text-10px text-[var(--text-tertiary)]">
+                + altre {lines.length - maxLines} voci
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Receipt footer — matches equation layout */}
+      <div className="border-t border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_2%,var(--surface-base)_98%)] px-4 py-2.5">
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-11px text-[var(--text-secondary)]">
+            <span>Voci lordo</span>
+            <span className="tabular-nums font-semibold text-[var(--text-primary)]">
+              {grossTotal.toLocaleString("it-IT", {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+          {hasMg && (
+            <div className="flex items-center justify-between text-11px text-[var(--info-base)]">
+              <span>+ Maggiorazioni MG</span>
+              <span className="tabular-nums font-semibold">
+                +
+                {mgTotal.toLocaleString("it-IT", {
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 2,
+                })}
+              </span>
             </div>
+          )}
+          {hasSurcharges && (
+            <div className="flex items-center justify-between text-11px text-[var(--info-base)]">
+              <span>+ Maggiorazioni su manodopera</span>
+              <span className="tabular-nums font-semibold">
+                +
+                {surchargeTotal.toLocaleString("it-IT", {
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+          )}
+        </div>
+        {hasMg || hasSurcharges ? (
+          <div className="mt-1 flex items-center justify-between border-t border-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)] pt-1 text-12px font-bold text-[var(--accent-primary)]">
+            <span>= Totale con maggiorazioni</span>
+            <span className="tabular-nums">
+              {(grossTotal + mgTotal + surchargeTotal).toLocaleString("it-IT", {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 2,
+              })}
+            </span>
           </div>
         ) : null}
-        <div className="grid grid-cols-[1fr_180px] border-b border-[var(--border-subtle)] text-[var(--danger-base)]">
-          <div className="p-2">Ribasso gara</div>
-          <div className="border-l border-[var(--border-subtle)] p-2 text-right">
-            -{discountTotal.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+        {discountTotal > 0 && (
+          <div className="mt-1 flex items-center justify-between text-11px text-[var(--danger-base)]">
+            <span>- Ribasso gara</span>
+            <span className="tabular-nums font-semibold">
+              -
+              {discountTotal.toLocaleString("it-IT", {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 2,
+              })}
+            </span>
           </div>
-        </div>
-        <div className="grid grid-cols-[1fr_180px] bg-[var(--info-soft)] font-bold">
-          <div className="p-2">TOTALE ATTUALE SAL</div>
-          <div className="border-l border-[var(--border-subtle)] p-2 text-right text-[var(--accent-primary)]">
-            {total.toLocaleString("it-IT", { minimumFractionDigits: 2 })}
-          </div>
+        )}
+        <div className="mt-1 flex items-center justify-between border-t border-[color-mix(in_srgb,var(--accent-primary)_15%,transparent)] pt-1.5 text-13px font-black text-[var(--accent-primary)]">
+          <span>= Totale netto SAL</span>
+          <span className="tabular-nums">
+            {total.toLocaleString("it-IT", {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2,
+            })}
+          </span>
         </div>
       </div>
     </div>

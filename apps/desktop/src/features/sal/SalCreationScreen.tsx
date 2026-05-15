@@ -25,10 +25,10 @@ import {
   useState,
 } from "react";
 import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
-import { SeverityBar, severityToneForPercentage } from "@/components/shared/SeverityBar";
+
 import { useToast } from "@/components/shared/ToastProvider";
 import { useNavigate } from "@/hooks/useNavigate";
-import { dispatchDataChanged } from "@/lib/sync-events";
+import { DATA_CHANGED_EVENT, dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowService } from "@/services/sal-service";
 import { useAppStore } from "@/store/app-store";
@@ -37,8 +37,6 @@ import type { DesktopMaterial } from "@/lib/desktopData";
 import { updateDesktopMaterial } from "@/lib/desktopData";
 import { SalComparisonView } from "./components/SalComparisonView";
 import {
-  AccountingRows,
-  BreakdownDetails,
   Currency,
   DocumentPreview,
   NumberValue,
@@ -209,7 +207,6 @@ export function SalCreationScreen() {
           lines: draft.lines,
           economicRules: draft.economicRules,
           materialUsage: draft.materialUsage ?? {},
-          materials: (draft.materials ?? []) as DesktopMaterial[],
           salTitle: draft.salTitle || draftSal?.title || project.salTitle,
           phase: draft.phase,
         },
@@ -486,7 +483,7 @@ export function SalCreationScreen() {
     [voicesMap, notify, setLines, setEconomicRules],
   );
 
-  function goPrimary() {
+  async function goPrimary() {
     const canContinue =
       phase === "context"
         ? Boolean(data.project && data.selectedTariffBooks.length > 0)
@@ -586,22 +583,18 @@ export function SalCreationScreen() {
     }
 
     // Deduct materials from inventory on SAL confirmation
-    for (const mu of materialUsagePayload) {
-      const mat = materials.find((m) => m.id === mu.materialId);
-      if (mat) {
-        updateDesktopMaterial(mu.materialId, {
-          id: mat.id,
-          code: mat.code,
-          description: mat.description,
-          category: mat.category,
-          unit: mat.unit,
-          quantity: Math.max(0, mat.quantity - mu.quantity),
-          minQuantity: mat.minQuantity,
-          notes: mat.notes,
-        });
-      }
-    }
     if (materialUsagePayload.length > 0) {
+      await Promise.all(
+        materialUsagePayload.map(async (mu) => {
+          const mat = materials.find((m) => m.id === mu.materialId);
+          if (mat) {
+            await updateDesktopMaterial(mu.materialId, {
+              ...mat,
+              quantity: Math.max(0, mat.quantity - mu.quantity),
+            });
+          }
+        }),
+      );
       dispatchDataChanged();
     }
 
@@ -627,12 +620,6 @@ export function SalCreationScreen() {
       economicRules,
       lines,
       materialUsage,
-      materials: materials.map((m: DesktopMaterial) => ({
-        id: m.id,
-        code: m.code,
-        description: m.description,
-        unit: m.unit,
-      })),
       phase,
       salTitle,
       selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
@@ -641,7 +628,6 @@ export function SalCreationScreen() {
     economicRules,
     lines,
     materialUsage,
-    materials,
     phase,
     salTitle,
     data.project,
@@ -662,12 +648,6 @@ export function SalCreationScreen() {
       economicRules,
       lines,
       materialUsage,
-      materials: materials.map((m) => ({
-        id: m.id,
-        code: m.code,
-        description: m.description,
-        unit: m.unit,
-      })),
       phase,
       salTitle,
       selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
@@ -728,12 +708,6 @@ export function SalCreationScreen() {
         economicRules,
         lines,
         materialUsage,
-        materials: materials.map((m) => ({
-          id: m.id,
-          code: m.code,
-          description: m.description,
-          unit: m.unit,
-        })),
         phase,
         salTitle: salTitle.trim() || project.salTitle,
         selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
@@ -1010,7 +984,6 @@ function SalEditorContent({
       ) : null}
       {phase === "voices" ? (
         <VoicesStep
-          economicRules={economicRules}
           lineViews={lineViews}
           lines={lines}
           onFactorChange={setFactor}
@@ -1420,7 +1393,6 @@ function disabledReason(
 
 /* ── Voices ── */
 function VoicesStep({
-  economicRules,
   lineViews,
   lines,
   onFactorChange,
@@ -1437,7 +1409,6 @@ function VoicesStep({
   onOpenTemplateDialog,
   tariffBookId,
 }: {
-  economicRules: SalEconomicRules;
   lineViews: SalLineView[];
   lines: SalLineDraft[];
   onFactorChange: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
@@ -1624,10 +1595,7 @@ function VoicesStep({
             />
           </div>
 
-          <div className="space-y-3">
-            <BreakdownDetails economicRules={economicRules} lineViews={lineViews} />
-            <EconomicEquation summary={summary} />
-          </div>
+          <SalBudgetLive summary={summary} />
         </div>
       </section>
 
@@ -1642,14 +1610,6 @@ function VoicesStep({
           <span className="text-[var(--border-subtle)]">·</span>
           <span className="text-[var(--text-secondary)]">
             Qtà: <NumberValue value={totalQty} />
-          </span>
-          <span className="text-[var(--border-subtle)]">·</span>
-          <span className="font-semibold text-[var(--danger-base)]">
-            Ribasso: -<Currency value={summary.discountAmount} />
-          </span>
-          <span className="text-[var(--border-subtle)]">·</span>
-          <span className="font-semibold text-[var(--success-base)]">
-            Residuo: <Currency value={summary.budgetResidual} />
           </span>
           {linked > 0 && (
             <>
@@ -1700,19 +1660,43 @@ function ReviewStep({
   compareLines: SalLineView[] | null;
   onToggleCompare: () => void;
 }) {
-  const [isMaterialPanelOpen, setIsMaterialPanelOpen] = useState(false);
+  const [materialsLoadEpoch, setMaterialsLoadEpoch] = useState(0);
   const [isSearchingMaterials, setIsSearchingMaterials] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState("");
+  const [materialExpanded, setMaterialExpanded] = useState(false);
+  const onMaterialsChangeRef = useRef(onMaterialsChange);
+  onMaterialsChangeRef.current = onMaterialsChange;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: materialsLoadEpoch triggers re-fetch on DATA_CHANGED_EVENT
   useEffect(() => {
-    if (!isMaterialPanelOpen) return;
     setIsSearchingMaterials(true);
     import("@/lib/desktopData").then(({ listDesktopMaterials }) =>
       listDesktopMaterials([]).then((res) => {
-        onMaterialsChange(res.data);
+        onMaterialsChangeRef.current(res.data);
         setIsSearchingMaterials(false);
       }),
     );
-  }, [isMaterialPanelOpen, onMaterialsChange]);
+  }, [materialsLoadEpoch]);
+
+  useEffect(() => {
+    const handleChange = () => setMaterialsLoadEpoch((e) => e + 1);
+    window.addEventListener(DATA_CHANGED_EVENT, handleChange);
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, handleChange);
+  }, []);
+
+  const filteredMaterials = useMemo(() => {
+    if (!materialSearch.trim()) return materials;
+    const q = materialSearch.toLowerCase();
+    return materials.filter(
+      (m) =>
+        m.code.toLowerCase().includes(q) ||
+        m.description.toLowerCase().includes(q) ||
+        (m.category ?? "").toLowerCase().includes(q),
+    );
+  }, [materials, materialSearch]);
+
+  const displayMaterials = materialExpanded ? filteredMaterials : filteredMaterials.slice(0, 5);
+  const hasMoreMaterials = filteredMaterials.length > 5;
 
   const usageCount = Object.values(materialUsage).filter((q) => q > 0).length;
   const usageTotalQty = Object.values(materialUsage).reduce((a, b) => a + b, 0);
@@ -1752,138 +1736,273 @@ function ReviewStep({
       {compareLines && <SalComparisonView before={previousSalLines} after={lineViews} />}
 
       {/* ── Materiali in cantiere ── */}
-      <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
-        <div className="flex items-center justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Package className="size-4 text-[var(--text-secondary)]" />
+      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]">
+        <div className="flex items-center justify-between gap-3 border-b border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base)_96%)] px-4 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] text-[var(--accent-primary)]">
+              <Package className="size-4" />
+            </span>
             <div>
-              <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              <div className="text-11px font-semibold text-[var(--text-primary)]">
                 Materiali in cantiere
               </div>
               {usageCount > 0 && (
-                <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
+                <div className="text-10px text-[var(--text-secondary)]">
                   {usageCount} material{usageCount !== 1 ? "i" : "e"} ·{" "}
                   {usageTotalQty.toLocaleString("it-IT")} unità
                 </div>
               )}
             </div>
           </div>
-          <m.button
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-11px font-semibold transition-colors",
-              isMaterialPanelOpen
-                ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
-                : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-            )}
-            onClick={() => setIsMaterialPanelOpen((o) => !o)}
-            type="button"
-          >
-            <Package className="size-3.5" />
-            {isMaterialPanelOpen ? "Chiudi" : "Registra materiali"}
-          </m.button>
+          {isSearchingMaterials && (
+            <span className="text-11px text-[var(--text-secondary)]">Caricamento...</span>
+          )}
         </div>
-        {isMaterialPanelOpen && (
-          <div className="border-t border-[var(--border-subtle)]/50">
-            <div className="max-h-[300px] overflow-y-auto">
-              {materials.length === 0 ? (
-                <div className="flex items-center justify-center px-4 py-8 text-13px text-[var(--text-secondary)]">
-                  {isSearchingMaterials
-                    ? "Caricamento materiali..."
-                    : "Nessun materiale disponibile."}
-                </div>
-              ) : (
-                materials.map((mat) => {
-                  const available = mat.quantity ?? 0;
-                  const used = materialUsage[mat.id] ?? 0;
-                  const coverage =
-                    available > 0
-                      ? Math.min(100, Math.round(((available - used) / available) * 100))
-                      : 0;
-                  const tone = severityToneForPercentage(100 - coverage);
-                  return (
-                    <div
-                      className="flex items-center gap-3 border-b border-[var(--border-subtle)]/30 px-4 py-3 last:border-b-0"
-                      key={mat.id}
-                    >
-                      <div className="min-w-0 flex-[2]">
-                        <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
-                          {mat.code} — {mat.description}
+
+        {/* Search */}
+        {materials.length > 0 && (
+          <div className="border-b border-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)] px-3 py-2">
+            <div className="relative">
+              <svg
+                aria-label="Cerca"
+                className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-tertiary)]"
+                fill="none"
+                role="img"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+              <input
+                className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-8 pr-3 text-12px outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                onChange={(e) => {
+                  setMaterialSearch(e.target.value);
+                  setMaterialExpanded(true);
+                }}
+                placeholder="Cerca codice, descrizione o categoria..."
+                value={materialSearch}
+              />
+            </div>
+          </div>
+        )}
+
+        {materials.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
+            <Package className="mb-2 size-8 text-[var(--text-tertiary)]" />
+            <p className="text-13px font-semibold text-[var(--text-primary)]">
+              {isSearchingMaterials ? "Caricamento materiali..." : "Nessun materiale disponibile"}
+            </p>
+            {!isSearchingMaterials && (
+              <p className="mt-1 max-w-xs text-11px text-[var(--text-secondary)]">
+                I materiali presenti a magazzino appaiono qui per tracciare il consumo in cantiere.
+              </p>
+            )}
+          </div>
+        ) : filteredMaterials.length === 0 ? (
+          <div className="px-4 py-6 text-center text-12px text-[var(--text-tertiary)]">
+            Nessun materiale corrisponde alla ricerca.
+          </div>
+        ) : (
+          <div className="max-h-[400px] overflow-y-auto">
+            {displayMaterials.map((mat) => {
+              const available = mat.quantity ?? 0;
+              const minQ = mat.minQuantity ?? 0;
+              const used = materialUsage[mat.id] ?? 0;
+              const remaining = Math.max(0, available - used);
+              const exceedsAvailable = used > available;
+              const barCoverage =
+                available > 0 ? Math.min(100, Math.round((remaining / available) * 100)) : 0;
+              const stockTone =
+                minQ > 0
+                  ? remaining < minQ
+                    ? "danger"
+                    : remaining <= minQ * 1.5
+                      ? "warning"
+                      : "success"
+                  : "success";
+              return (
+                <div
+                  key={mat.id}
+                  className="flex items-center gap-3 border-b border-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)] px-4 py-2.5 last:border-b-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="truncate text-12px font-semibold text-[var(--text-primary)]">
+                        {mat.description}
+                      </span>
+                      <span className="shrink-0 text-10px text-[var(--text-tertiary)]">
+                        {mat.code}
+                      </span>
+                      {exceedsAvailable && (
+                        <span className="shrink-0 rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-9px font-bold text-[var(--danger-base)]">
+                          Eccesso
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-10px text-[var(--text-secondary)]">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex h-1.5 w-16 overflow-hidden rounded-full bg-[var(--border-subtle)] sm:w-20">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              stockTone === "danger" && "bg-[var(--danger-base)]",
+                              stockTone === "warning" && "bg-[var(--warning-base)]",
+                              stockTone === "success" && "bg-[var(--success-base)]",
+                            )}
+                            style={{ width: `${barCoverage}%` }}
+                          />
                         </div>
-                        <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
-                          {mat.category} · {mat.unit} · disp. {available.toLocaleString("it-IT")}
-                        </div>
-                        {available > 0 && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <SeverityBar
-                              percentage={coverage}
-                              tone={tone}
-                              className="h-1.5 flex-1"
-                            />
+                        <span
+                          className={cn(
+                            "w-7 text-right font-bold tabular-nums",
+                            stockTone === "danger" && "text-[var(--danger-base)]",
+                            stockTone === "warning" && "text-[var(--warning-base)]",
+                            stockTone === "success" && "text-[var(--success-base)]",
+                          )}
+                        >
+                          {barCoverage}%
+                        </span>
+                      </div>
+                      <span>{mat.category}</span>
+                      <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+                      <span>
+                        disp.{" "}
+                        <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                          {available.toLocaleString("it-IT")}
+                        </span>{" "}
+                        {mat.unit}
+                      </span>
+                      {minQ > 0 && (
+                        <>
+                          <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+                          <span>
+                            soglia{" "}
+                            <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                              {minQ.toLocaleString("it-IT")}
+                            </span>
+                          </span>
+                        </>
+                      )}
+                      {used > 0 && (
+                        <>
+                          <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+                          <span>
+                            usati{" "}
+                            <span className="font-semibold tabular-nums text-[var(--accent-primary)]">
+                              {used.toLocaleString("it-IT")}
+                            </span>
+                          </span>
+                          <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+                          <span>
+                            restano{" "}
                             <span
                               className={cn(
-                                "w-10 text-right text-10px font-bold tabular-nums",
-                                tone === "danger" && "text-[var(--danger-base)]",
-                                tone === "warning" && "text-[var(--warning-base)]",
-                                tone === "success" && "text-[var(--success-base)]",
+                                "font-semibold tabular-nums",
+                                remaining < minQ
+                                  ? "text-[var(--danger-base)]"
+                                  : remaining <= minQ * 1.5
+                                    ? "text-[var(--warning-base)]"
+                                    : "text-[var(--success-base)]",
                               )}
                             >
-                              {coverage}%
+                              {remaining.toLocaleString("it-IT")}
                             </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-11px text-[var(--text-secondary)]">Qtà usata</span>
-                        <div className="flex items-center gap-1">
-                          <input
-                            className="h-8 w-20 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-right text-12px font-semibold outline-none transition focus:border-[var(--accent-primary)]"
-                            min={0}
-                            onBlur={onAutoSave}
-                            onChange={(e) => {
-                              const qty = Math.max(
-                                0,
-                                Number.parseFloat(e.target.value.replace(",", ".")) || 0,
-                              );
-                              onMaterialUsageChange({ ...materialUsage, [mat.id]: qty });
-                            }}
-                            placeholder="0"
-                            type="number"
-                            value={materialUsage[mat.id] ?? ""}
-                          />
-                          <span className="w-8 text-11px text-[var(--text-secondary)]">
-                            {mat.unit}
                           </span>
-                        </div>
-                      </div>
+                        </>
+                      )}
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex items-center overflow-hidden rounded-md border border-[var(--border-subtle)]">
+                      <button
+                        className="flex size-7 items-center justify-center text-13px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] disabled:opacity-30"
+                        disabled={used <= 0}
+                        onClick={() =>
+                          onMaterialUsageChange({
+                            ...materialUsage,
+                            [mat.id]: Math.max(0, used - 1),
+                          })
+                        }
+                        type="button"
+                      >
+                        −
+                      </button>
+                      <input
+                        className="h-7 w-14 border-x border-[var(--border-subtle)] bg-[var(--surface-base)] px-1 text-center text-11px font-semibold tabular-nums outline-none transition focus:bg-[var(--bg-muted)]"
+                        min={0}
+                        onBlur={onAutoSave}
+                        onChange={(e) => {
+                          const qty = Math.max(
+                            0,
+                            Number.parseFloat(e.target.value.replace(",", ".")) || 0,
+                          );
+                          onMaterialUsageChange({ ...materialUsage, [mat.id]: qty });
+                        }}
+                        placeholder="0"
+                        type="text"
+                        inputMode="decimal"
+                        value={used || ""}
+                      />
+                      <button
+                        className="flex size-7 items-center justify-center text-13px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                        onClick={() =>
+                          onMaterialUsageChange({ ...materialUsage, [mat.id]: used + 1 })
+                        }
+                        type="button"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Expand / collapse toggle */}
+        {hasMoreMaterials && (
+          <button
+            className="flex w-full items-center justify-center gap-1 border-t border-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)] px-4 py-2 text-11px font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--bg-muted)]/30"
+            onClick={() => setMaterialExpanded((o) => !o)}
+            type="button"
+          >
+            <ChevronDown
+              className={cn("size-3.5 transition-transform", materialExpanded && "rotate-180")}
+            />
+            {materialExpanded
+              ? "Mostra meno"
+              : `Mostra tutti (${filteredMaterials.length} materiali)`}
+          </button>
+        )}
+
+        {/* Summary footer */}
+        {usageCount > 0 && (
+          <div className="flex items-center justify-between border-t border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_2%,var(--surface-base)_98%)] px-4 py-2 text-11px text-[var(--text-secondary)]">
+            <span>
+              <span className="font-semibold text-[var(--text-primary)]">{usageCount}</span>{" "}
+              material{usageCount !== 1 ? "i" : "e"} con consumo
+            </span>
+            <span>
+              Totale{" "}
+              <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                {usageTotalQty.toLocaleString("it-IT")}
+              </span>{" "}
+              unità
+            </span>
           </div>
         )}
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
-        <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
-          <div className="bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-5 py-4">
-            <div className="text-10px font-medium uppercase tracking-overline text-[var(--text-secondary)]">
-              Verifica economica
-            </div>
-            <div className="mt-2 text-24px font-bold leading-none tracking-neg-0_025em text-[var(--text-primary)]">
-              <Currency value={summary.total} />
-            </div>
-            <div className="mt-1 text-12px font-medium text-[var(--text-secondary)]">
-              Totale attuale SAL
-            </div>
-          </div>
-          <div className="space-y-4 p-5">
-            <BreakdownDetails economicRules={economicRules} lineViews={lineViews} />
-            <div className="border-t border-[var(--border-subtle)]/40 pt-4">
-              <EconomicEquation summary={summary} />
-            </div>
-          </div>
-        </div>
+        <SalCostRecap
+          economicRules={economicRules}
+          lineViews={lineViews}
+          summary={summary}
+          showBudget
+        />
         <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
           <div className="flex items-center justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-5 py-4">
             <div>
@@ -1903,15 +2022,6 @@ function ReviewStep({
           </div>
         </div>
       </div>
-      <details className="rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
-        <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-12px font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
-          <ChevronDown className="size-3.5 transition-transform [details[open]_&]:rotate-180" />
-          Dettaglio voci ({lineViews.length})
-        </summary>
-        <div className="border-t border-[var(--border-subtle)]/50 px-4 pb-3 pt-3">
-          <AccountingRows lines={lineViews} />
-        </div>
-      </details>
       <div className="flex justify-end">
         <m.button
           className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
@@ -2000,12 +2110,12 @@ function ConfirmStep({
           </div>
         </div>
       </div>
-      <div className="space-y-4 rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-        <BreakdownDetails economicRules={economicRules} lineViews={lineViews} />
-        <div className="border-t border-[var(--border-subtle)]/40 pt-4">
-          <EconomicEquation summary={summary} />
-        </div>
-      </div>
+      <SalCostRecap
+        economicRules={economicRules}
+        lineViews={lineViews}
+        summary={summary}
+        showBudget
+      />
       <div
         className="responsive-grid-elastic gap-2"
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))" }}
@@ -2090,6 +2200,424 @@ function CompletedView({
 }
 
 /* ── Shared ── */
+
+function SalBudgetLive({ summary }: { summary: SalEconomicSummary }) {
+  const contractAmount = useMemo(
+    () => summary.budgetResidual + summary.previousProgressiveAmount + summary.total,
+    [summary],
+  );
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]">
+      <div className="border-b border-[var(--border-subtle)]/60 bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base)_96%)] px-4 py-2.5">
+        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+          Budget disponibile in tempo reale
+        </div>
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)]/40 md:grid-cols-4">
+        <LiveMetric label="Budget contratto" value={contractAmount} isActive={false} />
+        <LiveMetric
+          label="Già impegnato"
+          value={summary.previousProgressiveAmount}
+          isActive={false}
+        />
+        <LiveMetric label="In corso" value={summary.total} isActive />
+        <LiveMetric
+          label="Residuo"
+          value={summary.budgetResidual}
+          isActive={false}
+          danger={summary.budgetResidual < 0}
+        />
+      </div>
+    </div>
+  );
+}
+
+function LiveMetric({
+  label,
+  value,
+  isActive,
+  danger,
+}: {
+  label: string;
+  value: number;
+  isActive?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col justify-center px-4 py-3",
+        isActive && "bg-[color-mix(in_srgb,var(--accent-primary)_5%,var(--surface-base)_95%)]",
+      )}
+    >
+      <div className="text-10px font-medium text-[var(--text-secondary)]">{label}</div>
+      <m.span
+        key={Math.round(value * 100)}
+        initial={{ opacity: 0.3, y: 6, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.32, ease: [0.25, 0.1, 0.25, 1] }}
+        className={cn(
+          "mt-0.5 inline-block text-15px font-black tabular-nums transition-colors duration-500",
+          danger
+            ? "text-[var(--danger-base)]"
+            : isActive
+              ? "text-[var(--accent-primary)]"
+              : "text-[var(--text-primary)]",
+        )}
+      >
+        <Currency value={value} />
+      </m.span>
+    </div>
+  );
+}
+
+function SalCostRecap({
+  economicRules,
+  lineViews,
+  summary,
+  showBudget = true,
+}: {
+  economicRules: SalEconomicRules;
+  lineViews: SalLineView[];
+  summary: SalEconomicSummary;
+  showBudget?: boolean;
+}) {
+  const categories = useMemo(() => {
+    const catMap = new Map<
+      string,
+      { gross: number; net: number; count: number; hasSafety: boolean }
+    >();
+    for (const line of lineViews) {
+      const cat = line.voice.category || "Altro";
+      const existing = catMap.get(cat) ?? {
+        gross: 0,
+        net: 0,
+        count: 0,
+        hasSafety: false,
+      };
+      existing.gross += line.grossAmount;
+      existing.net += line.totalAmount;
+      existing.count += 1;
+      existing.hasSafety = existing.hasSafety || line.voice.isSafetyCost;
+      catMap.set(cat, existing);
+    }
+    return [...catMap.entries()].filter(([_, v]) => v.gross > 0);
+  }, [lineViews]);
+
+  const safetyCategories = useMemo(() => {
+    return categories.filter(([_, v]) => v.hasSafety);
+  }, [categories]);
+
+  const regularCategories = useMemo(() => {
+    return categories.filter(([_, v]) => !v.hasSafety);
+  }, [categories]);
+
+  const mgEntries = useMemo(
+    () => lineViews.flatMap((line) => line.linkedCharges.filter((c) => c.code.startsWith("MG."))),
+    [lineViews],
+  );
+
+  const totalMgAmount = useMemo(
+    () => mgEntries.reduce((sum, entry) => sum + entry.total, 0),
+    [mgEntries],
+  );
+
+  const hasMg = mgEntries.length > 0;
+  const hasDiscount = summary.discountAmount > 0;
+  const hasSurcharges = summary.linkedChargeAmount > 0;
+
+  const contractAmount = useMemo(
+    () => summary.budgetResidual + summary.previousProgressiveAmount + summary.total,
+    [summary],
+  );
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base)_96%)] px-5 py-3.5">
+        <div className="min-w-0">
+          <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            Riepilogo costi
+          </div>
+          <div className="mt-0.5 text-11px font-medium text-[var(--text-secondary)]">
+            {summary.voiceCount} voci ·{" "}
+            {categories.reduce((s, [_, v]) => s + v.count, 0) === summary.voiceCount
+              ? categories.length === 1
+                ? "1 categoria"
+                : `${categories.length} categorie`
+              : "importi raggruppati"}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            Totale netto
+          </div>
+          <div className="mt-0.5 text-17px font-black text-[var(--accent-primary)]">
+            <Currency value={summary.total} />
+          </div>
+        </div>
+      </div>
+
+      <div className="divide-y divide-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)]">
+        {/* Category breakdown */}
+        {regularCategories.length > 0 && (
+          <div className="px-5 py-3.5">
+            <div className="mb-2.5 text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              Importo lordo per categoria
+            </div>
+            <div className="space-y-0 divide-y divide-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)]">
+              {regularCategories.map(([cat, data], idx) => (
+                <CategoryRow
+                  key={cat}
+                  category={cat}
+                  count={data.count}
+                  amount={data.gross}
+                  withSeparator={idx < regularCategories.length - 1 || safetyCategories.length > 0}
+                />
+              ))}
+              {safetyCategories.length > 0 && (
+                <>
+                  {regularCategories.length > 0 && (
+                    <div className="h-0 border-t border-dashed border-[color-mix(in_srgb,var(--accent-primary)_14%,transparent)]" />
+                  )}
+                  {safetyCategories.map(([cat, data], idx) => (
+                    <CategoryRow
+                      key={cat}
+                      category={cat}
+                      count={data.count}
+                      amount={data.gross}
+                      isSafety
+                      withSeparator={idx < safetyCategories.length - 1}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* MG Surcharges */}
+        {hasMg && (
+          <div className="px-5 py-3.5">
+            <div className="mb-2.5 text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              Maggiorazioni MG
+            </div>
+            <div className="space-y-0 divide-y divide-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)]">
+              {mgEntries.map((entry) => {
+                const tariffPrefix = entry.code.replace("MG.", "");
+                const label =
+                  tariffPrefix === "ALL"
+                    ? `MG ${entry.percent.toLocaleString("it-IT")}% su tutte le voci`
+                    : `MG ${entry.percent.toLocaleString("it-IT")}% su voci ${tariffPrefix}`;
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between gap-3 py-1.5 text-12px"
+                  >
+                    <span className="min-w-0 truncate text-[var(--text-primary)]">{label}</span>
+                    <span className="shrink-0 font-semibold tabular-nums text-[var(--info-base)]">
+                      +<Currency value={entry.total} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Discount */}
+        {hasDiscount && (
+          <div className="px-5 py-3.5">
+            <div className="mb-2.5 text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              Ribasso gara ({economicRules.discountPercent.toLocaleString("it-IT")}%)
+            </div>
+            <div className="space-y-0 divide-y divide-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)]">
+              <div className="flex items-center justify-between py-1.5 text-12px">
+                <span className="text-[var(--text-primary)]">
+                  Su importo ribassabile{" "}
+                  <span className="text-[var(--text-tertiary)]">
+                    ({summary.discountedVoiceCount} voci)
+                  </span>
+                </span>
+                <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                  <Currency value={summary.discountableAmount} />
+                </span>
+              </div>
+              {summary.excludedSafetyVoiceCount > 0 && (
+                <div className="flex items-center justify-between py-1.5 text-11px text-[var(--text-secondary)]">
+                  <span>
+                    OS esclus{summary.excludedSafetyVoiceCount !== 1 ? "i" : "a"} (
+                    {summary.excludedSafetyVoiceCount} voci)
+                  </span>
+                  <span className="font-semibold tabular-nums text-[var(--danger-base)]">
+                    -<Currency value={summary.discountAmount} />
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Equation */}
+        <div className="bg-[color-mix(in_srgb,var(--accent-primary)_3%,var(--surface-base)_97%)] px-5 py-3.5">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-12px text-[var(--text-secondary)]">
+              <span>Voci lordo</span>
+              <span className="tabular-nums">
+                <Currency value={summary.grossAmount} />
+              </span>
+            </div>
+            {totalMgAmount > 0 && (
+              <div className="flex items-center justify-between text-12px text-[var(--info-base)]">
+                <span>+ Maggiorazioni MG distribuite</span>
+                <span className="tabular-nums">
+                  +<Currency value={totalMgAmount} />
+                </span>
+              </div>
+            )}
+            {hasSurcharges && (
+              <div className="flex items-center justify-between text-12px text-[var(--info-base)]">
+                <span>+ Maggiorazioni su manodopera</span>
+                <span className="tabular-nums">
+                  +<Currency value={summary.linkedChargeAmount} />
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="mt-2 flex items-center justify-between border-t border-[color-mix(in_srgb,var(--accent-primary)_15%,transparent)] pt-2 text-13px font-bold text-[var(--accent-primary)]">
+            <span>= Totale con maggiorazioni</span>
+            <span className="tabular-nums">
+              <Currency value={summary.grossAmount + totalMgAmount + summary.linkedChargeAmount} />
+            </span>
+          </div>
+          {hasDiscount && (
+            <div className="mt-1 flex items-center justify-between text-12px text-[var(--danger-base)]">
+              <span>- Ribasso gara ({economicRules.discountPercent.toLocaleString("it-IT")}%)</span>
+              <span className="tabular-nums">
+                -<Currency value={summary.discountAmount} />
+              </span>
+            </div>
+          )}
+          <div className="mt-2 flex items-center justify-between border-t border-[color-mix(in_srgb,var(--accent-primary)_18%,transparent)] pt-2.5 text-14px font-black text-[var(--accent-primary)]">
+            <span>= Totale netto SAL</span>
+            <span className="tabular-nums">
+              <Currency value={summary.total} />
+            </span>
+          </div>
+        </div>
+
+        {/* Safety footnote */}
+        {summary.safetyAmount > 0 && (
+          <div className="flex items-center gap-2 border-t border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] px-5 py-2.5 text-11px text-[var(--text-secondary)]">
+            <span className="size-1.5 shrink-0 rounded-full bg-[var(--danger-base)]" />
+            di cui oneri sicurezza (OS):{" "}
+            <span className="font-semibold tabular-nums text-[var(--danger-base)]">
+              <Currency value={summary.safetyAmount} />
+            </span>
+          </div>
+        )}
+
+        {/* Budget context */}
+        {showBudget && (
+          <div className="border-t border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[var(--bg-muted)]/20 px-5 py-3.5">
+            <div className="mb-2.5 text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              Budget contratto
+            </div>
+            <div className="space-y-0 divide-y divide-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)]">
+              <div className="flex items-center justify-between py-1.5 text-12px text-[var(--text-primary)]">
+                <span>Importo contratto</span>
+                <span className="font-semibold tabular-nums">
+                  <Currency value={contractAmount} />
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 text-12px text-[var(--text-secondary)]">
+                <span>Già impegnato (SAL precedenti)</span>
+                <span className="tabular-nums">
+                  <Currency value={summary.previousProgressiveAmount} />
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 text-12px text-[var(--accent-primary)]">
+                <span>Questo SAL</span>
+                <span className="tabular-nums">
+                  <Currency value={summary.total} />
+                </span>
+              </div>
+              <div className="border-t border-[color-mix(in_srgb,var(--accent-primary)_14%,transparent)] pt-1.5">
+                <div className="flex items-center justify-between py-1 text-13px font-bold">
+                  <span
+                    className={
+                      summary.budgetResidual >= 0
+                        ? "text-[var(--success-base)]"
+                        : "text-[var(--danger-base)]"
+                    }
+                  >
+                    Residuo disponibile
+                  </span>
+                  <span
+                    className={cn(
+                      "tabular-nums",
+                      summary.budgetResidual >= 0
+                        ? "text-[var(--success-base)]"
+                        : "text-[var(--danger-base)]",
+                    )}
+                  >
+                    <Currency value={summary.budgetResidual} />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CategoryRow({
+  category,
+  count,
+  amount,
+  isSafety,
+  withSeparator,
+}: {
+  category: string;
+  count: number;
+  amount: number;
+  isSafety?: boolean;
+  withSeparator?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 py-1.5 text-12px",
+        withSeparator &&
+          "border-b border-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)]",
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <span
+          className={cn(
+            "truncate",
+            isSafety ? "font-medium text-[var(--danger-base)]" : "text-[var(--text-primary)]",
+          )}
+        >
+          {category}
+        </span>
+        {isSafety && (
+          <span className="shrink-0 rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-9px font-bold text-[var(--danger-base)]">
+            OS
+          </span>
+        )}
+        <span className="shrink-0 text-10px text-[var(--text-tertiary)]">{count} voci</span>
+      </div>
+      <span className="shrink-0 font-semibold tabular-nums text-[var(--text-primary)]">
+        <Currency value={amount} />
+      </span>
+    </div>
+  );
+}
+
 function EconomicEquation({
   className,
   summary,

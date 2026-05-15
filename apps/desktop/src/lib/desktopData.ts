@@ -469,8 +469,11 @@ export async function updateDesktopMaterial(
   if (!isTauriRuntime()) {
     let current = readPreviewMaterials([]);
     const index = current.findIndex((m) => m.id === materialId);
+    const cleanRequest = Object.fromEntries(
+      Object.entries(request).filter(([_, v]) => v !== undefined),
+    ) as CreateDesktopMaterialRequest;
     if (index >= 0) {
-      current[index] = { ...current[index], ...request };
+      current[index] = { ...current[index], ...cleanRequest };
     } else {
       current = [request, ...current];
     }

@@ -76,18 +76,8 @@ export function useSalCreationData() {
         const defaultContract = contracts.find((c) => c.id === savedId) ?? contracts[0] ?? null;
         const defaultId = defaultContract?.id ?? "";
         const orderedBooks = mapTariffBooksForContract(tariffBooks, defaultContract);
-        const defaultSelectedIds = orderedBooks
-          .reduce((ids, book) => {
-            if (book.isPriority) ids.push(book.id);
-            return ids;
-          }, [] as string[])
-          .slice(0, 3);
-        const selectedTariffBookIds =
-          defaultSelectedIds.length > 0
-            ? defaultSelectedIds
-            : orderedBooks[0]
-              ? [orderedBooks[0].id]
-              : [];
+        const defaultSelectedIds = orderedBooks.map((book) => book.id);
+        const selectedTariffBookIds = defaultSelectedIds;
         const voices = await loadVoicesForBooks(selectedTariffBookIds, tariffBooks);
 
         if (!active) return;
@@ -212,12 +202,7 @@ export function useSalCreationData() {
     const contract = state.contracts.find((c) => c.id === contractId);
     if (!contract) return;
     writeSelectedProjectId(contractId);
-    const bookIds = mapTariffBooksForContract(state.tariffBooks, contract)
-      .reduce((ids, b) => {
-        if (b.isPriority) ids.push(b.id);
-        return ids;
-      }, [] as string[])
-      .slice(0, 3);
+    const bookIds = mapTariffBooksForContract(state.tariffBooks, contract).map((b) => b.id);
     setState((current) => ({
       ...current,
       error: null,

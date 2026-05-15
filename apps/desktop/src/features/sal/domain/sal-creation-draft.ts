@@ -5,7 +5,7 @@ type SalCreationDraft = {
   economicRules: SalEconomicRules;
   lines: SalLineDraft[];
   materialUsage: Record<string, number>;
-  materials: { code: string; description: string; id: string; unit: string }[];
+  materials?: { code: string; description: string; id: string; unit: string }[];
   phase: "context" | "voices" | "review" | "confirm" | "completed";
   projectId: string;
   salTitle: string;

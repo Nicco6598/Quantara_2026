@@ -118,7 +118,11 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
     matFbPromise.then((fb) => {
       listDesktopMaterials(fb).then((result) => {
         if (!active) return;
-        const data = result.data;
+        const data = result.data.map((m) => ({
+          ...m,
+          minQuantity: m.minQuantity ?? 10,
+          quantity: m.quantity ?? 0,
+        }));
         setCriticalMaterialsCount(data.filter((m) => m.quantity < m.minQuantity).length);
         setWarningMaterialsCount(data.filter((m) => m.quantity === 0).length);
       });

@@ -62,7 +62,9 @@ const categoryToneLabel: Record<CategoryTone, string> = {
 const CATEGORIES = ["Armamento", "Sottofondo", "Opere civili", "Impianti"];
 
 function toneForQuantity(quantity: number, minQuantity: number): StockTone {
-  if (quantity === 0 || quantity < minQuantity) return "danger";
+  if (minQuantity <= 0) return "success";
+  if (quantity < minQuantity) return "danger";
+  if (quantity <= minQuantity * 1.5) return "warning";
   return "success";
 }
 
@@ -386,6 +388,15 @@ export function MaterialsScreen() {
           dispatch({ type: "SET_SELECTED_MATERIAL_ID", payload: null });
         }}
         onCreated={loadMaterials}
+        onSaved={(updated) => {
+          if (state.selectedMaterialId) {
+            setMaterials((prev) =>
+              prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)),
+            );
+          } else {
+            setMaterials((prev) => [updated, ...prev]);
+          }
+        }}
       />
 
       <ConfirmDialog
@@ -553,41 +564,42 @@ function MaterialCard({
                 )}
               </div>
 
-              {/* Dual coverage bar: faded raw stock + solid effective */}
+              {/* Coverage bar */}
               {(() => {
                 const effective = Math.max(0, material.quantity - committed);
-                const maxVal = Math.max(material.quantity, material.minQuantity, 1);
-                const rawPct = Math.min(100, Math.round((material.quantity / maxVal) * 100));
-                const effPct = Math.min(100, Math.round((effective / maxVal) * 100));
-                const effBarColor =
-                  effTone === "danger"
-                    ? "var(--danger-base)"
-                    : effTone === "warning"
-                      ? "var(--warning-base)"
-                      : "var(--success-base)";
+                const barCoverage =
+                  material.quantity > 0
+                    ? Math.min(100, Math.round((effective / material.quantity) * 100))
+                    : 0;
+                const tone = toneForQuantity(effective, material.minQuantity);
                 return (
                   <div className="mt-3">
-                    <div className="relative h-2.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
+                    <div className="flex h-2 overflow-hidden rounded-full bg-[var(--border-subtle)]">
                       <div
-                        className="absolute inset-y-0 left-0 rounded-full opacity-20"
-                        style={{ width: `${rawPct}%`, backgroundColor: effBarColor }}
-                      />
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full transition-all"
-                        style={{ width: `${effPct}%`, backgroundColor: effBarColor }}
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          tone === "danger" && "bg-[var(--danger-base)]",
+                          tone === "warning" && "bg-[var(--warning-base)]",
+                          tone === "success" && "bg-[var(--success-base)]",
+                        )}
+                        style={{ width: `${barCoverage}%` }}
                       />
                     </div>
                     <div className="mt-1 flex items-center justify-between text-10px">
                       <span className="text-[var(--text-tertiary)]">
-                        {committed > 0 ? (
-                          <>
-                            {effPct}% effettivo · -{committed.toLocaleString("it-IT")} in SAL
-                          </>
-                        ) : (
-                          <>{effPct}% disponibile</>
-                        )}
+                        {barCoverage}%{" "}
+                        {committed > 0
+                          ? `· -${committed.toLocaleString("it-IT")} in SAL`
+                          : "disponibile"}
                       </span>
-                      <span className="font-semibold text-[var(--text-primary)]">
+                      <span
+                        className={cn(
+                          "font-semibold tabular-nums",
+                          tone === "danger" && "text-[var(--danger-base)]",
+                          tone === "warning" && "text-[var(--warning-base)]",
+                          tone === "success" && "text-[var(--text-primary)]",
+                        )}
+                      >
                         {formatQuantity(effective, material.unit)}
                       </span>
                     </div>
@@ -674,19 +686,8 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
   const usageInfo = getMaterialUsageInfo(material.id);
   const committed = usageInfo.inDraft + usageInfo.inConfirmed;
   const effectiveStock = Math.max(0, material.quantity - committed);
-  const effectiveCoverage =
-    material.minQuantity > 0
-      ? Math.min(100, Math.round((effectiveStock / material.minQuantity) * 100))
-      : 100;
-  const coverage =
-    material.minQuantity > 0
-      ? Math.min(100, Math.round((material.quantity / material.minQuantity) * 100))
-      : 100;
-  const tone = toneForQuantity(material.quantity, material.minQuantity);
   const effectiveTone = toneForQuantity(effectiveStock, material.minQuantity);
   const catTone = categoryColorMap[material.category] ?? "blue";
-  const effectiveColor =
-    effectiveTone === "danger" ? "danger" : effectiveTone === "warning" ? "warning" : "success";
 
   return (
     <Panel>
@@ -707,8 +708,12 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
               </div>
             </div>
           </div>
-          <StatusPill tone={tone}>
-            {tone === "danger" ? "Critico" : tone === "warning" ? "Attenzione" : "OK"}
+          <StatusPill tone={effectiveTone}>
+            {effectiveTone === "danger"
+              ? "Critico"
+              : effectiveTone === "warning"
+                ? "Attenzione"
+                : "OK"}
           </StatusPill>
         </div>
 
@@ -727,32 +732,46 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
 
         <div className="mt-3">
           <div className="flex items-center justify-between text-12px text-[var(--text-secondary)]">
-            <span className="font-medium">Copertura stock</span>
+            <span className="font-medium">Stock disponibile</span>
             <span className="font-bold text-[var(--text-primary)]">
               {formatQuantity(material.quantity, material.unit)}
             </span>
           </div>
-          <CoverageBar coverage={coverage} tone={tone} />
+          <CoverageBar
+            coverage={
+              material.quantity > 0
+                ? Math.min(100, Math.round((material.quantity / material.quantity) * 100))
+                : 0
+            }
+            tone={toneForQuantity(material.quantity, material.minQuantity)}
+          />
           {committed > 0 && (
             <div className="mt-2">
               <div className="flex items-center justify-between text-12px text-[var(--text-secondary)]">
-                <span className="font-medium">Copertura effettiva</span>
+                <span className="font-medium">Effettivo (impegni dedotti)</span>
                 <span
                   className={cn(
                     "font-bold",
-                    effectiveColor === "danger"
+                    effectiveTone === "danger"
                       ? "text-[var(--danger-base)]"
-                      : effectiveColor === "warning"
+                      : effectiveTone === "warning"
                         ? "text-[var(--warning-base)]"
-                        : "text-[var(--success-base)]",
+                        : "text-[var(--text-primary)]",
                   )}
                 >
                   {formatQuantity(effectiveStock, material.unit)}
                 </span>
               </div>
-              <CoverageBar coverage={effectiveCoverage} tone={effectiveTone} />
+              <CoverageBar
+                coverage={
+                  effectiveStock > 0 && material.quantity > 0
+                    ? Math.min(100, Math.round((effectiveStock / material.quantity) * 100))
+                    : 0
+                }
+                tone={effectiveTone}
+              />
               <div className="mt-0.5 text-right text-10px text-[var(--text-tertiary)]">
-                -{committed.toLocaleString("it-IT")} impegnato in SAL
+                -{committed.toLocaleString("it-IT")} in SAL
               </div>
             </div>
           )}
@@ -830,11 +849,13 @@ function AddMaterialModal({
   material,
   onClose,
   onCreated,
+  onSaved,
 }: {
   isOpen: boolean;
   material?: DesktopMaterial | null;
   onClose: () => void;
   onCreated: () => void;
+  onSaved?: (updated: DesktopMaterial) => void;
 }) {
   const { notify } = useToast();
   const isEditing = !!material;
@@ -875,9 +896,11 @@ function AddMaterialModal({
 
       if (material) {
         await updateDesktopMaterial(material.id, payload);
+        onSaved?.(payload);
       } else {
         const { createDesktopMaterial } = await import("@/lib/desktopData");
         await createDesktopMaterial(payload);
+        onSaved?.(payload);
       }
 
       dispatchDataChanged();

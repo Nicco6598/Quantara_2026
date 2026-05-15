@@ -2,6 +2,35 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.1 — 2026-05-15
+
+### Riepilogo costi più chiaro
+
+- **Nuovo "scontrino" dei costi** — nello step 3 (Verifica) e 4 (Conferma) della creazione SAL trovi un riepilogo stile ricevuta fiscale: categorie, maggiorazioni, ribasso e budget contratto, tutto in un colpo d'occhio. Niente più numeri sparsi in giro.
+- **Budget in tempo reale nello step 2** — mentre inserisci le voci, un contatore animato ti mostra budget contratto, già impegnato, quanto stai inserendo e il residuo che si aggiorna da solo.
+- **Passaggio in più nel calcolo** — l'equazione ora mostra "Voci lordo → + maggiorazioni → = Totale con maggiorazioni → − ribasso → = Totale netto SAL", così si capisce cosa succede a ogni passaggio.
+- **Anteprima documento più moderna** — la preview del libretto misure ora ha lo stesso stile "scontrino" del riepilogo costi, con righe compatte e totali subito leggibili.
+
+### Materiali in cantiere più facili da usare
+
+- **Pannello materiali sempre aperto** — non devi più cliccare "Registra materiali" per vederli. Appena arrivi allo step 3, i materiali sono già lì.
+- **Cerca materiali** — c'è un campo di ricerca che filtra in tempo reale per codice, descrizione o categoria. Utile quando hai tanti materiali.
+- **Input più pratico** — invece di scrivere a mano la quantità, ora hai i pulsanti `−` e `+` intorno al numero. Se usi più materiali di quanti ne hai disponibili, compare un avviso "Eccesso".
+- **Barra sempre visibile** — ogni materiale mostra subito quanto ne resta dopo l'uso, con un colore che cambia: verde se sei sopra la soglia, giallo se ti stai avvicinando, rosso se sei sotto.
+- **Dettaglio subito leggibile** — per ogni materiale vedi: barra con percentuale, categoria, disponibilità, soglia, quanti ne stai usando e quanti restano.
+- **Sync automatico** — se modifichi un materiale da un'altra schermata (es. Materiali), il pannello in SAL si aggiorna da solo. Niente più dati vecchi.
+- **Zona gialla più ampia** — la soglia di attenzione ora parte dal 50% sopra la soglia critica invece del 25%, così hai più tempo per accorgerti che stai finendo.
+
+### MaterialScreen più coerente con la SAL
+
+- **Barre aggiornate** — le card dei materiali e il pannello dettaglio ora usano la stessa logica della SAL: barra sempre visibile, colore a 3 zone (verde/giallo/rosso), e label "X% disponibile · -N in SAL" per capire subito l'impatto degli impegni.
+
+### Correzioni
+
+- **Conferma SAL non perde aggiornamenti** — quando confermavi una SAL, a volte i materiali non venivano scalati correttamente perché la scrittura nel database partiva in ritardo rispetto alla notifica alla sidebar. Ora la sidebar aspetta che il database abbia finito prima di ricaricare.
+- **Modifica materiale in MaterialScreen** — dopo aver modificato un materiale (es. soglia critica), le card si aggiornavano solo dopo un refresh. Ora il cambiamento è immediato.
+- **Caricamento infinito in step 3** — a volte il pannello materiali continuava a mostrare "Caricamento..." senza fermarsi. Risolto.
+
 ## 0.3.0 — 2026-05-14
 
 ### Materiali in magazzino
