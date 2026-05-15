@@ -10,10 +10,10 @@
   --surface-inset: #080c0a;
   --surface-highlight: rgb(255 255 255 / 0.06);
   --text-primary: #e0e8e4;
-  --text-secondary: #8a9a94;
-  --text-tertiary: #52605c;
+  --text-secondary: #98a89e;
+  --text-tertiary: #687a72;
   --text-inverse: #e0e8e4;
-  --border-subtle: #222a26;
+  --border-subtle: #2a322e;
   --border-strong: #2e3632;
   --ring-focus: color-mix(in srgb, var(--color-brand-500) 55%, transparent);
   --accent-primary: #4aaa6a;
@@ -27,7 +27,7 @@
   --info-base: #4a8ac8;
   --info-soft: #0e1a2e;
   --sidebar-bg: #080e0c;
-  --sidebar-active-bg: #12241a;
+  --sidebar-active-bg: #162c1e;
   --topbar-bg: color-mix(in srgb, var(--bg-app) 84%, var(--surface-base));
   --table-row-hover: #18221c;
   --detail-panel-bg: #0e1410;

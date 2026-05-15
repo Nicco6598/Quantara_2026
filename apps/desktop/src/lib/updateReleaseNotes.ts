@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+const STORAGE_KEY = "quantara.pending-release-notes";
 
 export type PendingReleaseNotes = {
   body: string;
@@ -7,63 +9,45 @@ export type PendingReleaseNotes = {
   version: string;
 };
 
-async function writeViaTauri(notes: PendingReleaseNotes): Promise<void> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("write_pending_release_notes", { json: JSON.stringify(notes) });
-  } catch {
-    // Fallback to localStorage
-    try {
-      window.localStorage.setItem("quantara.pending-release-notes", JSON.stringify(notes));
-    } catch {
-      /* no-op */
-    }
-  }
-}
-
-async function readViaTauri(): Promise<PendingReleaseNotes | null> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const json = await invoke<string>("read_pending_release_notes");
-    return JSON.parse(json) as PendingReleaseNotes;
-  } catch {
-    // Fallback to localStorage
-    try {
-      const raw = window.localStorage.getItem("quantara.pending-release-notes");
-      return raw ? (JSON.parse(raw) as PendingReleaseNotes) : null;
-    } catch {
-      return null;
-    }
-  }
-}
-
-async function clearViaTauri(): Promise<void> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("clear_pending_release_notes");
-  } catch {
-    try {
-      window.localStorage.removeItem("quantara.pending-release-notes");
-    } catch {
-      /* no-op */
-    }
-  }
-}
-
 export function storePendingReleaseNotes(notes: PendingReleaseNotes) {
-  void writeViaTauri(notes);
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  } catch {
+    /* no-op */
+  }
 }
 
 function clearPendingReleaseNotes() {
-  void clearViaTauri();
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* no-op */
+  }
+}
+
+function readPendingReleaseNotes(): PendingReleaseNotes | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as PendingReleaseNotes) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function usePendingReleaseNotes() {
-  const [pendingReleaseNotes, setPendingReleaseNotes] = useState<PendingReleaseNotes | null>(null);
+  const [pendingReleaseNotes, setPendingReleaseNotes] = useState<PendingReleaseNotes | null>(
+    readPendingReleaseNotes,
+  );
+
+  const refresh = useCallback(() => {
+    setPendingReleaseNotes(readPendingReleaseNotes());
+  }, []);
 
   useEffect(() => {
-    readViaTauri().then(setPendingReleaseNotes);
-  }, []);
+    const handler = () => refresh();
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, [refresh]);
 
   const dismissPendingReleaseNotes = () => {
     clearPendingReleaseNotes();
@@ -73,5 +57,6 @@ export function usePendingReleaseNotes() {
   return {
     dismissPendingReleaseNotes,
     pendingReleaseNotes,
+    refresh,
   };
 }

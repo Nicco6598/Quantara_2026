@@ -1,3 +1,4 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Search, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -17,6 +18,7 @@ type AutocompleteInputProps = {
 };
 
 const RESULTS_MAX_HEIGHT = 520;
+const ITEM_HEIGHT = 60;
 
 type DropdownPos = { left: number; top: number; width: number };
 
@@ -31,7 +33,7 @@ export function AutocompleteInput({
   const [floating, setFloating] = useState<DropdownPos | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
   const measureRef = useRef<() => void>(() => {});
 
@@ -45,6 +47,13 @@ export function AutocompleteInput({
         opt.keywords?.toLowerCase().includes(q),
     );
   }, [options, query]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ITEM_HEIGHT,
+    overscan: 8,
+  });
 
   useEffect(() => {
     setActiveIndex(0);
@@ -125,12 +134,10 @@ export function AutocompleteInput({
       isFirstRender.current = false;
       return;
     }
-    if (!listRef.current) return;
-    const active = listRef.current.querySelector<HTMLButtonElement>(
-      `[data-index="${activeIndex}"]`,
-    );
-    active?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex]);
+    rowVirtualizer.scrollToIndex(activeIndex, { align: "auto" });
+  }, [activeIndex, rowVirtualizer]);
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
 
   return (
     <div ref={containerRef} className="w-full">
@@ -185,41 +192,65 @@ export function AutocompleteInput({
               zIndex: 50,
             }}
           >
-            <div className="overflow-y-auto" style={{ maxHeight: RESULTS_MAX_HEIGHT }}>
-              <div ref={listRef} className="p-1.5" role="listbox">
-                {filtered.map((option, index) => (
-                  <button
-                    className={cn(
-                      "flex w-full items-start gap-3 rounded-14px px-3 py-3 text-left text-13px transition-colors duration-[180ms]",
-                      index === activeIndex ? "bg-[var(--bg-muted)]" : "hover:bg-[var(--bg-muted)]",
-                    )}
-                    aria-selected={index === activeIndex}
-                    data-index={index}
-                    key={option.value}
-                    onClick={() => handleSelect(option)}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    role="option"
-                    title={`${option.value} — ${option.label}${option.metadata ? `\n${option.metadata}` : ""}`}
-                    type="button"
-                  >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-14px bg-[var(--bg-muted-strong)] font-mono text-11px font-bold text-[var(--accent-primary)]">
-                      {option.value.slice(0, 4)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold leading-snug text-[var(--text-primary)]">
-                        <span className="font-mono text-[var(--accent-primary)]">
-                          {option.value}
-                        </span>{" "}
-                        {option.label}
-                      </span>
-                      {option.metadata && (
-                        <span className="mt-1 block text-11px leading-snug text-[var(--text-secondary)]">
-                          {option.metadata}
-                        </span>
+            <div
+              ref={scrollRef}
+              className="overflow-y-auto"
+              style={{ maxHeight: RESULTS_MAX_HEIGHT }}
+            >
+              <div
+                role="listbox"
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  position: "relative",
+                }}
+              >
+                {virtualItems.map((virtualRow) => {
+                  const option = filtered[virtualRow.index];
+                  if (!option) return null;
+                  return (
+                    <button
+                      className={cn(
+                        "flex w-full items-start gap-3 rounded-14px px-3 py-3 text-left text-13px transition-colors duration-[180ms]",
+                        virtualRow.index === activeIndex
+                          ? "bg-[var(--bg-muted)]"
+                          : "hover:bg-[var(--bg-muted)]",
                       )}
-                    </span>
-                  </button>
-                ))}
+                      aria-selected={virtualRow.index === activeIndex}
+                      data-index={virtualRow.index}
+                      key={virtualRow.key}
+                      onClick={() => handleSelect(option)}
+                      onMouseEnter={() => setActiveIndex(virtualRow.index)}
+                      role="option"
+                      title={`${option.value} — ${option.label}${option.metadata ? `\n${option.metadata}` : ""}`}
+                      type="button"
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-14px bg-[var(--bg-muted-strong)] font-mono text-11px font-bold text-[var(--accent-primary)]">
+                        {option.value.slice(0, 4)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold leading-snug text-[var(--text-primary)]">
+                          <span className="font-mono text-[var(--accent-primary)]">
+                            {option.value}
+                          </span>{" "}
+                          {option.label}
+                        </span>
+                        {option.metadata && (
+                          <span className="mt-1 block text-11px leading-snug text-[var(--text-secondary)]">
+                            {option.metadata}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>,

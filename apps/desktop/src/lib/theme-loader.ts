@@ -12,6 +12,8 @@ function getThemeKey(themeName: string): string | null {
 }
 
 export async function loadThemeCSS(themeName: string): Promise<void> {
+  if (activeStyleEls.has(themeName)) return;
+
   for (const [name, el] of activeStyleEls) {
     el.remove();
     activeStyleEls.delete(name);

@@ -11,6 +11,7 @@ import {
 import { m } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
+import { useAppStore } from "@/store/app-store";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import {
   createContractorId,
@@ -269,6 +270,8 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
 }
 
 function SidebarHeader({ collapsed }: { collapsed: boolean }) {
+  const themeMode = useAppStore((s) => s.themeMode);
+  const isDark = themeMode.startsWith("dark");
   return (
     <div
       className={cn(
@@ -285,6 +288,7 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
           draggable={false}
           height={40}
           src={logoSidebar}
+          style={isDark ? { filter: "brightness(0) invert(1)" } : undefined}
           width={40}
         />
         {!collapsed ? (

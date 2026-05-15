@@ -24,17 +24,17 @@
 
   --bg-app: #e8eef4;
   --bg-panel: var(--color-neutral-0);
-  --bg-muted: #dee6ec;
+  --bg-muted: #dae2ea;
   --bg-muted-strong: var(--color-neutral-100);
   --surface-base: var(--color-neutral-0);
   --surface-raised: #fafcfd;
   --surface-inset: var(--color-neutral-25);
   --surface-highlight: rgb(255 255 255 / 0.78);
   --text-primary: #141c28;
-  --text-secondary: #4a5a6e;
-  --text-tertiary: #7a8a9e;
+  --text-secondary: #3d4d60;
+  --text-tertiary: #5a6a80;
   --text-inverse: #fafcfd;
-  --border-subtle: #c8d2de;
+  --border-subtle: #bec8d6;
   --border-strong: var(--color-neutral-200);
   --ring-focus: color-mix(in srgb, var(--color-brand-500) 45%, transparent);
   --accent-primary: var(--color-brand-500);
@@ -54,7 +54,7 @@
   --chart-4: var(--color-copper-500);
   --chart-5: var(--color-neutral-300);
   --sidebar-bg: var(--surface-base);
-  --sidebar-active-bg: #dce6f0;
+  --sidebar-active-bg: #d4deea;
   --sidebar-active-text: var(--accent-primary);
   --topbar-bg: color-mix(in srgb, var(--bg-app) 82%, var(--surface-base));
   --kpi-card-bg: var(--surface-raised);

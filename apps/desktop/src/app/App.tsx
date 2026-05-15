@@ -30,7 +30,7 @@ import {
 } from "@/lib/appUpdater";
 import { loadThemeCSS } from "@/lib/theme-loader";
 import { migrateLegacyContractorsToDb } from "@/lib/contractorMigration";
-import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
+import { storePendingReleaseNotes, usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 import { RouteRenderer } from "@/routes/RouteRenderer";
 import {
@@ -54,25 +54,27 @@ const TITLEBAR_ROUTES: [TitlebarRoute, ...TitlebarRoute[]] = [
 ];
 
 function ThemeApplier() {
-  useEffect(() => {
-    const state = useAppStore.getState();
-    document.documentElement.dataset.theme = state.themeMode;
-    document.documentElement.style.colorScheme = state.themeMode.startsWith("dark")
-      ? "dark"
-      : "light";
-    loadThemeCSS(state.themeMode);
+  const { themeMode } = useThemeState();
+  const isFirst = useRef(true);
 
-    const unsub = useAppStore.subscribe((current, prev) => {
-      if (current.themeMode === prev.themeMode) return;
-      document.documentElement.dataset.theme = current.themeMode;
-      document.documentElement.style.colorScheme = current.themeMode.startsWith("dark")
+  useEffect(() => {
+    if (isFirst.current) {
+      isFirst.current = false;
+      const state = useAppStore.getState();
+      document.documentElement.dataset.theme = state.themeMode;
+      document.documentElement.style.colorScheme = state.themeMode.startsWith("dark")
         ? "dark"
         : "light";
-      loadThemeCSS(current.themeMode);
-    });
+      loadThemeCSS(state.themeMode);
+      return;
+    }
 
-    return unsub;
-  }, []);
+    const isDark = themeMode.startsWith("dark");
+    loadThemeCSS(themeMode).then(() => {
+      document.documentElement.dataset.theme = themeMode;
+      document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+    });
+  }, [themeMode]);
 
   return null;
 }
@@ -318,8 +320,13 @@ function WindowTitleBar({
 
         <button
           className="window-titlebar-tool"
-          onClick={(event) => {
+          onClick={async (event) => {
             event.stopPropagation();
+            const state = useAppStore.getState();
+            const nextMode = state.themeMode.startsWith("light")
+              ? state.darkThemePref
+              : state.lightThemePref;
+            await loadThemeCSS(nextMode);
             toggleTheme();
           }}
           onMouseDown={(event) => event.stopPropagation()}
@@ -480,7 +487,7 @@ function AppShell() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();
-  const { dismissPendingReleaseNotes, pendingReleaseNotes } = usePendingReleaseNotes();
+  const { dismissPendingReleaseNotes, pendingReleaseNotes, refresh } = usePendingReleaseNotes();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [closeRouteMenuKey, setCloseRouteMenuKey] = useState(0);
 
@@ -633,69 +640,66 @@ function AppShell() {
       setUpdateState({
         available: {
           checkedAt: new Date().toISOString(),
-          currentVersion: "0.1.43",
-          notes: [
-            "Titlebar desktop ridisegnata con controlli finestra, cambio tema, ricerca comandi e navigazione sezione sempre disponibili.",
-            "Sidebar integrata direttamente nel background dell'app per dare piu profondita alla view principale e ridurre i bordi doppi.",
-            "Cronologia di navigazione spostata in un menu a tendina compatto, con voci recenti ordinate e ritorno rapido alla pagina visitata.",
-            "Breadcrumb semplificato in un chip piu leggibile, evitando percorsi lunghi che occupavano tutta la toolbar.",
-            "Command palette ancorata correttamente alla titlebar anche quando viene aperta dal pulsante Comandi.",
-            "Toolbar superiore ripulita dai doppioni: ricerca globale, cambio tema e update check ora vivono nella titlebar.",
-            "Controlli finestra Tauri ripristinati con permessi espliciti per minimizza, massimizza, chiudi e drag della finestra.",
-            "Variante macOS della titlebar con controlli stile traffic light a sinistra e layout piu vicino al comportamento nativo MacBook.",
-            "Fix overflow orizzontale nella cronologia a tendina quando il cursore passa su voci molto lunghe o con descrizioni estese.",
-            "Fix layout responsive delle modali aggiornamento: su schermi piccoli il contenuto resta dentro la viewport e le note scorrono internamente.",
-            "Release notes post-riavvio riorganizzate con header fisso, lista scrollabile e footer azione sempre raggiungibile.",
-            "Migliorata la gestione di testi lunghi nelle card update con wrapping controllato e senza scroll orizzontale indesiderato.",
-            "Stress test dev ampliato per verificare release notes con molte voci, descrizioni lunghe e viewport ridotte.",
-            "Pulizia visiva dei pannelli update con spaziature piu compatte su laptop e layout a colonne solo quando lo schermo lo consente.",
-            "Stabilita generale migliorata nella shell desktop dopo il rework di topbar, sidebar e titlebar.",
-            "Import tariffari: pannello revisione piu stabile quando il parser restituisce molte voci ravvicinate con descrizioni simili.",
-            "Import tariffari: azioni rapide per resettare singoli campi senza perdere la revisione gia completata sulle altre righe.",
-            "Import tariffari: eliminazione diretta delle righe non valide dalla vista di controllo, senza dover riavviare l'import.",
-            "Import tariffari: indicatore di stato sempre visibile anche durante scroll prolungato su liste molto dense.",
-            "Import tariffari: migliorata la deduplicazione quando il PDF contiene descrizioni ripetute, note tecniche o intestazioni pagina.",
-            "Creazione SAL: riepilogo economico piu leggibile nella conferma finale con budget residuo evidenziato in base allo stato.",
-            "Creazione SAL: tabella voci piu robusta su schermi stretti, con overflow orizzontale controllato e colonne non tagliate.",
-            "Creazione SAL: ricerca voce con gerarchia invertita, codice principale piu visibile e descrizione usata come dettaglio secondario.",
-            "Creazione SAL: copia e incolla disponibile anche su stati non bozza, mantenendo il flusso operativo piu veloce.",
-            "Progetti: card appaltatori piu leggibili con azioni disponibili solo quando servono e apertura cliccando l'intera card.",
-            "Progetti: dati aggregati aggiornati in modo piu coerente dopo creazione, modifica o cancellazione di una SAL.",
-            "Dashboard: hero iniziale piu chiara con budget totale, conteggio cantieri e messaggi espliciti negli stati vuoti.",
-            "Dashboard: pannello laterale con attivita recenti lette dai dati reali invece di contenuti dimostrativi.",
-            "Team: ricerca e filtro ruolo ora lavorano sui membri reali, con paginazione e avatar generati dalle iniziali.",
-            "Contabilita: filtri appaltatore, progetto, periodo e stato resi piu coerenti con i dati presenti nel registro locale.",
-            "Contabilita: selezione multipla SAL e azioni bulk mantenute visibili solo quando ci sono elementi selezionati.",
-            "Materiali: schermata allineata al resto dell'app con dati reali, creazione, modifica ed eliminazione materiali.",
-            "Tema chiaro: palette neutra piu morbida con superfici meno bianche e contrasti piu adatti a sessioni lunghe.",
-            "Tema scuro: sfondo carbon caldo, bordi meno aggressivi e colori stato piu leggibili sui pannelli principali.",
-            "Performance: lookup voci ottimizzato con strutture dati piu efficienti nei flussi template e cronologia SAL.",
-            "Performance: ridotti render non necessari nelle schermate piu dense della creazione SAL.",
-            "Backend: connessioni database centralizzate per ridurre aperture e chiusure ripetute durante le operazioni Tauri.",
-            "Backend: parsing PDF asincrono per evitare blocchi dell'interfaccia durante import di tariffari pesanti.",
-            "Updater: fallback piu robusto quando il controllo aggiornamenti fallisce o quando il canale non supporta update automatici.",
-            "Updater: fallback piu robusto quando il controllo aggiornamenti fallisce o quando il canale non supporta update automatici.",
-            "Accessibilita: labels piu chiari sui controlli finestra, sui menu di navigazione e sulle azioni principali.",
-            "Accessibilita: escape globale mantiene il comportamento prevedibile chiudendo modali e menu prima di navigare indietro.",
-            "Layout: griglie elastiche con colonne automatiche per adattarsi meglio a 1180px, 1280px, 1512px e schermi esterni.",
-            "Layout: pannelli principali meno incapsulati e maggiore profondita visiva tra sidebar, contenuto e background app.",
-            "Toolbar: separazione piu netta tra comandi globali nella titlebar e azioni contestuali nella toolbar pagina.",
-            "Toolbar: separazione piu netta tra comandi globali nella titlebar e azioni contestuali nella toolbar pagina.",
-            "Breadcrumb: rappresentazione piu sintetica del percorso corrente per ridurre rumore quando la cronologia e lunga.",
-            "Cronologia: menu compatto con ritorno rapido alle pagine precedenti senza occupare tutta la testata.",
-            "Cronologia: protezione contro etichette lunghissime generate da progetti, appaltatori o SAL con nomi estesi.",
-            "MacBook: titlebar piu nativa con controlli semaforo a sinistra e spazio drag calibrato per evitare click accidentali.",
-            "Windows: titlebar custom mantenuta con controlli a destra e comportamento coerente con il layout desktop precedente.",
-            "Shell: stato collapsed della sidebar centralizzato per evitare doppioni tra toolbar, sidebar e titlebar.",
-            "Shell: apertura command palette da scorciatoia e da pulsante titlebar allineata allo stesso punto di ancoraggio.",
-            "Release notes: questo testo volutamente molto lungo serve a verificare che una singola voce con tante parole, riferimenti a funzionalita diverse, nomi di schermate, import tariffari, creazione SAL, dashboard, contabilita e impostazioni non generi piu scroll orizzontale nella modale.",
-            "Release notes: altra voce volutamente estesa per simulare changelog reali copiati da GitHub o generati dal sistema di update, con frasi lunghe, punteggiatura, dettagli tecnici e descrizioni utente che devono andare a capo correttamente.",
-            "Release notes: voce finale di stress test per controllare che il bottone Continua o Aggiorna e riavvia resti raggiungibile anche quando il contenuto supera abbondantemente l'altezza della finestra.",
-          ].join("\n"),
-          version: "0.1.44",
+          currentVersion: "0.2.6",
+          notes: `## 0.3.1 — 2026-05-15
+
+### SAL — bozze e tariffari
+- **Tariffari persi ripristinati** — quando una SAL salvata in bozza veniva riaperta i tariffari selezionati andavano persi, causando la scomparsa di righe e importi. Ora la bozza ripristina esattamente i tariffari originali.
+
+### Ricerca voci — prestazioni e design
+- **Ricerca voci virtualizzata** — il dropdown renderizza solo le righe visibili. Con migliaia di voci la digitazione resta fluida e lo scrolling istantaneo.
+- **Dropdown sempre nel viewport** — overlay fisso sotto il campo di ricerca, 520px massimi, mai tagliato.
+
+### Temi e contrasti
+- **Contrasti WCAG AA su tutti gli 8 temi** — \`text-tertiary\` ricalibrato su ogni tema per superare 4.5:1.
+- **Bordi e sfondi più leggibili** — \`border-subtle\` e \`bg-muted\` con contrasto migliorato.
+- **Logo adattivo al tema** — invertito sui temi scuri con filtro CSS.
+
+### Popup di aggiornamento — struttura ad albero
+- **Changelog navigabile** — note di rilascio in albero, rami collassabili al click.
+- **Post-update visibile anche su Windows** — \`localStorage\` come storage primario, attraversa il riavvio su tutti i sistemi.
+
+## 0.3.0 — 2026-05-14
+
+### Materiali in magazzino
+- **Nuovo cruscotto materiali** — stock, impegno in SAL e soglia critica con barra rossa.
+- **Si scalano dall'inventario** — materiali scalati alla conferma SAL, ripristinati se cancelli.
+
+### 8 temi, non solo chiaro/scuro
+- **4 temi chiari** — Naturale, Caldo, Freddo, Soft. **4 temi scuri** — Notte, Ambra, Midnight, Foresta.
+- **Scegli i tuoi due preferiti** — in Impostazioni scegli tema chiaro e scuro, alterni con un click dalla titlebar.
+
+### Cosa abbiamo sistemato
+- **Campi che non si lasciavano scrivere** — click su campi funzionante in finestre creazione.
+- **Materiali fantasma** — cancellazione multipla ora elimina davvero.
+- **Stati SAL fermi** — cambiando stato di una SAL tutte le schermate si aggiornano.
+- **Dati non allineati tra schermate** — ora tutto si aggiorna da solo.`,
+          version: "0.3.1",
         },
         install: { phase: "idle" },
       });
+      return;
+    }
+
+    if (import.meta.env.DEV && event.ctrlKey && event.shiftKey && key === "i") {
+      event.preventDefault();
+      storePendingReleaseNotes({
+        body: `## 0.3.1 — 2026-05-15
+
+### SAL — bozze e tariffari
+- **Tariffari persi ripristinati** — quando una SAL salvata in bozza veniva riaperta i tariffari selezionati andavano persi. Ora la bozza ripristina esattamente i tariffari originali.
+
+### Ricerca voci — prestazioni e design
+- **Ricerca voci virtualizzata** — il dropdown renderizza solo le righe visibili.
+
+### Popup di aggiornamento — struttura ad albero
+- **Changelog navigabile** — note di rilascio in albero, rami collassabili al click.
+- **Post-update visibile anche su Windows** — localStorage come storage primario.`,
+        currentVersion: "0.3.0",
+        installedAt: new Date().toISOString(),
+        version: "0.3.1",
+      });
+      refresh();
       return;
     }
 

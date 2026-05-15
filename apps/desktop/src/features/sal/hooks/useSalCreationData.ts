@@ -147,6 +147,34 @@ export function useSalCreationData() {
     [state.selectedTariffBookIds, tariffBookOptions],
   );
 
+  async function restoreTariffBookIds(tariffBookIds: string[]) {
+    const validIds = tariffBookIds.filter((id) => state.tariffBooks.some((book) => book.id === id));
+    if (validIds.length === 0) return;
+
+    setState((current) => ({
+      ...current,
+      error: null,
+      isLoading: true,
+      selectedTariffBookIds: validIds,
+    }));
+
+    try {
+      const voices = await loadVoicesForBooks(validIds, state.tariffBooks);
+      setState((current) => ({
+        ...current,
+        error: null,
+        isLoading: false,
+        voices,
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Impossibile caricare i tariffari.",
+        isLoading: false,
+      }));
+    }
+  }
+
   async function selectTariffBook(tariffBookId: string) {
     const exists = state.tariffBooks.some((book) => book.id === tariffBookId);
     if (!exists) return;
@@ -219,6 +247,7 @@ export function useSalCreationData() {
     error: state.error,
     isLoading: state.isLoading,
     project,
+    restoreTariffBookIds,
     selectedContractId: state.selectedContractId,
     selectedTariffBook,
     selectedTariffBooks,

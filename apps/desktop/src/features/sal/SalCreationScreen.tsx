@@ -214,6 +214,9 @@ export function SalCreationScreen() {
           phase: draft.phase,
         },
       });
+      if (draft.selectedTariffBookIds?.length > 0) {
+        data.restoreTariffBookIds(draft.selectedTariffBookIds);
+      }
       return;
     }
 
@@ -228,7 +231,7 @@ export function SalCreationScreen() {
         },
       });
     }
-  }, [data.project, data.voices, salDocuments]);
+  }, [data.project, data.voices, data.restoreTariffBookIds, salDocuments]);
 
   const voicesMap = useMemo(() => new Map(data.voices.map((v) => [v.id, v])), [data.voices]);
 

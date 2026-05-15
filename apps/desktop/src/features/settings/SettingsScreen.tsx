@@ -23,6 +23,7 @@ import { BezelSurface } from "@/components/shared/ui-primitives";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
 import { backupDatabase, type DatabaseInfo, getDatabaseInfo, restoreDatabase } from "@/lib/backup";
+import { loadThemeCSS } from "@/lib/theme-loader";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { cn } from "@/lib/utils";
 import { usePreferenceState, useThemeState } from "@/store/app-store";
@@ -133,28 +134,28 @@ function ThemeCard() {
         <div className="flex flex-wrap gap-2">
           {[
             {
-              id: "light" as const,
-              label: "Naturale",
-              desc: "Neutro predefinito",
-              previewAccent: "#3b7dd8",
-            },
-            {
-              id: "light-warm" as const,
-              label: "Caldo",
-              desc: "Terra e ambra",
-              previewAccent: "#c97a28",
-            },
-            {
               id: "light-cool" as const,
               label: "Freddo",
               desc: "Teal minimal",
               previewAccent: "#2a9a8a",
             },
             {
+              id: "light" as const,
+              label: "Naturale",
+              desc: "Neutro predefinito",
+              previewAccent: "#3b7dd8",
+            },
+            {
               id: "light-soft" as const,
               label: "Soft",
               desc: "Rosa pastello",
               previewAccent: "#c87a9a",
+            },
+            {
+              id: "light-warm" as const,
+              label: "Caldo",
+              desc: "Terra e ambra",
+              previewAccent: "#c97a28",
             },
           ].map((t) => (
             <button
@@ -165,9 +166,12 @@ function ThemeCard() {
                   : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40",
               )}
               key={t.id}
-              onClick={() => {
+              onClick={async () => {
                 setLightThemePref(t.id);
-                if (themeMode.startsWith("light")) setThemeMode(t.id);
+                if (themeMode.startsWith("light")) {
+                  await loadThemeCSS(t.id);
+                  setThemeMode(t.id);
+                }
               }}
               type="button"
             >
@@ -213,30 +217,8 @@ function ThemeCard() {
               previewBg: "#0e1017",
               previewCard: "#161822",
               previewTextPri: "#e6e8ef",
-              previewTextSec: "#9ba0b0",
-              previewBorder: "#282a36",
-            },
-            {
-              id: "dark-amber" as const,
-              label: "Ambra",
-              desc: "Carbon caldo",
-              previewAccent: "#d4903a",
-              previewBg: "#12100c",
-              previewCard: "#1c1a16",
-              previewTextPri: "#e8e4de",
-              previewTextSec: "#9a948a",
-              previewBorder: "#2a2824",
-            },
-            {
-              id: "dark-midnight" as const,
-              label: "Midnight",
-              desc: "Viola profondo",
-              previewAccent: "#7c6ac8",
-              previewBg: "#0c0b14",
-              previewCard: "#141320",
-              previewTextPri: "#e4e2ee",
-              previewTextSec: "#9490b0",
-              previewBorder: "#24223a",
+              previewTextSec: "#a8adb8",
+              previewBorder: "#30333e",
             },
             {
               id: "dark-forest" as const,
@@ -246,8 +228,30 @@ function ThemeCard() {
               previewBg: "#0c100e",
               previewCard: "#141c18",
               previewTextPri: "#e0e8e4",
-              previewTextSec: "#8a9a94",
-              previewBorder: "#222a26",
+              previewTextSec: "#98a89e",
+              previewBorder: "#2a322e",
+            },
+            {
+              id: "dark-midnight" as const,
+              label: "Midnight",
+              desc: "Viola profondo",
+              previewAccent: "#7c6ac8",
+              previewBg: "#0c0b14",
+              previewCard: "#141320",
+              previewTextPri: "#e4e2ee",
+              previewTextSec: "#a09cb8",
+              previewBorder: "#2c2a42",
+            },
+            {
+              id: "dark-amber" as const,
+              label: "Ambra",
+              desc: "Carbon caldo",
+              previewAccent: "#d4903a",
+              previewBg: "#12100c",
+              previewCard: "#1c1a16",
+              previewTextPri: "#e8e4de",
+              previewTextSec: "#a69e94",
+              previewBorder: "#32302c",
             },
           ].map((t) => (
             <button
@@ -258,9 +262,12 @@ function ThemeCard() {
                   : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40",
               )}
               key={t.id}
-              onClick={() => {
+              onClick={async () => {
                 setDarkThemePref(t.id);
-                if (themeMode.startsWith("dark")) setThemeMode(t.id);
+                if (themeMode.startsWith("dark")) {
+                  await loadThemeCSS(t.id);
+                  setThemeMode(t.id);
+                }
               }}
               type="button"
             >

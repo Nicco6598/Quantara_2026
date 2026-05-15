@@ -1,6 +1,8 @@
-import { Clock3, FileText, LoaderCircle, Sparkles, X } from "lucide-react";
+import { Clock3, LoaderCircle, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/shared/Button";
+import { ChangelogTree } from "@/components/shared/ChangelogTree";
 import { Dialog } from "@/components/shared/Dialog";
+import { parseChangelogTree } from "@/lib/changelog-tree";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
 
 type UpdateExperienceDialogProps = {
@@ -16,14 +18,14 @@ export function UpdateExperienceDialog({
   onInstall,
   update,
 }: UpdateExperienceDialogProps) {
-  const notes = normalizeNotes(update.notes);
+  const tree = parseChangelogTree(update.notes);
   const isBusy = installState.phase === "installing";
 
   return (
     <Dialog
-      className="max-w-4xl rounded-22px"
+      className="max-w-3xl rounded-22px"
       closeOnOverlay={!isBusy}
-      contentClassName="flex max-h-[75dvh] min-h-0 flex-col overflow-hidden rounded-[18px] p-0"
+      contentClassName="flex max-h-[80dvh] min-h-0 flex-col overflow-hidden rounded-[18px] p-0"
       isOpen
       onClose={onClose}
       zIndex={210}
@@ -34,7 +36,7 @@ export function UpdateExperienceDialog({
             Aggiornamento disponibile
           </div>
           <h3 className="mt-1 truncate text-17px font-semibold text-[var(--text-primary)]">
-            Da v{update.currentVersion} a v{update.version}
+            v{update.version}
           </h3>
         </div>
         <button
@@ -48,145 +50,85 @@ export function UpdateExperienceDialog({
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-row">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5">
-          <span className="inline-flex w-max items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-            <Sparkles className="size-3" />v{update.version}
-          </span>
-          <h2 className="mt-4 text-20px font-semibold leading-tight text-[var(--text-primary)]">
-            Cosa cambia
-          </h2>
-          <p className="mt-2 text-13px leading-5 text-[var(--text-secondary)]">
-            Quantara scarichera la patch, applichera l'update e riaprira l'app sulla nuova versione.
-          </p>
-
-          <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {notes.length > 0 ? (
-              notes.map((note) => (
-                <div
-                  className="flex min-w-0 items-start gap-3 rounded-xl bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]"
-                  key={note.key}
-                >
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--accent-primary)]" />
-                  <span className="min-w-0 text-13px leading-5 text-[var(--text-primary)]">
-                    {note.text}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] p-4 text-center text-13px text-[var(--text-secondary)]">
-                Nessuna nota release disponibile per questa build.
-              </div>
-            )}
+      <div className="flex min-h-0 flex-col p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-20px font-semibold leading-tight text-[var(--text-primary)]">
+              Cosa cambia
+            </h2>
+            <p className="mt-1 text-13px leading-5 text-[var(--text-secondary)]">
+              Quantara scaricherà la patch, applicherà l'update e riaprirà l'app sulla nuova
+              versione.
+            </p>
           </div>
+          <span className="mt-1 shrink-0 rounded-full bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base))] px-3 py-1 text-12px font-semibold text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]/25">
+            v{update.version}
+          </span>
         </div>
 
-        <div className="flex w-60 shrink-0 flex-col gap-4 border-l border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_30%,transparent)] p-5">
-          <div className="space-y-2">
-            <MetricPill icon={Sparkles} label="Release" value={`v${update.version}`} />
-            <MetricPill icon={Clock3} label="Controllo" value={formatTimestamp(update.checkedAt)} />
-            <MetricPill icon={FileText} label="Modifiche" value={`${notes.length} note`} />
+        {tree.length > 0 ? (
+          <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+            <ChangelogTree nodes={tree} />
           </div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)] p-6 text-center text-13px text-[var(--text-secondary)]">
+            Nessuna nota release disponibile per questa build.
+          </div>
+        )}
+      </div>
 
+      <div className="flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_88%,transparent)] px-5 py-3">
+        <div className="flex items-center gap-4 text-11px text-[var(--text-tertiary)]">
+          <span className="flex items-center gap-1.5">
+            <Clock3 className="size-3.5" />
+            {formatTimestamp(update.checkedAt)}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Sparkles className="size-3.5" />
+            Da v{update.currentVersion}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
           {installState.phase === "error" ? (
-            <div className="rounded-xl bg-[var(--danger-soft)] px-3 py-2.5 text-12px font-medium text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)]">
+            <span className="rounded-lg bg-[var(--danger-soft)] px-2.5 py-1.5 text-11px font-medium text-[var(--danger-base)]">
               {installState.message}
-            </div>
+            </span>
           ) : null}
-
-          <div className="flex flex-col gap-2 sm:mt-auto">
-            <Button className="w-full" disabled={isBusy} onClick={onInstall} variant="primary">
-              {isBusy ? (
-                <span className="flex items-center gap-2">
-                  <LoaderCircle className="size-4 animate-spin" />
-                  Installazione in corso…
-                </span>
-              ) : (
-                <span className="flex items-center gap-2.5">
-                  <svg
-                    aria-hidden="true"
-                    className="size-4 shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      d="M21 2v6h-6M3 22v-6h6"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.8}
-                    />
-                    <path
-                      d="M21 8A9 9 0 003.28 13M3 16a9 9 0 0017.72-5"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.8}
-                    />
-                  </svg>
-                  Aggiorna e riavvia
-                </span>
-              )}
-            </Button>
-            <Button className="w-full" disabled={isBusy} onClick={onClose} variant="ghost">
-              Più tardi
-            </Button>
-          </div>
+          <Button disabled={isBusy} onClick={onClose} variant="ghost">
+            Più tardi
+          </Button>
+          <Button disabled={isBusy} onClick={onInstall} variant="primary">
+            {isBusy ? (
+              <span className="inline-flex items-center gap-2">
+                <LoaderCircle className="size-4 animate-spin" />
+                Installazione…
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
+                  <path
+                    d="M21 2v6h-6M3 22v-6h6"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.8}
+                  />
+                  <path
+                    d="M21 8A9 9 0 003.28 13M3 16a9 9 0 0017.72-5"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.8}
+                  />
+                </svg>
+                Aggiorna e riavvia
+              </span>
+            )}
+          </Button>
         </div>
       </div>
     </Dialog>
   );
-}
-
-function MetricPill({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Sparkles;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
-      <div className="flex items-center gap-3">
-        <Icon className="size-4 text-[var(--info-base)]" />
-        <div>
-          <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-            {label}
-          </div>
-          <div className="mt-0.5 text-13px font-semibold text-[var(--text-primary)]">{value}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function normalizeNotes(notes: string) {
-  const values: string[] = [];
-  for (const raw of notes.split("\n")) {
-    const line = raw
-      .trim()
-      .replace(/^#{1,6}\s+/, "")
-      .replace(/^[-*]\s+/, "")
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/`([^`]+)`/g, "$1")
-      .trim();
-    if (line.length > 0 && !line.startsWith("```") && !line.startsWith("---")) {
-      values.push(line);
-    }
-  }
-
-  const seen = new Map<string, number>();
-
-  return values.map((text) => {
-    const current = seen.get(text) ?? 0;
-    seen.set(text, current + 1);
-    return {
-      key: current === 0 ? text : `${text}-${current}`,
-      text,
-    };
-  });
 }
 
 function formatTimestamp(value: string) {
