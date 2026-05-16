@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
+import { createSafeLocalStorage } from "@/lib/safe-storage";
 import { STORAGE_KEYS } from "@/persistence";
 
 export type QuantaraRoute =
@@ -356,7 +357,7 @@ export const useAppStore = create<AppStore>()(
         lightThemePref: state.lightThemePref,
         darkThemePref: state.darkThemePref,
       }),
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeLocalStorage()),
     },
   ),
 );

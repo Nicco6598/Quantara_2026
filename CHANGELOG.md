@@ -2,6 +2,20 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.21 — 2026-05-16
+
+### Stabilità e affidabilità
+
+- **Niente più schermata bianca all'avvio** — in alcune installazioni, Quantara si apriva con una pagina vuota. Ora l'app carica correttamente font e temi ad ogni avvio.
+- **Se qualcosa va storto, te lo dice** — quando un errore impedisce il caricamento di una schermata, ora vedi un messaggio chiaro con la possibilità di riprovare. Prima restava tutto bianco senza spiegazione.
+- **I temi non si perdono più** — se un tema salvato non è più disponibile, Quantara torna automaticamente a quello predefinito invece di mostrarti una pagina senza colori.
+- **Database? Se non si apre, lo sai** — se il database ha un problema all'avvio, ora compare una finestra che ti spiega cosa fare. Prima l'app si chiudeva senza dire nulla.
+- **Dati al sicuro anche con spazio pieno** — quando la memoria locale del browser è satura, Quantara libera automaticamente spazio per salvare il tuo lavoro. Prima poteva bloccarsi.
+
+### Correzioni
+
+- **Modalità sviluppo più stabile** — risolto un problema che lasciava lo schermo nero durante lo sviluppo.
+
 ## 0.3.2 — 2026-05-15
 
 ### Più veloce e leggera

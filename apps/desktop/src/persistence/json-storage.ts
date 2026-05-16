@@ -16,7 +16,18 @@ export function readJsonFromStorage<T>(
 export function writeJsonToStorage(storage: Storage, key: string, value: unknown): void {
   try {
     storage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Browser preview persistence is best-effort.
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "QuotaExceededError") {
+      console.warn(`[storage] Quota exceeded for key "${key}", clearing oldest entries`);
+      try {
+        const keys = Object.keys(storage).filter((k) => k.startsWith("quantara:"));
+        for (const k of keys.slice(0, Math.min(3, keys.length))) {
+          storage.removeItem(k);
+        }
+        storage.setItem(key, JSON.stringify(value));
+      } catch {
+        console.error(`[storage] Failed to write "${key}" even after cleanup`);
+      }
+    }
   }
 }
