@@ -6,6 +6,7 @@ mod updater;
 
 use infrastructure::local_storage::DbConnection;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(not(debug_assertions))]
 use tauri_plugin_dialog::DialogExt;
 
 pub fn run() {
@@ -33,7 +34,7 @@ pub fn run() {
                             ))
                             .title("Errore database")
                             .kind(tauri_plugin_dialog::MessageDialogKind::Error)
-                            .show();
+                            .show(|_| {});
                     }
                     return Err(e.into());
                 }

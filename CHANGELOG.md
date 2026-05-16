@@ -2,6 +2,12 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.24 — 2026-05-16
+
+### Correzioni
+
+- **Modalità sviluppo più stabile** — risolti problemi di schermate bianche e crash.
+
 ## 0.3.21 — 2026-05-16
 
 ### Stabilità e affidabilità
