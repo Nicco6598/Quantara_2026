@@ -30,7 +30,7 @@ import {
   restoreMaterialsFromSalUsage,
   updateDesktopContract,
 } from "@/lib/desktopData";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { formatMoney } from "@/lib/formatters";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";

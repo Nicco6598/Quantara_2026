@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { BACKUP_STORAGE_KEYS } from "@/persistence";
+import { BACKUP_STORAGE_KEYS } from "@/persistence/registry";
 
 export type DatabaseInfo = {
   dataDirectory: string;

@@ -22,7 +22,8 @@ import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import type { DesktopContract, DesktopMaterial } from "@/lib/desktopData";
 import { listDesktopContracts, listDesktopMaterials } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
-import { readJsonFromStorage, SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
+import { readJsonFromStorage } from "@/persistence/json-storage";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import type { QuantaraRoute } from "@/store/app-store";
 import { useActiveContext } from "@/store/app-store";
 

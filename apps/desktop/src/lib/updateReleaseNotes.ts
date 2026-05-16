@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { readJsonFromStorage, STORAGE_KEYS, writeJsonToStorage } from "@/persistence";
+import { readJsonFromStorage, writeJsonToStorage } from "@/persistence/json-storage";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
 const STORAGE_KEY = STORAGE_KEYS.releaseNotesAfterUpdate;
 

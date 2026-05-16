@@ -1,7 +1,7 @@
 import { listDesktopContracts, updateDesktopContract } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { STORAGE_KEYS } from "@/persistence";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
 const contractorMigrationStorageKey = STORAGE_KEYS.contractorMigrationDone;
 const legacyProjectContractorStorageKey = STORAGE_KEYS.projectContractors;

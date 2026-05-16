@@ -42,7 +42,7 @@ import {
   updateDesktopContract,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import {
   type PendingWorkflowAction,
   useAppStore,

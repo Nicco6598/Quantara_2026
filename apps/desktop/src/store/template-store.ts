@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createId } from "@/features/sal/domain/sal-workflow";
 import { createSafeLocalStorage } from "@/lib/safe-storage";
-import { STORAGE_KEYS } from "@/persistence";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import type { SalEconomicRules } from "@/features/sal/types";
 
 type TemplateVoiceEntry = {

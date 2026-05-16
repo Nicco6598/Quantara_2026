@@ -7,7 +7,7 @@ import {
   listDesktopTariffVoices,
 } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import {
   mapContractToSalProject,
   mapTariffBooksForContract,

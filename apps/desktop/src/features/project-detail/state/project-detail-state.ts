@@ -1,6 +1,6 @@
 import type { PortfolioProject } from "@/features/projects/types";
 import type { DesktopContract, DesktopTariffBook } from "@/lib/desktopData";
-import { SESSION_STORAGE_KEYS } from "@/persistence";
+import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
 
 export type ProjectState = {
   contracts: DesktopContract[];

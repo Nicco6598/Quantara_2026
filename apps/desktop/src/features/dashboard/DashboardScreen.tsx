@@ -23,7 +23,7 @@ import { useNavigate } from "@/hooks/useNavigate";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { PortfolioBurn } from "@/components/shared/charts";
 import { useAuditLogStore } from "@/store/audit-log-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";

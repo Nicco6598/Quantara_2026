@@ -3,7 +3,7 @@ import { useNavigate } from "@/hooks/useNavigate";
 import type { DesktopContract, DesktopDataResult } from "@/lib/desktopData";
 import { deleteDesktopContract } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { SESSION_STORAGE_KEYS } from "@/persistence";
+import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 type Notify = (toast: {

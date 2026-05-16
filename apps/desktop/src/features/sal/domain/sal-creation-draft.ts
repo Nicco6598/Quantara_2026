@@ -1,4 +1,5 @@
-import { readJsonFromStorage, STORAGE_KEYS, writeJsonToStorage } from "@/persistence";
+import { readJsonFromStorage, writeJsonToStorage } from "@/persistence/json-storage";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import type { SalEconomicRules, SalLineDraft, SalVoiceDraft } from "../types";
 import type { SalDocument } from "./sal-workflow";
 

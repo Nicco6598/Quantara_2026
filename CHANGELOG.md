@@ -2,6 +2,15 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.25 — 2026-05-16
+
+### Correzioni
+
+- **Avvio corretto dopo l'aggiornamento** — risolto un problema che poteva far aprire Quantara con una schermata bianca nella versione installata, anche se l'app funzionava correttamente in sviluppo.
+- **Dashboard di nuovo visibile in produzione** — la build desktop ora carica correttamente i file interni dell'app e mostra subito l'interfaccia principale all'avvio.
+- **Aggiornamenti e dati locali più affidabili** — migliorata la stabilità del caricamento iniziale, così Quantara recupera preferenze, dati locali e controlli update senza bloccare l'interfaccia.
+- **Comunicazione interna dell'app più stabile** — corretta la configurazione desktop per evitare avvisi e fallback durante il dialogo tra interfaccia e motore locale.
+
 ## 0.3.24 — 2026-05-16
 
 ### Correzioni

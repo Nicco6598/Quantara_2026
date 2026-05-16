@@ -30,7 +30,7 @@ import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useNavigate } from "@/hooks/useNavigate";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
-import { SESSION_STORAGE_KEYS } from "@/persistence";
+import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowService } from "@/services/sal-service";
 import { useAppStore } from "@/store/app-store";
 import type { SalTemplate } from "@/store/template-store";

@@ -24,7 +24,7 @@ import {
 
 import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 

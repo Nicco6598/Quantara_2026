@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { createSafeLocalStorage } from "@/lib/safe-storage";
-import { STORAGE_KEYS } from "@/persistence";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
 export type QuantaraRoute =
   | "dashboard"

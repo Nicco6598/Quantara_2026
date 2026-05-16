@@ -32,7 +32,8 @@ import {
   updateDesktopTariffBook,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { readJsonFromStorage, STORAGE_KEYS, writeJsonToStorage } from "@/persistence";
+import { readJsonFromStorage, writeJsonToStorage } from "@/persistence/json-storage";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
 import { useAppStore } from "@/store/app-store";
 

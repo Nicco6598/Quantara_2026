@@ -11,7 +11,6 @@ import type {
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
 import { invokeWithFallback, isTauriRuntime } from "./tauri-wrapper";
-import { STORAGE_KEYS, writeJsonToStorage } from "@/persistence";
 import { dispatchDataChanged } from "@/lib/sync-events";
 
 export type DesktopContract = DesktopContractRecord;
@@ -30,7 +29,8 @@ import type { DesktopDataResult } from "./tauri-wrapper";
 export type { DesktopDataResult };
 
 const tariffVoiceCache = new Map<string, DesktopTariffVoiceRecord[]>();
-const previewContractsStorageKey = STORAGE_KEYS.previewContracts;
+const previewContractsStorageKey = "quantara.preview.contracts.v1";
+const previewMaterialsStorageKey = "quantara.preview.materials.v1";
 const PREVIEW_TTL_MS = 3_600_000; // 1 hour
 
 type InflightKey =
@@ -415,8 +415,6 @@ export type CreateDesktopMaterialRequest = {
   notes: string;
 };
 
-const previewMaterialsStorageKey = STORAGE_KEYS.previewMaterials;
-
 function readPreviewMaterials(fallback: DesktopMaterial[]): DesktopMaterial[] {
   try {
     const raw = localStorage.getItem(previewMaterialsStorageKey);
@@ -433,6 +431,10 @@ function readPreviewMaterials(fallback: DesktopMaterial[]): DesktopMaterial[] {
   } catch {
     return fallback;
   }
+}
+
+function writeJsonToStorage(storage: Storage, key: string, value: unknown): void {
+  storage.setItem(key, JSON.stringify(value));
 }
 
 function writePreviewMaterials(materials: DesktopMaterial[]) {
