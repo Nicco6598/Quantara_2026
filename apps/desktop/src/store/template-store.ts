@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createId } from "@/features/sal/domain/sal-workflow";
+import { createSafeLocalStorage } from "@/lib/safe-storage";
 import { STORAGE_KEYS } from "@/persistence";
 import type { SalEconomicRules } from "@/features/sal/types";
 
@@ -64,7 +65,7 @@ export const useTemplateStore = create<TemplateStore>()(
     }),
     {
       name: STORAGE_KEYS.salTemplates,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeLocalStorage()),
     },
   ),
 );

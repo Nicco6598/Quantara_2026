@@ -28,7 +28,7 @@ import {
   runAppUpdateCheck,
   type UpdateInstallState,
 } from "@/lib/appUpdater";
-import { loadThemeCSS } from "@/lib/theme-loader";
+import { loadThemeCSS, resolveThemeName } from "@/lib/theme-loader";
 import { migrateLegacyContractorsToDb } from "@/lib/contractorMigration";
 import { storePendingReleaseNotes, usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
@@ -61,17 +61,17 @@ function ThemeApplier() {
     if (isFirst.current) {
       isFirst.current = false;
       const state = useAppStore.getState();
-      document.documentElement.dataset.theme = state.themeMode;
-      document.documentElement.style.colorScheme = state.themeMode.startsWith("dark")
-        ? "dark"
-        : "light";
-      loadThemeCSS(state.themeMode);
+      const resolved = resolveThemeName(state.themeMode);
+      document.documentElement.dataset.theme = resolved;
+      document.documentElement.style.colorScheme = resolved.startsWith("dark") ? "dark" : "light";
+      void loadThemeCSS(resolved);
       return;
     }
 
-    const isDark = themeMode.startsWith("dark");
-    loadThemeCSS(themeMode).then(() => {
-      document.documentElement.dataset.theme = themeMode;
+    const resolved = resolveThemeName(themeMode);
+    const isDark = resolved.startsWith("dark");
+    void loadThemeCSS(resolved).then(() => {
+      document.documentElement.dataset.theme = resolved;
       document.documentElement.style.colorScheme = isDark ? "dark" : "light";
     });
   }, [themeMode]);

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { generateSalTitle } from "@/features/sal/domain/sal-utils";
 import { createId } from "@/features/sal/domain/sal-workflow";
+import { createSafeLocalStorage } from "@/lib/safe-storage";
 import { STORAGE_KEYS } from "@/persistence";
 import type {
   SalDocument,
@@ -310,7 +311,7 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
         }
         return persisted as SalWorkflowStore;
       },
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeLocalStorage()),
     },
   ),
 );

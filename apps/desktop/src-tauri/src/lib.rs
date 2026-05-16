@@ -6,6 +6,7 @@ mod updater;
 
 use infrastructure::local_storage::DbConnection;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::DialogExt;
 
 pub fn run() {
     #[cfg(all(target_os = "windows", not(debug_assertions)))]
@@ -17,7 +18,26 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let db = DbConnection::open(app.handle())?;
+            let db = match DbConnection::open(app.handle()) {
+                Ok(db) => db,
+                Err(e) => {
+                    eprintln!("[quantara] FATAL: failed to open database: {e}");
+                    #[cfg(not(debug_assertions))]
+                    {
+                        let _ = app
+                            .dialog()
+                            .message(&format!(
+                                "Impossibile inizializzare il database.\n\n{e}\n\n\
+                                 Riavvia l'applicazione. Se il problema persiste, \
+                                 reinstalla Quantara."
+                            ))
+                            .title("Errore database")
+                            .kind(tauri_plugin_dialog::MessageDialogKind::Error)
+                            .show();
+                    }
+                    return Err(e.into());
+                }
+            };
             app.manage(db);
 
             #[cfg(target_os = "macos")]

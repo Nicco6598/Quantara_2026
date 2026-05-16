@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { createSafeLocalStorage } from "@/lib/safe-storage";
 import { STORAGE_KEYS } from "@/persistence";
 
 type AuditEntry = {
@@ -40,7 +41,7 @@ export const useAuditLogStore = create<AuditLogStore>()(
       getEntriesForEntity: (entityType, entityId) =>
         get().entries.filter((e) => e.entityType === entityType && e.entityId === entityId),
     }),
-    { name: STORAGE_KEYS.auditLog, storage: createJSONStorage(() => localStorage) },
+    { name: STORAGE_KEYS.auditLog, storage: createJSONStorage(() => createSafeLocalStorage()) },
   ),
 );
 
