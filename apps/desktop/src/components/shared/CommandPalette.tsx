@@ -274,6 +274,12 @@ export function CommandPalette({
   const onRouteChangeRef = useRef(onRouteChange);
   onRouteChangeRef.current = onRouteChange;
   const { themeMode, toggleTheme } = useThemeState();
+  const searchableRef = useRef<{
+    contracts: Array<{ id: string; title: string; applicationContractCode: string }>;
+    materials: Array<{ id: string; code: string; description: string; category: string }>;
+    tariffBooks: Array<{ id: string; name: string; sourceName: string; year: number }>;
+  } | null>(null);
+  const searchGenerationRef = useRef(0);
 
   const commands = useMemo<PaletteCommand[]>(
     () => [
@@ -374,6 +380,25 @@ export function CommandPalette({
   }, [isOpen]);
 
   useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      listDesktopContracts([]),
+      listDesktopMaterials([]),
+      listDesktopTariffBooks([]),
+    ]).then(([contractsRes, materialsRes, tariffBooksRes]) => {
+      if (cancelled) return;
+      searchableRef.current = {
+        contracts: contractsRes.data,
+        materials: materialsRes.data,
+        tariffBooks: tariffBooksRes.data,
+      };
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
@@ -385,90 +410,83 @@ export function CommandPalette({
       return;
     }
 
+    const data = searchableRef.current;
+    if (!data) {
+      dispatch({ type: "SET_SEARCHING", searching: true });
+      debounceRef.current = window.setTimeout(() => {
+        dispatch({ type: "SET_SEARCHING", searching: false });
+      }, 250);
+      return;
+    }
+
     dispatch({ type: "SET_SEARCHING", searching: true });
+    const generation = ++searchGenerationRef.current;
+    const ql = q.toLowerCase();
 
-    const firedQuery = q;
+    debounceRef.current = window.setTimeout(() => {
+      if (searchGenerationRef.current !== generation) return;
 
-    debounceRef.current = window.setTimeout(async () => {
-      try {
-        const [contractsRes, materialsRes, tariffBooksRes] = await Promise.all([
-          listDesktopContracts([]),
-          listDesktopMaterials([]),
-          listDesktopTariffBooks([]),
-        ]);
+      const items: DataResult[] = [];
 
-        const currentQuery = queryRef.current.trim().toLowerCase();
-        if (currentQuery !== firedQuery.toLowerCase()) return;
-
-        const ql = firedQuery.toLowerCase();
-        const items: DataResult[] = [];
-
-        for (const c of contractsRes.data) {
-          const title = c.title.toLowerCase();
-          const code = (c.applicationContractCode ?? "").toLowerCase();
-          if (title.includes(ql) || code.includes(ql)) {
-            items.push({
-              id: `contract-${c.id}`,
-              group: "Progetti",
-              label: c.title,
-              description: c.applicationContractCode || "",
-              icon: Building2,
-              run: () => {
-                onRouteChangeRef.current("projects");
-                onCloseRef.current();
-              },
-            });
-          }
+      for (const c of data.contracts) {
+        const title = c.title.toLowerCase();
+        const code = (c.applicationContractCode ?? "").toLowerCase();
+        if (title.includes(ql) || code.includes(ql)) {
+          items.push({
+            id: `contract-${c.id}`,
+            group: "Progetti",
+            label: c.title,
+            description: c.applicationContractCode || "",
+            icon: Building2,
+            run: () => {
+              onRouteChangeRef.current("projects");
+              onCloseRef.current();
+            },
+          });
         }
-
-        for (const m of materialsRes.data) {
-          const code = m.code.toLowerCase();
-          const description = m.description.toLowerCase();
-          const category = m.category.toLowerCase();
-          if (code.includes(ql) || description.includes(ql) || category.includes(ql)) {
-            items.push({
-              id: `material-${m.id}`,
-              group: "Materiali",
-              label: m.code,
-              description: m.description,
-              icon: Package,
-              run: () => {
-                onRouteChangeRef.current("materials");
-                onCloseRef.current();
-              },
-            });
-          }
-        }
-
-        for (const t of tariffBooksRes.data) {
-          const name = t.name.toLowerCase();
-          const source = (t.sourceName ?? "").toLowerCase();
-          if (name.includes(ql) || source.includes(ql)) {
-            items.push({
-              id: `tariff-${t.id}`,
-              group: "Tariffari",
-              label: t.name,
-              description: t.sourceName || String(t.year || ""),
-              icon: BookOpen,
-              run: () => {
-                onRouteChangeRef.current("tariffs");
-                onCloseRef.current();
-              },
-            });
-          }
-        }
-
-        const currentQuery2 = queryRef.current.trim().toLowerCase();
-        if (currentQuery2 !== firedQuery.toLowerCase()) return;
-
-        dispatch({ type: "SET_DATA_RESULTS", results: items });
-        dispatch({ type: "SET_SEARCHING", searching: false });
-      } catch {
-        const currentQuery2 = queryRef.current.trim().toLowerCase();
-        if (currentQuery2 !== firedQuery.toLowerCase()) return;
-        dispatch({ type: "SET_SEARCHING", searching: false });
       }
-    }, 250);
+
+      for (const m of data.materials) {
+        const code = m.code.toLowerCase();
+        const description = m.description.toLowerCase();
+        const category = m.category.toLowerCase();
+        if (code.includes(ql) || description.includes(ql) || category.includes(ql)) {
+          items.push({
+            id: `material-${m.id}`,
+            group: "Materiali",
+            label: m.code,
+            description: m.description,
+            icon: Package,
+            run: () => {
+              onRouteChangeRef.current("materials");
+              onCloseRef.current();
+            },
+          });
+        }
+      }
+
+      for (const t of data.tariffBooks) {
+        const name = t.name.toLowerCase();
+        const source = (t.sourceName ?? "").toLowerCase();
+        if (name.includes(ql) || source.includes(ql)) {
+          items.push({
+            id: `tariff-${t.id}`,
+            group: "Tariffari",
+            label: t.name,
+            description: t.sourceName || String(t.year || ""),
+            icon: BookOpen,
+            run: () => {
+              onRouteChangeRef.current("tariffs");
+              onCloseRef.current();
+            },
+          });
+        }
+      }
+
+      if (searchGenerationRef.current !== generation) return;
+      dispatch({ type: "SET_DATA_RESULTS", results: items });
+      dispatch({ type: "SET_SEARCHING", searching: false });
+    }, 150);
 
     return () => {
       if (debounceRef.current) {

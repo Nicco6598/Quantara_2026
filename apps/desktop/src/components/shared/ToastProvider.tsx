@@ -1,4 +1,4 @@
-import { m } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { CheckCircle2, Info, TriangleAlert, X, XCircle } from "lucide-react";
 import {
   createContext,
@@ -7,10 +7,11 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { MOTION_DURATION, SPRING_EASE } from "@/components/shared/easings";
 import { cn } from "@/lib/utils";
+import { motionVariants } from "@/motion";
 
 type ToastTone = "info" | "success" | "warning" | "danger";
 
@@ -81,6 +82,11 @@ function unlockAudioOnGesture() {
   for (const event of events) {
     window.addEventListener(event, handler, { once: true });
   }
+  return () => {
+    for (const event of events) {
+      window.removeEventListener(event, handler);
+    }
+  };
 }
 
 async function getAudioContext() {
@@ -147,13 +153,19 @@ async function playToastSound(tone?: ToastTone) {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timeoutIds = useRef(new Map<string, number>());
 
   // Unlock audio context on first user gesture (macOS/WebView)
   useEffect(() => {
-    unlockAudioOnGesture();
+    return unlockAudioOnGesture();
   }, []);
 
   const dismiss = useCallback((id: string) => {
+    const timeoutId = timeoutIds.current.get(id);
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+      timeoutIds.current.delete(id);
+    }
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
 
@@ -166,8 +178,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const nextToast: ToastItem = { ...toast, id, tone: toast.tone ?? "info" };
 
-      setToasts((current) => [nextToast, ...current].slice(0, 4));
-      window.setTimeout(() => dismiss(id), 5200);
+      setToasts((current) => {
+        const next = [nextToast, ...current].slice(0, 4);
+        const visibleIds = new Set(next.map((item) => item.id));
+        for (const currentToast of current) {
+          if (!visibleIds.has(currentToast.id)) {
+            const timeoutId = timeoutIds.current.get(currentToast.id);
+            if (timeoutId !== undefined) {
+              window.clearTimeout(timeoutId);
+              timeoutIds.current.delete(currentToast.id);
+            }
+          }
+        }
+        return next;
+      });
+      const timeoutId = window.setTimeout(() => dismiss(id), 5200);
+      timeoutIds.current.set(id, timeoutId);
       return id;
     },
     [dismiss],
@@ -185,6 +211,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(QUANTARA_TOAST_EVENT, handleToastEvent);
   }, [notify]);
 
+  useEffect(
+    () => () => {
+      for (const timeoutId of timeoutIds.current.values()) {
+        window.clearTimeout(timeoutId);
+      }
+      timeoutIds.current.clear();
+    },
+    [],
+  );
+
   return (
     <ToastContext.Provider value={value}>
       {children}
@@ -192,65 +228,67 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         aria-live="polite"
         className="pointer-events-none fixed bottom-5 right-5 z-[90] flex w-[360px] max-w-[calc(100vw-2rem)] flex-col-reverse gap-2"
       >
-        {toasts.map((toast) => {
-          const Icon = toneIcons[toast.tone];
+        <AnimatePresence initial={false}>
+          {toasts.map((toast) => {
+            const Icon = toneIcons[toast.tone];
 
-          return (
-            <m.div
-              className={cn(
-                "pointer-events-auto rounded-18px bg-[var(--surface-base)] p-3.5 shadow-soft inset-shadow-[0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 backdrop-blur-md",
-                toneBorder[toast.tone],
-              )}
-              initial={{ opacity: 0, y: 20, scale: 0.94 }}
-              transition={{ duration: MOTION_DURATION.reveal, ease: SPRING_EASE }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.94 }}
-              key={toast.id}
-              layout
-            >
-              <div className="flex items-start gap-3">
-                <span
-                  className={cn(
-                    "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
-                    toneBg[toast.tone],
-                  )}
-                >
-                  <Icon className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  {toast.title ? (
-                    <div className="text-13px font-semibold text-[var(--text-primary)]">
-                      {toast.title}
+            return (
+              <m.div
+                animate={motionVariants.toast.animate}
+                className={cn(
+                  "pointer-events-auto rounded-18px bg-[var(--surface-base)] p-3.5 shadow-soft inset-shadow-[0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 backdrop-blur-md",
+                  toneBorder[toast.tone],
+                )}
+                exit={motionVariants.toast.exit}
+                initial={motionVariants.toast.initial}
+                key={toast.id}
+                layout="position"
+                transition={motionVariants.toast.transition}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={cn(
+                      "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
+                      toneBg[toast.tone],
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    {toast.title ? (
+                      <div className="text-13px font-semibold text-[var(--text-primary)]">
+                        {toast.title}
+                      </div>
+                    ) : null}
+                    <div className="text-13px leading-5 text-[var(--text-secondary)]">
+                      {toast.message}
                     </div>
-                  ) : null}
-                  <div className="text-13px leading-5 text-[var(--text-secondary)]">
-                    {toast.message}
+                    {toast.onAction ? (
+                      <button
+                        className="mt-2 text-12px font-semibold text-[var(--accent-primary)] hover:underline"
+                        onClick={() => {
+                          toast.onAction?.();
+                          dismiss(toast.id);
+                        }}
+                        type="button"
+                      >
+                        {toast.actionLabel ?? "Annulla"}
+                      </button>
+                    ) : null}
                   </div>
-                  {toast.onAction ? (
-                    <button
-                      className="mt-2 text-12px font-semibold text-[var(--accent-primary)] hover:underline"
-                      onClick={() => {
-                        toast.onAction?.();
-                        dismiss(toast.id);
-                      }}
-                      type="button"
-                    >
-                      {toast.actionLabel ?? "Annulla"}
-                    </button>
-                  ) : null}
+                  <button
+                    aria-label="Chiudi notifica"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-10px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                    onClick={() => dismiss(toast.id)}
+                    type="button"
+                  >
+                    <X className="size-4" />
+                  </button>
                 </div>
-                <button
-                  aria-label="Chiudi notifica"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-10px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-                  onClick={() => dismiss(toast.id)}
-                  type="button"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            </m.div>
-          );
-        })}
+              </m.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
     </ToastContext.Provider>
   );

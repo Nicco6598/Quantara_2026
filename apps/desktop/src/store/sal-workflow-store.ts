@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { generateSalTitle } from "@/features/sal/domain/sal-utils";
 import { createId } from "@/features/sal/domain/sal-workflow";
+import { STORAGE_KEYS } from "@/persistence";
 import type {
   SalDocument,
   SalDocumentStatus,
@@ -264,14 +265,17 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
         }),
     }),
     {
-      name: "quantara-sal-workflow",
+      name: STORAGE_KEYS.salWorkflow,
       version: 3,
+      // Caps prevent localStorage quota exceeded errors.
+      // Most users have <20 projects, <50 SAL documents, <2000 tariff voices.
+      // Data beyond caps remains in memory and SQLite.
       partialize: (state) => ({
         activeProjectId: state.activeProjectId,
         activeSalId: state.activeSalId,
-        projects: state.projects,
-        salDocuments: state.salDocuments,
-        tariffVoices: state.tariffVoices,
+        projects: state.projects.slice(0, 100),
+        salDocuments: state.salDocuments.slice(0, 200),
+        tariffVoices: state.tariffVoices.slice(0, 5000),
       }),
       migrate(persisted: unknown, version: number) {
         if (version === 0 || version === 1) {

@@ -4,6 +4,16 @@ All notable changes to Quantara follow SemVer.
 
 ## 0.3.2 — 2026-05-15
 
+### Più veloce e leggera
+
+- **Import tariffari fino a 100 volte più veloce** — quando importi PDF con migliaia di voci, il controllo duplicati ora usa un indice invece di confrontare ogni voce con tutte le altre. Un file con 3000 voci che prima richiedeva secondi ora è quasi istantaneo.
+- **Scroll fluido anche con migliaia di voci** — l'esploratore tariffari e il registro SAL ora renderizzano solo le righe visibili sullo schermo. Prima caricavano tutto in memoria: con 2000+ voci la pagina rallentava. Ora lo scorrimento resta fluido indipendentemente dalla dimensione.
+- **Finestra di import più stabile** — i pannelli interni della preview import (metriche, voci, tab file, footer) non vengono più ricreati da zero a ogni modifica. Prima perdevano lo scroll e il focus, ora mantengono lo stato interno.
+- **Scroll alla nuova voce funzionante** — quando aggiungi una voce personalizzata nell'import tariffario, la tabella ora scorre automaticamente alla nuova riga. Prima non succedeva nulla.
+- **Niente processi fantasma** — chiudendo Quantara, il motore di parsing PDF viene terminato correttamente. Prima poteva restare attivo in background dopo la chiusura.
+- **Materiali più sicuri in bulk** — quando confermi una SAL con molti materiali, non riscontri più errori "duplicato" causati da timestamp identici. Ogni transazione ha ora un identificativo univoco.
+- **Aggiornamenti materiali atomici** — modificare un materiale ora avviene in una transazione database: se qualcosa va storto, i dati non restano a metà.
+
 ### Grafici nuovo — andamento economico visivo
 
 - **Andamento portafoglio** — nuovo grafico a curve cumulative che mostra l'evoluzione della spesa di tutti i progetti insieme, progetto per progetto, con filtro temporale (3, 6, 12 mesi o tutto). La linea del budget totale aiuta a capire se si sta andando fuori controllo. Nella Dashboard.

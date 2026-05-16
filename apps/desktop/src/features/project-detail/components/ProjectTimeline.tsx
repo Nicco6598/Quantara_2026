@@ -2,7 +2,7 @@ import { m } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { useMemo } from "react";
 import { Currency } from "@/components/shared/Currency";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/motion";
 import type { PortfolioProject } from "@/features/projects/types";
 
 import type { SalDocument } from "@/features/sal/domain/sal-workflow";

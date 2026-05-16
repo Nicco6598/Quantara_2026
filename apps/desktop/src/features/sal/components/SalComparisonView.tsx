@@ -1,7 +1,7 @@
 import { m } from "framer-motion";
 import { ArrowRight, Minus, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/motion";
 import { cn } from "@/lib/utils";
 import { type DiffResult, diffSalLines } from "../domain/sal-comparison";
 import type { SalLineView } from "../types";

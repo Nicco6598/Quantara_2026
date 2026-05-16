@@ -9,9 +9,9 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
   const completedCount = doneCount + errorCount;
 
   return (
-    <div className="fixed inset-0 z-[82] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-[82] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
       <div className="relative w-full max-w-lg rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
-        <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-6 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+        <div className="rounded-22px bg-[var(--surface-base)] p-6 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-start gap-4">
             <div className="relative flex size-14 shrink-0 items-center justify-center rounded-18px bg-[var(--info-soft)] text-[var(--info-base)]">
               <FileText className="size-6" />

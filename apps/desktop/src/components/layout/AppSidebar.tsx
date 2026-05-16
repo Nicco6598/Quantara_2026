@@ -9,7 +9,7 @@ import {
   Users,
 } from "@phosphor-icons/react";
 import { m } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
 import { useAppStore } from "@/store/app-store";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
@@ -18,12 +18,13 @@ import {
   isPlaceholderContractorName,
 } from "@/features/projects/utils/projects-helpers";
 import { APP_VERSION } from "@/generated/appVersion";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import type { DesktopContract, DesktopMaterial } from "@/lib/desktopData";
 import { listDesktopContracts, listDesktopMaterials } from "@/lib/desktopData";
-import { DATA_CHANGED_EVENT } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
+import { readJsonFromStorage, SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
 import type { QuantaraRoute } from "@/store/app-store";
-import { useNavigationState } from "@/store/app-store";
+import { useActiveContext } from "@/store/app-store";
 
 type NavItem = {
   badges?: {
@@ -54,13 +55,12 @@ const SIDEBAR_WIDTH_EXPANDED = 220;
 const SIDEBAR_WIDTH_COLLAPSED = 0;
 
 export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebarProps) {
-  const { activeContext } = useNavigationState();
+  const activeContext = useActiveContext();
   const [contracts, setContracts] = useState<DesktopContract[]>([]);
   const [projects, setProjects] = useState<{ id: string; contractor: string }[]>([]);
   const [contractorCount, setContractorCount] = useState(0);
   const [criticalMaterialsCount, setCriticalMaterialsCount] = useState(0);
   const [warningMaterialsCount, setWarningMaterialsCount] = useState(0);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const loadProjects = useCallback(() => {
     let active = true;
@@ -70,8 +70,10 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
         ? {}
         : (() => {
             try {
-              return JSON.parse(
-                window.localStorage.getItem("quantara.projectContractors.v1") ?? "{}",
+              return readJsonFromStorage<Record<string, string>>(
+                window.localStorage,
+                STORAGE_KEYS.projectContractors,
+                {},
               );
             } catch {
               return {};
@@ -82,8 +84,11 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
         ? []
         : (() => {
             try {
-              const parsed = JSON.parse(
-                window.localStorage.getItem("quantara.contractorRegistry.v1") ?? "[]",
+              const parsed = readJsonFromStorage<unknown[]>(
+                window.localStorage,
+                STORAGE_KEYS.contractorRegistry,
+                [],
+                Array.isArray,
               );
               return Array.isArray(parsed)
                 ? parsed.filter((item): item is string => typeof item === "string")
@@ -138,25 +143,14 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
     return cleanup;
   }, [loadProjects]);
 
-  useEffect(() => {
-    const handleChange = () => {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(loadProjects, 150);
-    };
-
-    window.addEventListener(DATA_CHANGED_EVENT, handleChange);
-    return () => {
-      window.removeEventListener(DATA_CHANGED_EVENT, handleChange);
-      clearTimeout(debounceRef.current);
-    };
-  }, [loadProjects]);
+  useDataChangedListener(loadProjects);
 
   const projectCount = projects.length;
 
   const contextLabel = useMemo(() => {
     const selectedProjectId = (() => {
       try {
-        const raw = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
+        const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEYS.selectedProjectDetail);
         if (!raw) return null;
         const parsed = JSON.parse(raw) as { id?: unknown };
         return typeof parsed.id === "string" ? parsed.id : null;
@@ -238,26 +232,28 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
       className="relative z-40 flex h-full shrink-0 select-none overflow-hidden bg-transparent [font-family:var(--font-sans)] text-[var(--text-primary)]"
       transition={{ type: "tween", duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="sidebar-rail relative flex min-h-0 w-full flex-col overflow-hidden p-3">
+      <m.div
+        animate={{ opacity: collapsed ? 0 : 1 }}
+        className="sidebar-rail relative flex min-h-0 w-full flex-col overflow-hidden p-3"
+        transition={{ duration: 0.2, ease: "easeInOut" }}
+      >
         <div className="shrink-0">
           <SidebarHeader collapsed={collapsed} />
         </div>
 
         <div className="mt-5 min-h-0 flex-1 overflow-hidden">
-          <SidebarGroup label="Workspace" collapsed={collapsed}>
+          <SidebarGroup label="Workspace">
             <SidebarNav
               activeRoute={activeRoute}
-              collapsed={collapsed}
               contextLabel={contextLabel}
               items={primaryNavItems}
               onNavigate={onRouteChange}
             />
           </SidebarGroup>
 
-          <SidebarGroup className="mt-5" label="Sistema" collapsed={collapsed}>
+          <SidebarGroup className="mt-5" label="Sistema">
             <SidebarNav
               activeRoute={activeRoute}
-              collapsed={collapsed}
               contextLabel={null}
               items={utilityNavItems}
               onNavigate={onRouteChange}
@@ -266,9 +262,9 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
         </div>
 
         <div className="shrink-0 pt-3">
-          <SidebarFooter collapsed={collapsed} />
+          <SidebarFooter />
         </div>
-      </div>
+      </m.div>
     </m.aside>
   );
 }
@@ -281,30 +277,28 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
       className={cn(
         "flex min-h-12 items-center rounded-18px",
         collapsed
-          ? "justify-center px-0"
+          ? "justify-between px-2.5"
           : "justify-between bg-[color-mix(in_srgb,var(--surface-base)_56%,transparent)] px-2.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_46%,transparent)]",
       )}
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <img
           alt="Quantara"
-          className={cn("shrink-0 object-contain", collapsed ? "h-9 w-9" : "h-8 w-8")}
+          className="shrink-0 object-contain h-8 w-8"
           draggable={false}
           height={40}
           src={logoSidebar}
           style={isDark ? { filter: "brightness(0) invert(1)" } : undefined}
           width={40}
         />
-        {!collapsed ? (
-          <div className="min-w-0">
-            <div className="truncate text-13px font-650 leading-4 text-[var(--text-primary)]">
-              Quantara
-            </div>
-            <div className="truncate text-10px font-medium leading-3 text-[var(--text-secondary)]">
-              Construction Suite
-            </div>
+        <div className="min-w-0">
+          <div className="truncate text-13px font-650 leading-4 text-[var(--text-primary)]">
+            Quantara
           </div>
-        ) : null}
+          <div className="truncate text-10px font-medium leading-3 text-[var(--text-secondary)]">
+            Construction Suite
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -313,21 +307,17 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
 function SidebarGroup({
   children,
   className,
-  collapsed,
   label,
 }: {
   children: React.ReactNode;
   className?: string;
-  collapsed: boolean;
   label: string;
 }) {
   return (
     <section className={cn("min-w-0", className)}>
-      {!collapsed ? (
-        <div className="mb-2 px-2 text-9px font-700 uppercase tracking-0_14em text-[color-mix(in_srgb,var(--text-secondary)_64%,transparent)]">
-          {label}
-        </div>
-      ) : null}
+      <div className="mb-2 px-2 text-9px font-700 uppercase tracking-0_14em text-[color-mix(in_srgb,var(--text-secondary)_64%,transparent)]">
+        {label}
+      </div>
       {children}
     </section>
   );
@@ -335,14 +325,12 @@ function SidebarGroup({
 
 function SidebarNav({
   activeRoute,
-  collapsed,
   className,
   contextLabel,
   items,
   onNavigate,
 }: {
   activeRoute: QuantaraRoute;
-  collapsed: boolean;
   className?: string;
   contextLabel: { primary: string; secondary: string | null } | null;
   items: NavItem[];
@@ -354,18 +342,13 @@ function SidebarNav({
         const isActive = isRouteActive(item.route, activeRoute);
         return (
           <div key={item.route}>
-            <SidebarNavItem
-              active={isActive}
-              collapsed={collapsed}
-              item={item}
-              onClick={() => onNavigate(item.route)}
-            />
-            {isActive && contextLabel && !collapsed ? (
+            <SidebarNavItem active={isActive} item={item} onClick={() => onNavigate(item.route)} />
+            {isActive && contextLabel && (
               <SidebarContextBreadcrumb
                 label={contextLabel as SidebarContextInfo}
                 onNavigate={onNavigate}
               />
-            ) : null}
+            )}
           </div>
         );
       })}
@@ -410,7 +393,7 @@ function SidebarContextBreadcrumb({
             onClick={() => {
               try {
                 window.sessionStorage.setItem(
-                  "quantara.selectedProjectDetail.v1",
+                  SESSION_STORAGE_KEYS.selectedProjectDetail,
                   JSON.stringify({ id: label.secondaryId }),
                 );
               } catch {
@@ -431,12 +414,10 @@ function SidebarContextBreadcrumb({
 
 function SidebarNavItem({
   active,
-  collapsed,
   item,
   onClick,
 }: {
   active: boolean;
-  collapsed: boolean;
   item: NavItem;
   onClick: () => void;
 }) {
@@ -447,7 +428,7 @@ function SidebarNavItem({
       aria-label={item.label}
       className={cn(
         "group relative flex w-full select-none items-center overflow-hidden rounded-14px text-left outline-none transition-all duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
-        collapsed ? "h-11 justify-center px-0" : "min-h-[50px] gap-2.5 px-2.5 py-2.5",
+        "min-h-[50px] gap-2.5 px-2.5 py-2.5",
         active
           ? "text-[var(--text-primary)]"
           : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
@@ -466,7 +447,7 @@ function SidebarNavItem({
         <span
           className={cn(
             "absolute rounded-full bg-[var(--accent-primary)]",
-            collapsed ? "bottom-1.5 h-1 w-5" : "left-1.5 top-1/2 h-4 w-1 -translate-y-1/2",
+            "left-1.5 top-1/2 h-4 w-1 -translate-y-1/2",
           )}
         />
       ) : null}
@@ -482,21 +463,17 @@ function SidebarNavItem({
         <NavIcon size={16} weight={active ? "fill" : "regular"} />
       </span>
 
-      {!collapsed && item.label ? (
-        <span className="relative z-10 min-w-0 flex-1 text-left">
-          <span className="flex min-w-0 items-center justify-between gap-2">
-            <span className="block min-w-0 truncate text-13px font-650 leading-4">
-              {item.label}
-            </span>
-            {item.badges ? <BadgeCluster badges={item.badges} /> : null}
-          </span>
-          {item.badges ? (
-            <span className="mt-1 block truncate text-10px font-medium leading-3 text-[var(--text-tertiary)]">
-              {item.detail}
-            </span>
-          ) : null}
+      <span className="relative z-10 min-w-0 flex-1 text-left">
+        <span className="flex min-w-0 items-center justify-between gap-2">
+          <span className="block min-w-0 truncate text-13px font-650 leading-4">{item.label}</span>
+          {item.badges ? <BadgeCluster badges={item.badges} /> : null}
         </span>
-      ) : null}
+        {item.badges ? (
+          <span className="mt-1 block truncate text-10px font-medium leading-3 text-[var(--text-tertiary)]">
+            {item.detail}
+          </span>
+        ) : null}
+      </span>
     </button>
   );
 }
@@ -539,15 +516,13 @@ function NavBadgePill({
   );
 }
 
-function SidebarFooter({ collapsed }: { collapsed: boolean }) {
+function SidebarFooter() {
   return (
     <footer className="select-none">
       <div
         className={cn(
           "group flex items-center gap-2.5 rounded-18px text-left transition-colors duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
-          collapsed
-            ? "justify-center px-0 py-2"
-            : "bg-[color-mix(in_srgb,var(--surface-base)_58%,transparent)] p-2 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_46%,transparent)] hover:bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)]",
+          "bg-[color-mix(in_srgb,var(--surface-base)_58%,transparent)] p-2 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_46%,transparent)] hover:bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)]",
         )}
       >
         <div className="shrink-0">
@@ -555,33 +530,27 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
             MB
           </div>
         </div>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-12px font-650 leading-4 text-[var(--text-primary)]">
-              Marco Bianchi
-            </div>
-            <div className="truncate text-10px font-medium leading-3 text-[var(--text-secondary)]">
-              Project Manager
-            </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-12px font-650 leading-4 text-[var(--text-primary)]">
+            Marco Bianchi
           </div>
-        )}
+          <div className="truncate text-10px font-medium leading-3 text-[var(--text-secondary)]">
+            Project Manager
+          </div>
+        </div>
       </div>
 
       <div
         className={cn(
           "mt-2 flex items-center gap-2 px-1 text-[12px] font-medium leading-none text-[var(--text-secondary)]",
-          collapsed ? "justify-center" : "justify-between px-1",
+          "justify-between px-1",
         )}
       >
-        {!collapsed && (
-          <>
-            <span className="tracking-normal">v{APP_VERSION}</span>
-            <span className="flex items-center gap-1">
-              <span className="size-1 rounded-full bg-[var(--success-base)] shadow-[0_0_0_2px_color-mix(in_srgb,var(--success-base)_10%,transparent)]" />
-              Online
-            </span>
-          </>
-        )}
+        <span className="tracking-normal">v{APP_VERSION}</span>
+        <span className="flex items-center gap-1">
+          <span className="size-1 rounded-full bg-[var(--success-base)] shadow-[0_0_0_2px_color-mix(in_srgb,var(--success-base)_10%,transparent)]" />
+          Online
+        </span>
       </div>
     </footer>
   );

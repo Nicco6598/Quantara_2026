@@ -3,6 +3,7 @@ import { useNavigate } from "@/hooks/useNavigate";
 import type { DesktopContract, DesktopDataResult } from "@/lib/desktopData";
 import { deleteDesktopContract } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { SESSION_STORAGE_KEYS } from "@/persistence";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 type Notify = (toast: {
@@ -70,8 +71,8 @@ export function useProjectMutations({
     };
 
     try {
-      window.sessionStorage.setItem("quantara.editingProject.v1", JSON.stringify(values));
-      window.sessionStorage.setItem("quantara.editingContractId.v1", contract.id);
+      window.sessionStorage.setItem(SESSION_STORAGE_KEYS.editingProject, JSON.stringify(values));
+      window.sessionStorage.setItem(SESSION_STORAGE_KEYS.editingContractId, contract.id);
     } catch {
       /* no-op */
     }

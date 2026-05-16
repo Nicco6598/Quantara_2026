@@ -11,7 +11,6 @@ import {
   ShoppingCart,
   Trash2,
   Warehouse,
-  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch } from "@/components/filters";
@@ -20,7 +19,7 @@ import { Button } from "@/components/shared/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/motion";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { QuickAction } from "@/components/shared/QuickAction";
@@ -28,6 +27,7 @@ import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import { SeverityBar } from "@/components/shared/SeverityBar";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
@@ -35,120 +35,22 @@ import {
   type DesktopMaterial,
   deleteDesktopMaterial,
   listDesktopMaterials,
-  updateDesktopMaterial,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useSelectionStore } from "@/store/selection-store";
-
-type StockTone = "danger" | "success" | "warning";
-type CategoryTone = "blue" | "green" | "orange" | "purple";
-
-const categoryColorMap: Record<string, CategoryTone> = {
-  Armamento: "blue",
-  Sottofondo: "orange",
-  "Opere civili": "purple",
-  Impianti: "green",
-};
-
-const categoryToneLabel: Record<CategoryTone, string> = {
-  blue: "bg-[var(--info-soft)] text-[var(--info-base)]",
-  green: "bg-[var(--success-soft)] text-[var(--success-base)]",
-  orange: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-  purple: "bg-[var(--bg-muted-strong)] text-[var(--accent-secondary)]",
-};
-
-const CATEGORIES = ["Armamento", "Sottofondo", "Opere civili", "Impianti"];
-
-function toneForQuantity(quantity: number, minQuantity: number): StockTone {
-  if (minQuantity <= 0) return "success";
-  if (quantity < minQuantity) return "danger";
-  if (quantity <= minQuantity * 1.5) return "warning";
-  return "success";
-}
-
-function formatQuantity(value: number, unit: string): string {
-  const n = Number.isInteger(value) ? value : Math.round(value * 100) / 100;
-  return `${n} ${unit}`;
-}
-
-/* ── State reducers ── */
-
-type ScreenState = {
-  searchQuery: string;
-  selectedCategory: string | null;
-  selectedMaterialId: string | null;
-  isCreateModalOpen: boolean;
-  deleteConfirmId: string | null;
-};
-
-type ScreenAction =
-  | { type: "SET_SEARCH_QUERY"; payload: string }
-  | { type: "SET_SELECTED_CATEGORY"; payload: string | null }
-  | { type: "SET_SELECTED_MATERIAL_ID"; payload: string | null }
-  | { type: "SET_CREATE_MODAL"; payload: boolean }
-  | { type: "SET_DELETE_CONFIRM_ID"; payload: string | null };
-
-function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
-  switch (action.type) {
-    case "SET_SEARCH_QUERY":
-      return { ...state, searchQuery: action.payload };
-    case "SET_SELECTED_CATEGORY":
-      return { ...state, selectedCategory: action.payload };
-    case "SET_SELECTED_MATERIAL_ID":
-      return { ...state, selectedMaterialId: action.payload };
-    case "SET_CREATE_MODAL":
-      return { ...state, isCreateModalOpen: action.payload };
-    case "SET_DELETE_CONFIRM_ID":
-      return { ...state, deleteConfirmId: action.payload };
-  }
-}
-
-type FormField = "code" | "description" | "category" | "unit" | "quantity" | "minQuantity";
-
-type FormAction =
-  | { type: "SET_FIELD"; field: FormField; value: string }
-  | { type: "SET_SAVING"; payload: boolean }
-  | { type: "RESET"; payload?: DesktopMaterial | null };
-
-function formReducer(
-  state: {
-    code: string;
-    description: string;
-    category: string;
-    unit: string;
-    quantity: string;
-    minQuantity: string;
-    saving: boolean;
-  },
-  action: FormAction,
-): {
-  code: string;
-  description: string;
-  category: string;
-  unit: string;
-  quantity: string;
-  minQuantity: string;
-  saving: boolean;
-} {
-  switch (action.type) {
-    case "SET_FIELD":
-      return { ...state, [action.field]: action.value };
-    case "SET_SAVING":
-      return { ...state, saving: action.payload };
-    case "RESET":
-      return {
-        code: action.payload?.code ?? "",
-        description: action.payload?.description ?? "",
-        category: action.payload?.category ?? "Armamento",
-        unit: action.payload?.unit ?? "m",
-        quantity: String(action.payload?.quantity ?? 0),
-        minQuantity: String(action.payload?.minQuantity ?? 0),
-        saving: false,
-      };
-  }
-}
+import { AddMaterialModal } from "./components/AddMaterialModal";
+import {
+  CATEGORIES,
+  type CategoryTone,
+  type StockTone,
+  categoryColorMap,
+  categoryToneLabel,
+  formatQuantity,
+  screenReducer,
+  toneForQuantity,
+} from "./materials-screen-state";
 
 export function MaterialsScreen() {
   const { notify } = useToast();
@@ -160,8 +62,6 @@ export function MaterialsScreen() {
     isCreateModalOpen: false,
     deleteConfirmId: null,
   });
-
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const loadMaterials = useCallback(() => {
     let active = true;
@@ -185,17 +85,7 @@ export function MaterialsScreen() {
     return cleanup;
   }, [loadMaterials]);
 
-  useEffect(() => {
-    const handleChange = () => {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(loadMaterials, 150);
-    };
-    window.addEventListener("quantara:data-changed", handleChange);
-    return () => {
-      window.removeEventListener("quantara:data-changed", handleChange);
-      clearTimeout(debounceRef.current);
-    };
-  }, [loadMaterials]);
+  useDataChangedListener(loadMaterials);
 
   const selectedMaterial = useMemo(
     () => materials.find((m) => m.id === state.selectedMaterialId) ?? null,
@@ -498,14 +388,7 @@ function MaterialCard({
     >
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
-          <button
-            className="flex min-w-0 flex-1 items-start gap-4 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSelection(material.id);
-            }}
-            type="button"
-          >
+          <div className="flex min-w-0 flex-1 items-start gap-4">
             <span
               className={cn(
                 "mt-0.5 transition-opacity duration-200",
@@ -514,7 +397,14 @@ function MaterialCard({
             >
               <SelectionCheckbox checked={checked} id={material.id} onToggle={onToggleSelection} />
             </span>
-            <div className="min-w-0 flex-1 pt-0.5">
+            <button
+              className="min-w-0 flex-1 rounded-lg pt-0.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelection(material.id);
+              }}
+              type="button"
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   variant={
@@ -637,8 +527,8 @@ function MaterialCard({
                   ))}
                 </div>
               )}
-            </div>
-          </button>
+            </button>
+          </div>
 
           <div ref={menuRef}>
             <Button
@@ -841,222 +731,6 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
         </div>
       </div>
     </Panel>
-  );
-}
-
-function AddMaterialModal({
-  isOpen,
-  material,
-  onClose,
-  onCreated,
-  onSaved,
-}: {
-  isOpen: boolean;
-  material?: DesktopMaterial | null;
-  onClose: () => void;
-  onCreated: () => void;
-  onSaved?: (updated: DesktopMaterial) => void;
-}) {
-  const { notify } = useToast();
-  const isEditing = !!material;
-
-  const [form, formDispatch] = useReducer(formReducer, {
-    code: "",
-    description: "",
-    category: "Armamento",
-    unit: "m",
-    quantity: "0",
-    minQuantity: "0",
-    saving: false,
-  });
-
-  useEffect(() => {
-    formDispatch({ type: "RESET", payload: material ?? null });
-  }, [material]);
-
-  if (!isOpen) return null;
-
-  const handleSave = async () => {
-    const qty = Number.parseFloat(form.quantity);
-    const minQty = Number.parseFloat(form.minQuantity);
-    if (!form.code.trim() || !form.description.trim() || Number.isNaN(qty)) return;
-
-    formDispatch({ type: "SET_SAVING", payload: true });
-    try {
-      const payload = {
-        id: material?.id ?? `mat_${Date.now()}`,
-        code: form.code.trim(),
-        description: form.description.trim(),
-        category: form.category,
-        unit: form.unit,
-        quantity: qty,
-        minQuantity: minQty,
-        notes: "",
-      };
-
-      if (material) {
-        await updateDesktopMaterial(material.id, payload);
-        onSaved?.(payload);
-      } else {
-        const { createDesktopMaterial } = await import("@/lib/desktopData");
-        await createDesktopMaterial(payload);
-        onSaved?.(payload);
-      }
-
-      dispatchDataChanged();
-      onClose();
-      formDispatch({ type: "RESET" });
-      onCreated();
-      notify({
-        message: `${form.description.trim()} ${material ? "modificato" : "creato"}.`,
-        title: material ? "Materiale modificato" : "Materiale aggiunto",
-        tone: "success",
-      });
-    } catch (error) {
-      notify({
-        message: error instanceof Error ? error.message : String(error),
-        title: material ? "Modifica non riuscita" : "Creazione non riuscita",
-        tone: "danger",
-      });
-    } finally {
-      formDispatch({ type: "SET_SAVING", payload: false });
-    }
-  };
-
-  const units = ["m", "m2", "m3", "cad", "t", "kg", "set", "lt"];
-  const set = (field: FormField) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    formDispatch({ type: "SET_FIELD", field, value: e.target.value });
-
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
-        <div className="rounded-22px bg-[var(--surface-base)] p-5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-          <div className="flex items-center justify-between">
-            <h3 className="text-16px font-semibold text-[var(--text-primary)]">
-              {isEditing ? "Modifica materiale" : "Nuovo materiale"}
-            </h3>
-            <button
-              className="flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-              onClick={onClose}
-              type="button"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-
-          <div className="mt-5 grid gap-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Codice">
-                <input
-                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  onChange={set("code")}
-                  placeholder="Es. BIN-60E1"
-                  type="text"
-                  value={form.code}
-                />
-              </Field>
-              <Field label="Unità">
-                <div className="relative">
-                  <select
-                    className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                    onChange={set("unit")}
-                    value={form.unit}
-                  >
-                    {units.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                  <svg
-                    aria-hidden={true}
-                    className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                </div>
-              </Field>
-            </div>
-
-            <Field label="Descrizione">
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                onChange={set("description")}
-                placeholder="Descrizione del materiale"
-                type="text"
-                value={form.description}
-              />
-            </Field>
-
-            <Field label="Categoria">
-              <div className="relative">
-                <select
-                  className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  onChange={set("category")}
-                  value={form.category}
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  aria-hidden={true}
-                  className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </div>
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Quantità">
-                <input
-                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  min="0"
-                  onChange={set("quantity")}
-                  step="any"
-                  type="number"
-                  value={form.quantity}
-                />
-              </Field>
-              <Field label="Soglia minima">
-                <input
-                  className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-13px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  min="0"
-                  onChange={set("minQuantity")}
-                  step="any"
-                  type="number"
-                  value={form.minQuantity}
-                />
-              </Field>
-            </div>
-          </div>
-
-          <div className="mt-6 flex justify-end gap-3">
-            <Button onClick={onClose} variant="outline">
-              Annulla
-            </Button>
-            <Button
-              disabled={form.saving || !form.code.trim() || !form.description.trim()}
-              onClick={handleSave}
-              variant="primary"
-            >
-              {form.saving ? "Salvataggio..." : isEditing ? "Salva modifiche" : "Crea materiale"}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1373,15 +1047,6 @@ function DetailLine({
       <dd className={cn("text-right text-13px font-bold text-[var(--text-primary)]", className)}>
         {value}
       </dd>
-    </div>
-  );
-}
-
-function Field({ children, label }: { children: React.ReactNode; label: string }) {
-  return (
-    <div className="block">
-      <div className="mb-1.5 text-12px font-semibold text-[var(--text-secondary)]">{label}</div>
-      {children}
     </div>
   );
 }

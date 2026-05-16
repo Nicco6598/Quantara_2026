@@ -1,10 +1,10 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { m } from "framer-motion";
 import { Check, ChevronDown, Copy, Download, MoreHorizontal, Trash2 } from "lucide-react";
-import { memo, type ReactNode, useRef, useState } from "react";
+import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 import { Currency } from "@/components/shared/Currency";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/motion";
 import { InlineEdit } from "@/components/shared/InlineEdit";
 import { StatusPill } from "@/components/shared/StatusPill";
 
@@ -450,6 +450,17 @@ function GridCell({
 
 export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(lines[0]?.id ?? null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: lines.length,
+    estimateSize: (index) => {
+      const line = lines[index];
+      return expandedId === line?.id ? 280 : 48;
+    },
+    getScrollElement: () => scrollRef.current,
+    overscan: 5,
+  });
 
   if (lines.length === 0) {
     return (
@@ -475,111 +486,134 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
           <span>Stato</span>
           <span />
         </div>
-        {lines.map((line) => {
-          const expanded = expandedId === line.id;
-          return (
-            <div className="border-t border-[var(--border-subtle)]/50" key={line.id}>
-              <m.button
-                aria-expanded={expanded}
-                className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_60px_36px] items-center p-3 text-left text-13px hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                onClick={() => setExpandedId(expanded ? null : line.id)}
-                type="button"
-                transition={{ duration: 0.42, ease: SPRING_EASE }}
-              >
-                <ChevronDown
-                  className={cn(
-                    "size-4 text-[var(--accent-primary)] transition-transform",
-                    !expanded && "-rotate-90",
-                  )}
-                />
-                <span>{line.voice.tariffBookName}</span>
-                <span>{line.voice.code}</span>
-                <span className="font-semibold">{line.voice.description}</span>
-                <span>{line.voice.unit}</span>
-                <span className="font-semibold">
-                  <NumberValue value={line.quantity} />
-                </span>
-                <span className="font-semibold">
-                  <Currency value={line.grossAmount} />
-                </span>
-                <span className="font-semibold text-[var(--danger-base)]">
-                  -<Currency value={line.discountAmount} />
-                </span>
-                <span className="font-bold text-[var(--accent-primary)]">
-                  <Currency value={line.totalAmount} />
-                </span>
-                <StatusPill tone={line.status === "complete" ? "success" : "warning"}>
-                  {line.status === "complete" ? "Completa" : "Da completare"}
-                </StatusPill>
-                <MoreHorizontal className="size-5 text-[var(--text-secondary)]" />
-              </m.button>
-              {expanded ? (
-                <div className="grid gap-3 border-t border-[var(--border-subtle)] bg-[var(--bg-muted)]/20 p-3 lg:grid-cols-[1.25fr_1fr]">
-                  <NestedTable
-                    columns={["Descrizione", "U.M.", "F1", "F2", "F3", "Qtà", "Note"]}
-                    title="Misure"
+        <div ref={scrollRef} style={{ height: "600px", overflow: "auto" }}>
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const line = lines[virtualRow.index];
+              if (!line) return null;
+              const expanded = expandedId === line.id;
+              return (
+                <div
+                  className="absolute left-0 right-0 border-t border-[var(--border-subtle)]/50"
+                  data-index={virtualRow.index}
+                  key={line.id}
+                  ref={(node) => rowVirtualizer.measureElement(node)}
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <m.button
+                    aria-expanded={expanded}
+                    className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_60px_36px] items-center p-3 text-left text-13px hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    onClick={() => setExpandedId(expanded ? null : line.id)}
+                    type="button"
+                    transition={{ duration: 0.42, ease: SPRING_EASE }}
                   >
-                    {line.measurementRows.length === 0 ? (
-                      <tr>
-                        <td className="p-3 text-[var(--text-secondary)]" colSpan={7}>
-                          Nessuna misura inserita.
-                        </td>
-                      </tr>
-                    ) : (
-                      line.measurementRows.map((row) => (
-                        <tr className="border-t border-[var(--border-subtle)]/50" key={row.id}>
-                          <td className="px-3 py-2">{row.description}</td>
-                          <td className="px-3 py-2">{row.unit}</td>
-                          <td className="px-3 py-2 text-right">
-                            {row.factor1.toLocaleString("it-IT")}
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            {row.factor2.toLocaleString("it-IT")}
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            {row.factor3.toLocaleString("it-IT")}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold">
-                            {row.partialQuantity.toLocaleString("it-IT")}
-                          </td>
-                          <td className="px-3 py-2">{row.notes}</td>
-                        </tr>
-                      ))
-                    )}
-                  </NestedTable>
-                  <NestedTable
-                    columns={["Codice", "Tipo", "Base", "%", "Importo"]}
-                    title="Collegate"
-                  >
-                    {line.linkedCharges.length === 0 ? (
-                      <tr>
-                        <td className="p-3 text-[var(--text-secondary)]" colSpan={5}>
-                          Nessuna maggiorazione attiva.
-                        </td>
-                      </tr>
-                    ) : (
-                      line.linkedCharges.map((charge) => (
-                        <tr className="border-t border-[var(--border-subtle)]/50" key={charge.id}>
-                          <td className="px-3 py-2">{charge.code}</td>
-                          <td className="px-3 py-2">{charge.description}</td>
-                          <td className="px-3 py-2 text-right">
-                            <Currency value={charge.baseAmount} />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            {charge.percent.toLocaleString("it-IT")} %
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold">
-                            <Currency value={charge.total} />
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </NestedTable>
+                    <ChevronDown
+                      className={cn(
+                        "size-4 text-[var(--accent-primary)] transition-transform",
+                        !expanded && "-rotate-90",
+                      )}
+                    />
+                    <span>{line.voice.tariffBookName}</span>
+                    <span>{line.voice.code}</span>
+                    <span className="font-semibold">{line.voice.description}</span>
+                    <span>{line.voice.unit}</span>
+                    <span className="font-semibold">
+                      <NumberValue value={line.quantity} />
+                    </span>
+                    <span className="font-semibold">
+                      <Currency value={line.grossAmount} />
+                    </span>
+                    <span className="font-semibold text-[var(--danger-base)]">
+                      -<Currency value={line.discountAmount} />
+                    </span>
+                    <span className="font-bold text-[var(--accent-primary)]">
+                      <Currency value={line.totalAmount} />
+                    </span>
+                    <StatusPill tone={line.status === "complete" ? "success" : "warning"}>
+                      {line.status === "complete" ? "Completa" : "Da completare"}
+                    </StatusPill>
+                    <MoreHorizontal className="size-5 text-[var(--text-secondary)]" />
+                  </m.button>
+                  {expanded ? (
+                    <div className="grid gap-3 border-t border-[var(--border-subtle)] bg-[var(--bg-muted)]/20 p-3 lg:grid-cols-[1.25fr_1fr]">
+                      <NestedTable
+                        columns={["Descrizione", "U.M.", "F1", "F2", "F3", "Qtà", "Note"]}
+                        title="Misure"
+                      >
+                        {line.measurementRows.length === 0 ? (
+                          <tr>
+                            <td className="p-3 text-[var(--text-secondary)]" colSpan={7}>
+                              Nessuna misura inserita.
+                            </td>
+                          </tr>
+                        ) : (
+                          line.measurementRows.map((row) => (
+                            <tr className="border-t border-[var(--border-subtle)]/50" key={row.id}>
+                              <td className="px-3 py-2">{row.description}</td>
+                              <td className="px-3 py-2">{row.unit}</td>
+                              <td className="px-3 py-2 text-right">
+                                {row.factor1.toLocaleString("it-IT")}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {row.factor2.toLocaleString("it-IT")}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {row.factor3.toLocaleString("it-IT")}
+                              </td>
+                              <td className="px-3 py-2 text-right font-semibold">
+                                {row.partialQuantity.toLocaleString("it-IT")}
+                              </td>
+                              <td className="px-3 py-2">{row.notes}</td>
+                            </tr>
+                          ))
+                        )}
+                      </NestedTable>
+                      <NestedTable
+                        columns={["Codice", "Tipo", "Base", "%", "Importo"]}
+                        title="Collegate"
+                      >
+                        {line.linkedCharges.length === 0 ? (
+                          <tr>
+                            <td className="p-3 text-[var(--text-secondary)]" colSpan={5}>
+                              Nessuna maggiorazione attiva.
+                            </td>
+                          </tr>
+                        ) : (
+                          line.linkedCharges.map((charge) => (
+                            <tr
+                              className="border-t border-[var(--border-subtle)]/50"
+                              key={charge.id}
+                            >
+                              <td className="px-3 py-2">{charge.code}</td>
+                              <td className="px-3 py-2">{charge.description}</td>
+                              <td className="px-3 py-2 text-right">
+                                <Currency value={charge.baseAmount} />
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {charge.percent.toLocaleString("it-IT")} %
+                              </td>
+                              <td className="px-3 py-2 text-right font-semibold">
+                                <Currency value={charge.total} />
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </NestedTable>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -763,6 +797,15 @@ export function BreakdownDetails({
   lineViews: SalLineView[];
   economicRules: SalEconomicRules;
 }) {
+  const voiceCountByPrefix = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const line of lineViews) {
+      const prefix = line.voice.code.split(".")[0] ?? "";
+      counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+    }
+    return counts;
+  }, [lineViews]);
+
   const mgEntries = lineViews.flatMap((line) =>
     line.linkedCharges
       .filter((c) => c.code.startsWith("MG."))
@@ -771,7 +814,7 @@ export function BreakdownDetails({
         const voiceCount =
           tariffPrefix === "ALL"
             ? lineViews.filter((v) => v.linkedCharges.length === 0).length
-            : lineViews.filter((v) => v.voice.code.startsWith(`${tariffPrefix}.`)).length;
+            : (voiceCountByPrefix.get(tariffPrefix) ?? 0);
         return {
           code: c.code,
           description: c.description,

@@ -1,8 +1,9 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence, m } from "framer-motion";
 import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Dialog } from "@/components/shared/Dialog";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/motion";
 import type { DesktopTariffVoice } from "@/lib/desktopData";
 
 import { formatEuro } from "@/lib/formatters";
@@ -66,6 +67,14 @@ export function TariffVoicesExplorerModal({
   const focusedGroup = focusedGroupCode
     ? (filteredGroups.find((g) => g.code === focusedGroupCode) ?? null)
     : null;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: focusedGroup?.children.length ?? 0,
+    estimateSize: () => 52,
+    getScrollElement: () => scrollRef.current,
+    overscan: 5,
+  });
 
   return (
     <Dialog
@@ -142,7 +151,7 @@ export function TariffVoicesExplorerModal({
                   </div>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto" ref={scrollRef}>
                 <div className="min-w-[600px]">
                   <div className="sticky top-0 z-10 grid grid-cols-[1fr_60px_80px_90px] gap-3 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)] px-5 py-2.5 text-10px font-bold uppercase tracking-widest text-[var(--text-secondary)]">
                     <span>Voce</span>
@@ -150,35 +159,48 @@ export function TariffVoicesExplorerModal({
                     <span>Manod.</span>
                     <span className="text-right">Prezzo</span>
                   </div>
-                  {focusedGroup.children.map((voice, idx) => (
-                    <div
-                      className={cn(
-                        "grid grid-cols-[1fr_60px_80px_90px] gap-3 border-b border-[var(--border-subtle)]/50 px-5 py-3 text-12px transition-colors last:border-b-0 hover:bg-[var(--bg-muted)]/50",
-                        idx % 2 === 1 && "bg-[var(--bg-muted)]/20",
-                      )}
-                      key={voice.id}
-                    >
-                      <div className="min-w-0">
-                        <span className="font-bold text-[var(--text-primary)]">
-                          {voice.officialCode}
-                        </span>
-                        {voice.description ? (
-                          <span className="ml-2 text-[var(--text-secondary)]">
-                            · {voice.description}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="self-center text-[var(--text-secondary)]">
-                        {voice.unitOfMeasure || "—"}
-                      </div>
-                      <div className="self-center font-semibold text-[var(--text-primary)]">
-                        {formatPercent(voice.laborPercentage)}
-                      </div>
-                      <div className="self-center text-right font-semibold text-[var(--text-primary)]">
-                        {formatEuro(voice.unitPrice)}
-                      </div>
-                    </div>
-                  ))}
+                  <div className="relative" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+                    {virtualizer.getVirtualItems().map((virtualRow) => {
+                      const voice = focusedGroup.children[virtualRow.index];
+                      if (!voice) return null;
+                      const idx = virtualRow.index;
+                      return (
+                        <div
+                          className={cn(
+                            "absolute left-0 right-0 grid grid-cols-[1fr_60px_80px_90px] gap-3 border-b border-[var(--border-subtle)]/50 px-5 py-3 text-12px transition-colors last:border-b-0 hover:bg-[var(--bg-muted)]/50",
+                            idx % 2 === 1 && "bg-[var(--bg-muted)]/20",
+                          )}
+                          data-voice-index={idx}
+                          key={voice.id}
+                          style={{
+                            height: `${virtualRow.size}px`,
+                            top: 0,
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <div className="min-w-0">
+                            <span className="font-bold text-[var(--text-primary)]">
+                              {voice.officialCode}
+                            </span>
+                            {voice.description ? (
+                              <span className="ml-2 text-[var(--text-secondary)]">
+                                · {voice.description}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="self-center text-[var(--text-secondary)]">
+                            {voice.unitOfMeasure || "—"}
+                          </div>
+                          <div className="self-center font-semibold text-[var(--text-primary)]">
+                            {formatPercent(voice.laborPercentage)}
+                          </div>
+                          <div className="self-center text-right font-semibold text-[var(--text-primary)]">
+                            {formatEuro(voice.unitPrice)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </m.div>

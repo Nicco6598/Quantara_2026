@@ -42,7 +42,12 @@ import {
   updateDesktopContract,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { type PendingWorkflowAction, useAppStore, useNavigationState } from "@/store/app-store";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
+import {
+  type PendingWorkflowAction,
+  useAppStore,
+  useProjectsNavigationState,
+} from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { fallbackProjectTariffBook, focusOptions } from "./projects-data";
 import { mapContractToProject } from "./utils/project-mappers";
@@ -59,8 +64,8 @@ export type { PortfolioProject } from "@/features/projects/types";
 export { portfolioProjects } from "./projects-data";
 export { mapContractToProject } from "./utils/project-mappers";
 
-const contractorRegistryStorageKey = "quantara.contractorRegistry.v1";
-const projectContractorStorageKey = "quantara.projectContractors.v1";
+const contractorRegistryStorageKey = STORAGE_KEYS.contractorRegistry;
+const projectContractorStorageKey = STORAGE_KEYS.projectContractors;
 
 const ContractorModal = lazy(() =>
   import("@/features/projects/components/ContractorModal").then((m) => ({
@@ -72,7 +77,7 @@ const SalModal = lazy(() =>
 );
 export function ProjectsScreen() {
   const navigate = useNavigate();
-  const { activeContext, activeRoute, navigateBack } = useNavigationState();
+  const { activeContext, activeRoute, navigateBack } = useProjectsNavigationState();
   const { notify } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
@@ -240,7 +245,10 @@ export function ProjectsScreen() {
 
   function handleOpenProject(project: PortfolioProject) {
     try {
-      window.sessionStorage.setItem("quantara.selectedProjectDetail.v1", JSON.stringify(project));
+      window.sessionStorage.setItem(
+        SESSION_STORAGE_KEYS.selectedProjectDetail,
+        JSON.stringify(project),
+      );
     } catch {
       // Detail still opens with fallback content if storage is unavailable.
     }

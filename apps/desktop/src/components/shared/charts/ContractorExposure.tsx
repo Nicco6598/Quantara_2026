@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useChartColors } from "./useChartColors";
 import type { ContractorExposureItem } from "./chart-helpers";
 import { UplotChart } from "./UplotChart";
@@ -8,12 +9,11 @@ type ContractorExposureProps = {
 
 export function ContractorExposure({ items }: ContractorExposureProps) {
   const { colors } = useChartColors();
+  const labels = useMemo(() => items.map((i) => i.contractor), [items]);
+  const budgetData = useMemo(() => items.map((i) => i.budget), [items]);
+  const committedData = useMemo(() => items.map((i) => i.committed), [items]);
 
   if (items.length === 0) return null;
-
-  const labels = items.map((i) => i.contractor);
-  const budgetData = items.map((i) => i.budget);
-  const committedData = items.map((i) => i.committed);
 
   const data: uPlot.AlignedData = [labels.map((_, i) => i), budgetData, committedData];
 

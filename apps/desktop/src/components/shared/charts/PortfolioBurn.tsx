@@ -96,13 +96,20 @@ function buildStackedSeries(projectSeries: ProjectBurnSeries[]): {
 
   const layers: number[][] = [];
   const currentCum = projectSeries.map(() => 0);
+  const pointers = projectSeries.map(() => 0);
 
   for (const date of allDates) {
     for (let p = 0; p < projectSeries.length; p++) {
       const s = projectSeries[p];
       if (!s) continue;
-      const idx = s.dates.findLastIndex((d) => d <= date);
-      currentCum[p] = idx >= 0 ? (s.cumulative[idx] ?? 0) : 0;
+      let ptr = pointers[p] ?? 0;
+      let nextDate = s.dates[ptr + 1];
+      while (nextDate !== undefined && nextDate <= date) {
+        ptr++;
+        nextDate = s.dates[ptr + 1];
+      }
+      pointers[p] = ptr;
+      currentCum[p] = s.cumulative[ptr] ?? 0;
     }
     const row: number[] = [];
     let running = 0;

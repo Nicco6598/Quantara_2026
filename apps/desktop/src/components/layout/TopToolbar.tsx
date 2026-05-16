@@ -1,44 +1,33 @@
 import {
   ArrowRight,
   Bell,
-  Briefcase,
   CaretDown,
   CaretLeft,
   CaretRight,
   CheckCircle,
-  FileText,
   FloppyDisk,
-  Plus,
   PlusCircle,
   Trash,
-  UploadSimple,
 } from "@phosphor-icons/react";
 import { AnimatePresence, m } from "framer-motion";
-import { useRef, useState, useSyncExternalStore } from "react";
-import { MOTION_DURATION, SPRING_EASE } from "@/components/shared/easings";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { MOTION_DURATION, SPRING_EASE } from "@/motion";
 import { cn } from "@/lib/utils";
-import { type QuantaraRoute, useNavigationState, usePreferenceState } from "@/store/app-store";
-
-type RouteMeta = {
-  dateLabel: string;
-  title: string;
-};
-
-type PageAction = {
-  actionId: string;
-  hasDropdown?: boolean;
-  label: string;
-  mark: string;
-  menuItems?: PageActionMenuItem[];
-  variant: "outline" | "primary";
-};
-
-type PageActionMenuItem = {
-  actionId: string;
-  description: string;
-  label: string;
-  mark: string;
-};
+import {
+  useActiveRouteState,
+  useHistoryNavigationState,
+  useProjectToolbarState,
+  useSalCurrentStep,
+  useSalToolbarState,
+  useTariffImportToolbarState,
+} from "@/store/app-store";
+import {
+  commonPageActions,
+  markIconMap,
+  type PageAction,
+  routeActionOverrides,
+  routeMetaMap,
+} from "./top-toolbar-config";
 
 function formatToolbarMoney(value: number): string {
   return value.toLocaleString("it-IT", {
@@ -47,62 +36,6 @@ function formatToolbarMoney(value: number): string {
     style: "currency",
   });
 }
-
-const routeMetaMap: Record<QuantaraRoute, RouteMeta> = {
-  accounting: { dateLabel: "", title: "Contabilità" },
-  dashboard: { dateLabel: "", title: "Panoramica operativa" },
-  materials: { dateLabel: "", title: "Materiali" },
-  "project-detail": { dateLabel: "", title: "Dettaglio progetto" },
-  "project-create": { dateLabel: "", title: "Nuovo progetto" },
-  projects: { dateLabel: "", title: "Progetti" },
-  "sal-create": { dateLabel: "", title: "Nuova SAL" },
-  settings: { dateLabel: "", title: "Impostazioni" },
-  tariffs: { dateLabel: "", title: "Tariffario" },
-  team: { dateLabel: "", title: "Team" },
-};
-
-const createMenuItems: PageActionMenuItem[] = [
-  {
-    actionId: "new-project",
-    description: "Crea contratto, importo e tariffario principale",
-    label: "Progetto",
-    mark: "PR",
-  },
-  {
-    actionId: "new-sal",
-    description: "Apri la creazione guidata di uno stato avanzamento",
-    label: "SAL",
-    mark: "+",
-  },
-  {
-    actionId: "import-tariff",
-    description: "Importa o prepara un tariffario da PDF",
-    label: "Tariffario",
-    mark: "TF",
-  },
-];
-
-const commonPageActions: PageAction[] = [
-  {
-    actionId: "new",
-    hasDropdown: true,
-    label: "Nuovo",
-    mark: "+",
-    menuItems: createMenuItems,
-    variant: "primary",
-  },
-];
-
-const routeActionOverrides: Partial<Record<QuantaraRoute, PageAction[]>> = {
-  tariffs: [{ actionId: "import-tariff", label: "Importa", mark: "UP", variant: "primary" }],
-};
-
-const markIconMap: Record<string, React.ElementType> = {
-  "+": Plus,
-  PR: Briefcase,
-  TF: FileText,
-  UP: UploadSimple,
-};
 
 function ActionMarkIcon({ mark, size = 12 }: { mark: string; size?: number }) {
   const Icon = markIconMap[mark];
@@ -119,10 +52,10 @@ type TopToolbarProps = {
 };
 
 export function TopToolbar({ onPageAction }: TopToolbarProps) {
-  const { activeRoute, tariffImportToolbar } = useNavigationState();
+  const { activeRoute, tariffImportPhase } = useActiveRouteState();
   const meta = routeMetaMap[activeRoute];
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
-  const isTariffPreview = activeRoute === "tariffs" && tariffImportToolbar.phase === "preview";
+  const isTariffPreview = activeRoute === "tariffs" && tariffImportPhase === "preview";
   const isMac = useSyncExternalStore(
     () => () => {},
     () => /Mac OS X|Macintosh/.test(navigator.userAgent),
@@ -170,7 +103,7 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
 }
 
 function TariffImportControls({ onAction }: { onAction: (actionId: string) => void }) {
-  const { tariffImportToolbar } = useNavigationState();
+  const tariffImportToolbar = useTariffImportToolbarState();
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const fileCount = tariffImportToolbar.fileLabels.length;
   const activeLabel = tariffImportToolbar.fileLabels[tariffImportToolbar.activeIndex];
@@ -388,7 +321,7 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
 }
 
 function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void }) {
-  const { salToolbar } = useNavigationState();
+  const salToolbar = useSalToolbarState();
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -432,7 +365,7 @@ function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void
 }
 
 function ProjectToolbarControls({ onAction }: { onAction: (actionId: string) => void }) {
-  const { projectToolbar } = useNavigationState();
+  const projectToolbar = useProjectToolbarState();
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -555,7 +488,7 @@ function ToolbarMetric({
 }
 
 function SalStepNav({ onAction }: { onAction?: (actionId: string) => void }) {
-  const { salCurrentStep } = usePreferenceState();
+  const salCurrentStep = useSalCurrentStep();
 
   const steps = [
     { label: "Impostazioni", icon: "01", actionId: "sal-goto-step-1" },
@@ -617,7 +550,7 @@ function HistoryNavigator() {
     navigateToHistoryIndex,
     routeHistory,
     routeHistoryIndex,
-  } = useNavigationState();
+  } = useHistoryNavigationState();
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleHistory = routeHistory
@@ -638,6 +571,16 @@ function HistoryNavigator() {
       longPressRef.current = null;
     }
   }
+
+  useEffect(
+    () => () => {
+      if (longPressRef.current) {
+        clearTimeout(longPressRef.current);
+        longPressRef.current = null;
+      }
+    },
+    [],
+  );
 
   return (
     <div className="animate-entry-sm top-toolbar-history-wrap">

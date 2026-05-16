@@ -1,7 +1,7 @@
 import { m } from "framer-motion";
 import { BookOpen, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { SPRING_EASE } from "@/components/shared/easings";
+import { SPRING_EASE } from "@/motion";
 import { type SalTemplate, useTemplateStore } from "@/store/template-store";
 
 type TemplatePickerProps = {

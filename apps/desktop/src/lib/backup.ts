@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { BACKUP_STORAGE_KEYS } from "@/persistence";
 
 export type DatabaseInfo = {
   dataDirectory: string;
@@ -7,20 +8,6 @@ export type DatabaseInfo = {
   exists: boolean;
   sizeBytes: number;
 };
-
-// All Zustand persist keys + app-specific storage keys
-const STORAGE_KEYS = [
-  "quantara-shell-preferences",
-  "quantara-sal-workflow",
-  "quantara-sal-templates-v1",
-  "quantara-audit-log-v1",
-  "quantara.tariffs.favoriteBookIds",
-  "quantara.salCreationDraft.v1",
-  "quantara.projectDraft.v2",
-  "quantara.projectContractors.v1",
-  "quantara.contractorRegistry.v1",
-  "quantara.preview.contracts.v1",
-];
 
 export async function getDatabaseInfo(): Promise<DatabaseInfo> {
   return invoke<DatabaseInfo>("get_database_info");
@@ -35,7 +22,7 @@ export async function backupDatabase(): Promise<string> {
 
   // Collect all localStorage data
   const lsData: Record<string, string | null> = {};
-  for (const key of STORAGE_KEYS) {
+  for (const key of BACKUP_STORAGE_KEYS) {
     try {
       lsData[key] = localStorage.getItem(key);
     } catch {
@@ -63,7 +50,9 @@ export async function restoreDatabase(): Promise<string> {
   try {
     const lsData: Record<string, string | null> = JSON.parse(result);
     for (const [key, value] of Object.entries(lsData)) {
-      if (value !== null) {
+      if (value === null) {
+        localStorage.removeItem(key);
+      } else {
         localStorage.setItem(key, value);
       }
     }

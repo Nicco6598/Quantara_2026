@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createId } from "@/features/sal/domain/sal-workflow";
+import { STORAGE_KEYS } from "@/persistence";
 import type { SalEconomicRules } from "@/features/sal/types";
 
 type TemplateVoiceEntry = {
@@ -62,7 +63,7 @@ export const useTemplateStore = create<TemplateStore>()(
       listTemplates: () => get().templates,
     }),
     {
-      name: "quantara-sal-templates-v1",
+      name: STORAGE_KEYS.salTemplates,
       storage: createJSONStorage(() => localStorage),
     },
   ),

@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::infrastructure::{
     contract_repository::{ContractRecord, CreateContractRequest, UpdateContractRequest},
-    local_storage::{with_db, with_db_mut, DbConnection},
+    local_storage::{DbConnection, with_db, with_db_mut},
 };
 
 #[tauri::command]
@@ -44,10 +44,7 @@ pub fn update_contract(
 }
 
 #[tauri::command]
-pub fn delete_contract(
-    state: State<'_, DbConnection>,
-    contract_id: String,
-) -> Result<(), String> {
+pub fn delete_contract(state: State<'_, DbConnection>, contract_id: String) -> Result<(), String> {
     with_db_mut(&state, |conn| {
         crate::infrastructure::contract_repository::delete_contract(conn, &contract_id)
     })

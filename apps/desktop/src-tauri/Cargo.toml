@@ -1,6 +1,6 @@
 [package]
 name = "quantara_desktop"
-version = "0.3.1"
+version = "0.3.2"
 description = "Quantara desktop shell"
 authors = ["Quantara"]
 edition = "2024"

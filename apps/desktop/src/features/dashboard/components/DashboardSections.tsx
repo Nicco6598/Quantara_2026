@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { ModernDonut, SegmentBars } from "@/components/shared/LegacyCharts";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/motion";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { PortfolioProject } from "@/features/projects/types";
@@ -41,14 +41,14 @@ export function PriorityActions({ items }: { items: PortfolioProject[] }) {
   return (
     <BezelSurface innerClassName="p-4">
       <div className="space-y-3">
-        {items.slice(0, 4).map((project) => (
+        {items.slice(0, 4).map((project, index) => (
           <m.div
             className="flex items-start gap-3 rounded-18px p-3 transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--bg-muted)]"
             initial={MOTION_VARIANTS.listItem.initial}
             key={project.id}
             transition={{
               ...MOTION_VARIANTS.listItem.transition,
-              delay: Math.min(0.12, items.indexOf(project) * 0.03),
+              delay: Math.min(0.12, index * 0.03),
             }}
             viewport={MOTION_VARIANTS.row.viewport}
             whileInView={MOTION_VARIANTS.listItem.animate}
@@ -103,15 +103,19 @@ export function TimelineGantt({
   onDelete: (projectId: string) => void;
 }) {
   const today = new Date();
-  const allDates = bars.flatMap((bar) => [bar.startDate, bar.endDate, today]);
-  const minDate =
-    allDates.length > 0
-      ? startOfMonth(new Date(Math.min(...allDates.map((d) => d.getTime()))))
-      : today;
-  const maxDate =
-    allDates.length > 0
-      ? endOfMonth(new Date(Math.max(...allDates.map((d) => d.getTime()))))
-      : today;
+  let minTime = Infinity;
+  let maxTime = -Infinity;
+  for (const bar of bars) {
+    const s = bar.startDate.getTime();
+    const e = bar.endDate.getTime();
+    if (s < minTime) minTime = s;
+    if (e > maxTime) maxTime = e;
+  }
+  const todayTime = today.getTime();
+  if (todayTime < minTime) minTime = todayTime;
+  if (todayTime > maxTime) maxTime = todayTime;
+  const minDate = bars.length > 0 ? startOfMonth(new Date(minTime)) : today;
+  const maxDate = bars.length > 0 ? endOfMonth(new Date(maxTime)) : today;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);

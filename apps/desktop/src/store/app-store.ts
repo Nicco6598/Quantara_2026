@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
+import { STORAGE_KEYS } from "@/persistence";
 
 export type QuantaraRoute =
   | "dashboard"
@@ -249,6 +250,11 @@ export const useAppStore = create<AppStore>()(
           const nextHistory = state.routeHistory.slice(0, state.routeHistoryIndex + 1);
           nextHistory.push(context !== undefined ? { route, context } : { route });
 
+          const MAX_HISTORY = 100;
+          if (nextHistory.length > MAX_HISTORY) {
+            nextHistory.splice(0, nextHistory.length - MAX_HISTORY);
+          }
+
           return {
             ...createNavigationState(nextHistory, nextHistory.length - 1),
           };
@@ -334,7 +340,8 @@ export const useAppStore = create<AppStore>()(
         }),
     }),
     {
-      name: "quantara-shell-preferences",
+      name: STORAGE_KEYS.shellPreferences,
+      version: 1,
       onRehydrateStorage: () => (state) => {
         state?.setHasHydratedPreferences(true);
       },
@@ -408,6 +415,72 @@ export function useThemeState() {
       darkThemePref: state.darkThemePref,
       setLightThemePref: state.setLightThemePref,
       setDarkThemePref: state.setDarkThemePref,
+    })),
+  );
+}
+
+export function useActiveRouteState() {
+  return useAppStore(
+    useShallow((state) => ({
+      activeRoute: state.activeRoute,
+      tariffImportPhase: state.tariffImportToolbar.phase,
+    })),
+  );
+}
+
+export function useTariffImportToolbarState() {
+  return useAppStore((state) => state.tariffImportToolbar);
+}
+
+export function useSalToolbarState() {
+  return useAppStore((state) => state.salToolbar);
+}
+
+export function useProjectToolbarState() {
+  return useAppStore((state) => state.projectToolbar);
+}
+
+export function useSalCurrentStep() {
+  return useAppStore((state) => state.salCurrentStep);
+}
+
+export function useHistoryNavigationState() {
+  return useAppStore(
+    useShallow((state) => ({
+      canGoBack: state.canGoBack,
+      canGoForward: state.canGoForward,
+      navigateBack: state.navigateBack,
+      navigateForward: state.navigateForward,
+      navigateToHistoryIndex: state.navigateToHistoryIndex,
+      routeHistory: state.routeHistory,
+      routeHistoryIndex: state.routeHistoryIndex,
+    })),
+  );
+}
+
+export function useAppShellNavigationState() {
+  return useAppStore(
+    useShallow((state) => ({
+      activeRoute: state.activeRoute,
+      canGoBack: state.canGoBack,
+      canGoForward: state.canGoForward,
+      navigateBack: state.navigateBack,
+      navigateForward: state.navigateForward,
+      pendingWorkflowAction: state.pendingWorkflowAction,
+    })),
+  );
+}
+
+export function useActiveContext() {
+  return useAppStore((state) => state.activeContext);
+}
+
+export function useProjectsNavigationState() {
+  return useAppStore(
+    useShallow((state) => ({
+      activeContext: state.activeContext,
+      activeRoute: state.activeRoute,
+      navigateBack: state.navigateBack,
     })),
   );
 }

@@ -1,9 +1,9 @@
-import { m } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { MOTION_DURATION, MOTION_VARIANTS, SPRING_EASE } from "@/components/shared/easings";
 import { cn } from "@/lib/utils";
+import { motionDuration, motionEase, motionVariants } from "@/motion";
 
 const MENU_WIDTH = 224;
 
@@ -31,7 +31,7 @@ export function DropdownItem({
         onClick();
       }}
       type="button"
-      transition={{ duration: MOTION_DURATION.base, ease: SPRING_EASE }}
+      transition={{ duration: motionDuration.base, ease: motionEase.emphasized }}
     >
       <span
         className={cn(
@@ -76,26 +76,31 @@ export function DropdownMenu({
     }
   }, [isOpen, triggerRef]);
 
-  if (!isOpen || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
 
   return createPortal(
-    <>
-      <button
-        aria-label="Chiudi menu"
-        className="fixed inset-0 z-[var(--z-dropdown-portal)] cursor-default"
-        onClick={onClose}
-        type="button"
-      />
-      <m.div
-        className="fixed z-[var(--z-dropdown-portal)] w-56 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]"
-        initial={MOTION_VARIANTS.popover.initial}
-        animate={MOTION_VARIANTS.popover.animate}
-        style={{ left: position.left, top: position.top }}
-        transition={MOTION_VARIANTS.popover.transition}
-      >
-        {children}
-      </m.div>
-    </>,
+    <AnimatePresence>
+      {isOpen ? (
+        <>
+          <button
+            aria-label="Chiudi menu"
+            className="fixed inset-0 z-[var(--z-dropdown-portal)] cursor-default"
+            onClick={onClose}
+            type="button"
+          />
+          <m.div
+            animate={motionVariants.popover.animate}
+            className="fixed z-[var(--z-dropdown-portal)] w-56 overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]"
+            exit={motionVariants.popover.exit}
+            initial={motionVariants.popover.initial}
+            style={{ left: position.left, top: position.top }}
+            transition={motionVariants.popover.transition}
+          >
+            {children}
+          </m.div>
+        </>
+      ) : null}
+    </AnimatePresence>,
     document.body,
   );
 }

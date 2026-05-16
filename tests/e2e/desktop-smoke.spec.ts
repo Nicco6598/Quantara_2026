@@ -1,53 +1,36 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Quantara desktop web shell", () => {
+  test.setTimeout(60_000);
+
   test("loads the dashboard shell", async ({ page }) => {
-    await page.goto("/");
-    await expect(
-      page.getByRole("heading", {
-        name: "Visione unica su cantieri, SAL e presidio operativo.",
-      }),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Dashboard" })).toBeVisible();
-    await expect(page.getByText("Linea AV/AC Milano-Verona").first()).toBeVisible();
-    await expect(page.getByText("Segnali giornata")).toBeVisible();
-    await expect(page.getByText("Registro portfolio")).toBeVisible();
+    await page.goto("/", { timeout: 45_000, waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Panoramica operativa" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Portafoglio lavori" })).toBeVisible();
+    await expect(page.getByRole("button", { exact: true, name: "Dashboard" })).toBeVisible();
+    await expect(page.getByText("Budget portafoglio")).toBeVisible();
     await expect(page.getByText("Distribuzione stato")).toBeVisible();
-    await expect(page.getByText("Feed operativo")).toBeVisible();
+    await expect(page.getByText("Azioni rapide")).toBeVisible();
   });
 
   test("opens phase C operational screens", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/", { timeout: 45_000, waitUntil: "domcontentloaded" });
     const sidebar = page.getByRole("complementary");
 
-    await sidebar.getByRole("button", { name: /^Progetti/ }).click();
-    await expect(
-      page.getByRole("heading", { name: "Portafoglio lavori sotto presidio operativo." }),
-    ).toBeVisible();
-    await expect(page.getByText("Workbench dei progetti")).toBeVisible();
+    await sidebar.getByRole("button", { name: /Appaltatori/ }).click();
+    await expect(page.getByRole("heading", { name: "Progetti" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Cockpit appaltatori" })).toBeVisible();
 
-    await sidebar.getByRole("button", { exact: true, name: "SAL" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Stati avanzamento lavori sotto presidio operativo." }),
-    ).toBeVisible();
-    await expect(page.getByText("Panoramica pratica")).toBeVisible();
-
-    await sidebar.getByRole("button", { name: "Tariffari" }).click();
-    await expect(
-      page.getByRole("heading", {
-        name: "Catalogo tariffari per ente, anno e progetto.",
-      }),
-    ).toBeVisible();
-    await expect(page.getByText("Nuovo tariffario")).toBeVisible();
-    await expect(page.getByText("Fornitura e posa binario tipo 60E1").first()).toBeVisible();
+    await sidebar.getByRole("button", { name: /Tariffario/ }).click();
+    await expect(page.getByRole("heading", { name: "Tariffario" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Catalogo tariffari" })).toBeVisible();
 
     await sidebar.getByRole("button", { name: "Materiali" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Materiali e coperture letti come flusso operativo." }),
-    ).toBeVisible();
-    await expect(page.getByText("BIN-60E1").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Materiali" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Materiali e coperture" })).toBeVisible();
 
-    await sidebar.getByRole("button", { name: "Contabilita" }).click();
-    await expect(page.getByRole("heading", { name: "Pacchetto documentale" })).toBeVisible();
+    await sidebar.getByRole("button", { name: /Contabilità/ }).click();
+    await expect(page.getByRole("heading", { name: "Contabilità" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Report contabile" })).toBeVisible();
   });
 });

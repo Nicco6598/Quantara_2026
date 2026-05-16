@@ -130,26 +130,31 @@ pub fn create_material(
 }
 
 pub fn update_material(
-    connection: &Connection,
+    connection: &mut Connection,
     material_id: &str,
     request: UpdateMaterialRequest,
 ) -> Result<MaterialRecord, AppError> {
-    connection
-        .execute(
-            "UPDATE materials SET code = ?1, description = ?2, category = ?3, unit = ?4,
-             min_quantity = ?5, notes = ?6, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?7",
-            rusqlite::params![
-                request.code,
-                request.description,
-                request.category,
-                request.unit,
-                request.min_quantity,
-                request.notes,
-                material_id,
-            ],
-        )
+    let tx = connection
+        .transaction()
         .map_err(|e| AppError::Database(e.to_string()))?;
+
+    tx.execute(
+        "UPDATE materials SET code = ?1, description = ?2, category = ?3, unit = ?4,
+         min_quantity = ?5, notes = ?6, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?7",
+        rusqlite::params![
+            request.code,
+            request.description,
+            request.category,
+            request.unit,
+            request.min_quantity,
+            request.notes,
+            material_id,
+        ],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+
+    tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
 
     get_material(connection, material_id)?.ok_or(AppError::Database(
         "Materiale non trovato dopo aggiornamento".to_string(),
@@ -259,6 +264,13 @@ pub fn deduct_materials(
 
     let mut updated = Vec::new();
 
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let base_ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let mut counter: u64 = 0;
+
     for (material_id, quantity, reference_id) in deductions {
         let material = get_material(&tx, material_id)?.ok_or(AppError::Database(format!(
             "Materiale non trovato: {}",
@@ -274,12 +286,8 @@ pub fn deduct_materials(
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let tx_id = format!("sal_{}_{}", material_id, ts);
+        let tx_id = format!("sal_{}_{}_{}", material_id, base_ts, counter);
+        counter += 1;
         tx.execute(
             "INSERT INTO material_transactions (id, material_id, quantity_change, quantity_after, transaction_type, reference_id, description)
              VALUES (?1, ?2, ?3, ?4, 'sal_deduction', ?5, 'Impegno da SAL')",

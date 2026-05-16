@@ -8,6 +8,7 @@ type CacheEntry<T> = {
 
 const cache = new Map<string, CacheEntry<unknown>>();
 const DEFAULT_TTL_MS = 5000;
+const MAX_CACHE_ENTRIES = 50;
 
 export function cachedFetch<T>(
   key: string,
@@ -19,28 +20,42 @@ export function cachedFetch<T>(
     return Promise.resolve(existing.data as T);
   }
 
-  const promise = fetchFn().then((data) => {
-    cache.set(key, { data, expiresAt: Date.now() + ttlMs, key });
-    return data;
-  });
+  const promise = fetchFn()
+    .then((data) => {
+      cache.set(key, { data, expiresAt: Date.now() + ttlMs, key });
+      return data;
+    })
+    .catch((error) => {
+      cache.delete(key);
+      throw error;
+    });
+
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const first = cache.keys().next().value;
+    if (first) cache.delete(first);
+  }
 
   cache.set(key, { data: promise, expiresAt: Date.now() + ttlMs, key } as never);
   return promise;
 }
 
 function invalidateCache(pattern?: string) {
-  if (!pattern) {
-    cache.clear();
-    return;
-  }
-  for (const key of cache.keys()) {
-    if (key.includes(pattern)) {
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (!pattern || key.includes(pattern)) {
+      cache.delete(key);
+    } else if (now >= entry.expiresAt) {
       cache.delete(key);
     }
   }
 }
 
-// Auto-invalidate cache when data changes
-if (typeof window !== "undefined") {
+const cacheListenerFlag = "__quantaraFetchCacheListenerInstalled";
+
+if (
+  typeof window !== "undefined" &&
+  !(window as unknown as Record<string, boolean>)[cacheListenerFlag]
+) {
+  (window as unknown as Record<string, boolean>)[cacheListenerFlag] = true;
   window.addEventListener(DATA_CHANGED_EVENT, () => invalidateCache());
 }

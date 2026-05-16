@@ -1,3 +1,4 @@
+import { readJsonFromStorage, STORAGE_KEYS, writeJsonToStorage } from "@/persistence";
 import type { SalEconomicRules, SalLineDraft, SalVoiceDraft } from "../types";
 import type { SalDocument } from "./sal-workflow";
 
@@ -13,17 +14,20 @@ type SalCreationDraft = {
   selectedTariffBookIds: string[];
 };
 
-const SAL_DRAFT_STORAGE_KEY = "quantara.salCreationDraft.v1";
+const SAL_DRAFT_STORAGE_KEY = STORAGE_KEYS.salCreationDraft;
 
 type StoredSalDraft = Omit<SalCreationDraft, "projectId">;
 
 export function saveSalCreationDraft(projectId: string, data: StoredSalDraft) {
   try {
-    const existing: Record<string, StoredSalDraft> = JSON.parse(
-      localStorage.getItem(SAL_DRAFT_STORAGE_KEY) ?? "{}",
+    const existing = readJsonFromStorage<Record<string, StoredSalDraft>>(
+      localStorage,
+      SAL_DRAFT_STORAGE_KEY,
+      {},
+      isDraftRecord,
     );
     existing[projectId] = data;
-    localStorage.setItem(SAL_DRAFT_STORAGE_KEY, JSON.stringify(existing));
+    writeJsonToStorage(localStorage, SAL_DRAFT_STORAGE_KEY, existing);
   } catch {
     /* no-op */
   }
@@ -35,8 +39,11 @@ export function saveSalCreationDraftBySalId(salId: string, data: StoredSalDraft)
 
 export function loadSalCreationDraft(projectId: string): StoredSalDraft | null {
   try {
-    const all: Record<string, StoredSalDraft> = JSON.parse(
-      localStorage.getItem(SAL_DRAFT_STORAGE_KEY) ?? "{}",
+    const all = readJsonFromStorage<Record<string, StoredSalDraft>>(
+      localStorage,
+      SAL_DRAFT_STORAGE_KEY,
+      {},
+      isDraftRecord,
     );
     return all[projectId] ?? null;
   } catch {
@@ -50,14 +57,21 @@ export function loadSalCreationDraftBySalId(salId: string): StoredSalDraft | nul
 
 export function clearSalCreationDraft(projectId: string) {
   try {
-    const all: Record<string, StoredSalDraft> = JSON.parse(
-      localStorage.getItem(SAL_DRAFT_STORAGE_KEY) ?? "{}",
+    const all = readJsonFromStorage<Record<string, StoredSalDraft>>(
+      localStorage,
+      SAL_DRAFT_STORAGE_KEY,
+      {},
+      isDraftRecord,
     );
     delete all[projectId];
-    localStorage.setItem(SAL_DRAFT_STORAGE_KEY, JSON.stringify(all));
+    writeJsonToStorage(localStorage, SAL_DRAFT_STORAGE_KEY, all);
   } catch {
     /* no-op */
   }
+}
+
+function isDraftRecord(value: unknown): value is Record<string, StoredSalDraft> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 export function clearSalCreationDraftBySalId(salId: string) {

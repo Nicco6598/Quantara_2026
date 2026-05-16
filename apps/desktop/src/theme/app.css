@@ -927,18 +927,12 @@ body {
 }
 
 .sidebar-rail {
-  background: color-mix(in srgb, var(--surface-base) 46%, transparent);
+  background: color-mix(in srgb, var(--bg-app-accent) 72%, transparent);
   backdrop-filter: blur(22px) saturate(1.08);
 }
 
 .sidebar-rail::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 0 auto;
-  width: 1px;
-  pointer-events: none;
-  background: color-mix(in srgb, var(--border-subtle) 54%, transparent);
-  box-shadow: none;
+  display: none;
 }
 
 .app-aura::before,

@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::infrastructure::{
-    local_storage::{with_db, with_db_mut, DbConnection},
+    local_storage::{DbConnection, with_db, with_db_mut},
     material_repository::{
         self, CreateMaterialRequest, MaterialRecord, MaterialTransactionRecord,
         UpdateMaterialRequest,
@@ -29,16 +29,13 @@ pub fn update_material(
     material_id: String,
     request: UpdateMaterialRequest,
 ) -> Result<MaterialRecord, String> {
-    with_db(&state, |conn| {
+    with_db_mut(&state, |conn| {
         material_repository::update_material(conn, &material_id, request)
     })
 }
 
 #[tauri::command]
-pub fn delete_material(
-    state: State<'_, DbConnection>,
-    material_id: String,
-) -> Result<(), String> {
+pub fn delete_material(state: State<'_, DbConnection>, material_id: String) -> Result<(), String> {
     with_db_mut(&state, |conn| {
         material_repository::delete_material(conn, &material_id)
     })

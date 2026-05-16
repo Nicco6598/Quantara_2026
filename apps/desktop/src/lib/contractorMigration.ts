@@ -1,9 +1,10 @@
 import { listDesktopContracts, updateDesktopContract } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { STORAGE_KEYS } from "@/persistence";
 
-const contractorMigrationStorageKey = "quantara.contractorsDbMigration.v1";
-const legacyProjectContractorStorageKey = "quantara.projectContractors.v1";
+const contractorMigrationStorageKey = STORAGE_KEYS.contractorMigrationDone;
+const legacyProjectContractorStorageKey = STORAGE_KEYS.projectContractors;
 
 let migrationPromise: Promise<void> | null = null;
 

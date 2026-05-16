@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { readJsonFromStorage, STORAGE_KEYS, writeJsonToStorage } from "@/persistence";
 
-const STORAGE_KEY = "quantara.pending-release-notes";
+const STORAGE_KEY = STORAGE_KEYS.releaseNotesAfterUpdate;
 
 export type PendingReleaseNotes = {
   body: string;
@@ -11,7 +12,7 @@ export type PendingReleaseNotes = {
 
 export function storePendingReleaseNotes(notes: PendingReleaseNotes) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+    writeJsonToStorage(window.localStorage, STORAGE_KEY, notes);
   } catch {
     /* no-op */
   }
@@ -27,11 +28,26 @@ function clearPendingReleaseNotes() {
 
 function readPendingReleaseNotes(): PendingReleaseNotes | null {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PendingReleaseNotes) : null;
+    return readJsonFromStorage<PendingReleaseNotes | null>(
+      window.localStorage,
+      STORAGE_KEY,
+      null,
+      isPendingReleaseNotes,
+    );
   } catch {
     return null;
   }
+}
+
+function isPendingReleaseNotes(value: unknown): value is PendingReleaseNotes {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as PendingReleaseNotes).body === "string" &&
+    typeof (value as PendingReleaseNotes).currentVersion === "string" &&
+    typeof (value as PendingReleaseNotes).installedAt === "string" &&
+    typeof (value as PendingReleaseNotes).version === "string"
+  );
 }
 
 export function usePendingReleaseNotes() {

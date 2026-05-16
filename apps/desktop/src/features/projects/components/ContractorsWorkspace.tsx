@@ -21,7 +21,7 @@ import {
 import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/motion";
 import { MetricCard } from "@/components/shared/MetricCard";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";

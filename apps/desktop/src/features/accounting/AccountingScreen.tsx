@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClearFiltersButton,
   FilterDateInput,
@@ -28,6 +28,7 @@ import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { listDesktopContracts, restoreMaterialsFromSalUsage } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
 import { dispatchDataChanged } from "@/lib/sync-events";
@@ -39,7 +40,6 @@ const STATUS_OPTIONS = ["Tutti", "Bozza", "In revisione", "Approvata", "Chiuso"]
 
 export function AccountingScreen() {
   const { notify } = useToast();
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [contracts, setContracts] = useState<
     { id: string; budget: { amount: number }; title: string; contractor: string }[]
   >([]);
@@ -81,17 +81,7 @@ export function AccountingScreen() {
     return cleanup;
   }, [loadContracts]);
 
-  useEffect(() => {
-    const handleChange = () => {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(loadContracts, 150);
-    };
-    window.addEventListener("quantara:data-changed", handleChange);
-    return () => {
-      window.removeEventListener("quantara:data-changed", handleChange);
-      clearTimeout(debounceRef.current);
-    };
-  }, [loadContracts]);
+  useDataChangedListener(loadContracts);
 
   const salViews = useMemo(
     () => salDocuments.map((doc) => buildSalDocumentView(doc, tariffVoices)),

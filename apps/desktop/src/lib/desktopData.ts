@@ -11,6 +11,8 @@ import type {
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
 import { invokeWithFallback, isTauriRuntime } from "./tauri-wrapper";
+import { STORAGE_KEYS, writeJsonToStorage } from "@/persistence";
+import { dispatchDataChanged } from "@/lib/sync-events";
 
 export type DesktopContract = DesktopContractRecord;
 export type CreateDesktopContractRequest = CreateDesktopContractRecordRequest;
@@ -28,7 +30,8 @@ import type { DesktopDataResult } from "./tauri-wrapper";
 export type { DesktopDataResult };
 
 const tariffVoiceCache = new Map<string, DesktopTariffVoiceRecord[]>();
-const previewContractsStorageKey = "quantara.preview.contracts.v1";
+const previewContractsStorageKey = STORAGE_KEYS.previewContracts;
+const PREVIEW_TTL_MS = 3_600_000; // 1 hour
 
 type InflightKey =
   | "contracts"
@@ -124,12 +127,17 @@ export async function deleteDesktopContract(contractId: string): Promise<void> {
 
 function readPreviewContracts(fallback: DesktopContract[]): DesktopContract[] {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(previewContractsStorageKey) ?? "[]");
-    if (!Array.isArray(parsed)) {
+    const raw = window.localStorage.getItem(previewContractsStorageKey);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    const wrapped = Array.isArray(parsed) ? parsed : parsed.data;
+    if (!Array.isArray(wrapped)) return fallback;
+    const cachedAt = parsed._cachedAt ?? 0;
+    if (Date.now() - cachedAt > PREVIEW_TTL_MS) {
+      window.localStorage.removeItem(previewContractsStorageKey);
       return fallback;
     }
-
-    const contracts = parsed.filter(isDesktopContract);
+    const contracts = wrapped.filter(isDesktopContract);
     return contracts.length > 0 ? contracts : fallback;
   } catch {
     return fallback;
@@ -138,7 +146,10 @@ function readPreviewContracts(fallback: DesktopContract[]): DesktopContract[] {
 
 function writePreviewContracts(contracts: DesktopContract[]): void {
   try {
-    window.localStorage.setItem(previewContractsStorageKey, JSON.stringify(contracts));
+    writeJsonToStorage(window.localStorage, previewContractsStorageKey, {
+      _cachedAt: Date.now(),
+      data: contracts,
+    });
   } catch {
     // Browser preview persistence is best-effort.
   }
@@ -404,27 +415,50 @@ export type CreateDesktopMaterialRequest = {
   notes: string;
 };
 
-const previewMaterialsStorageKey = "quantara.preview.materials.v1";
+const previewMaterialsStorageKey = STORAGE_KEYS.previewMaterials;
 
 function readPreviewMaterials(fallback: DesktopMaterial[]): DesktopMaterial[] {
   try {
-    const stored = localStorage.getItem(previewMaterialsStorageKey);
-    if (stored) {
-      const parsed = JSON.parse(stored) as DesktopMaterial[];
-      return parsed;
+    const raw = localStorage.getItem(previewMaterialsStorageKey);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    const wrapped = Array.isArray(parsed) ? parsed : parsed.data;
+    if (!Array.isArray(wrapped)) return fallback;
+    const cachedAt = parsed._cachedAt ?? 0;
+    if (Date.now() - cachedAt > PREVIEW_TTL_MS) {
+      localStorage.removeItem(previewMaterialsStorageKey);
+      return fallback;
     }
+    return isDesktopMaterialArray(wrapped) ? wrapped : fallback;
   } catch {
-    /* no-op */
+    return fallback;
   }
-  return fallback;
 }
 
 function writePreviewMaterials(materials: DesktopMaterial[]) {
   try {
-    localStorage.setItem(previewMaterialsStorageKey, JSON.stringify(materials));
+    writeJsonToStorage(localStorage, previewMaterialsStorageKey, {
+      _cachedAt: Date.now(),
+      data: materials,
+    });
   } catch {
     /* no-op */
   }
+}
+
+function isDesktopMaterialArray(value: unknown): value is DesktopMaterial[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        typeof (item as Partial<DesktopMaterial>).id === "string" &&
+        typeof (item as Partial<DesktopMaterial>).code === "string" &&
+        typeof (item as Partial<DesktopMaterial>).description === "string" &&
+        typeof (item as Partial<DesktopMaterial>).quantity === "number",
+    )
+  );
 }
 
 export async function listDesktopMaterials(
@@ -459,7 +493,9 @@ export async function createDesktopMaterial(
     return request;
   }
 
-  return invoke<DesktopMaterial>("create_material", { request });
+  const result = await invoke<DesktopMaterial>("create_material", { request });
+  dispatchDataChanged();
+  return result;
 }
 
 export async function updateDesktopMaterial(
@@ -481,7 +517,9 @@ export async function updateDesktopMaterial(
     return request;
   }
 
-  return invoke<DesktopMaterial>("update_material", { materialId, request });
+  const result = await invoke<DesktopMaterial>("update_material", { materialId, request });
+  dispatchDataChanged();
+  return result;
 }
 
 export async function restoreMaterialsFromSalUsage(
@@ -515,4 +553,5 @@ export async function deleteDesktopMaterial(materialId: string): Promise<void> {
   }
 
   await invoke<void>("delete_material", { materialId });
+  dispatchDataChanged();
 }

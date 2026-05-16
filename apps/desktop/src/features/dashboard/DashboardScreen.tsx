@@ -23,16 +23,27 @@ import { useNavigate } from "@/hooks/useNavigate";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
 import { PortfolioBurn } from "@/components/shared/charts";
 import { useAuditLogStore } from "@/store/audit-log-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
+let cachedGreeting: string | null = null;
+let cachedGreetingHour: number | null = null;
+
 function timeGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 6) return "Buonanotte";
-  if (hour < 13) return "Buongiorno";
-  if (hour < 18) return "Buon pomeriggio";
-  return "Buonasera";
+  if (cachedGreeting !== null && cachedGreetingHour === hour) {
+    return cachedGreeting;
+  }
+  let greeting: string;
+  if (hour < 6) greeting = "Buonanotte";
+  else if (hour < 13) greeting = "Buongiorno";
+  else if (hour < 18) greeting = "Buon pomeriggio";
+  else greeting = "Buonasera";
+  cachedGreeting = greeting;
+  cachedGreetingHour = hour;
+  return greeting;
 }
 
 function buildOperationalTotals(projects: PortfolioProject[], views: SalDocumentView[]) {
@@ -70,7 +81,10 @@ export function DashboardScreen() {
   const handleOpenProject = useCallback(
     (project: PortfolioProject) => {
       try {
-        window.sessionStorage.setItem("quantara.selectedProjectDetail.v1", JSON.stringify(project));
+        window.sessionStorage.setItem(
+          SESSION_STORAGE_KEYS.selectedProjectDetail,
+          JSON.stringify(project),
+        );
       } catch {
         /* no-op */
       }
@@ -85,7 +99,7 @@ export function DashboardScreen() {
     listDesktopContracts([])
       .then((contracts) => {
         if (abort.signal.aborted) return;
-        const contractors = readStringRecord("quantara.projectContractors.v1");
+        const contractors = readStringRecord(STORAGE_KEYS.projectContractors);
         setProjects(
           contracts.data.map((contract) =>
             mapContractToProject(contract, contractors[contract.id]),
@@ -104,45 +118,52 @@ export function DashboardScreen() {
     return () => abort.abort();
   }, [notify]);
 
-  const derived = useMemo(() => {
-    const views = buildSalDocumentViews(salDocuments, tariffVoices);
-    const salTimeline = buildSalTimeline(projects, views);
-    let totalBudget = 0;
-    let escalationCount = 0;
+  const views = useMemo(
+    () => buildSalDocumentViews(salDocuments, tariffVoices),
+    [salDocuments, tariffVoices],
+  );
 
-    for (const project of projects) {
-      totalBudget += project.budget.amount;
-      if (project.tone === "danger") {
-        escalationCount += 1;
-      }
-    }
-
-    let totalSal = 0;
-    for (const view of views) {
-      totalSal += view.total;
-    }
-
-    const viewsByProjectId = new Map<string, (typeof views)[number][]>();
+  const viewsByProjectId = useMemo(() => {
+    const map = new Map<string, (typeof views)[number][]>();
     for (const v of views) {
-      const existing = viewsByProjectId.get(v.projectId) || [];
+      const existing = map.get(v.projectId) || [];
       existing.push(v);
-      viewsByProjectId.set(v.projectId, existing);
+      map.set(v.projectId, existing);
     }
+    return map;
+  }, [views]);
 
-    return {
-      metrics: buildOverviewMetrics(projects),
-      distribution: buildFocusRows(projects),
-      activities: buildActivityRows(auditEntries),
-      priorityActions: buildPriorityActions(projects),
-      ganttBars: buildGanttBars(projects, salTimeline),
-      totalBudget,
-      totalSal,
-      escalationCount,
-      operationalTotals: buildOperationalTotals(projects, views),
-      salTimeline,
-      viewsByProjectId,
-    };
-  }, [projects, salDocuments, tariffVoices, auditEntries]);
+  const salTimeline = useMemo(() => buildSalTimeline(projects, views), [projects, views]);
+
+  const metrics = useMemo(() => buildOverviewMetrics(projects), [projects]);
+  const distribution = useMemo(() => buildFocusRows(projects), [projects]);
+  const priorityActions = useMemo(() => buildPriorityActions(projects), [projects]);
+
+  const ganttBars = useMemo(() => buildGanttBars(projects, salTimeline), [projects, salTimeline]);
+
+  const operationalTotals = useMemo(
+    () => buildOperationalTotals(projects, views),
+    [projects, views],
+  );
+
+  const activities = useMemo(() => buildActivityRows(auditEntries), [auditEntries]);
+
+  const totalBudget = useMemo(() => {
+    let sum = 0;
+    for (const p of projects) sum += p.budget.amount;
+    return sum;
+  }, [projects]);
+
+  const totalSal = useMemo(() => {
+    let sum = 0;
+    for (const v of views) sum += v.total;
+    return sum;
+  }, [views]);
+
+  const escalationCount = useMemo(
+    () => projects.filter((p) => p.tone === "danger").length,
+    [projects],
+  );
 
   async function handleDeleteProject(projectId: string) {
     try {
@@ -188,7 +209,7 @@ export function DashboardScreen() {
                     Budget totale
                   </p>
                   <p className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-                    {derived.totalBudget.toLocaleString("it-IT", {
+                    {totalBudget.toLocaleString("it-IT", {
                       style: "currency",
                       currency: "EUR",
                       minimumFractionDigits: 0,
@@ -201,31 +222,31 @@ export function DashboardScreen() {
               </div>
               <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
                 {projects.length} cantier{projects.length === 1 ? "e" : "i"} ·{" "}
-                {derived.totalSal.toLocaleString("it-IT", {
+                {totalSal.toLocaleString("it-IT", {
                   style: "currency",
                   currency: "EUR",
                   minimumFractionDigits: 0,
                 })}{" "}
                 SAL
-                {derived.escalationCount > 0 ? ` · ${derived.escalationCount} criticita` : ""}
+                {escalationCount > 0 ? ` · ${escalationCount} criticita` : ""}
               </p>
             </div>
           }
         />
 
         <div className="animate-entry grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {derived.metrics.map((metric) => (
+          {metrics.map((metric) => (
             <MetricCard {...metric} key={metric.label} />
           ))}
         </div>
 
-        <PriorityActions items={derived.priorityActions} />
+        <PriorityActions items={priorityActions} />
 
-        {derived.ganttBars.length > 0 ? (
+        {ganttBars.length > 0 ? (
           <TimelineGantt
-            bars={derived.ganttBars}
+            bars={ganttBars}
             projects={projects}
-            operationalByProjectId={derived.operationalTotals}
+            operationalByProjectId={operationalTotals}
             onOpen={handleOpenProject}
             onDelete={handleDeleteProject}
           />
@@ -237,13 +258,13 @@ export function DashboardScreen() {
 
         <PortfolioBurn
           projects={projects}
-          viewsByProjectId={derived.viewsByProjectId}
-          totalBudget={derived.totalBudget}
+          viewsByProjectId={viewsByProjectId}
+          totalBudget={totalBudget}
         />
 
         <RightRail
-          activities={derived.activities}
-          distribution={derived.distribution}
+          activities={activities}
+          distribution={distribution}
           projectCount={projects.length}
         />
       </div>

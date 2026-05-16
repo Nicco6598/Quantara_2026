@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { STORAGE_KEYS } from "@/persistence";
 
 type AuditEntry = {
   action: string;
@@ -39,7 +40,7 @@ export const useAuditLogStore = create<AuditLogStore>()(
       getEntriesForEntity: (entityType, entityId) =>
         get().entries.filter((e) => e.entityType === entityType && e.entityId === entityId),
     }),
-    { name: "quantara-audit-log-v1", storage: createJSONStorage(() => localStorage) },
+    { name: STORAGE_KEYS.auditLog, storage: createJSONStorage(() => localStorage) },
   ),
 );
 

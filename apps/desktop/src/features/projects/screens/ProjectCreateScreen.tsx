@@ -24,6 +24,7 @@ import {
 
 import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
@@ -40,8 +41,8 @@ type ProjectFormState = {
   osIvaPercent: string;
 };
 
-const projectContractorStorageKey = "quantara.projectContractors.v1";
-const contractorRegistryStorageKey = "quantara.contractorRegistry.v1";
+const projectContractorStorageKey = STORAGE_KEYS.projectContractors;
+const contractorRegistryStorageKey = STORAGE_KEYS.contractorRegistry;
 
 type ProjectUIState = {
   draft: ProjectFormState;
@@ -87,9 +88,9 @@ export function ProjectCreateScreen() {
 
   const initialValues = useMemo(() => {
     try {
-      const raw = window.sessionStorage.getItem("quantara.editingProject.v1");
+      const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEYS.editingProject);
       if (raw) {
-        window.sessionStorage.removeItem("quantara.editingProject.v1");
+        window.sessionStorage.removeItem(SESSION_STORAGE_KEYS.editingProject);
         return JSON.parse(raw) as ProjectFormState;
       }
     } catch {
@@ -181,7 +182,7 @@ export function ProjectCreateScreen() {
     Number.isFinite(discountPercent) && discountPercent >= 0 && discountPercent <= 100
       ? discountPercent
       : Number.NaN;
-  const validation = getProjectValidation(draft);
+  const validation = useMemo(() => getProjectValidation(draft), [draft]);
   const canGoNext = step === 1 && validation.identityError === null;
 
   // Sync toolbar state
@@ -294,7 +295,7 @@ export function ProjectCreateScreen() {
 
     try {
       const editingContractId = initialValues?.contractorName
-        ? window.sessionStorage.getItem("quantara.editingContractId.v1")
+        ? window.sessionStorage.getItem(SESSION_STORAGE_KEYS.editingContractId)
         : null;
 
       const savedContract = editingContractId
@@ -302,7 +303,7 @@ export function ProjectCreateScreen() {
         : await createDesktopContract(request);
 
       if (editingContractId) {
-        window.sessionStorage.removeItem("quantara.editingContractId.v1");
+        window.sessionStorage.removeItem(SESSION_STORAGE_KEYS.editingContractId);
         notify({ message: "Progetto aggiornato.", title: "Aggiornato", tone: "success" });
       } else {
         notify({ message: "Progetto creato.", title: "Creato", tone: "success" });

@@ -1,7 +1,7 @@
 import { AnimatePresence, m } from "framer-motion";
 import { Download, Trash2, XCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/motion";
 import { useSelectionStore } from "@/store/selection-store";
 
 type BulkAction = {

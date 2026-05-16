@@ -1,6 +1,6 @@
 import { m } from "framer-motion";
 import type { ReactNode } from "react";
-import { MOTION_DURATION, SPRING_EASE } from "@/components/shared/easings";
+import { MOTION_DURATION, SPRING_EASE } from "@/motion";
 import { cn } from "@/lib/utils";
 
 export function BezelSurface({

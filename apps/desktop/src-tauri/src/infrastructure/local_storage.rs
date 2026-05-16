@@ -14,10 +14,21 @@ pub struct DbConnection {
 impl DbConnection {
     pub fn open(app: &AppHandle) -> Result<Self, AppError> {
         let database_path = get_database_path(app)?;
-        let conn = Connection::open(&database_path)
-            .map_err(|e| AppError::Database(e.to_string()))?;
+        let conn =
+            Connection::open(&database_path).map_err(|e| AppError::Database(e.to_string()))?;
+
+        conn.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA cache_size = -2000;
+             PRAGMA temp_store = MEMORY;",
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
         migrations::apply_migrations(&conn)?;
-        Ok(Self { conn: Mutex::new(conn) })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 }
 
@@ -54,4 +65,3 @@ pub fn get_database_path(app: &AppHandle) -> Result<PathBuf, AppError> {
     let dir = get_app_data_dir(app)?;
     Ok(dir.join(default_database_name()))
 }
-

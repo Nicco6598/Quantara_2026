@@ -1,7 +1,7 @@
 import { m } from "framer-motion";
 import { Building2, ChevronRight, FileText, FolderKanban } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
+import { MOTION_VARIANTS } from "@/motion";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { PortfolioProject } from "@/features/projects/types";
@@ -286,6 +286,20 @@ function ProjectNodeItem({
   );
 }
 
+const SAL_STATUS_TONES: Record<string, string> = {
+  success: "bg-[var(--success-soft)] text-[var(--success-base)]",
+  info: "bg-[var(--info-soft)] text-[var(--info-base)]",
+  warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+  danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
+};
+
+const SAL_STATUS_LABELS: Record<string, string> = {
+  closed: "Approvata",
+  approved: "Approvata",
+  "in-review": "Revisione",
+  draft: "Bozza",
+};
+
 function SalStatusPill({ status }: { status: string }) {
   const tone =
     status === "closed" || status === "approved"
@@ -294,28 +308,14 @@ function SalStatusPill({ status }: { status: string }) {
         ? "info"
         : "warning";
 
-  const toneColors = {
-    success: "bg-[var(--success-soft)] text-[var(--success-base)]",
-    info: "bg-[var(--info-soft)] text-[var(--info-base)]",
-    warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-    danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-  };
-
-  const labels: Record<string, string> = {
-    closed: "Approvata",
-    approved: "Approvata",
-    "in-review": "Revisione",
-    draft: "Bozza",
-  };
-
   return (
     <span
       className={cn(
         "shrink-0 rounded-full px-1.5 py-0.5 text-9px font-semibold",
-        toneColors[tone as keyof typeof toneColors] || toneColors.warning,
+        SAL_STATUS_TONES[tone] || SAL_STATUS_TONES.warning,
       )}
     >
-      {labels[status] || status}
+      {SAL_STATUS_LABELS[status] || status}
     </span>
   );
 }
@@ -328,7 +328,7 @@ function TreeContent({ children, collapsed }: { children: React.ReactNode; colla
     if (innerRef.current && h === null) {
       setH(innerRef.current.scrollHeight);
     }
-  });
+  }, [h]);
 
   return (
     <m.div

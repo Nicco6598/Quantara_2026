@@ -2,23 +2,31 @@ import { useEffect, useRef } from "react";
 
 type EscapeHandler = () => void;
 
-const globalStack: EscapeHandler[] = [];
+type StackEntry = {
+  handler: EscapeHandler;
+  id: number;
+};
 
-function pushEscapeHandler(handler: EscapeHandler) {
-  globalStack.push(handler);
+const globalStack: StackEntry[] = [];
+let nextId = 0;
+
+function pushEscapeHandler(handler: EscapeHandler): number {
+  const id = nextId++;
+  globalStack.push({ handler, id });
+  return id;
 }
 
-function popEscapeHandler(handler: EscapeHandler) {
-  const index = globalStack.indexOf(handler);
+function popEscapeHandler(id: number) {
+  const index = globalStack.findIndex((entry) => entry.id === id);
   if (index !== -1) {
     globalStack.splice(index, 1);
   }
 }
 
 function executeEscape(): boolean {
-  const handler = globalStack.pop();
-  if (handler) {
-    handler();
+  const entry = globalStack.pop();
+  if (entry) {
+    entry.handler();
     return true;
   }
   return false;
@@ -27,12 +35,17 @@ function executeEscape(): boolean {
 export function useEscapeStack(handler: EscapeHandler, active: boolean) {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
+  const idRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!active) return;
     const wrapped = () => handlerRef.current();
-    pushEscapeHandler(wrapped);
-    return () => popEscapeHandler(wrapped);
+    idRef.current = pushEscapeHandler(wrapped);
+    return () => {
+      if (idRef.current !== null) {
+        popEscapeHandler(idRef.current);
+      }
+    };
   }, [active]);
 }
 

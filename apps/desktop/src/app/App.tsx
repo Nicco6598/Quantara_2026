@@ -35,8 +35,8 @@ import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 import { RouteRenderer } from "@/routes/RouteRenderer";
 import {
   type QuantaraRoute,
+  useAppShellNavigationState,
   useAppStore,
-  useNavigationState,
   usePreferenceState,
   useThemeState,
 } from "@/store/app-store";
@@ -483,7 +483,7 @@ function AppShell() {
     navigateBack,
     navigateForward,
     pendingWorkflowAction,
-  } = useNavigationState();
+  } = useAppShellNavigationState();
   const navigate = useNavigate();
   const { notify } = useToast();
   const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();

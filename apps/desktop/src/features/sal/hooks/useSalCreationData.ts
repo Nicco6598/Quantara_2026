@@ -7,6 +7,7 @@ import {
   listDesktopTariffVoices,
 } from "@/lib/desktopData";
 import { readStringRecord } from "@/lib/shared-utils";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence";
 import {
   mapContractToSalProject,
   mapTariffBooksForContract,
@@ -34,11 +35,11 @@ const initialLoadState: LoadState = {
   voices: [],
 };
 
-const projectContractorStorageKey = "quantara.projectContractors.v1";
+const projectContractorStorageKey = STORAGE_KEYS.projectContractors;
 
 function readSelectedProjectId(): string | null {
   try {
-    const rawValue = window.sessionStorage.getItem("quantara.selectedProjectDetail.v1");
+    const rawValue = window.sessionStorage.getItem(SESSION_STORAGE_KEYS.selectedProjectDetail);
     if (!rawValue) return null;
     const parsed = JSON.parse(rawValue) as { id?: unknown };
     return typeof parsed.id === "string" ? parsed.id : null;
@@ -49,7 +50,10 @@ function readSelectedProjectId(): string | null {
 
 function writeSelectedProjectId(id: string) {
   try {
-    window.sessionStorage.setItem("quantara.selectedProjectDetail.v1", JSON.stringify({ id }));
+    window.sessionStorage.setItem(
+      SESSION_STORAGE_KEYS.selectedProjectDetail,
+      JSON.stringify({ id }),
+    );
   } catch {
     /* no-op */
   }

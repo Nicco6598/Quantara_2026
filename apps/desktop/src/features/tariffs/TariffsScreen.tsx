@@ -1,33 +1,20 @@
-import { m } from "framer-motion";
 import {
-  ArrowUp,
   Building2,
   CalendarDays,
   CheckCircle2,
   Copy,
   Database,
-  Eye,
   FileText,
-  MoreVertical,
-  Pencil,
   Save,
   Sparkles,
-  Star,
-  Trash2,
 } from "lucide-react";
-import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
-import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
-import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface } from "@/components/shared/ui-primitives";
 
 import {
   createDesktopTariffBook,
@@ -44,19 +31,20 @@ import {
   updateDesktopContract,
   updateDesktopTariffBook,
 } from "@/lib/desktopData";
-
-import { cn } from "@/lib/utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { readJsonFromStorage, STORAGE_KEYS, writeJsonToStorage } from "@/persistence";
 
 import { useAppStore } from "@/store/app-store";
 
 import { QuickAction } from "./components/QuickAction";
-import { TariffEditField } from "./components/TariffEditField";
-import { TariffImportLoadingModal } from "./components/TariffImportLoadingModal";
 import {
-  TariffImportPreviewModal,
-  type TariffImportPreviewResult,
-} from "./components/TariffImportPreviewModal";
+  Panel,
+  PanelTitle,
+  TariffBookPreviewCard,
+  TariffImportPreviewPanel,
+} from "./components/TariffScreenPanels";
+import { TariffImportLoadingModal } from "./components/TariffImportLoadingModal";
+import type { TariffImportPreviewResult } from "./components/TariffImportPreviewModal";
 import { TariffVoicesExplorerModal } from "./components/TariffVoicesExplorerModal";
 import {
   fallbackContracts,
@@ -65,6 +53,13 @@ import {
   fallbackTariffVoices,
 } from "./tariffs-data";
 import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
+import {
+  areNumberSetsEqual,
+  getScrollableAncestor,
+  importMetaReducer,
+  initialImportMeta,
+  isStringArray,
+} from "./state/import-meta";
 import { groupTariffVoices } from "./utils/tariff-grouping";
 import {
   buildImportPreviewToolbarSummary,
@@ -76,90 +71,8 @@ import {
 } from "./utils/tariffs-screen-model";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
 
-type ImportFile = {
-  fileName: string;
-  index: number;
-  total: number;
-  status: "pending" | "processing" | "done" | "error";
-  error?: string;
-};
-
-type ImportMetaState = {
-  phase: "idle" | "loading" | "preview";
-  previews: TariffPdfMetadata[];
-  previewIndex: number;
-  files: ImportFile[];
-};
-
-const initialImportMeta: ImportMetaState = {
-  phase: "idle",
-  previews: [],
-  previewIndex: 0,
-  files: [],
-};
-
-type ImportMetaAction =
-  | { type: "START_LOADING" }
-  | { type: "UPDATE_FILE"; file: ImportFile }
-  | { type: "SHOW_PREVIEW"; previews: TariffPdfMetadata[] }
-  | { type: "SET_PREVIEWS"; previews: TariffPdfMetadata[] }
-  | { type: "SET_INDEX"; index: number }
-  | { type: "SET_PHASE"; phase: ImportMetaState["phase"] }
-  | { type: "CLEAR" };
-
-function areNumberSetsEqual(left: Set<number>, right: Set<number>) {
-  if (left.size !== right.size) return false;
-  for (const value of left) {
-    if (!right.has(value)) return false;
-  }
-  return true;
-}
-
-function importMetaReducer(state: ImportMetaState, action: ImportMetaAction): ImportMetaState {
-  switch (action.type) {
-    case "START_LOADING":
-      return { ...state, phase: "loading", files: [] };
-    case "UPDATE_FILE":
-      return {
-        ...state,
-        files: state.files.some((f) => f.index === action.file.index)
-          ? state.files.map((f) => (f.index === action.file.index ? { ...f, ...action.file } : f))
-          : [...state.files, action.file],
-      };
-    case "SHOW_PREVIEW":
-      return { ...state, phase: "preview", previews: action.previews, previewIndex: 0 };
-    case "SET_PREVIEWS":
-      return { ...state, previews: action.previews };
-    case "SET_INDEX":
-      return { ...state, previewIndex: action.index };
-    case "SET_PHASE":
-      return { ...state, phase: action.phase };
-    case "CLEAR":
-      return { ...initialImportMeta };
-    default:
-      return state;
-  }
-}
-
-function getScrollableAncestor(element: HTMLElement | null) {
-  let current = element?.parentElement ?? null;
-
-  while (current) {
-    const style = window.getComputedStyle(current);
-    const canScroll =
-      /(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight;
-    if (canScroll) {
-      return current;
-    }
-
-    current = current.parentElement;
-  }
-
-  return null;
-}
-
 export function TariffsScreen() {
-  const FAVORITES_STORAGE_KEY = "quantara.tariffs.favoriteBookIds";
+  const FAVORITES_STORAGE_KEY = STORAGE_KEYS.tariffFavoriteBookIds;
   const { notify } = useToast();
   const [contractsState, setContractsState] = useState<DesktopDataResult<DesktopContract[]>>({
     data: fallbackContracts,
@@ -194,13 +107,12 @@ export function TariffsScreen() {
   const [favoriteBookIds, setFavoriteBookIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
-      const rawValue = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
-      if (rawValue) {
-        const parsed = JSON.parse(rawValue);
-        if (Array.isArray(parsed) && parsed.every((value) => typeof value === "string")) {
-          return parsed;
-        }
-      }
+      return readJsonFromStorage<string[]>(
+        window.localStorage,
+        FAVORITES_STORAGE_KEY,
+        [],
+        isStringArray,
+      );
     } catch {
       window.localStorage.removeItem(FAVORITES_STORAGE_KEY);
     }
@@ -236,7 +148,7 @@ export function TariffsScreen() {
       return;
     }
 
-    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteBookIds));
+    writeJsonToStorage(window.localStorage, FAVORITES_STORAGE_KEY, favoriteBookIds);
   }, [favoriteBookIds]);
 
   useEffect(() => {
@@ -1190,390 +1102,5 @@ export function TariffsScreen() {
         />
       ) : null}
     </ScreenLayout>
-  );
-}
-
-function TariffBookPreviewCard({
-  book,
-  editForm,
-  editing,
-  isFavorite,
-  isSelected,
-  linkedProjectCount,
-  onCancelEdit,
-  onDelete,
-  onEdit,
-  onEditFormChange,
-  onOpenVoices,
-  onSaveEdit,
-  onSelect,
-  onShowDetails,
-  onToggleFavorite,
-  showDetails,
-  voiceCount,
-}: {
-  book: DesktopTariffBook;
-  editForm: EditTariffBookForm;
-  editing: boolean;
-  isFavorite: boolean;
-  isSelected: boolean;
-  linkedProjectCount: number;
-  onCancelEdit: () => void;
-  onDelete: () => void;
-  onEdit: () => void;
-  onEditFormChange: Dispatch<SetStateAction<EditTariffBookForm>>;
-  onOpenVoices: () => void;
-  onSaveEdit: () => void;
-  onSelect: () => void;
-  onShowDetails: () => void;
-  onToggleFavorite: () => void;
-  showDetails: boolean;
-  voiceCount: number | undefined;
-}) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const displayVoiceCount = voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT");
-
-  return (
-    <m.article
-      className={cn(
-        "relative min-h-[168px] rounded-14px border p-4 text-left transition-colors duration-200",
-        isSelected
-          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
-          : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
-      )}
-      initial={MOTION_VARIANTS.row.initial}
-      transition={MOTION_VARIANTS.row.transition}
-      viewport={MOTION_VARIANTS.row.viewport}
-      whileInView={MOTION_VARIANTS.row.whileInView}
-    >
-      <div className="flex h-full flex-col">
-        <div className="flex items-start justify-between gap-3">
-          <button
-            className="flex min-w-0 flex-1 items-start gap-4 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-            onClick={onSelect}
-            type="button"
-          >
-            <div
-              className={cn(
-                "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-md border bg-[var(--surface-raised)] text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]",
-                isSelected ? "border-[var(--accent-primary)]" : "border-[var(--border-subtle)]",
-              )}
-            >
-              <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-[var(--text-inverse)]">
-                PDF
-              </span>
-              <div className="space-y-1.5 text-[var(--text-tertiary)]">
-                <div className="h-1 w-9 rounded bg-current" />
-                <div className="h-1 w-7 rounded bg-current" />
-                <div className="h-1 w-10 rounded bg-current" />
-                <div className="mt-4 h-1 w-8 rounded bg-current" />
-                <div className="h-1 w-11 rounded bg-current" />
-              </div>
-            </div>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  variant={
-                    book.status === "draft"
-                      ? "warning"
-                      : book.status === "validated"
-                        ? "info"
-                        : "success"
-                  }
-                >
-                  {book.status === "draft"
-                    ? "Bozza"
-                    : book.status === "validated"
-                      ? "Validato"
-                      : "Attivo"}
-                </Badge>
-                <span className="text-12px font-semibold text-[var(--text-secondary)]">
-                  Anno {book.year}
-                </span>
-              </div>
-              <h3 className="mt-3 truncate text-16px font-semibold leading-tight text-[var(--text-primary)]">
-                {book.name}
-              </h3>
-              <p className="mt-2 truncate text-13px text-[var(--text-secondary)]">
-                {book.sourceName}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-12px font-medium text-[var(--text-secondary)]">
-                <span>{displayVoiceCount} voci</span>
-                <span>·</span>
-                <span>{linkedProjectCount} progetti</span>
-              </div>
-            </div>
-          </button>
-
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              aria-label={isFavorite ? "Rimuovi dai preferiti" : "Segna come preferito"}
-              className={cn(
-                "flex size-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[var(--warning-soft)] hover:text-[var(--warning-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
-                isFavorite && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-              )}
-              onClick={onToggleFavorite}
-              type="button"
-            >
-              <Star className={cn("size-4", isFavorite && "fill-current")} />
-            </button>
-            <div ref={menuRef}>
-              <Button onClick={() => setIsMenuOpen((v) => !v)} variant="icon">
-                <MoreVertical className="size-4" />
-              </Button>
-              <DropdownMenu
-                isOpen={isMenuOpen}
-                onClose={() => setIsMenuOpen(false)}
-                triggerRef={menuRef}
-              >
-                <DropdownItem
-                  icon={Eye}
-                  label={showDetails ? "Nascondi scheda" : "Mostra scheda"}
-                  onClick={() => {
-                    onShowDetails();
-                    setIsMenuOpen(false);
-                  }}
-                />
-                <DropdownItem
-                  icon={Pencil}
-                  label="Modifica dettagli"
-                  onClick={() => {
-                    onEdit();
-                    setIsMenuOpen(false);
-                  }}
-                />
-                <DropdownItem
-                  icon={Database}
-                  label="Modifica voci"
-                  onClick={() => {
-                    onOpenVoices();
-                    setIsMenuOpen(false);
-                  }}
-                />
-                <DropdownDivider />
-                <DropdownItem
-                  icon={Trash2}
-                  label="Elimina tariffario"
-                  onClick={() => {
-                    onDelete();
-                    setIsMenuOpen(false);
-                  }}
-                  tone="danger"
-                />
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-
-        {editing ? (
-          <div className="mt-4 space-y-3 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3">
-            <TariffEditField
-              label="Nome"
-              onChange={(value) => onEditFormChange((form) => ({ ...form, name: value }))}
-              value={editForm.name}
-            />
-            <TariffEditField
-              label="Ente"
-              onChange={(value) => onEditFormChange((form) => ({ ...form, sourceName: value }))}
-              value={editForm.sourceName}
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <TariffEditField
-                label="Anno"
-                onChange={(value) => onEditFormChange((form) => ({ ...form, year: value }))}
-                value={editForm.year}
-              />
-              <label className="text-11px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
-                Stato
-                <div className="relative mt-1">
-                  <select
-                    className="h-10 w-full appearance-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 pr-8 text-13px font-medium normal-case tracking-normal text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                    onChange={(event) =>
-                      onEditFormChange((form) => ({ ...form, status: event.target.value }))
-                    }
-                    value={editForm.status}
-                  >
-                    <option value="active">active</option>
-                    <option value="draft">draft</option>
-                    <option value="validated">validated</option>
-                  </select>
-                  <svg
-                    aria-hidden={true}
-                    className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                </div>
-              </label>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <Button className="flex-1" icon={Save} onClick={onSaveEdit} variant="primary">
-                Salva
-              </Button>
-              <Button onClick={onCancelEdit} variant="outline">
-                Annulla
-              </Button>
-            </div>
-          </div>
-        ) : showDetails ? (
-          <m.div
-            className="mt-4 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/40 p-3"
-            animate={MOTION_VARIANTS.viewSwap.animate}
-            exit={MOTION_VARIANTS.viewSwap.exit}
-            initial={MOTION_VARIANTS.viewSwap.initial}
-            transition={MOTION_VARIANTS.viewSwap.transition}
-          >
-            <div className="grid gap-2 text-12px font-medium text-[var(--text-secondary)]">
-              <DetailLine label="ID" value={book.id} />
-              <DetailLine label="Ente" value={book.sourceName} />
-              <DetailLine label="Stato" value={book.status} />
-              <DetailLine label="Progetti collegati" value={`${linkedProjectCount}`} />
-              <DetailLine label="Sottovoci" value={displayVoiceCount} />
-            </div>
-          </m.div>
-        ) : null}
-      </div>
-      {isSelected ? (
-        <span className="absolute bottom-4 right-4 flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--accent-primary)] text-[var(--text-inverse)]">
-          <CheckCircle2 className="size-4" strokeWidth={3} />
-        </span>
-      ) : null}
-    </m.article>
-  );
-}
-
-function TariffImportPreviewPanel({
-  draftedImportFiles,
-  getExistingBookIds,
-  importPreviewIndex,
-  importPreviews,
-  onCancel,
-  onConfirm,
-  onDraftedFilesChange,
-  onMetadatasChange,
-  onPageCanConfirmChange,
-  onReviewedFilesChange,
-  reviewedFiles,
-  scrollPreviewToTop,
-}: {
-  draftedImportFiles: Set<number>;
-  getExistingBookIds: () => string[];
-  importPreviewIndex: number;
-  importPreviews: TariffPdfMetadata[];
-  onCancel: () => void;
-  onConfirm: (metadatas: TariffImportPreviewResult[]) => Promise<void>;
-  onDraftedFilesChange: (next: Set<number>) => void;
-  onMetadatasChange: (metadatas: TariffPdfMetadata[]) => void;
-  onPageCanConfirmChange: (v: boolean) => void;
-  onReviewedFilesChange: (next: Set<number>) => void;
-  reviewedFiles: Set<number>;
-  scrollPreviewToTop: () => void;
-}) {
-  return (
-    <div className="-mx-4 -mt-4 flex flex-col md:-mx-6">
-      <div className="p-6">
-        <section className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-          <div className="min-w-0">
-            <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-              Preview importazione
-            </div>
-            <h2 className="mt-2 truncate text-28px font-semibold leading-tight text-[var(--text-primary)]">
-              {importPreviews[importPreviewIndex]?.name ?? "Tariffario da importare"}
-            </h2>
-            <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
-              Revisiona descrizioni, codici e prezzi; i comandi principali sono nella toolbar.
-            </p>
-          </div>
-          <div
-            className={cn(
-              "flex items-center gap-2 rounded-full px-3 py-2 text-12px font-bold ring-1",
-              draftedImportFiles.has(importPreviewIndex)
-                ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[var(--warning-base)]/30"
-                : reviewedFiles.has(importPreviewIndex)
-                  ? "bg-[var(--success-soft)] text-[var(--success-base)] ring-[var(--success-base)]/30"
-                  : "bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-[var(--border-subtle)]",
-            )}
-          >
-            {draftedImportFiles.has(importPreviewIndex) ? (
-              <Save className="size-4" />
-            ) : (
-              <CheckCircle2
-                className={cn(
-                  "size-4",
-                  reviewedFiles.has(importPreviewIndex)
-                    ? "text-[var(--success-base)]"
-                    : "text-[var(--text-secondary)]",
-                )}
-              />
-            )}
-            {draftedImportFiles.has(importPreviewIndex)
-              ? "Salvato in bozza"
-              : reviewedFiles.has(importPreviewIndex)
-                ? "File revisionato"
-                : "Da revisionare"}
-          </div>
-        </section>
-        <TariffImportPreviewModal
-          activeIndex={importPreviewIndex}
-          existingBookIds={getExistingBookIds()}
-          isBusy={false}
-          metadatas={importPreviews}
-          onCancel={onCancel}
-          onConfirm={onConfirm}
-          onDraftedFilesChange={onDraftedFilesChange}
-          onMetadatasChange={onMetadatasChange}
-          onPageCanConfirmChange={onPageCanConfirmChange}
-          onReviewedFilesChange={onReviewedFilesChange}
-          pageView
-        />
-      </div>
-      <m.button
-        id="fab-back-to-top"
-        className="group fixed bottom-6 right-6 z-[120] flex h-11 w-11 items-center justify-start gap-2 overflow-hidden rounded-full bg-[var(--accent-primary)] px-3 text-[var(--text-inverse)] shadow-lg outline-none ring-1 ring-white/10 transition-[width,box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:w-40 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-        initial={MOTION_VARIANTS.popover.initial}
-        animate={MOTION_VARIANTS.popover.animate}
-        onClick={scrollPreviewToTop}
-        transition={MOTION_VARIANTS.popover.transition}
-        type="button"
-        title="Torna su"
-      >
-        <span className="flex size-5 shrink-0 items-center justify-center">
-          <ArrowUp className="size-5" />
-        </span>
-        <span className="whitespace-nowrap text-12px font-bold opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          Torna in cima
-        </span>
-      </m.button>
-    </div>
-  );
-}
-
-function DetailLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid grid-cols-[112px_minmax(0,1fr)] items-baseline gap-3">
-      <span className="text-10px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
-        {label}
-      </span>
-      <span className="truncate text-right text-12px font-semibold text-[var(--text-primary)]">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return <BezelSurface innerClassName={cn("p-4", className)}>{children}</BezelSurface>;
-}
-
-function PanelTitle({ children }: { children: string }) {
-  return (
-    <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-      {children}
-    </div>
   );
 }

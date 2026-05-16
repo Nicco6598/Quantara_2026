@@ -22,37 +22,34 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
-                WebviewWindowBuilder::new(
-                    app,
-                    "main",
-                    WebviewUrl::App("index.html".into()),
-                )
-                .title("Quantara")
-                .inner_size(1440.0, 900.0)
-                .min_inner_size(1180.0, 720.0)
-                .maximized(true)
-                .decorations(true)
-                .hidden_title(true)
-                .title_bar_style(tauri::TitleBarStyle::Overlay)
-                .build()?;
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                    .title("Quantara")
+                    .inner_size(1440.0, 900.0)
+                    .min_inner_size(1180.0, 720.0)
+                    .maximized(true)
+                    .decorations(true)
+                    .hidden_title(true)
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                    .build()?;
             }
 
             #[cfg(not(target_os = "macos"))]
             {
-                WebviewWindowBuilder::new(
-                    app,
-                    "main",
-                    WebviewUrl::App("index.html".into()),
-                )
-                .title("Quantara")
-                .inner_size(1440.0, 900.0)
-                .min_inner_size(1180.0, 720.0)
-                .maximized(true)
-                .decorations(false)
-                .build()?;
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                    .title("Quantara")
+                    .inner_size(1440.0, 900.0)
+                    .min_inner_size(1180.0, 720.0)
+                    .maximized(true)
+                    .decorations(false)
+                    .build()?;
             }
 
             Ok(())
+        })
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                infrastructure::tariff_repository::shutdown_rfi_parser();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::health::get_health_snapshot,

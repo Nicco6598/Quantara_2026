@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::Path,
@@ -14,7 +15,6 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use crate::{
-    db::migrations::apply_migrations,
     infrastructure::{cents_to_money, money_to_cents, to_database_error},
     models::app_error::AppError,
 };
@@ -127,8 +127,6 @@ struct ParserOutput {
 }
 
 pub fn list_tariff_books(connection: &Connection) -> Result<Vec<TariffBookRecord>, AppError> {
-    apply_migrations(connection).map_err(to_database_error)?;
-
     let mut statement = connection
         .prepare(
             "SELECT id, name, source_name, year, status
@@ -149,7 +147,6 @@ pub fn create_tariff_book(
     request: CreateTariffBookRequest,
 ) -> Result<TariffBookRecord, AppError> {
     validate_tariff_book_request(&request)?;
-    apply_migrations(connection).map_err(to_database_error)?;
 
     let transaction = connection.transaction().map_err(to_database_error)?;
 
@@ -200,7 +197,6 @@ pub fn update_tariff_book(
     request: UpdateTariffBookRequest,
 ) -> Result<TariffBookRecord, AppError> {
     validate_tariff_book_update_request(&request)?;
-    apply_migrations(connection).map_err(to_database_error)?;
 
     let transaction = connection.transaction().map_err(to_database_error)?;
 
@@ -246,8 +242,6 @@ pub fn delete_tariff_book(
     connection: &mut Connection,
     tariff_book_id: &str,
 ) -> Result<(), AppError> {
-    apply_migrations(connection).map_err(to_database_error)?;
-
     let transaction = connection.transaction().map_err(to_database_error)?;
     transaction
         .execute(
@@ -273,8 +267,6 @@ pub fn list_tariff_voices(
     connection: &Connection,
     tariff_book_id: &str,
 ) -> Result<Vec<TariffVoiceRecord>, AppError> {
-    apply_migrations(connection).map_err(to_database_error)?;
-
     let mut statement = connection
         .prepare(
             "SELECT id, tariff_book_id, official_code, description, category, unit_of_measure, unit_price_cents, labor_percentage
@@ -301,8 +293,6 @@ pub struct TariffVoiceCountRecord {
 pub fn list_tariff_voice_counts(
     connection: &Connection,
 ) -> Result<Vec<TariffVoiceCountRecord>, AppError> {
-    apply_migrations(connection).map_err(to_database_error)?;
-
     let mut statement = connection
         .prepare(
             "SELECT tariff_book_id, COUNT(*) as voice_count
@@ -595,6 +585,7 @@ fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
 
 fn merge_duplicate_rfi_records(records: Vec<RfiTariffRecord>) -> Vec<RfiTariffRecord> {
     let mut merged: Vec<RfiTariffRecord> = Vec::with_capacity(records.len());
+    let mut index: HashMap<String, usize> = HashMap::with_capacity(records.len());
 
     for record in records {
         let code = record.codice.trim();
@@ -603,14 +594,13 @@ fn merge_duplicate_rfi_records(records: Vec<RfiTariffRecord>) -> Vec<RfiTariffRe
             continue;
         }
 
-        if let Some(existing) = merged
-            .iter_mut()
-            .find(|item| item.codice.trim().eq_ignore_ascii_case(code))
-        {
-            merge_rfi_record_description(existing, &record);
+        let lookup = code.to_ascii_lowercase();
+        if let Some(&pos) = index.get(&lookup) {
+            merge_rfi_record_description(&mut merged[pos], &record);
             continue;
         }
 
+        index.insert(lookup, merged.len());
         merged.push(record);
     }
 
@@ -844,7 +834,11 @@ impl RfiParserClient {
         let stdin = BufWriter::new(child.stdin.take().ok_or("stdin not available")?);
         let stdout = BufReader::new(child.stdout.take().ok_or("stdout not available")?);
 
-        Ok(Self { stdin, stdout, child })
+        Ok(Self {
+            stdin,
+            stdout,
+            child,
+        })
     }
 
     fn parse(&mut self, path: &Path) -> Result<ParserOutput, String> {
@@ -852,16 +846,17 @@ impl RfiParserClient {
         self.stdin.flush().map_err(|e| e.to_string())?;
 
         let mut line = String::new();
-        self.stdout.read_line(&mut line).map_err(|e| e.to_string())?;
+        self.stdout
+            .read_line(&mut line)
+            .map_err(|e| e.to_string())?;
         let trimmed = line.trim();
 
         if trimmed.is_empty() {
             return Err("Parser process ended unexpectedly".into());
         }
 
-        serde_json::from_str::<ParserOutput>(trimmed).map_err(|e| {
-            format!("Invalid JSON from parser: {e}")
-        })
+        serde_json::from_str::<ParserOutput>(trimmed)
+            .map_err(|e| format!("Invalid JSON from parser: {e}"))
     }
 }
 
@@ -878,6 +873,14 @@ impl Drop for RfiParserClient {
 fn rfi_parser_state() -> &'static Mutex<Option<RfiParserClient>> {
     static STATE: OnceLock<Mutex<Option<RfiParserClient>>> = OnceLock::new();
     STATE.get_or_init(|| Mutex::new(None))
+}
+
+/// Explicitly terminate the parser subprocess on app shutdown.
+pub fn shutdown_rfi_parser() {
+    let state = rfi_parser_state();
+    if let Ok(mut guard) = state.lock() {
+        *guard = None;
+    }
 }
 
 fn parse_via_persistent_parser(
@@ -1183,11 +1186,11 @@ fn clean_text(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
+
+    use crate::db::migrations::apply_migrations;
 
     use super::{
         CreateTariffBookRequest, TariffVoiceRecord, UpdateTariffBookRequest, create_tariff_book,
@@ -1198,6 +1201,7 @@ mod tests {
     #[test]
     fn creates_and_lists_tariff_books() {
         let mut connection = Connection::open_in_memory().expect("in-memory db");
+        apply_migrations(&connection).expect("schema applied");
 
         create_tariff_book(
             &mut connection,
@@ -1260,6 +1264,7 @@ mod tests {
     #[test]
     fn reimport_replaces_existing_tariff_voices() {
         let mut connection = Connection::open_in_memory().expect("in-memory db");
+        apply_migrations(&connection).expect("schema applied");
         let mut request = CreateTariffBookRequest {
             id: "tariff_rfi_2025".into(),
             name: "RFI 2025".into(),
@@ -1313,6 +1318,7 @@ mod tests {
     #[test]
     fn update_tariff_book_replaces_existing_tariff_voices() {
         let mut connection = Connection::open_in_memory().expect("in-memory db");
+        apply_migrations(&connection).expect("schema applied");
         let book_id = "tariff_rfi_2026";
 
         create_tariff_book(

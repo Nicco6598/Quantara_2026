@@ -2,8 +2,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::migrations::apply_migrations,
-    infrastructure::{cents_to_money, money_to_cents, to_database_error, Money},
+    infrastructure::{Money, cents_to_money, money_to_cents, to_database_error},
     models::app_error::AppError,
 };
 
@@ -49,8 +48,6 @@ pub struct ContractRecord {
 }
 
 pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, AppError> {
-    apply_migrations(connection).map_err(to_database_error)?;
-
     let mut statement = connection
         .prepare(
             "SELECT contracts.id, contracts.title, contracts.application_contract_code, contracts.framework_agreement_code, contracts.contractual_amount_cents
@@ -67,21 +64,67 @@ pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, Ap
         .collect::<Result<Vec<_>, _>>()
         .map_err(to_database_error)?;
 
-    contracts
-        .into_iter()
-        .map(|mut contract| {
-            contract.tariff_priorities = list_priorities(connection, &contract.id)?;
-            Ok(contract)
+    if contracts.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let contract_ids: Vec<&str> = contracts.iter().map(|c| c.id.as_str()).collect();
+    let placeholders = contract_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "SELECT contract_id, tariff_book_id, priority, reason FROM tariff_priorities WHERE contract_id IN ({}) ORDER BY contract_id, priority ASC",
+        placeholders
+    );
+
+    let mut priorities_stmt = connection.prepare(&sql).map_err(to_database_error)?;
+
+    let params: Vec<&dyn rusqlite::ToSql> = contract_ids
+        .iter()
+        .map(|id| id as &dyn rusqlite::ToSql)
+        .collect();
+    let priority_rows = priorities_stmt
+        .query_map(rusqlite::params_from_iter(params.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i32>(2)?,
+                row.get::<_, String>(3)?,
+            ))
         })
-        .collect()
+        .map_err(to_database_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(to_database_error)?;
+
+    let mut contracts = contracts;
+    let mut priority_map: std::collections::HashMap<String, Vec<TariffPriorityRecord>> =
+        std::collections::HashMap::new();
+    for (contract_id, book_id, priority, reason) in priority_rows {
+        priority_map
+            .entry(contract_id)
+            .or_default()
+            .push(TariffPriorityRecord {
+                tariff_book_id: book_id,
+                priority,
+                reason,
+            });
+    }
+
+    for contract in &mut contracts {
+        if let Some(priorities) = priority_map.remove(&contract.id) {
+            contract.tariff_priorities = priorities;
+        }
+    }
+
+    Ok(contracts)
 }
 
 pub fn get_contract(
     connection: &Connection,
     contract_id: &str,
 ) -> Result<Option<ContractRecord>, AppError> {
-    apply_migrations(connection).map_err(to_database_error)?;
-
     let mut contract = connection
         .query_row(
             "SELECT contracts.id, contracts.title, contracts.application_contract_code, contracts.framework_agreement_code, contracts.contractual_amount_cents
@@ -107,16 +150,12 @@ pub fn create_contract(
     request: CreateContractRequest,
 ) -> Result<ContractRecord, AppError> {
     validate_contract_request(&request)?;
-    apply_migrations(connection).map_err(to_database_error)?;
 
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
     let contractor_id = upsert_contractor(&transaction, request.contractor_name.as_deref())?;
 
-    let os_cents = request
-        .os_excluded_amount
-        .map(money_to_cents)
-        .unwrap_or(0);
+    let os_cents = request.os_excluded_amount.map(money_to_cents).unwrap_or(0);
 
     transaction
         .execute(
@@ -170,16 +209,12 @@ pub fn update_contract(
     request: UpdateContractRequest,
 ) -> Result<ContractRecord, AppError> {
     validate_contract_request(&request)?;
-    apply_migrations(connection).map_err(to_database_error)?;
 
     let transaction = connection.transaction().map_err(to_database_error)?;
     let amount_cents = money_to_cents(request.contractual_amount);
     let contractor_id = upsert_contractor(&transaction, request.contractor_name.as_deref())?;
 
-    let os_cents = request
-        .os_excluded_amount
-        .map(money_to_cents)
-        .unwrap_or(0);
+    let os_cents = request.os_excluded_amount.map(money_to_cents).unwrap_or(0);
 
     let updated = transaction
         .execute(
@@ -239,8 +274,6 @@ pub fn update_contract(
 }
 
 pub fn delete_contract(connection: &mut Connection, contract_id: &str) -> Result<(), AppError> {
-    apply_migrations(connection).map_err(to_database_error)?;
-
     let transaction = connection.transaction().map_err(to_database_error)?;
     transaction
         .execute(
@@ -314,7 +347,10 @@ fn upsert_contractor(
     transaction: &rusqlite::Transaction<'_>,
     contractor_name: Option<&str>,
 ) -> Result<Option<String>, AppError> {
-    let Some(name) = contractor_name.map(str::trim).filter(|name| !name.is_empty()) else {
+    let Some(name) = contractor_name
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    else {
         return Ok(None);
     };
 
@@ -383,15 +419,14 @@ fn validate_contract_request(request: &CreateContractRequest) -> Result<(), AppE
             || priority.reason.trim().is_empty()
         {
             return Err(AppError::Validation(
-                "le priorita tariffarie richiedono priorita positiva, ID tariffario e motivo".into(),
+                "le priorita tariffarie richiedono priorita positiva, ID tariffario e motivo"
+                    .into(),
             ));
         }
     }
 
     Ok(())
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -463,6 +498,7 @@ mod tests {
     #[test]
     fn creates_contract_without_tariff_priorities() {
         let mut connection = Connection::open_in_memory().expect("in-memory db");
+        apply_migrations(&connection).expect("schema applied");
         let mut request = sample_contract();
         request.tariff_priorities = Vec::new();
 

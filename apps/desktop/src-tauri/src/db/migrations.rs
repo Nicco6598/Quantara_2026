@@ -1,4 +1,4 @@
-pub const CURRENT_SCHEMA_VERSION: i32 = 1;
+pub const CURRENT_SCHEMA_VERSION: i32 = 4;
 const INITIAL_SCHEMA: &str = include_str!("../../migrations/0001_initial.sql");
 
 pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
@@ -14,6 +14,7 @@ pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<(
     ensure_contractors_migration(connection)?;
 
     connection.execute_batch(include_str!("../../migrations/0003_materials.sql"))?;
+    connection.execute_batch(include_str!("../../migrations/0004_indexes.sql"))?;
 
     Ok(())
 }
@@ -93,10 +94,7 @@ fn ensure_contract_migration(connection: &rusqlite::Connection) -> rusqlite::Res
     }
 
     // Add os_excluded_amount_cents if missing
-    if !columns
-        .iter()
-        .any(|c| c == "os_excluded_amount_cents")
-    {
+    if !columns.iter().any(|c| c == "os_excluded_amount_cents") {
         connection.execute(
             "ALTER TABLE contracts ADD COLUMN os_excluded_amount_cents INTEGER NOT NULL DEFAULT 0",
             [],

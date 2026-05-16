@@ -22,13 +22,12 @@ import {
 } from "react";
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
-import { MOTION_VARIANTS } from "@/components/shared/easings";
 import { useToast } from "@/components/shared/ToastProvider";
 
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 
 import type { ImportValidation } from "../tariffs-types";
-import { groupEditableTariffVoices } from "../utils/tariff-grouping";
+import { groupEditableTariffVoices, type VoiceGroup } from "../utils/tariff-grouping";
 import type { ImportDraft } from "../utils/tariff-import-drafts";
 import {
   createDraftName,
@@ -49,6 +48,262 @@ import { ImportMetric } from "./ImportMetric";
 import { ValidationLine } from "./ValidationLine";
 
 type InspectorTab = "checks" | "categories" | "issues";
+
+function MetricsBar({
+  totalVoices,
+  validation,
+}: {
+  totalVoices: number;
+  validation: ImportValidation;
+}) {
+  return (
+    <div className="grid grid-flow-dense gap-3 md:grid-cols-4">
+      <ImportMetric
+        caption="Totali rilevate"
+        icon={Files}
+        label="Righe rilevate"
+        tone="info"
+        value={totalVoices.toLocaleString("it-IT")}
+      />
+      <ImportMetric
+        caption="Pronte all'uso"
+        icon={CheckCircle2}
+        label="Valide"
+        tone={validation.validCount > 0 ? "success" : "warning"}
+        value={validation.validCount.toLocaleString("it-IT")}
+      />
+      <ImportMetric
+        caption="Da verificare"
+        icon={AlertTriangle}
+        label="Warning"
+        tone={validation.warningCount > 0 ? "warning" : "neutral"}
+        value={validation.warningCount.toLocaleString("it-IT")}
+      />
+      <ImportMetric
+        caption="Possibili duplicati"
+        icon={Archive}
+        label="Duplicati"
+        tone={validation.duplicateCount > 0 ? "warning" : "info"}
+        value={validation.duplicateCount.toLocaleString("it-IT")}
+      />
+    </div>
+  );
+}
+
+function VoicesPanel({
+  duplicateCodes,
+  editableGroups,
+  handleAddVoice,
+  updateVoice,
+  askDeleteVoice,
+  updateCategorySections,
+  gridRef,
+  gridScrollTarget,
+  activeValidation,
+  hasVoices,
+}: {
+  duplicateCodes: Set<string>;
+  editableGroups: VoiceGroup[];
+  handleAddVoice: () => void;
+  updateVoice: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  askDeleteVoice: (index: number) => void;
+  updateCategorySections: (next: TariffGridSectionSummary[]) => void;
+  gridRef: React.RefObject<EditableTariffVoicesGridHandle | null>;
+  gridScrollTarget: TariffGridScrollTarget | null;
+  activeValidation: ImportValidation;
+  hasVoices: boolean;
+}) {
+  return (
+    <>
+      <div className="min-w-0 self-start">
+        <EditableTariffVoicesGrid
+          duplicateCodes={duplicateCodes}
+          groups={editableGroups}
+          onAddVoice={handleAddVoice}
+          onChange={updateVoice}
+          onDelete={askDeleteVoice}
+          onSectionsChange={updateCategorySections}
+          ref={gridRef}
+          scrollTarget={gridScrollTarget}
+          validation={activeValidation}
+        />
+      </div>
+      {!hasVoices ? (
+        <div className="mt-4 rounded-2xl bg-[var(--warning-soft)] px-4 py-3 text-13px font-semibold text-[var(--warning-base)]">
+          Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento contenga
+          codici, unita di misura e prezzi leggibili.
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function FileTabs({
+  metadatas,
+  validations,
+  editableVoicesList,
+  modalReviewedFiles,
+  draftedFiles,
+  switchFile,
+  localActiveIndex,
+}: {
+  metadatas: TariffPdfMetadata[];
+  validations: ImportValidation[];
+  editableVoicesList: DesktopTariffVoice[][];
+  modalReviewedFiles: Set<number>;
+  draftedFiles: Set<number>;
+  switchFile: (index: number) => void;
+  localActiveIndex: number;
+}) {
+  return (
+    <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/25 px-5 py-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+          File import
+        </div>
+        <div className="text-12px font-semibold text-[var(--text-secondary)]">
+          {metadatas.length}/{metadatas.length} in revisione
+        </div>
+      </div>
+      <div className="flex gap-2 overflow-x-auto">
+        {metadatas.map((meta, i) => {
+          const v = validations[i];
+          const voices = editableVoicesList[i];
+          const hasErrors = (v?.invalidCount ?? 0) > 0 || (v?.duplicateCount ?? 0) > 0;
+          const isValid = (voices?.length ?? 0) > 0 && !hasErrors;
+          const isReviewed = modalReviewedFiles.has(i);
+          return (
+            <m.button
+              className={cn(
+                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-12px font-semibold transition-all duration-200",
+                i === localActiveIndex
+                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
+                  : draftedFiles.has(i)
+                    ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/30"
+                    : isReviewed
+                      ? "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/30"
+                      : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:text-[var(--text-primary)]",
+              )}
+              key={meta.name}
+              onClick={() => switchFile(i)}
+              type="button"
+            >
+              {draftedFiles.has(i) ? (
+                <Save className="size-3.5 shrink-0" />
+              ) : isReviewed ? (
+                <CheckCircle2 className="size-3.5 shrink-0" />
+              ) : isValid ? (
+                <CheckCircle2 className="size-3.5 shrink-0 text-[var(--success-base)]" />
+              ) : hasErrors ? (
+                <span className="size-3.5 shrink-0 rounded-full bg-[var(--warning-base)]" />
+              ) : null}
+              <span className="min-w-0 truncate">{meta.name}</span>
+              {draftedFiles.has(i) ? (
+                <span className="shrink-0 rounded-full bg-[var(--warning-base)]/15 px-1.5 py-0.5 text-9px font-bold uppercase tracking-wider text-[var(--warning-base)]">
+                  Bozza
+                </span>
+              ) : isReviewed ? (
+                <span className="shrink-0 rounded-full bg-[var(--success-base)]/15 px-1.5 py-0.5 text-9px font-bold uppercase tracking-wider text-[var(--success-base)]">
+                  Rev.
+                </span>
+              ) : null}
+            </m.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ModalFooter({
+  onCancel,
+  saveDraft,
+  loadedDraft,
+  discardDraft,
+  removeActiveFile,
+  toggleActiveFileDraft,
+  draftedFiles,
+  localActiveIndex,
+  markActiveFileReviewed,
+  modalReviewedFiles,
+  metadatas,
+  canConfirm,
+  isBusy,
+  confirmChanges,
+}: {
+  onCancel: () => void;
+  saveDraft: () => void;
+  loadedDraft: ImportDraft | null;
+  discardDraft: () => void;
+  removeActiveFile: () => void;
+  toggleActiveFileDraft: () => void;
+  draftedFiles: Set<number>;
+  localActiveIndex: number;
+  markActiveFileReviewed: () => void;
+  modalReviewedFiles: Set<number>;
+  metadatas: TariffPdfMetadata[];
+  canConfirm: boolean;
+  isBusy: boolean;
+  confirmChanges: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <Button onClick={onCancel} variant="outline">
+          Annulla
+        </Button>
+        <Button icon={Save} onClick={saveDraft} variant="secondary">
+          Salva bozza
+        </Button>
+        {loadedDraft ? (
+          <Button icon={Archive} onClick={discardDraft} variant="outline">
+            Elimina bozza
+          </Button>
+        ) : null}
+        {metadatas.length > 0 ? (
+          <Button icon={Trash2} onClick={removeActiveFile} variant="outline">
+            Cancella file
+          </Button>
+        ) : null}
+        {metadatas.length > 1 ? (
+          <Button icon={Save} onClick={toggleActiveFileDraft} variant="secondary">
+            {draftedFiles.has(localActiveIndex) ? "Salvato in bozza" : "Salva in bozza"}
+          </Button>
+        ) : null}
+        {metadatas.length > 1 && !modalReviewedFiles.has(localActiveIndex) ? (
+          <Button
+            disabled={draftedFiles.has(localActiveIndex)}
+            icon={CheckCircle2}
+            onClick={markActiveFileReviewed}
+            variant="secondary"
+          >
+            Segna come revisionato
+          </Button>
+        ) : null}
+        {metadatas.length > 1 && (modalReviewedFiles.size > 0 || draftedFiles.size > 0) ? (
+          <span className="text-12px font-medium text-[var(--text-secondary)]">
+            <span className="text-[var(--success-base)]">{modalReviewedFiles.size}</span>/
+            {metadatas.length} revisionati{" "}
+            <span className="text-[var(--warning-base)]">{draftedFiles.size}</span>/
+            {metadatas.length} in bozza
+          </span>
+        ) : null}
+      </div>
+      <Button
+        disabled={!canConfirm || isBusy}
+        icon={CheckCircle2}
+        onClick={confirmChanges}
+        variant="primary"
+      >
+        {metadatas.length > 1
+          ? modalReviewedFiles.size === metadatas.length
+            ? `Conferma tutti (${metadatas.length})`
+            : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
+          : "Conferma importazione"}
+      </Button>
+    </div>
+  );
+}
 
 export type TariffImportPreviewResult = TariffPdfMetadata & {
   importStatus: "active" | "draft";
@@ -320,6 +575,7 @@ export function TariffImportPreviewModal({
     setCategorySections((current) => (areSectionSummariesEqual(current, next) ? current : next));
   }, []);
   const scrollToVoiceIdRef = useRef<string | null>(null);
+  const [voiceAddedNonce, setVoiceAddedNonce] = useState(0);
   const localActiveIndex = pageView ? activeIndex : modalActiveIndex;
   const activeMetadata = metadatas[localActiveIndex];
   const activeVoices = editableVoicesList[localActiveIndex] ?? [];
@@ -432,9 +688,11 @@ export function TariffImportPreviewModal({
     };
     scrollToVoiceIdRef.current = voiceId;
     dispatch({ type: "ADD_VOICE", activeIndex: localActiveIndex, voice: newVoice });
+    setVoiceAddedNonce((n) => n + 1);
   }, [localActiveIndex, existingBookIds]);
 
   // Scroll to newly added voice row
+  // biome-ignore lint/correctness/useExhaustiveDependencies: voiceAddedNonce is a trigger that fires after ADD_VOICE dispatch sets scrollToVoiceIdRef
   useEffect(() => {
     const voiceId = scrollToVoiceIdRef.current;
     if (!voiceId) return;
@@ -449,7 +707,7 @@ export function TariffImportPreviewModal({
       }
     });
     return () => cancelAnimationFrame(frameId);
-  }, []);
+  }, [voiceAddedNonce]);
 
   const buildConfirmableMetadatas = useCallback(
     (nextEditableVoicesList: DesktopTariffVoice[][]) => {
@@ -726,186 +984,23 @@ export function TariffImportPreviewModal({
     />
   ) : null;
 
-  const MetricsBar = () => (
-    <div className="grid grid-flow-dense gap-3 md:grid-cols-4">
-      <ImportMetric
-        caption="Totali rilevate"
-        icon={Files}
-        label="Righe rilevate"
-        tone="info"
-        value={activeVoices.length.toLocaleString("it-IT")}
-      />
-      <ImportMetric
-        caption="Pronte all'uso"
-        icon={CheckCircle2}
-        label="Valide"
-        tone={activeValidation.validCount > 0 ? "success" : "warning"}
-        value={activeValidation.validCount.toLocaleString("it-IT")}
-      />
-      <ImportMetric
-        caption="Da verificare"
-        icon={AlertTriangle}
-        label="Warning"
-        tone={activeValidation.warningCount > 0 ? "warning" : "neutral"}
-        value={activeValidation.warningCount.toLocaleString("it-IT")}
-      />
-      <ImportMetric
-        caption="Possibili duplicati"
-        icon={Archive}
-        label="Duplicati"
-        tone={activeValidation.duplicateCount > 0 ? "warning" : "info"}
-        value={activeValidation.duplicateCount.toLocaleString("it-IT")}
-      />
-    </div>
-  );
-
-  const VoicesPanel = () => (
-    <>
-      <div className="min-w-0 self-start">
-        <EditableTariffVoicesGrid
-          duplicateCodes={duplicateCodes}
-          groups={editableGroups}
-          onAddVoice={handleAddVoice}
-          onChange={updateVoice}
-          onDelete={askDeleteVoice}
-          onSectionsChange={updateCategorySections}
-          ref={gridRef}
-          scrollTarget={gridScrollTarget}
-          validation={activeValidation}
-        />
-      </div>
-      {!hasVoices ? (
-        <div className="mt-4 rounded-2xl bg-[var(--warning-soft)] px-4 py-3 text-13px font-semibold text-[var(--warning-base)]">
-          Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento contenga
-          codici, unita di misura e prezzi leggibili.
-        </div>
-      ) : null}
-    </>
-  );
-
-  const FileTabs = () => (
-    <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/25 px-5 py-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
-          File import
-        </div>
-        <div className="text-12px font-semibold text-[var(--text-secondary)]">
-          {metadatas.length}/{metadatas.length} in revisione
-        </div>
-      </div>
-      <div className="flex gap-2 overflow-x-auto">
-        {metadatas.map((meta, i) => {
-          const v = validations[i];
-          const voices = editableVoicesList[i];
-          const hasErrors = (v?.invalidCount ?? 0) > 0 || (v?.duplicateCount ?? 0) > 0;
-          const isValid = (voices?.length ?? 0) > 0 && !hasErrors;
-          const isReviewed = modalReviewedFiles.has(i);
-          return (
-            <m.button
-              className={cn(
-                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-12px font-semibold transition-all duration-200",
-                i === localActiveIndex
-                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
-                  : draftedFiles.has(i)
-                    ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/30"
-                    : isReviewed
-                      ? "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/30"
-                      : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:text-[var(--text-primary)]",
-              )}
-              key={meta.name}
-              onClick={() => switchFile(i)}
-              type="button"
-            >
-              {draftedFiles.has(i) ? (
-                <Save className="size-3.5 shrink-0" />
-              ) : isReviewed ? (
-                <CheckCircle2 className="size-3.5 shrink-0" />
-              ) : isValid ? (
-                <CheckCircle2 className="size-3.5 shrink-0 text-[var(--success-base)]" />
-              ) : hasErrors ? (
-                <span className="size-3.5 shrink-0 rounded-full bg-[var(--warning-base)]" />
-              ) : null}
-              <span className="min-w-0 truncate">{meta.name}</span>
-              {draftedFiles.has(i) ? (
-                <span className="shrink-0 rounded-full bg-[var(--warning-base)]/15 px-1.5 py-0.5 text-9px font-bold uppercase tracking-wider text-[var(--warning-base)]">
-                  Bozza
-                </span>
-              ) : isReviewed ? (
-                <span className="shrink-0 rounded-full bg-[var(--success-base)]/15 px-1.5 py-0.5 text-9px font-bold uppercase tracking-wider text-[var(--success-base)]">
-                  Rev.
-                </span>
-              ) : null}
-            </m.button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  const ModalFooter = () => (
-    <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
-        <Button onClick={onCancel} variant="outline">
-          Annulla
-        </Button>
-        <Button icon={Save} onClick={saveDraft} variant="secondary">
-          Salva bozza
-        </Button>
-        {loadedDraft ? (
-          <Button icon={Archive} onClick={discardDraft} variant="outline">
-            Elimina bozza
-          </Button>
-        ) : null}
-        {metadatas.length > 0 ? (
-          <Button icon={Trash2} onClick={removeActiveFile} variant="outline">
-            Cancella file
-          </Button>
-        ) : null}
-        {metadatas.length > 1 ? (
-          <Button icon={Save} onClick={toggleActiveFileDraft} variant="secondary">
-            {draftedFiles.has(localActiveIndex) ? "Salvato in bozza" : "Salva in bozza"}
-          </Button>
-        ) : null}
-        {metadatas.length > 1 && !modalReviewedFiles.has(localActiveIndex) ? (
-          <Button
-            disabled={draftedFiles.has(localActiveIndex)}
-            icon={CheckCircle2}
-            onClick={markActiveFileReviewed}
-            variant="secondary"
-          >
-            Segna come revisionato
-          </Button>
-        ) : null}
-        {metadatas.length > 1 && (modalReviewedFiles.size > 0 || draftedFiles.size > 0) ? (
-          <span className="text-12px font-medium text-[var(--text-secondary)]">
-            <span className="text-[var(--success-base)]">{modalReviewedFiles.size}</span>/
-            {metadatas.length} revisionati{" "}
-            <span className="text-[var(--warning-base)]">{draftedFiles.size}</span>/
-            {metadatas.length} in bozza
-          </span>
-        ) : null}
-      </div>
-      <Button
-        disabled={!canConfirm || isBusy}
-        icon={CheckCircle2}
-        onClick={confirmChanges}
-        variant="primary"
-      >
-        {metadatas.length > 1
-          ? modalReviewedFiles.size === metadatas.length
-            ? `Conferma tutti (${metadatas.length})`
-            : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
-          : "Conferma importazione"}
-      </Button>
-    </div>
-  );
-
   return pageView ? (
     <>
       <div className="flex w-full flex-col gap-5 pb-28 xl:pb-0 xl:pr-[360px]">
-        <MetricsBar />
+        <MetricsBar totalVoices={activeVoices.length} validation={activeValidation} />
         <div className="min-w-0">
-          <VoicesPanel />
+          <VoicesPanel
+            activeValidation={activeValidation}
+            askDeleteVoice={askDeleteVoice}
+            duplicateCodes={duplicateCodes}
+            editableGroups={editableGroups}
+            gridRef={gridRef}
+            gridScrollTarget={gridScrollTarget}
+            handleAddVoice={handleAddVoice}
+            hasVoices={hasVoices}
+            updateCategorySections={updateCategorySections}
+            updateVoice={updateVoice}
+          />
         </div>
       </div>
       <TariffImportReviewInspector
@@ -924,7 +1019,7 @@ export function TariffImportPreviewModal({
       {deleteDialog}
     </>
   ) : (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
       <m.button
         aria-label="Chiudi"
         className="absolute inset-0 cursor-default"
@@ -936,11 +1031,12 @@ export function TariffImportPreviewModal({
       />
       <m.div
         className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-        initial={MOTION_VARIANTS.dialog.initial}
-        transition={MOTION_VARIANTS.dialog.transition}
-        animate={MOTION_VARIANTS.dialog.animate}
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="flex min-h-0 flex-col rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+        <div className="flex min-h-0 flex-col rounded-22px bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
             <div className="min-w-0">
               <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
@@ -957,13 +1053,34 @@ export function TariffImportPreviewModal({
             </div>
           </div>
 
-          {metadatas.length > 1 ? <FileTabs /> : null}
+          {metadatas.length > 1 ? (
+            <FileTabs
+              draftedFiles={draftedFiles}
+              editableVoicesList={editableVoicesList}
+              localActiveIndex={localActiveIndex}
+              metadatas={metadatas}
+              modalReviewedFiles={modalReviewedFiles}
+              switchFile={switchFile}
+              validations={validations}
+            />
+          ) : null}
 
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
             <div className="min-h-0 overflow-y-auto p-5" data-tariff-preview-scroll>
-              <MetricsBar />
+              <MetricsBar totalVoices={activeVoices.length} validation={activeValidation} />
               <div className="mt-4 min-w-0">
-                <VoicesPanel />
+                <VoicesPanel
+                  activeValidation={activeValidation}
+                  askDeleteVoice={askDeleteVoice}
+                  duplicateCodes={duplicateCodes}
+                  editableGroups={editableGroups}
+                  gridRef={gridRef}
+                  gridScrollTarget={gridScrollTarget}
+                  handleAddVoice={handleAddVoice}
+                  hasVoices={hasVoices}
+                  updateCategorySections={updateCategorySections}
+                  updateVoice={updateVoice}
+                />
               </div>
             </div>
             <TariffImportReviewInspector
@@ -981,7 +1098,22 @@ export function TariffImportPreviewModal({
             />
           </div>
 
-          <ModalFooter />
+          <ModalFooter
+            canConfirm={canConfirm}
+            confirmChanges={confirmChanges}
+            discardDraft={discardDraft}
+            draftedFiles={draftedFiles}
+            isBusy={isBusy}
+            loadedDraft={loadedDraft}
+            localActiveIndex={localActiveIndex}
+            markActiveFileReviewed={markActiveFileReviewed}
+            metadatas={metadatas}
+            modalReviewedFiles={modalReviewedFiles}
+            onCancel={onCancel}
+            removeActiveFile={removeActiveFile}
+            saveDraft={saveDraft}
+            toggleActiveFileDraft={toggleActiveFileDraft}
+          />
         </div>
       </m.div>
       {deleteDialog}
