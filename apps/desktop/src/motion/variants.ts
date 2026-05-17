@@ -1,8 +1,10 @@
-import { motionDuration, motionEase } from "./tokens";
+import { motionDuration, motionEase, motionSpring } from "./tokens";
+
+const butteryTransition = { type: "spring", ...motionSpring.buttery } as const;
 
 export const motionVariants = {
   activeIndicator: {
-    transition: { duration: motionDuration.base, ease: motionEase.emphasized },
+    transition: butteryTransition,
   },
   dialogBackdrop: {
     animate: { opacity: 1 },
@@ -14,19 +16,19 @@ export const motionVariants = {
     animate: { opacity: 1, scale: 1, y: 0 },
     exit: { opacity: 0, scale: 0.99, y: 8 },
     initial: { opacity: 0, scale: 0.982, y: 18 },
-    transition: { duration: motionDuration.deliberate, ease: motionEase.entrance },
+    transition: butteryTransition,
   },
   listItem: {
     animate: { opacity: 1, x: 0, y: 0 },
     exit: { opacity: 0, x: -4, y: 0 },
     initial: { opacity: 0, x: -6, y: 0 },
-    transition: { duration: motionDuration.base, ease: motionEase.emphasized },
+    transition: butteryTransition,
   },
   popover: {
     animate: { opacity: 1, scale: 1, y: 0 },
     exit: { opacity: 0, scale: 0.99, y: -4 },
     initial: { opacity: 0, scale: 0.99, y: -8 },
-    transition: { duration: motionDuration.base, ease: motionEase.entrance },
+    transition: butteryTransition,
   },
   progress: {
     initial: { scaleX: 0 },
@@ -37,18 +39,18 @@ export const motionVariants = {
     animate: { opacity: 1, y: 0 },
     exit: { opacity: 0, y: -4 },
     initial: { opacity: 0, y: 14 },
-    transition: { duration: motionDuration.deliberate, ease: motionEase.entrance },
+    transition: butteryTransition,
   },
   subtleReveal: {
     animate: { opacity: 1, scale: 1, y: 0 },
     initial: { opacity: 0, scale: 0.995, y: 10 },
-    transition: { duration: motionDuration.deliberate, ease: motionEase.entrance },
+    transition: butteryTransition,
   },
   toast: {
     animate: { opacity: 1, scale: 1, y: 0 },
     exit: { opacity: 0, scale: 0.98, y: 8 },
     initial: { opacity: 0, scale: 0.985, y: 14 },
-    transition: { duration: motionDuration.deliberate, ease: motionEase.entrance },
+    transition: butteryTransition,
   },
 } as const;
 
@@ -64,7 +66,8 @@ export const MOTION_VARIANTS = {
   popover: motionVariants.popover,
   progress: motionVariants.progress,
   press: {
-    whileTap: { scale: 0.98 },
+    transition: { type: "spring", ...motionSpring.press },
+    whileTap: { scale: 0.985, y: 1 },
   },
   row: {
     initial: { opacity: 0, y: 8 },

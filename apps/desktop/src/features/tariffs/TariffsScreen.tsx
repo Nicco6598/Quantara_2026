@@ -668,17 +668,6 @@ export function TariffsScreen() {
     return () => window.removeEventListener("tariff-preview-action", handlePreviewAction);
   }, [handlePreviewAction]);
 
-  function scrollPreviewToTop() {
-    const host = getScrollableAncestor(screenRef.current);
-    if (host) {
-      host.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    document.documentElement.scrollTo?.({ top: 0, behavior: "smooth" });
-  }
-
   useEffect(() => {
     const unsub = useAppStore.subscribe((state) => {
       if (state.pendingWorkflowAction === "import-tariff") {
@@ -859,7 +848,6 @@ export function TariffsScreen() {
           }}
           onReviewedFilesChange={updateReviewedFiles}
           reviewedFiles={reviewedFiles}
-          scrollPreviewToTop={scrollPreviewToTop}
         />
       ) : (
         <>

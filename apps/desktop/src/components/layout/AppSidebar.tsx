@@ -8,7 +8,7 @@ import {
   SquaresFour,
   Users,
 } from "@phosphor-icons/react";
-import { m } from "framer-motion";
+import { LayoutGroup, m } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
 import { useAppStore } from "@/store/app-store";
@@ -22,6 +22,7 @@ import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import type { DesktopContract, DesktopMaterial } from "@/lib/desktopData";
 import { listDesktopContracts, listDesktopMaterials } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
+import { motionSpring } from "@/motion";
 import { readJsonFromStorage } from "@/persistence/json-storage";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import type { QuantaraRoute } from "@/store/app-store";
@@ -53,7 +54,8 @@ type AppSidebarProps = {
 };
 
 const SIDEBAR_WIDTH_EXPANDED = 220;
-const SIDEBAR_WIDTH_COLLAPSED = 0;
+const SIDEBAR_WIDTH_COLLAPSED = 72;
+const SIDEBAR_ACTIVE_TRANSITION = { type: "spring", ...motionSpring.buttery } as const;
 
 export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebarProps) {
   const activeContext = useActiveContext();
@@ -234,7 +236,6 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
       transition={{ type: "tween", duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
       <m.div
-        animate={{ opacity: collapsed ? 0 : 1 }}
         className="sidebar-rail relative flex min-h-0 w-full flex-col overflow-hidden p-3"
         transition={{ duration: 0.2, ease: "easeInOut" }}
       >
@@ -242,28 +243,32 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
           <SidebarHeader collapsed={collapsed} />
         </div>
 
-        <div className="mt-5 min-h-0 flex-1 overflow-hidden">
-          <SidebarGroup label="Workspace">
-            <SidebarNav
-              activeRoute={activeRoute}
-              contextLabel={contextLabel}
-              items={primaryNavItems}
-              onNavigate={onRouteChange}
-            />
-          </SidebarGroup>
+        <LayoutGroup id="sidebar-active-rail">
+          <div className="mt-5 min-h-0 flex-1 overflow-hidden">
+            <SidebarGroup collapsed={collapsed} label="Workspace">
+              <SidebarNav
+                activeRoute={activeRoute}
+                collapsed={collapsed}
+                contextLabel={contextLabel}
+                items={primaryNavItems}
+                onNavigate={onRouteChange}
+              />
+            </SidebarGroup>
 
-          <SidebarGroup className="mt-5" label="Sistema">
-            <SidebarNav
-              activeRoute={activeRoute}
-              contextLabel={null}
-              items={utilityNavItems}
-              onNavigate={onRouteChange}
-            />
-          </SidebarGroup>
-        </div>
+            <SidebarGroup collapsed={collapsed} className="mt-5" label="Sistema">
+              <SidebarNav
+                activeRoute={activeRoute}
+                collapsed={collapsed}
+                contextLabel={null}
+                items={utilityNavItems}
+                onNavigate={onRouteChange}
+              />
+            </SidebarGroup>
+          </div>
+        </LayoutGroup>
 
         <div className="shrink-0 pt-3">
-          <SidebarFooter />
+          <SidebarFooter collapsed={collapsed} />
         </div>
       </m.div>
     </m.aside>
@@ -276,9 +281,9 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
   return (
     <div
       className={cn(
-        "flex min-h-12 items-center rounded-18px",
+        "flex min-h-12 items-center rounded-18px transition-all duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
         collapsed
-          ? "justify-between px-2.5"
+          ? "justify-center px-1.5"
           : "justify-between bg-[color-mix(in_srgb,var(--surface-base)_56%,transparent)] px-2.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_46%,transparent)]",
       )}
     >
@@ -292,7 +297,7 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
           style={isDark ? { filter: "brightness(0) invert(1)" } : undefined}
           width={40}
         />
-        <div className="min-w-0">
+        <div className={cn("min-w-0 transition-opacity duration-200", collapsed && "sr-only")}>
           <div className="truncate text-13px font-650 leading-4 text-[var(--text-primary)]">
             Quantara
           </div>
@@ -308,15 +313,22 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
 function SidebarGroup({
   children,
   className,
+  collapsed,
   label,
 }: {
   children: React.ReactNode;
   className?: string;
+  collapsed: boolean;
   label: string;
 }) {
   return (
     <section className={cn("min-w-0", className)}>
-      <div className="mb-2 px-2 text-9px font-700 uppercase tracking-0_14em text-[color-mix(in_srgb,var(--text-secondary)_64%,transparent)]">
+      <div
+        className={cn(
+          "mb-2 px-2 text-9px font-700 uppercase tracking-0_14em text-[color-mix(in_srgb,var(--text-secondary)_64%,transparent)]",
+          collapsed && "sr-only",
+        )}
+      >
         {label}
       </div>
       {children}
@@ -327,12 +339,14 @@ function SidebarGroup({
 function SidebarNav({
   activeRoute,
   className,
+  collapsed,
   contextLabel,
   items,
   onNavigate,
 }: {
   activeRoute: QuantaraRoute;
   className?: string;
+  collapsed: boolean;
   contextLabel: { primary: string; secondary: string | null } | null;
   items: NavItem[];
   onNavigate: (route: QuantaraRoute) => void;
@@ -343,8 +357,13 @@ function SidebarNav({
         const isActive = isRouteActive(item.route, activeRoute);
         return (
           <div key={item.route}>
-            <SidebarNavItem active={isActive} item={item} onClick={() => onNavigate(item.route)} />
-            {isActive && contextLabel && (
+            <SidebarNavItem
+              active={isActive}
+              collapsed={collapsed}
+              item={item}
+              onClick={() => onNavigate(item.route)}
+            />
+            {!collapsed && isActive && contextLabel && (
               <SidebarContextBreadcrumb
                 label={contextLabel as SidebarContextInfo}
                 onNavigate={onNavigate}
@@ -415,10 +434,12 @@ function SidebarContextBreadcrumb({
 
 function SidebarNavItem({
   active,
+  collapsed,
   item,
   onClick,
 }: {
   active: boolean;
+  collapsed: boolean;
   item: NavItem;
   onClick: () => void;
 }) {
@@ -429,27 +450,43 @@ function SidebarNavItem({
       aria-label={item.label}
       className={cn(
         "group relative flex w-full select-none items-center overflow-hidden rounded-14px text-left outline-none transition-all duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
-        "min-h-[50px] gap-2.5 px-2.5 py-2.5",
+        collapsed
+          ? "min-h-[48px] justify-center px-1.5 py-2"
+          : "min-h-[50px] gap-2.5 px-2.5 py-2.5",
         active
           ? "text-[var(--text-primary)]"
           : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring-focus)]",
       )}
       onClick={onClick}
+      title={collapsed ? item.label : undefined}
       type="button"
     >
       {active ? (
-        <span className="absolute inset-0 rounded-14px bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--accent-primary)_12%)] shadow-[0_8px_22px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--surface-highlight)_70%,transparent)]" />
+        <m.span
+          className={cn(
+            "absolute bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--accent-primary)_12%)] shadow-[0_8px_22px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--surface-highlight)_70%,transparent)]",
+            collapsed
+              ? "left-1/2 top-1/2 size-11 -translate-x-1/2 -translate-y-1/2 rounded-16px"
+              : "inset-0 rounded-14px",
+          )}
+          layoutId="sidebar-active-surface"
+          transition={SIDEBAR_ACTIVE_TRANSITION}
+        />
       ) : (
         <span className="absolute inset-0 rounded-14px bg-[color-mix(in_srgb,var(--surface-base)_58%,transparent)] opacity-0 transition-opacity duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:opacity-100" />
       )}
 
       {active ? (
-        <span
+        <m.span
           className={cn(
-            "absolute rounded-full bg-[var(--accent-primary)]",
-            "left-1.5 top-1/2 h-4 w-1 -translate-y-1/2",
+            "absolute rounded-full bg-[var(--accent-primary)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-primary)_10%,transparent)]",
+            collapsed
+              ? "bottom-[7px] left-1/2 h-1 w-[22px] -translate-x-1/2"
+              : "left-[7px] top-1/2 h-[22px] w-1 -translate-y-1/2",
           )}
+          layoutId="sidebar-active-indicator"
+          transition={SIDEBAR_ACTIVE_TRANSITION}
         />
       ) : null}
 
@@ -464,7 +501,7 @@ function SidebarNavItem({
         <NavIcon size={16} weight={active ? "fill" : "regular"} />
       </span>
 
-      <span className="relative z-10 min-w-0 flex-1 text-left">
+      <span className={cn("relative z-10 min-w-0 flex-1 text-left", collapsed && "sr-only")}>
         <span className="flex min-w-0 items-center justify-between gap-2">
           <span className="block min-w-0 truncate text-13px font-650 leading-4">{item.label}</span>
           {item.badges ? <BadgeCluster badges={item.badges} /> : null}
@@ -517,21 +554,23 @@ function NavBadgePill({
   );
 }
 
-function SidebarFooter() {
+function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   return (
     <footer className="select-none">
       <div
         className={cn(
           "group flex items-center gap-2.5 rounded-18px text-left transition-colors duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
           "bg-[color-mix(in_srgb,var(--surface-base)_58%,transparent)] p-2 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_46%,transparent)] hover:bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)]",
+          collapsed && "justify-center",
         )}
+        title={collapsed ? "Marco Bianchi - Project Manager" : undefined}
       >
         <div className="shrink-0">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-10px bg-[var(--accent-primary)] text-10px font-800 text-[var(--text-inverse)] shadow-[0_8px_18px_color-mix(in_srgb,var(--accent-primary)_16%,transparent)]">
             MB
           </div>
         </div>
-        <div className="min-w-0 flex-1">
+        <div className={cn("min-w-0 flex-1", collapsed && "sr-only")}>
           <div className="truncate text-12px font-650 leading-4 text-[var(--text-primary)]">
             Marco Bianchi
           </div>
@@ -545,12 +584,16 @@ function SidebarFooter() {
         className={cn(
           "mt-2 flex items-center gap-2 px-1 text-[12px] font-medium leading-none text-[var(--text-secondary)]",
           "justify-between px-1",
+          collapsed && "justify-center",
         )}
       >
-        <span className="tracking-normal">v{APP_VERSION}</span>
-        <span className="flex items-center gap-1">
+        <span className={cn("tracking-normal", collapsed && "sr-only")}>v{APP_VERSION}</span>
+        <span
+          className="flex items-center gap-1"
+          title={collapsed ? `v${APP_VERSION} - Online` : undefined}
+        >
           <span className="size-1 rounded-full bg-[var(--success-base)] shadow-[0_0_0_2px_color-mix(in_srgb,var(--success-base)_10%,transparent)]" />
-          Online
+          <span className={cn(collapsed && "sr-only")}>Online</span>
         </span>
       </div>
     </footer>

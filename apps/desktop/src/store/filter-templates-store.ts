@@ -16,7 +16,11 @@ export type FilterTemplate = {
 
 type FilterTemplatesStore = {
   templates: FilterTemplate[];
-  saveTemplate: (name: string, scope: FilterTemplateScope, filters: Record<string, unknown>) => FilterTemplate;
+  saveTemplate: (
+    name: string,
+    scope: FilterTemplateScope,
+    filters: Record<string, unknown>,
+  ) => FilterTemplate;
   deleteTemplate: (id: string) => void;
   applyTemplate: (id: string) => FilterTemplate | undefined;
   listTemplates: (scope: FilterTemplateScope) => FilterTemplate[];

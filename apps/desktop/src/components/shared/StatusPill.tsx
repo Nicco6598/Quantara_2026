@@ -7,6 +7,7 @@ type StatusPillProps = {
   tone?: StatusTone;
   dot?: boolean;
   className?: string;
+  title?: string;
 };
 
 export function StatusPill({
@@ -14,17 +15,19 @@ export function StatusPill({
   tone = "neutral",
   dot = false,
   className,
+  title,
 }: StatusPillProps) {
   return (
     <span
       className={cn(
-        "inline-flex w-fit items-center justify-center gap-1.5 rounded-full px-3 py-1 text-12px font-bold",
+        "inline-flex max-w-full min-w-0 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-12px font-bold",
         statusToneStyles[tone],
         className,
       )}
+      title={title}
     >
-      {dot ? <span className="size-1.5 rounded-full bg-current" /> : null}
-      {children}
+      {dot ? <span className="size-1.5 shrink-0 rounded-full bg-current" /> : null}
+      <span className="min-w-0 truncate">{children}</span>
     </span>
   );
 }

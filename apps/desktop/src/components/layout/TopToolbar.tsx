@@ -1,26 +1,19 @@
 import {
-  ArrowRight,
   Bell,
   CaretDown,
   CaretLeft,
   CaretRight,
   CheckCircle,
   FloppyDisk,
-  PlusCircle,
   Trash,
 } from "@phosphor-icons/react";
 import { AnimatePresence, m } from "framer-motion";
-import { CheckCircle2, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { AutoSaveIndicator } from "@/components/shared/AutoSaveIndicator";
 import { MOTION_DURATION, SPRING_EASE } from "@/motion";
 import { cn } from "@/lib/utils";
 import {
   useActiveRouteState,
   useHistoryNavigationState,
-  useProjectToolbarState,
-  useSalCurrentStep,
-  useSalToolbarState,
   useTariffImportToolbarState,
 } from "@/store/app-store";
 import {
@@ -30,14 +23,6 @@ import {
   routeActionOverrides,
   routeMetaMap,
 } from "./top-toolbar-config";
-
-function formatToolbarMoney(value: number): string {
-  return value.toLocaleString("it-IT", {
-    currency: "EUR",
-    maximumFractionDigits: 0,
-    style: "currency",
-  });
-}
 
 function ActionMarkIcon({ mark, size = 12 }: { mark: string; size?: number }) {
   const Icon = markIconMap[mark];
@@ -87,11 +72,7 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
         <div className="flex shrink-0 items-center gap-1.5">
           {isTariffPreview ? (
             <TariffImportControls onAction={onPageAction} />
-          ) : activeRoute === "sal-create" ? (
-            <SalToolbarControls onAction={onPageAction} />
-          ) : activeRoute === "project-create" ? (
-            <ProjectToolbarControls onAction={onPageAction} />
-          ) : (
+          ) : activeRoute === "sal-create" || activeRoute === "project-create" ? null : (
             <>
               <div className="top-toolbar-divider" />
               <PageActions actions={pageActions} onAction={onPageAction} />
@@ -318,281 +299,6 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
         <CheckCircle size={14} weight="bold" />
         <span>Approva import</span>
       </m.button>
-    </div>
-  );
-}
-
-function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void }) {
-  const salToolbar = useSalToolbarState();
-  const salCurrentStep = useSalCurrentStep();
-  const [showSavedFlash, setShowSavedFlash] = useState(false);
-
-  useEffect(() => {
-    if (salToolbar.autoSaveStatus === "saved") {
-      setShowSavedFlash(true);
-      const t = setTimeout(() => setShowSavedFlash(false), 2500);
-      return () => clearTimeout(t);
-    }
-  }, [salToolbar.autoSaveStatus]);
-
-  const isUnsaved = salToolbar.autoSaveStatus === "unsaved";
-  const isSaving = salToolbar.autoSaveStatus === "saving";
-  const showSaved = showSavedFlash && salToolbar.autoSaveStatus === "saved";
-
-  const buttonLabel = showSaved ? "Salvato" : isSaving ? "Salvataggio..." : "Salva bozza";
-
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-1 ring-1 ring-[var(--border-subtle)]/50">
-        <SalStepNav onAction={onAction} />
-      </div>
-      <div className="inline-flex items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3.5 py-1.5 text-11px font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)]">
-        <ToolbarMetric label="Totale" tone="accent" value={formatToolbarMoney(salToolbar.total)} />
-        <span className="h-7 w-px bg-[var(--border-subtle)]/50" />
-        <ToolbarMetric label="Voci" value={`${salToolbar.lineCount}/${salToolbar.voicesCount}`} />
-        <span className="h-7 w-px bg-[var(--border-subtle)]/50" />
-        <ToolbarMetric
-          label="Residuo"
-          tone={salToolbar.budgetResidual < 0 ? "danger" : "success"}
-          value={formatToolbarMoney(salToolbar.budgetResidual)}
-        />
-        {salToolbar.discountAmount > 0 ? (
-          <>
-            <span className="h-7 w-px bg-[var(--border-subtle)]/50" />
-            <ToolbarMetric
-              label="Ribasso"
-              tone="danger"
-              value={`-${formatToolbarMoney(salToolbar.discountAmount)}`}
-            />
-          </>
-        ) : null}
-      </div>
-      {salCurrentStep === 4 ? (
-        <m.button
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
-          onClick={() => onAction("sal-confirm")}
-          type="button"
-        >
-          <CheckCircle size={14} weight="bold" />
-          <span>Conferma SAL</span>
-        </m.button>
-      ) : null}
-      <m.button
-        className={cn(
-          "relative inline-flex h-10 items-center gap-2 rounded-full border px-4 text-12px font-bold transition-all duration-300",
-          showSaved
-            ? "border-[var(--success-base)]/30 bg-[var(--success-soft)] text-[var(--success-base)]"
-            : isSaving
-              ? "border-[var(--info-base)]/30 bg-[var(--info-soft)] text-[var(--info-base)]"
-              : isUnsaved
-                ? "border-[var(--warning-base)]/50 bg-[color-mix(in_srgb,var(--warning-base)_14%,var(--surface-base)_86%)] text-[var(--warning-base)] hover:bg-[color-mix(in_srgb,var(--warning-base)_22%,var(--surface-base)_78%)]"
-                : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-        )}
-        onClick={() => onAction("sal-save-draft")}
-        type="button"
-      >
-        {isUnsaved && (
-          <span className="absolute -top-0.5 -right-0.5 flex size-2.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--warning-base)] opacity-75" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-[var(--warning-base)]" />
-          </span>
-        )}
-        {showSaved ? (
-          <CheckCircle2 size={14} />
-        ) : isSaving ? (
-          <Loader2 size={14} className="animate-spin" />
-        ) : (
-          <FloppyDisk size={14} weight="bold" />
-        )}
-        <span>{buttonLabel}</span>
-        {salToolbar.autoSaveLastSaved && !showSaved && !isSaving && (
-          <span className="ml-1 text-10px font-medium opacity-50">
-            {new Date(salToolbar.autoSaveLastSaved).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
-          </span>
-        )}
-      </m.button>
-    </div>
-  );
-}
-
-function ProjectToolbarControls({ onAction }: { onAction: (actionId: string) => void }) {
-  const projectToolbar = useProjectToolbarState();
-
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-1 ring-1 ring-[var(--border-subtle)]/50">
-        {[1, 2].map((stepNum) => {
-          const isCurrent = projectToolbar.currentStep === stepNum;
-          const isCompleted = projectToolbar.currentStep > stepNum;
-          const isClickable = isCompleted || stepNum === projectToolbar.currentStep + 1;
-          return (
-            <div className="flex items-center" key={stepNum}>
-              {stepNum > 1 && (
-                <div
-                  className={cn(
-                    "mx-1 h-px w-4",
-                    isCompleted || isCurrent
-                      ? "bg-[var(--accent-primary)]"
-                      : "bg-[var(--border-subtle)]",
-                  )}
-                />
-              )}
-              <button
-                className={cn(
-                  "inline-flex h-10 items-center gap-2 rounded-full px-3.5 text-12px font-bold whitespace-nowrap transition-all duration-200",
-                  isCurrent && "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm",
-                  isCompleted && "bg-[var(--success-soft)] text-[var(--success-base)]",
-                  !isCurrent &&
-                    !isCompleted &&
-                    (isClickable
-                      ? "bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
-                      : "bg-[var(--bg-muted)]/50 text-[var(--text-secondary)]/50 cursor-not-allowed"),
-                )}
-                onClick={() => {
-                  if (isClickable)
-                    onAction(stepNum === 1 ? "project-goto-step-1" : "project-goto-step-2");
-                }}
-                type="button"
-              >
-                <span className="text-11px">{stepNum === 1 ? "01" : "02"}</span>
-                <span>{stepNum === 1 ? "Dati" : "Economico"}</span>
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {projectToolbar.error ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--danger-soft)] px-3 py-1.5 text-11px font-semibold text-[var(--danger-base)]">
-          {projectToolbar.error}
-        </span>
-      ) : null}
-
-      <AutoSaveIndicator
-        lastSaved={projectToolbar.autoSaveLastSaved}
-        status={projectToolbar.autoSaveStatus}
-      />
-
-      <div className="flex items-center gap-1.5">
-        {projectToolbar.currentStep === 1 ? (
-          <button
-            className={cn(
-              "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-12px font-bold text-[var(--text-inverse)] shadow-sm transition-colors",
-              projectToolbar.canGoNext
-                ? "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90"
-                : "bg-[var(--accent-primary)]/50 cursor-not-allowed",
-            )}
-            disabled={!projectToolbar.canGoNext}
-            onClick={() => onAction("project-goto-step-2")}
-            type="button"
-          >
-            Avanti
-            <ArrowRight size={14} weight="bold" />
-          </button>
-        ) : (
-          <button
-            className={cn(
-              "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-12px font-bold text-[var(--text-inverse)] shadow-sm transition-colors",
-              projectToolbar.canSubmit && !projectToolbar.isSaving
-                ? "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90"
-                : "bg-[var(--accent-primary)]/50 cursor-not-allowed",
-            )}
-            disabled={!projectToolbar.canSubmit || projectToolbar.isSaving}
-            onClick={() => onAction("project-submit")}
-            type="button"
-          >
-            <PlusCircle size={14} weight="bold" />
-            <span>
-              {projectToolbar.isSaving
-                ? "Salvataggio"
-                : projectToolbar.isEditing
-                  ? "Salva modifiche"
-                  : "Crea progetto"}
-            </span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ToolbarMetric({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone?: "accent" | "danger" | "success";
-  value: string;
-}) {
-  return (
-    <div className="flex flex-col justify-center gap-0.5 leading-none">
-      <span className="text-10px font-semibold text-[var(--text-secondary)]">{label}</span>
-      <span
-        className={cn(
-          "max-w-[140px] truncate text-13px font-black tabular-nums text-[var(--text-primary)]",
-          tone === "accent" && "text-[var(--accent-primary)]",
-          tone === "danger" && "text-[var(--danger-base)]",
-          tone === "success" && "text-[var(--success-base)]",
-        )}
-        title={value}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function SalStepNav({ onAction }: { onAction?: (actionId: string) => void }) {
-  const salCurrentStep = useSalCurrentStep();
-
-  const steps = [
-    { label: "Impostazioni", icon: "01", actionId: "sal-goto-step-1" },
-    { label: "Voci", icon: "02", actionId: "sal-goto-step-2" },
-    { label: "Verifica", icon: "03", actionId: "sal-goto-step-3" },
-    { label: "Conferma", icon: "04", actionId: "sal-goto-step-4" },
-  ];
-
-  return (
-    <div className="flex flex-wrap items-center gap-1">
-      {steps.map((step, index) => {
-        const stepNumber = index + 1;
-        const isCurrent = salCurrentStep === stepNumber;
-        const isCompleted = salCurrentStep > stepNumber;
-        const isClickable = isCompleted || stepNumber === salCurrentStep + 1;
-
-        return (
-          <div className="flex items-center" key={step.label}>
-            {index > 0 && (
-              <div
-                className={cn(
-                  "mx-1 h-px w-4",
-                  isCompleted ? "bg-[var(--accent-primary)]" : "bg-[var(--border-subtle)]",
-                )}
-              />
-            )}
-            <button
-              className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-full px-3.5 text-12px font-bold whitespace-nowrap transition-all duration-200",
-                isCurrent && "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm",
-                isCompleted && "bg-[var(--success-soft)] text-[var(--success-base)]",
-                !isCurrent &&
-                  !isCompleted &&
-                  (isClickable
-                    ? "bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
-                    : "bg-[var(--bg-muted)]/50 text-[var(--text-secondary)]/50 ring-1 ring-[var(--border-subtle)]/50 cursor-not-allowed"),
-              )}
-              onClick={() => {
-                if (isClickable && onAction) onAction(step.actionId);
-              }}
-              type="button"
-            >
-              <span className="text-11px">{step.icon}</span>
-              <span>{step.label}</span>
-            </button>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -911,9 +617,11 @@ function PageActionMenu({
 }
 
 function UtilityButtons({ onAction }: { onAction: (actionId: string) => void }) {
+  void onAction;
+
   return (
     <div className="flex items-center gap-1">
-      <UtilityButton label="Notifiche" onClick={() => onAction("notifications")}>
+      <UtilityButton disabled label="Notifiche non disponibili">
         <Bell size={15} weight="regular" />
       </UtilityButton>
     </div>
@@ -924,14 +632,20 @@ function UtilityButton({
   children,
   label,
   onClick,
+  disabled,
 }: {
   children: React.ReactNode;
+  disabled?: boolean;
   label: string;
   onClick?: () => void;
 }) {
   return (
     <m.button
-      className="top-toolbar-icon-button relative flex size-9 items-center justify-center rounded-full text-[var(--text-secondary)]"
+      className={cn(
+        "top-toolbar-icon-button relative flex size-9 items-center justify-center rounded-full text-[var(--text-secondary)]",
+        disabled && "cursor-not-allowed opacity-45",
+      )}
+      disabled={disabled}
       onClick={onClick}
       title={label}
       type="button"

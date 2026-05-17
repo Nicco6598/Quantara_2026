@@ -1,6 +1,5 @@
 import { m } from "framer-motion";
 import {
-  ArrowUp,
   CheckCircle2,
   Database,
   Eye,
@@ -292,7 +291,6 @@ export function TariffImportPreviewPanel({
   onPageCanConfirmChange,
   onReviewedFilesChange,
   reviewedFiles,
-  scrollPreviewToTop,
 }: {
   draftedImportFiles: Set<number>;
   getExistingBookIds: () => string[];
@@ -305,7 +303,6 @@ export function TariffImportPreviewPanel({
   onPageCanConfirmChange: (value: boolean) => void;
   onReviewedFilesChange: (next: Set<number>) => void;
   reviewedFiles: Set<number>;
-  scrollPreviewToTop: () => void;
 }) {
   return (
     <div className="-mx-4 -mt-4 flex flex-col md:-mx-6">
@@ -365,23 +362,6 @@ export function TariffImportPreviewPanel({
           pageView
         />
       </div>
-      <m.button
-        id="fab-back-to-top"
-        className="group fixed bottom-6 right-6 z-[120] flex h-11 w-11 items-center justify-start gap-2 overflow-hidden rounded-full bg-[var(--accent-primary)] px-3 text-[var(--text-inverse)] shadow-lg outline-none ring-1 ring-white/10 transition-[width,box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:w-40 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-        initial={MOTION_VARIANTS.popover.initial}
-        animate={MOTION_VARIANTS.popover.animate}
-        onClick={scrollPreviewToTop}
-        transition={MOTION_VARIANTS.popover.transition}
-        type="button"
-        title="Torna su"
-      >
-        <span className="flex size-5 shrink-0 items-center justify-center">
-          <ArrowUp className="size-5" />
-        </span>
-        <span className="whitespace-nowrap text-12px font-bold opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          Torna in cima
-        </span>
-      </m.button>
     </div>
   );
 }

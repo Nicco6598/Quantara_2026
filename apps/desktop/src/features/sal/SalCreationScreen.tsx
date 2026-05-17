@@ -30,6 +30,7 @@ import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useNavigate } from "@/hooks/useNavigate";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
+import { motionDuration, motionEase, motionSpring } from "@/motion";
 import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowService } from "@/services/sal-service";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
@@ -88,6 +89,39 @@ import type {
 } from "./types";
 
 const CREATED_FLAG_KEY = SESSION_STORAGE_KEYS.salCreated;
+const SAL_STEPPER_SPRING = { type: "spring", ...motionSpring.panel } as const;
+const SAL_STEPPER_REVEAL = {
+  duration: motionDuration.deliberate,
+  ease: motionEase.emphasized,
+} as const;
+
+const SAL_PHASES: Exclude<SalWorkflowPhase, "completed">[] = [
+  "context",
+  "voices",
+  "review",
+  "confirm",
+];
+
+const SAL_PHASE_LABELS: Record<Exclude<SalWorkflowPhase, "completed">, string> = {
+  confirm: "Conferma",
+  context: "Impostazioni",
+  review: "Verifica",
+  voices: "Voci",
+};
+
+const SAL_PHASE_DESCRIPTIONS: Record<Exclude<SalWorkflowPhase, "completed">, string> = {
+  confirm: "Chiusura SAL",
+  context: "Progetto e tariffario",
+  review: "Controlli e materiali",
+  voices: "Misure e importi",
+};
+
+const SAL_PRIMARY_LABELS: Record<Exclude<SalWorkflowPhase, "completed">, string> = {
+  confirm: "Conferma SAL",
+  context: "Vai alle voci",
+  review: "Vai alla conferma",
+  voices: "Verifica SAL",
+};
 
 export function SalCreationScreen() {
   const { notify } = useToast();
@@ -244,7 +278,7 @@ export function SalCreationScreen() {
     if (draft.selectedTariffBookIds?.length > 0) {
       data.restoreTariffBookIds(draft.selectedTariffBookIds);
     }
-  }, [data.project, data.voices, data.restoreTariffBookIds]);
+  }, [data.project, data.restoreTariffBookIds]);
 
   const voicesMap = useMemo(() => new Map(data.voices.map((v) => [v.id, v])), [data.voices]);
 
@@ -321,6 +355,23 @@ export function SalCreationScreen() {
     [lineViews, summary, economicRules],
   );
   const hasDangerChecks = checks.some((check) => check.tone === "danger");
+  const canContinue = canContinueSalPhase({
+    checks,
+    lineViews,
+    lines,
+    phase,
+    project: data.project,
+    selectedTariffBooks: data.selectedTariffBooks,
+  });
+  const currentDisabledReason = canContinue
+    ? null
+    : disabledReason(
+        phase,
+        data.project,
+        data.selectedTariffBooks[0] ?? null,
+        lineViews,
+        hasDangerChecks,
+      );
 
   const previousSalLines = useMemo(() => {
     if (voicesMap.size === 0) return [];
@@ -500,26 +551,9 @@ export function SalCreationScreen() {
   );
 
   async function goPrimary() {
-    const canContinue =
-      phase === "context"
-        ? Boolean(data.project && data.selectedTariffBooks.length > 0)
-        : phase === "voices"
-          ? lines.length > 0 && lineViews.every((l) => l.status === "complete")
-          : phase === "review"
-            ? checks.every((c) => c.tone !== "danger") && lines.length > 0
-            : phase === "confirm"
-              ? lines.length > 0 && !checks.some((c) => c.tone === "danger")
-              : true;
-
     if (!canContinue) {
       notify({
-        message: disabledReason(
-          phase,
-          data.project,
-          data.selectedTariffBooks[0] ?? null,
-          lineViews,
-          hasDangerChecks,
-        ),
+        message: currentDisabledReason ?? "Completa i campi richiesti prima di proseguire.",
         title: "Attenzione",
         tone: "warning",
       });
@@ -707,7 +741,7 @@ export function SalCreationScreen() {
     setSalAutoSaveStatus((prev) => (prev === "saving" || prev === "error" ? prev : "unsaved"));
     if (debounceAutoSave.current) clearTimeout(debounceAutoSave.current);
     debounceAutoSave.current = setTimeout(persistDraftSilent, 800);
-  }, [lines, economicRules, materialUsage, salTitle, salDate, persistDraftSilent]);
+  }, [persistDraftSilent]);
 
   // Periodic auto-save every 30s if there are changes
   useEffect(() => {
@@ -921,6 +955,9 @@ export function SalCreationScreen() {
           />
         ) : (
           <SalEditorContent
+            autoSaveLastSaved={salAutoSaveLastSaved}
+            autoSaveStatus={salAutoSaveStatus}
+            canContinue={canContinue}
             checks={checks}
             compareLines={compareLines}
             contracts={data.contracts}
@@ -941,6 +978,9 @@ export function SalCreationScreen() {
             materials={materials}
             notify={notify}
             onAutoSave={handleAutoSave}
+            onPhaseChange={(nextPhase) => setPhase(nextPhase)}
+            onPrimary={goPrimary}
+            onSaveDraft={handleSaveDraft}
             onMaterialUsageChange={(usage) =>
               dispatch({ type: "MATERIAL_USAGE", materialUsage: usage })
             }
@@ -961,6 +1001,7 @@ export function SalCreationScreen() {
             upsertLine={upsertLine}
             project={data.project}
             phase={phase}
+            primaryDisabledReason={currentDisabledReason}
             tariffBookId={data.selectedTariffBook?.id ?? ""}
           />
         )}
@@ -985,6 +1026,9 @@ export function SalCreationScreen() {
 
 /* ── Editor content ── */
 function SalEditorContent({
+  autoSaveLastSaved,
+  autoSaveStatus,
+  canContinue,
   checks,
   compareLines,
   contracts,
@@ -1006,11 +1050,15 @@ function SalEditorContent({
   materials,
   notify,
   onAutoSave,
+  onPhaseChange,
+  onPrimary,
   onMaterialUsageChange,
   onMaterialsChange,
+  onSaveDraft,
   onToggleCompare,
   previousSalLines,
   phase,
+  primaryDisabledReason,
   removeLine,
   salDate,
   salTitle,
@@ -1025,6 +1073,9 @@ function SalEditorContent({
   tariffBookId,
   upsertLine,
 }: {
+  autoSaveLastSaved: string | null;
+  autoSaveStatus: "idle" | "saving" | "saved" | "error" | "unsaved";
+  canContinue: boolean;
   checks: ReturnType<typeof buildVerificationChecks>;
   compareLines: SalLineView[] | null;
   contracts: { id: string; title: string; contractor?: string }[];
@@ -1046,11 +1097,15 @@ function SalEditorContent({
   materials: DesktopMaterial[];
   notify: ReturnType<typeof useToast>["notify"];
   onAutoSave: () => void;
+  onPhaseChange: (phase: Exclude<SalWorkflowPhase, "completed">) => void;
+  onPrimary: () => void;
   onMaterialUsageChange: (usage: Record<string, number>) => void;
   onMaterialsChange: (mats: DesktopMaterial[]) => void;
+  onSaveDraft: () => void;
   onToggleCompare: () => void;
   previousSalLines: SalLineView[];
   phase: SalWorkflowPhase;
+  primaryDisabledReason: string | null;
   removeLine: (lineId: string) => void;
   salDate: string;
   salTitle: string;
@@ -1067,6 +1122,19 @@ function SalEditorContent({
 }) {
   return (
     <>
+      <SalLocalWizardControls
+        autoSaveLastSaved={autoSaveLastSaved}
+        autoSaveStatus={autoSaveStatus}
+        canContinue={canContinue}
+        lineCount={lineViews.length}
+        onPhaseChange={onPhaseChange}
+        onPrimary={onPrimary}
+        onSaveDraft={onSaveDraft}
+        phase={phase}
+        primaryDisabledReason={primaryDisabledReason}
+        project={project}
+        total={summary.total}
+      />
       {dataError ? (
         <FeedbackBanner tone="danger" title="Caricamento fallito" message={dataError} />
       ) : null}
@@ -1141,6 +1209,227 @@ function SalEditorContent({
       ) : null}
     </>
   );
+}
+
+function SalLocalWizardControls({
+  autoSaveLastSaved,
+  autoSaveStatus,
+  canContinue,
+  lineCount,
+  onPhaseChange,
+  onPrimary,
+  onSaveDraft,
+  phase,
+  primaryDisabledReason,
+  project,
+  total,
+}: {
+  autoSaveLastSaved: string | null;
+  autoSaveStatus: "idle" | "saving" | "saved" | "error" | "unsaved";
+  canContinue: boolean;
+  lineCount: number;
+  onPhaseChange: (phase: Exclude<SalWorkflowPhase, "completed">) => void;
+  onPrimary: () => void;
+  onSaveDraft: () => void;
+  phase: SalWorkflowPhase;
+  primaryDisabledReason: string | null;
+  project: SalProjectContext | null;
+  total: number;
+}) {
+  const currentPhaseIndex = Math.max(
+    0,
+    SAL_PHASES.indexOf(phase as Exclude<SalWorkflowPhase, "completed">),
+  );
+  const progress = ((currentPhaseIndex + 1) / SAL_PHASES.length) * 100;
+  const statusLabel =
+    autoSaveStatus === "saving"
+      ? "Salvataggio..."
+      : autoSaveStatus === "saved"
+        ? `Bozza aggiornata${autoSaveLastSaved ? ` alle ${formatDraftTime(autoSaveLastSaved)}` : ""}`
+        : autoSaveStatus === "error"
+          ? "Salvataggio non riuscito"
+          : autoSaveStatus === "unsaved"
+            ? "Modifiche non ancora salvate"
+            : "Bozza locale attiva";
+
+  return (
+    <section className="overflow-hidden rounded-22px bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/70">
+      <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 text-11px font-semibold text-[var(--text-secondary)]">
+            <span className="rounded-md bg-[var(--bg-muted)] px-2.5 py-1 text-12px text-[var(--text-primary)]">
+              Step {currentPhaseIndex + 1}/{SAL_PHASES.length}
+            </span>
+            <span className="text-12px text-[var(--text-primary)]">
+              {SAL_PHASE_LABELS[phase as Exclude<SalWorkflowPhase, "completed">]}
+            </span>
+            <span className="hidden text-[var(--border-subtle)] sm:inline">/</span>
+            <span className="truncate">{project?.title ?? "Nuovo SAL"}</span>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-4">
+            {SAL_PHASES.map((step, index) => {
+              const isCurrent = step === phase;
+              const isDone = index < currentPhaseIndex;
+              return (
+                <m.button
+                  key={step}
+                  animate={{
+                    scale: isCurrent ? 1.012 : 1,
+                    y: isCurrent ? -1 : 0,
+                  }}
+                  className={cn(
+                    "relative overflow-hidden rounded-18px px-3.5 py-3 text-left ring-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
+                    isCurrent
+                      ? "ring-[color-mix(in_srgb,var(--accent-primary)_28%,transparent)]"
+                      : isDone
+                        ? "bg-[var(--success-soft)]/45 ring-[color-mix(in_srgb,var(--success-base)_18%,transparent)] hover:bg-[var(--success-soft)]/65"
+                        : "bg-[var(--bg-muted)]/45 ring-[var(--border-subtle)]/60 hover:bg-[var(--bg-muted)]/75",
+                  )}
+                  initial={false}
+                  layout
+                  onClick={() => onPhaseChange(step)}
+                  transition={SAL_STEPPER_SPRING}
+                  type="button"
+                  whileTap={{ scale: 0.985 }}
+                >
+                  {isCurrent ? (
+                    <m.span
+                      className="absolute inset-0 rounded-18px bg-[color-mix(in_srgb,var(--accent-primary)_9%,var(--surface-base)_91%)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_45%,transparent)]"
+                      layoutId="sal-stepper-active-surface"
+                      transition={SAL_STEPPER_SPRING}
+                    />
+                  ) : null}
+                  <div className="relative flex items-center gap-2.5">
+                    <m.span
+                      animate={{ scale: isCurrent ? 1.08 : 1 }}
+                      className={cn(
+                        "flex size-8 shrink-0 items-center justify-center rounded-13px text-12px font-bold shadow-[inset_0_1px_0_color-mix(in_srgb,white_30%,transparent)]",
+                        isCurrent
+                          ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                          : isDone
+                            ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
+                            : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]",
+                      )}
+                      layout
+                      transition={SAL_STEPPER_SPRING}
+                    >
+                      {!isCurrent && isDone ? <Check className="size-3.5" /> : index + 1}
+                    </m.span>
+                    <div className="min-w-0">
+                      <div className="truncate text-14px font-bold text-[var(--text-primary)]">
+                        {SAL_PHASE_LABELS[step]}
+                      </div>
+                      <div className="mt-1 truncate text-12px font-medium text-[var(--text-secondary)]">
+                        {SAL_PHASE_DESCRIPTIONS[step]}
+                      </div>
+                    </div>
+                  </div>
+                </m.button>
+              );
+            })}
+          </div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted)]">
+            <m.div
+              animate={{ scaleX: progress / 100 }}
+              className="h-full w-full origin-left rounded-full bg-[var(--accent-primary)]"
+              initial={false}
+              transition={SAL_STEPPER_REVEAL}
+            />
+          </div>
+        </div>
+
+        <div className="flex w-full flex-col gap-2.5 lg:w-[340px]">
+          <div className="overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--bg-muted)_12%)] ring-1 ring-[var(--border-subtle)]/65 shadow-[inset_0_1px_0_color-mix(in_srgb,white_42%,transparent)]">
+            <div className="bg-[color-mix(in_srgb,var(--accent-primary)_7%,transparent)] px-4 py-3">
+              <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                Totale SAL corrente
+              </div>
+              <m.div
+                key={Math.round(total * 100)}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className="mt-1 text-24px font-black leading-none tabular-nums text-[var(--accent-primary)]"
+                initial={{ opacity: 0.45, y: 7, scale: 0.985 }}
+                transition={SAL_STEPPER_REVEAL}
+              >
+                <Currency value={total} />
+              </m.div>
+              <div className="mt-2 flex items-center gap-2 text-11px font-medium text-[var(--text-secondary)]">
+                <span className="flex size-5 items-center justify-center rounded-8px bg-[var(--surface-base)] text-10px font-black text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]/60">
+                  {lineCount}
+                </span>
+                <span>voc{lineCount === 1 ? "e" : "i"} in bozza</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 px-4 py-3">
+              <span
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-11px",
+                  autoSaveStatus === "error"
+                    ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                    : autoSaveStatus === "unsaved" || autoSaveStatus === "saving"
+                      ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                      : "bg-[var(--success-soft)] text-[var(--success-base)]",
+                )}
+              >
+                <CheckCircle2 className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                  Stato bozza
+                </div>
+                <div className="mt-0.5 truncate text-12px font-semibold text-[var(--text-primary)]">
+                  {statusLabel}
+                </div>
+              </div>
+            </div>
+          </div>
+          {primaryDisabledReason ? (
+            <div className="rounded-md bg-[var(--warning-soft)] px-3 py-2 text-11px font-medium text-[var(--warning-base)]">
+              {primaryDisabledReason}
+            </div>
+          ) : null}
+          <div className="flex gap-2">
+            <m.button
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] px-4 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]/75 shadow-[inset_0_1px_0_color-mix(in_srgb,white_40%,transparent)] transition-colors hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-45"
+              disabled={!project}
+              initial={false}
+              onClick={onSaveDraft}
+              transition={SAL_STEPPER_SPRING}
+              type="button"
+              whileTap={{ scale: 0.985, y: 1 }}
+            >
+              <FileText className="size-4" />
+              Salva bozza
+            </m.button>
+            <m.button
+              aria-disabled={!canContinue}
+              className={cn(
+                "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full px-4 text-12px font-black shadow-[inset_0_1px_0_color-mix(in_srgb,white_28%,transparent)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]",
+                canContinue
+                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] hover:bg-[color-mix(in_srgb,var(--accent-primary)_88%,black_12%)]"
+                  : "bg-[color-mix(in_srgb,var(--accent-primary)_52%,var(--surface-base)_48%)] text-[var(--text-inverse)] opacity-85 hover:bg-[color-mix(in_srgb,var(--accent-primary)_62%,var(--surface-base)_38%)]",
+              )}
+              initial={false}
+              onClick={onPrimary}
+              transition={SAL_STEPPER_SPRING}
+              type="button"
+              whileTap={{ scale: 0.985, y: 1 }}
+            >
+              {SAL_PRIMARY_LABELS[phase as Exclude<SalWorkflowPhase, "completed">]}
+              <ArrowRight className="size-4" />
+            </m.button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function formatDraftTime(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 }
 
 /* ── Setup ── */
@@ -1496,6 +1785,29 @@ function SetupMetricsCards({
       <EconomicEquation className="mt-4" summary={summary} />
     </div>
   );
+}
+
+function canContinueSalPhase({
+  checks,
+  lineViews,
+  lines,
+  phase,
+  project,
+  selectedTariffBooks,
+}: {
+  checks: ReturnType<typeof buildVerificationChecks>;
+  lineViews: SalLineView[];
+  lines: SalLineDraft[];
+  phase: SalWorkflowPhase;
+  project: SalProjectContext | null;
+  selectedTariffBooks: SalTariffBookOption[];
+}): boolean {
+  if (phase === "context") return Boolean(project && selectedTariffBooks.length > 0);
+  if (phase === "voices")
+    return lines.length > 0 && lineViews.every((l) => l.status === "complete");
+  if (phase === "review") return checks.every((c) => c.tone !== "danger") && lines.length > 0;
+  if (phase === "confirm") return lines.length > 0 && !checks.some((c) => c.tone === "danger");
+  return true;
 }
 
 function disabledReason(

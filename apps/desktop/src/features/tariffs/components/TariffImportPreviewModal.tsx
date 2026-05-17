@@ -986,7 +986,7 @@ export function TariffImportPreviewModal({
 
   return pageView ? (
     <>
-      <div className="flex w-full flex-col gap-5 pb-28 xl:pb-0 xl:pr-[360px]">
+      <div className="flex w-full flex-col gap-5 pb-28 xl:pb-0 xl:pr-[410px]">
         <MetricsBar totalVoices={activeVoices.length} validation={activeValidation} />
         <div className="min-w-0">
           <VoicesPanel
@@ -1174,8 +1174,8 @@ function TariffImportReviewInspector({
 
   if (variant === "page") {
     return (
-      <aside className="fixed inset-x-4 bottom-4 z-20 xl:bottom-auto xl:left-auto xl:right-8 xl:top-[300px] xl:w-[336px]">
-        <div className="max-h-[58dvh] overflow-y-auto rounded-22px xl:max-h-[calc(100dvh-324px)]">
+      <aside className="fixed inset-x-3 bottom-3 z-20 xl:inset-x-auto xl:bottom-4 xl:left-auto xl:right-6 xl:top-28 xl:w-[380px]">
+        <div className="max-h-[68dvh] overflow-y-auto rounded-22px xl:max-h-[calc(100dvh-6rem-1rem)]">
           {body}
         </div>
       </aside>

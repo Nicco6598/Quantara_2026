@@ -3,10 +3,7 @@ import { BookmarkPlus, ChevronDown, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MOTION_VARIANTS } from "@/motion";
 import { cn } from "@/lib/utils";
-import {
-  type FilterTemplateScope,
-  useFilterTemplatesStore,
-} from "@/store/filter-templates-store";
+import { type FilterTemplateScope, useFilterTemplatesStore } from "@/store/filter-templates-store";
 
 type QuickTemplate = {
   label: string;
@@ -52,7 +49,10 @@ export function FilterTemplatePicker({
   const ref = useRef<HTMLDivElement>(null);
 
   const allTemplates = useFilterTemplatesStore((s) => s.templates);
-  const templates = useMemo(() => allTemplates.filter((t) => t.scope === scope), [allTemplates, scope]);
+  const templates = useMemo(
+    () => allTemplates.filter((t) => t.scope === scope),
+    [allTemplates, scope],
+  );
   const saveTemplate = useFilterTemplatesStore((s) => s.saveTemplate);
   const deleteTemplate = useFilterTemplatesStore((s) => s.deleteTemplate);
   const applyTemplate = useFilterTemplatesStore((s) => s.applyTemplate);
@@ -168,6 +168,7 @@ export function FilterTemplatePicker({
                   }}
                   placeholder="Nome template"
                   value={templateName}
+                  // biome-ignore lint/a11y/noAutofocus: intentional UX for save-template flow
                   autoFocus
                 />
                 <div className="mt-2 flex justify-end gap-1.5">
@@ -263,9 +264,7 @@ export function FilterTemplatePicker({
                             </button>
                             <button
                               aria-label={
-                                isPendingDelete
-                                  ? "Conferma eliminazione"
-                                  : `Elimina ${tpl.name}`
+                                isPendingDelete ? "Conferma eliminazione" : `Elimina ${tpl.name}`
                               }
                               className={cn(
                                 "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors",

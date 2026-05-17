@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { Button } from "@/components/shared/Button";
 import { SalHistoryBars, SpendingTrend } from "@/components/shared/charts";
 import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
+import { MetricCard } from "@/components/shared/MetricCard";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
@@ -53,7 +54,6 @@ import { useUndoStore } from "@/store/undo-store";
 import {
   DeleteConfirmDialog,
   InfoBlock,
-  MetricCard,
   MilestoneItem,
   Panel,
   PanelTitle,

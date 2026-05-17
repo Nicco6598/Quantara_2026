@@ -2,7 +2,7 @@
 
 All notable changes to Quantara follow SemVer.
 
-## 0.3.30 — 2026-05-16
+## 0.3.30 — 2026-05-17
 
 ### SAL ora nel database
 
@@ -23,6 +23,15 @@ All notable changes to Quantara follow SemVer.
 - **Selezione multipla più chiara** — la checkbox compare solo quando attivi la selezione multipla e lo spazio del testo si adatta senza salti visivi.
 - **Grafico SAL ridisegnato** — lo storico SAL ora mostra barre chiare sulle date reali dei documenti, con mesi evidenziati e giorni leggibili. Il grafico usa meglio lo spazio disponibile e il tooltip resta vicino al cursore.
 - **Grafico budget più leggibile nel tempo** — anche il grafico dell'andamento budget ora separa i mesi dai giorni: i mesi sono più evidenti, le date restano leggere. È più facile capire dove ci si trova nel calendario.
+
+### Esperienza più fluida
+
+- **Movimenti più morbidi in tutta l'app** — aperture, cambi pagina, menu, finestre e righe ora hanno una risposta più naturale. L'interfaccia sembra meno rigida e segue meglio il ritmo del lavoro.
+- **Wizard progetto e SAL più chiari** — gli step sono cliccabili direttamente, portano davvero alla schermata giusta e mostrano meglio dove ti trovi. Il passaggio tra gli step è più fluido e meno scattoso.
+- **Azioni SAL più ordinate** — nella lista del progetto, stato e comandi sono separati meglio: lo stato resta leggibile, mentre "Continua", "Approva" e il menu azioni stanno nella zona comandi.
+- **Meno doppioni visivi** — rimosse informazioni ripetute come lo stato "Approvata" mostrato due volte sulla stessa riga SAL.
+- **Dati importanti più visibili** — importi, voci e stato bozza nelle schermate SAL hanno più peso visivo, così si capisce prima cosa conta davvero.
+- **Barra superiore più pulita** — tolti gli stepper duplicati dalla toolbar quando stai creando progetti o SAL. La navigazione principale resta nella pagina, vicino ai contenuti.
 
 ### Più affidabile
 

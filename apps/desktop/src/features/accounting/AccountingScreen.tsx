@@ -198,9 +198,7 @@ export function AccountingScreen() {
   const selection = useMemo(() => {
     const ids = multiSelect.selectedIds;
     if (ids.size === 0) return sortedRows.map((r) => ({ doc: r.doc, view: r.view }));
-    return sortedRows
-      .filter((r) => ids.has(r.doc.id))
-      .map((r) => ({ doc: r.doc, view: r.view }));
+    return sortedRows.filter((r) => ids.has(r.doc.id)).map((r) => ({ doc: r.doc, view: r.view }));
   }, [sortedRows, multiSelect.selectedIds]);
 
   const metrics = useMemo(() => {
@@ -620,7 +618,8 @@ export function AccountingScreen() {
                       <FileBadge className="size-8" />
                     </div>
                     <p className="mt-7 max-w-[260px] text-14px font-medium leading-6 text-[var(--text-secondary)]">
-                      {multiSelect.count} SAL pront{multiSelect.count === 1 ? "o" : "i"} per il report contabile.
+                      {multiSelect.count} SAL pront{multiSelect.count === 1 ? "o" : "i"} per il
+                      report contabile.
                     </p>
                     <Button
                       className="mt-5 h-12 w-full justify-between"

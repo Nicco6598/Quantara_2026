@@ -1,9 +1,13 @@
 import { contractSchema } from "@quantara/validation";
+import { m } from "framer-motion";
 import {
+  ArrowLeft,
+  ArrowRight,
   Check,
   CircleAlert,
   FileText,
   Percent,
+  Save,
   Search,
   ShieldCheck,
   WalletCards,
@@ -12,12 +16,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
-import {
-  clearAutoDraft,
-  loadAutoDraft,
-  saveAutoDraft,
-  useAutoSave,
-} from "@/hooks/use-auto-save";
+import { clearAutoDraft, loadAutoDraft, saveAutoDraft, useAutoSave } from "@/hooks/use-auto-save";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   type CreateDesktopContractRequest,
@@ -30,11 +29,17 @@ import {
 
 import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { motionDuration, motionEase, motionSpring } from "@/motion";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 const PROJECT_AUTO_DRAFT_KEY = STORAGE_KEYS.projectAutoDraft;
+const PROJECT_STEPPER_SPRING = { type: "spring", ...motionSpring.panel } as const;
+const PROJECT_STEPPER_REVEAL = {
+  duration: motionDuration.deliberate,
+  ease: motionEase.emphasized,
+} as const;
 
 type ProjectFormState = {
   applicationContractCode: string;
@@ -92,6 +97,7 @@ export function ProjectCreateScreen() {
   const navigate = useNavigate();
   const [tariffBooks, setTariffBooks] = useState<DesktopTariffBook[]>([]);
   const [contractorOptions, setContractorOptions] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
   const initialValues = useMemo(() => {
@@ -199,7 +205,7 @@ export function ProjectCreateScreen() {
   useEffect(() => {
     if (!initialValues) {
       const savedDraft = loadAutoDraft<ProjectFormState>(PROJECT_AUTO_DRAFT_KEY);
-      if (savedDraft && savedDraft.title) {
+      if (savedDraft?.title) {
         restoredDraftRef.current = savedDraft;
         setShowRestoreDialog(true);
       }
@@ -218,12 +224,9 @@ export function ProjectCreateScreen() {
     setShowRestoreDialog(false);
   }, []);
 
-  const handleProjectAutoSave = useCallback(
-    (data: unknown) => {
-      saveAutoDraft(PROJECT_AUTO_DRAFT_KEY, data);
-    },
-    [],
-  );
+  const handleProjectAutoSave = useCallback((data: unknown) => {
+    saveAutoDraft(PROJECT_AUTO_DRAFT_KEY, data);
+  }, []);
 
   const autoSave = useAutoSave({
     data: draft,
@@ -241,13 +244,20 @@ export function ProjectCreateScreen() {
       currentStep: step,
       error,
       isEditing: !!initialValues,
-      isSaving: savingRef.current,
+      isSaving,
       totalSteps: 2,
     });
-  }, [autoSave.lastSaved, autoSave.status, canGoNext, error, initialValues, step, validation.canSubmit]);
+  }, [
+    autoSave.lastSaved,
+    autoSave.status,
+    canGoNext,
+    error,
+    initialValues,
+    isSaving,
+    step,
+    validation.canSubmit,
+  ]);
 
-  const validationRef = useRef(validation);
-  validationRef.current = validation;
   const handleSubmitRef = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
     const handler = (event: Event) => {
@@ -257,11 +267,6 @@ export function ProjectCreateScreen() {
         return;
       }
       if (actionId === "project-goto-step-2") {
-        const err = validationRef.current.identityError;
-        if (err) {
-          dispatch({ type: "SET_ERROR", payload: err });
-          return;
-        }
         dispatch({ type: "NAVIGATE_STEP", payload: { step: 2, error: "" } });
         return;
       }
@@ -284,11 +289,6 @@ export function ProjectCreateScreen() {
         if (target === 1) {
           dispatch({ type: "NAVIGATE_STEP", payload: { step: 1, error: "" } });
         } else if (target === 2) {
-          const err = validationRef.current.identityError;
-          if (err) {
-            dispatch({ type: "SET_ERROR", payload: err });
-            return;
-          }
           dispatch({ type: "NAVIGATE_STEP", payload: { step: 2, error: "" } });
         }
         useAppStore.getState().setProjectPendingStep(null);
@@ -340,6 +340,7 @@ export function ProjectCreateScreen() {
     }
 
     savingRef.current = true;
+    setIsSaving(true);
 
     try {
       const editingContractId = initialValues?.contractorName
@@ -381,11 +382,31 @@ export function ProjectCreateScreen() {
       dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : String(err) });
     } finally {
       savingRef.current = false;
+      setIsSaving(false);
     }
   }, [amount, draft, initialValues, navigate, notify, parsedDiscount, validation.submitError]);
 
   // Keep refs in sync with latest callback/validation
   handleSubmitRef.current = handleSubmit;
+
+  const handleGoToStep = useCallback((targetStep: 1 | 2) => {
+    dispatch({ type: "NAVIGATE_STEP", payload: { step: targetStep, error: "" } });
+  }, []);
+
+  const handleSaveDraft = useCallback(() => {
+    saveAutoDraft(PROJECT_AUTO_DRAFT_KEY, draft);
+    notify({ message: "Bozza progetto salvata.", title: "Bozza salvata", tone: "success" });
+  }, [draft, notify]);
+
+  const actionFeedback =
+    error ||
+    (step === 1
+      ? validation.identityError
+      : (validation.submitError ?? "Il progetto è pronto per la creazione."));
+  const actionFeedbackTone =
+    error || (step === 1 ? validation.identityError : validation.submitError)
+      ? "warning"
+      : "success";
 
   return (
     <main className="relative mx-auto w-full max-w-5xl px-4 pb-10 pt-6 md:px-6">
@@ -405,7 +426,7 @@ export function ProjectCreateScreen() {
           <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
             {initialValues ? "Modifica progetto" : "Nuovo progetto"}
           </div>
-          <h2 className="mt-2 max-w-3xl text-28px font-semibold leading-1_05 tracking-neg-0_035em text-[var(--text-primary)] md:text-38px">
+          <h2 className="mt-2 max-w-3xl text-30px font-semibold leading-1_05 text-[var(--text-primary)] md:text-38px">
             {step === 1 ? "Dati contratto e perimetro" : "Importo e perimetro economico"}
           </h2>
           <p className="mt-2 max-w-2xl text-13px font-medium leading-5 text-[var(--text-secondary)]">
@@ -416,7 +437,40 @@ export function ProjectCreateScreen() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_350px]">
+      <nav
+        aria-label="Avanzamento creazione progetto"
+        className="mt-6 rounded-22px bg-[var(--surface-base)]/80 p-4 ring-1 ring-[var(--border-subtle)]/70"
+      >
+        <div className="flex items-center gap-3">
+          <ProjectStepButton
+            description="Anagrafica e codici"
+            isActive={step === 1}
+            isComplete={validation.checks.identity}
+            label="Contratto"
+            onClick={() => handleGoToStep(1)}
+            stepNumber={1}
+          />
+          <div className="h-px flex-1 bg-[var(--border-subtle)]" />
+          <ProjectStepButton
+            description="Budget e tariffari"
+            isActive={step === 2}
+            isComplete={validation.canSubmit}
+            label="Economia"
+            onClick={() => handleGoToStep(2)}
+            stepNumber={2}
+          />
+        </div>
+        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted)]">
+          <m.div
+            animate={{ scaleX: step === 1 ? 0.5 : 1 }}
+            className="h-full w-full origin-left rounded-full bg-[var(--accent-primary)]"
+            initial={false}
+            transition={PROJECT_STEPPER_REVEAL}
+          />
+        </div>
+      </nav>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_350px]">
         <div className="min-w-0 rounded-2xl bg-[var(--surface-base)]/80 p-5 ring-1 ring-[var(--border-subtle)]/70 md:p-6">
           {step === 1 ? (
             <section>
@@ -667,6 +721,70 @@ export function ProjectCreateScreen() {
               </div>
             </section>
           )}
+
+          <div className="mt-6 border-t border-[var(--border-subtle)]/70 pt-5">
+            <ProjectActionFeedback message={actionFeedback} tone={actionFeedbackTone} />
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <m.button
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_86%,var(--bg-muted)_14%)] px-5 text-13px font-bold text-[var(--text-secondary)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_40%,transparent)] transition hover:bg-[var(--bg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] disabled:cursor-not-allowed disabled:opacity-45"
+                disabled={step === 1 || isSaving}
+                initial={false}
+                onClick={() => handleGoToStep(1)}
+                transition={PROJECT_STEPPER_SPRING}
+                type="button"
+                whileTap={{ scale: 0.985, y: 1 }}
+              >
+                <ArrowLeft className="size-4" />
+                Indietro
+              </m.button>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <m.button
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_86%,var(--bg-muted)_14%)] px-5 text-13px font-bold text-[var(--text-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_40%,transparent)] transition hover:bg-[var(--bg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] disabled:cursor-not-allowed disabled:opacity-45"
+                  disabled={isSaving}
+                  initial={false}
+                  onClick={handleSaveDraft}
+                  transition={PROJECT_STEPPER_SPRING}
+                  type="button"
+                  whileTap={{ scale: 0.985, y: 1 }}
+                >
+                  <Save className="size-4" />
+                  Salva bozza
+                </m.button>
+                {step === 1 ? (
+                  <m.button
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-black text-[var(--text-inverse)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_28%,transparent)] transition hover:bg-[color-mix(in_srgb,var(--accent-primary)_88%,black_12%)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={!canGoNext || isSaving}
+                    initial={false}
+                    onClick={() => handleGoToStep(2)}
+                    transition={PROJECT_STEPPER_SPRING}
+                    type="button"
+                    whileTap={{ scale: 0.985, y: 1 }}
+                  >
+                    Continua
+                    <ArrowRight className="size-4" />
+                  </m.button>
+                ) : (
+                  <m.button
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-black text-[var(--text-inverse)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_28%,transparent)] transition hover:bg-[color-mix(in_srgb,var(--accent-primary)_88%,black_12%)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={!validation.canSubmit || isSaving}
+                    initial={false}
+                    onClick={() => void handleSubmit()}
+                    transition={PROJECT_STEPPER_SPRING}
+                    type="button"
+                    whileTap={{ scale: 0.985, y: 1 }}
+                  >
+                    {isSaving
+                      ? "Salvataggio..."
+                      : initialValues
+                        ? "Aggiorna progetto"
+                        : "Crea progetto"}
+                    <Check className="size-4" />
+                  </m.button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         <aside className="space-y-5">
@@ -767,6 +885,103 @@ function ProjectTextField({
         value={value}
       />
     </label>
+  );
+}
+
+function ProjectStepButton({
+  description,
+  isActive,
+  isComplete,
+  label,
+  onClick,
+  stepNumber,
+}: {
+  description: string;
+  isActive: boolean;
+  isComplete: boolean;
+  label: string;
+  onClick: () => void;
+  stepNumber: 1 | 2;
+}) {
+  return (
+    <m.button
+      aria-current={isActive ? "step" : undefined}
+      animate={{
+        scale: isActive ? 1.012 : 1,
+        y: isActive ? -1 : 0,
+      }}
+      className={`relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-18px px-4 py-3.5 text-left focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] ${
+        isActive
+          ? "ring-1 ring-[color-mix(in_srgb,var(--accent-primary)_28%,transparent)]"
+          : "ring-1 ring-transparent hover:bg-[var(--bg-muted)]/70"
+      }`}
+      initial={false}
+      layout
+      onClick={onClick}
+      transition={PROJECT_STEPPER_SPRING}
+      type="button"
+      whileTap={{ scale: 0.985 }}
+    >
+      {isActive ? (
+        <m.span
+          className="absolute inset-0 rounded-18px bg-[color-mix(in_srgb,var(--accent-primary)_9%,var(--surface-base)_91%)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_45%,transparent)]"
+          layoutId="project-stepper-active-surface"
+          transition={PROJECT_STEPPER_SPRING}
+        />
+      ) : null}
+      <m.span
+        animate={{ scale: isActive ? 1.08 : 1 }}
+        className={`relative flex size-9 shrink-0 items-center justify-center rounded-14px text-12px font-bold shadow-[inset_0_1px_0_color-mix(in_srgb,white_30%,transparent)] ${
+          isActive
+            ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+            : isComplete
+              ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+              : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/70"
+        }`}
+        layout
+        transition={PROJECT_STEPPER_SPRING}
+      >
+        {!isActive && isComplete ? <Check className="size-4" strokeWidth={3} /> : stepNumber}
+      </m.span>
+      <span className="relative min-w-0">
+        <span className="block truncate text-15px font-bold text-[var(--text-primary)]">
+          {label}
+        </span>
+        <span className="mt-1 block truncate text-12px font-medium text-[var(--text-secondary)]">
+          {description}
+        </span>
+      </span>
+    </m.button>
+  );
+}
+
+function ProjectActionFeedback({
+  message,
+  tone,
+}: {
+  message: string | null;
+  tone: "success" | "warning";
+}) {
+  if (!message) return null;
+
+  const isSuccess = tone === "success";
+
+  return (
+    <div
+      className={`flex items-start gap-3 rounded-14px px-4 py-3 text-13px font-medium leading-5 ${
+        isSuccess
+          ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+          : "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+      }`}
+      role={isSuccess ? "status" : "alert"}
+    >
+      {isSuccess ? (
+        <Check className="mt-0.5 size-4 shrink-0" strokeWidth={3} />
+      ) : (
+        <CircleAlert className="mt-0.5 size-4 shrink-0" />
+      )}
+      <span>{message}</span>
+    </div>
   );
 }
 
@@ -920,7 +1135,7 @@ function BudgetPreviewRow({
         {label}
       </div>
       <div className="mt-1 space-y-0.5">
-        <div className="flex items-center justify-between text-sm font-semibold text-[var(--text-primary)]">
+        <div className="flex items-center justify-between text-15px font-semibold text-[var(--text-primary)]">
           <span>BASE</span>
           <span>{formatAmount(amount)}</span>
         </div>
@@ -930,7 +1145,7 @@ function BudgetPreviewRow({
               <span>+ IVA ({pct.toLocaleString("it-IT")}%)</span>
               <span>{formatAmount(ivaAmount)}</span>
             </div>
-            <div className="flex items-center justify-between border-t border-[var(--border-subtle)]/50 pt-0.5 text-13px font-bold text-[var(--text-primary)]">
+            <div className="flex items-center justify-between border-t border-[var(--border-subtle)]/50 pt-1 text-16px font-bold text-[var(--text-primary)]">
               <span>= TOTALE</span>
               <span>{formatAmount(total)}</span>
             </div>
@@ -952,7 +1167,7 @@ function PreviewMetric({ icon, label, value }: { icon: ReactNode; label: string;
         <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
           {label}
         </div>
-        <div className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+        <div className="mt-1 truncate text-16px font-bold tabular-nums text-[var(--text-primary)]">
           {value}
         </div>
       </div>

@@ -141,17 +141,17 @@ export function MaterialsScreen() {
     return { totalStock, critical, zero, committed, avgCoverage };
   }, [materials]);
 
-  const applyTemplateFilters = useCallback(
-    (filters: Record<string, unknown>) => {
-      if (typeof filters.selectedCategory === "string" || filters.selectedCategory === null) {
-        dispatch({ type: "SET_SELECTED_CATEGORY", payload: filters.selectedCategory as string | null });
-      }
-      if (typeof filters.searchQuery === "string") {
-        dispatch({ type: "SET_SEARCH_QUERY", payload: filters.searchQuery });
-      }
-    },
-    [],
-  );
+  const applyTemplateFilters = useCallback((filters: Record<string, unknown>) => {
+    if (typeof filters.selectedCategory === "string" || filters.selectedCategory === null) {
+      dispatch({
+        type: "SET_SELECTED_CATEGORY",
+        payload: filters.selectedCategory as string | null,
+      });
+    }
+    if (typeof filters.searchQuery === "string") {
+      dispatch({ type: "SET_SEARCH_QUERY", payload: filters.searchQuery });
+    }
+  }, []);
 
   const handleDelete = useCallback(
     async (materialId: string) => {

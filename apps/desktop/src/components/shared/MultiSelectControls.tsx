@@ -87,6 +87,7 @@ export function MultiSelectBulkBar({
             strokeWidth={3}
             viewBox="0 0 24 24"
           >
+            <title>{allSelected ? "Tutti selezionati" : "Selezione parziale"}</title>
             {allSelected ? <path d="M20 6L9 17l-5-5" /> : <path d="M6 12h12" />}
           </svg>
         ) : null}

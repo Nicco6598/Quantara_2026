@@ -16,23 +16,20 @@ export function useTableSort<T extends Record<string, unknown>>(
     direction: defaultSortKey ? "asc" : null,
   });
 
-  const onSort = useCallback(
-    (key: keyof T) => {
-      setSortConfig((prev) => {
-        if (prev.key !== key) {
-          return { key, direction: "asc" };
-        }
-        if (prev.direction === "asc") {
-          return { key, direction: "desc" };
-        }
-        if (prev.direction === "desc") {
-          return { key: null, direction: null };
-        }
+  const onSort = useCallback((key: keyof T) => {
+    setSortConfig((prev) => {
+      if (prev.key !== key) {
         return { key, direction: "asc" };
-      });
-    },
-    [],
-  );
+      }
+      if (prev.direction === "asc") {
+        return { key, direction: "desc" };
+      }
+      if (prev.direction === "desc") {
+        return { key: null, direction: null };
+      }
+      return { key, direction: "asc" };
+    });
+  }, []);
 
   const sortedItems = useMemo(() => {
     if (!sortConfig.key || !sortConfig.direction) {

@@ -5,8 +5,8 @@ export { MOTION_VARIANTS, motionVariants } from "./variants";
 
 export const SPRING_EASE = [0.22, 1, 0.36, 1] as const;
 export const MOTION_DURATION = {
-  base: 0.3,
-  fast: 0.18,
-  reveal: 0.52,
-  slow: 0.42,
+  base: 0.34,
+  fast: 0.2,
+  reveal: 0.58,
+  slow: 0.48,
 } as const;

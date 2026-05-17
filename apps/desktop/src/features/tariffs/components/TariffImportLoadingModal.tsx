@@ -1,5 +1,6 @@
 import { CheckCircle2, FileText, Loader, ScanLine, XCircle } from "lucide-react";
 import type { ImportFileProgress } from "@/lib/desktopData";
+import { createPortal } from "react-dom";
 
 export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[] }) {
   const doneCount = files.filter((f) => f.status === "done").length;
@@ -8,7 +9,7 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
   const total = files.length;
   const completedCount = doneCount + errorCount;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[82] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
       <div className="relative w-full max-w-lg rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
         <div className="rounded-22px bg-[var(--surface-base)] p-6 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
@@ -98,6 +99,7 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

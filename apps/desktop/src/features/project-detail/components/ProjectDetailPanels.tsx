@@ -1,5 +1,6 @@
 import { m } from "framer-motion";
 import {
+  ArrowRight,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -7,7 +8,6 @@ import {
   ListChecks,
   type LucideIcon,
   MoreVertical,
-  Play,
   Search,
   ThumbsUp,
   Trash2,
@@ -18,7 +18,6 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { StatusPill } from "@/components/shared/StatusPill";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { DesktopTariffBook } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
@@ -33,68 +32,6 @@ export function PanelTitle({ children, icon: Icon }: { children: string; icon: L
       <Icon className="size-4 text-[var(--info-base)]" />
       {children}
     </div>
-  );
-}
-
-export function MetricCard({
-  badge,
-  caption,
-  icon: Icon,
-  label,
-  tone,
-  value,
-}: {
-  badge?: string;
-  caption: string;
-  icon: LucideIcon;
-  label: string;
-  tone: "blue" | "info" | "success" | "warning" | "danger";
-  value: string;
-}) {
-  return (
-    <BezelSurface
-      innerClassName={cn(
-        "group flex min-h-[104px] items-center gap-4 p-4 2xl:min-h-[120px]",
-        tone === "blue" ? "bg-[var(--info-soft)]/20" : "",
-      )}
-    >
-      <div
-        className={cn(
-          "flex size-11 shrink-0 items-center justify-center rounded-xl",
-          (!tone || tone === "blue" || tone === "info") &&
-            "bg-[var(--info-soft)] text-[var(--info-base)]",
-          tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
-          tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-          tone === "danger" && "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-        )}
-      >
-        <Icon className="size-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-          {label}
-        </div>
-        <div
-          className={cn(
-            "mt-1.5 truncate text-19px font-semibold leading-none",
-            (!tone || tone === "blue" || tone === "info") && "text-[var(--text-primary)]",
-            tone === "success" && "text-[var(--success-base)]",
-            tone === "warning" && "text-[var(--warning-base)]",
-            tone === "danger" && "text-[var(--danger-base)]",
-          )}
-        >
-          {value}
-        </div>
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <span className="text-11px font-medium text-[var(--text-tertiary)]">{caption}</span>
-          {badge ? (
-            <span className="rounded-full bg-[var(--bg-muted-strong)] px-2 py-0.5 text-10px font-semibold text-[var(--text-secondary)]">
-              {badge}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </BezelSurface>
   );
 }
 
@@ -207,11 +144,12 @@ export function SalCard({
 
   const isSelectable = onSelect !== undefined;
   const springEase = [0.22, 1, 0.36, 1] as const;
+  void tone;
 
   return (
     <m.article
       className={cn(
-        "group relative grid gap-3.5 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_62%,var(--surface-base)_38%)] px-4 py-4 ring-1 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)] sm:px-5 md:grid-cols-[minmax(220px,1fr)_176px_120px_minmax(240px,max-content)] md:items-center md:gap-4",
+        "group relative grid gap-3.5 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_62%,var(--surface-base)_38%)] px-4 py-4 ring-1 hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)] sm:px-5 md:grid-cols-[minmax(220px,1fr)_176px_120px_260px] md:items-center md:gap-4",
         isSelected
           ? "bg-[var(--selection-bg)] ring-[var(--accent-primary)]/50"
           : "ring-[var(--border-subtle)]/60 hover:ring-[var(--border-subtle)]",
@@ -290,7 +228,7 @@ export function SalCard({
 
         <span
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset",
+            "relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-15px ring-1 ring-inset shadow-[inset_0_1px_0_color-mix(in_srgb,white_32%,transparent)]",
             isFinal
               ? "bg-[var(--success-soft)] text-[var(--success-base)]"
               : isReview
@@ -303,7 +241,14 @@ export function SalCard({
                 : "ring-[color-mix(in_srgb,var(--warning-base)_18%,transparent)]",
           )}
         >
-          {isFinal ? <CheckCircle2 className="size-5" /> : <Clock3 className="size-5" />}
+          <span className="absolute inset-x-2 bottom-1 h-0.5 rounded-full bg-current/45" />
+          {isFinal ? (
+            <CheckCircle2 className="size-5" />
+          ) : isReview ? (
+            <ThumbsUp className="size-5" />
+          ) : (
+            <Clock3 className="size-5" />
+          )}
         </span>
         <div className="min-w-0">
           <div className="truncate text-14px font-semibold text-[var(--text-primary)]">{sal}</div>
@@ -350,91 +295,102 @@ export function SalCard({
         </div>
       </div>
 
-      <div className="pointer-events-auto relative z-10 flex min-w-0 items-center justify-between gap-2.5 rounded-lg bg-[var(--surface-base)]/45 px-3.5 py-2.5 md:justify-end md:bg-transparent md:px-0 md:py-0">
-        <StatusPill tone={tone}>{status}</StatusPill>
-
-        {isDraft ? (
-          <Button
-            size="sm"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onContinue?.();
-            }}
-            variant="secondary"
-          >
-            <Play className="size-3.5" />
-            Continua
-          </Button>
-        ) : isReview ? (
-          <Button
-            size="sm"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            variant="secondary"
-          >
-            <ThumbsUp className="size-3.5" />
-            Approva
-          </Button>
-        ) : isFinal ? (
+      <div className="pointer-events-auto relative z-10 grid min-w-0 grid-cols-[104px_1px_minmax(0,1fr)] items-center gap-2.5 rounded-lg bg-[var(--surface-base)]/45 px-3.5 py-2.5 md:bg-transparent md:px-0 md:py-0">
+        <div className="flex min-w-0 items-center justify-start">
           <span
             className={cn(
-              "hidden items-center gap-1.5 rounded-full px-3 py-1 text-11px font-semibold sm:inline-flex",
-              "bg-[var(--success-soft)] text-[var(--success-base)]",
+              "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full px-2 text-11px font-black shadow-[inset_0_1px_0_color-mix(in_srgb,white_30%,transparent)]",
+              isFinal &&
+                "bg-[color-mix(in_srgb,var(--success-base)_16%,var(--surface-base)_84%)] text-[color-mix(in_srgb,var(--success-base)_82%,var(--text-primary)_18%)] ring-1 ring-[color-mix(in_srgb,var(--success-base)_26%,transparent)]",
+              isDraft &&
+                "bg-[color-mix(in_srgb,var(--warning-base)_12%,var(--surface-base)_88%)] text-[color-mix(in_srgb,var(--warning-base)_82%,var(--text-primary)_18%)] ring-1 ring-[color-mix(in_srgb,var(--warning-base)_24%,transparent)]",
+              isReview &&
+                "bg-[color-mix(in_srgb,var(--info-base)_12%,var(--surface-base)_88%)] text-[color-mix(in_srgb,var(--info-base)_82%,var(--text-primary)_18%)] ring-1 ring-[color-mix(in_srgb,var(--info-base)_24%,transparent)]",
             )}
           >
-            <ThumbsUp className="size-3.5" />
-            Approvata
+            <span className="min-w-0 truncate leading-none">{status}</span>
           </span>
-        ) : null}
+        </div>
 
-        <div ref={menuBtnRef}>
-          <Button
-            aria-label="Azioni SAL"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              setMenuOpen((value) => !value);
-            }}
-            variant="icon"
-          >
-            <MoreVertical className="size-4" />
-          </Button>
-          <DropdownMenu
-            isOpen={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            triggerRef={menuBtnRef}
-          >
-            {isDraft ? (
-              <DropdownItem
-                icon={Play}
-                label="Continua bozza"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onContinue?.();
-                }}
-              />
-            ) : null}
-            {isDraft || isReview ? (
-              <DropdownItem
-                icon={ThumbsUp}
-                label={isDraft ? "Invia in revisione" : "Approva"}
-                onClick={() => {
-                  setMenuOpen(false);
-                  onClose();
-                }}
-              />
-            ) : null}
-            <DropdownItem
-              icon={Trash2}
-              label="Elimina"
-              onClick={() => {
-                setMenuOpen(false);
-                onDelete();
+        <div className="h-8 w-px shrink-0 bg-[color-mix(in_srgb,var(--border-subtle)_72%,var(--text-tertiary)_28%)] transition-none" />
+
+        <div className="grid min-w-0 grid-cols-[96px_36px] items-center justify-start gap-2">
+          {isDraft ? (
+            <button
+              className="inline-flex h-9 w-24 items-center justify-center gap-1.5 rounded-full bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] px-3 text-11px font-black text-[var(--accent-primary)] ring-1 ring-[color-mix(in_srgb,var(--accent-primary)_22%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_34%,transparent)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_16%,var(--surface-base)_84%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onContinue?.();
               }}
-              tone="danger"
-            />
-          </DropdownMenu>
+              type="button"
+            >
+              <span className="leading-none">Continua</span>
+              <ArrowRight className="size-3.5 translate-y-px" strokeWidth={2.4} />
+            </button>
+          ) : isReview ? (
+            <button
+              className="inline-flex h-9 w-24 items-center justify-center gap-1.5 rounded-full bg-[color-mix(in_srgb,var(--success-base)_12%,var(--surface-base)_88%)] px-3 text-11px font-black leading-none text-[var(--success-base)] ring-1 ring-[color-mix(in_srgb,var(--success-base)_24%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_34%,transparent)] transition-colors hover:bg-[color-mix(in_srgb,var(--success-base)_18%,var(--surface-base)_82%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              type="button"
+            >
+              <ThumbsUp className="size-3.5 translate-y-px" />
+              <span className="leading-none">Approva</span>
+            </button>
+          ) : (
+            <span aria-hidden="true" className="block h-9 w-24" />
+          )}
+
+          <div ref={menuBtnRef} className="shrink-0">
+            <button
+              aria-label="Azioni SAL"
+              className="inline-flex size-9 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/70 transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                setMenuOpen((value) => !value);
+              }}
+              type="button"
+            >
+              <MoreVertical className="size-4" />
+            </button>
+            <DropdownMenu
+              isOpen={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              triggerRef={menuBtnRef}
+            >
+              {isDraft ? (
+                <DropdownItem
+                  icon={ArrowRight}
+                  label="Continua bozza"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onContinue?.();
+                  }}
+                />
+              ) : null}
+              {isDraft || isReview ? (
+                <DropdownItem
+                  icon={ThumbsUp}
+                  label={isDraft ? "Invia in revisione" : "Approva"}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onClose();
+                  }}
+                />
+              ) : null}
+              <DropdownItem
+                icon={Trash2}
+                label="Elimina"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete();
+                }}
+                tone="danger"
+              />
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </m.article>
