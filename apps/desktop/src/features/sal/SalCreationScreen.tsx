@@ -32,15 +32,20 @@ import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowService } from "@/services/sal-service";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useAppStore } from "@/store/app-store";
 import type { SalTemplate } from "@/store/template-store";
 import type { DesktopMaterial } from "@/lib/desktopData";
 import { updateDesktopMaterial } from "@/lib/desktopData";
+import {
+  saveSalDocument,
+  saveSalProject,
+  updateSalDocument as updateBackendSalDocument,
+} from "@/lib/sal-data";
 import { SalComparisonView } from "./components/SalComparisonView";
 import {
   Currency,
   DocumentPreview,
-  NumberValue,
   OutputRow,
   SelectedVoicesPanel,
 } from "./components/SalCreationTables";
@@ -146,6 +151,10 @@ export function SalCreationScreen() {
 
   const editingDraftSalId = useRef<string | null>(null);
   const idCounter = useRef(0);
+  const [salAutoSaveStatus, setSalAutoSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error" | "unsaved"
+  >("idle");
+  const [salAutoSaveLastSaved, setSalAutoSaveLastSaved] = useState<string | null>(null);
 
   // Guard: if SAL was already created in this session, redirect to project-detail
   useEffect(() => {
@@ -204,6 +213,38 @@ export function SalCreationScreen() {
       });
     }
   }, [data.project, data.voices, data.restoreTariffBookIds, salDocuments]);
+
+  // Restore auto-saved draft on mount if no explicit resume
+  const hasRestoredDraft = useRef(false);
+  useEffect(() => {
+    if (hasRestoredDraft.current) return;
+    const resumeSalId = sessionStorage.getItem(SESSION_STORAGE_KEYS.salResumeDraft);
+    if (resumeSalId) return; // handled by the effect above
+
+    const project = data.project;
+    if (!project) return;
+
+    const draft = loadSalCreationDraft(project.id);
+    if (!draft || (draft.lines.length === 0 && !draft.salTitle)) return;
+
+    hasRestoredDraft.current = true;
+    setSalAutoSaveStatus("saved");
+    setSalAutoSaveLastSaved(new Date().toISOString());
+    dispatch({
+      type: "ALL",
+      partial: {
+        lines: draft.lines,
+        economicRules: draft.economicRules,
+        materialUsage: draft.materialUsage ?? {},
+        salDate: draft.salDate ?? new Date().toISOString().slice(0, 10),
+        salTitle: draft.salTitle || project.salTitle,
+        phase: draft.phase,
+      },
+    });
+    if (draft.selectedTariffBookIds?.length > 0) {
+      data.restoreTariffBookIds(draft.selectedTariffBookIds);
+    }
+  }, [data.project, data.voices, data.restoreTariffBookIds]);
 
   const voicesMap = useMemo(() => new Map(data.voices.map((v) => [v.id, v])), [data.voices]);
 
@@ -510,6 +551,13 @@ export function SalCreationScreen() {
       name: data.project.title,
       year: data.selectedTariffBook?.year ?? 2026,
     });
+    saveSalProject({
+      client: data.project.contractor,
+      description: `${data.project.frameworkAgreementCode} - ${data.project.applicationContractCode}`,
+      id: data.project.id,
+      name: data.project.title,
+      year: data.selectedTariffBook?.year ?? 2026,
+    });
 
     const materialUsagePayload = Object.entries(materialUsage)
       .filter(([_, qty]) => qty > 0)
@@ -553,8 +601,15 @@ export function SalCreationScreen() {
     if (editingDraftSalId.current) {
       updateSalDraft(editingDraftSalId.current, finalSalPayload);
       closeSal(editingDraftSalId.current);
+      const finalized = useSalWorkflowStore
+        .getState()
+        .salDocuments.find((d) => d.id === editingDraftSalId.current);
+      if (finalized) {
+        await updateBackendSalDocument(editingDraftSalId.current, finalized);
+      }
     } else {
-      createSal(finalSalPayload);
+      const created = createSal({ ...finalSalPayload, status: "closed" });
+      await saveSalDocument(data.project.id, created);
     }
 
     // Deduct materials from inventory on SAL confirmation
@@ -587,11 +642,25 @@ export function SalCreationScreen() {
     });
   }
 
-  const persistDraftSilent = useCallback(() => {
-    const project = data.project;
-    const pid = project?.id;
-    if (!project || !pid) return;
-    saveSalCreationDraft(pid, {
+  const debounceAutoSave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalAutoSave = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasChangesRef = useRef(false);
+  const projectIdRef = useRef(data.project?.id ?? "");
+  projectIdRef.current = data.project?.id ?? "";
+
+  const draftDataRef = useRef({
+    economicRules,
+    lines,
+    materialUsage,
+    phase,
+    salDate,
+    salTitle,
+    selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
+  });
+
+  // Keep refs in sync
+  useEffect(() => {
+    draftDataRef.current = {
       economicRules,
       lines,
       materialUsage,
@@ -599,25 +668,61 @@ export function SalCreationScreen() {
       salDate,
       salTitle,
       selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
-    });
-  }, [
-    economicRules,
-    lines,
-    materialUsage,
-    phase,
-    salDate,
-    salTitle,
-    data.project,
-    data.selectedTariffBooks,
-  ]);
+    };
+  });
 
-  const debounceAutoSave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistDraftSilent = useCallback(() => {
+    const pid = projectIdRef.current;
+    if (!pid) return;
+    setSalAutoSaveStatus("saving");
+    try {
+      const d = draftDataRef.current;
+      saveSalCreationDraft(pid, {
+        economicRules: d.economicRules,
+        lines: d.lines,
+        materialUsage: d.materialUsage,
+        phase: d.phase,
+        salDate: d.salDate,
+        salTitle: d.salTitle,
+        selectedTariffBookIds: d.selectedTariffBookIds,
+      });
+      hasChangesRef.current = false;
+      setSalAutoSaveLastSaved(new Date().toISOString());
+      setSalAutoSaveStatus("saved");
+    } catch {
+      setSalAutoSaveStatus("error");
+    }
+  }, []);
+
   const handleAutoSave = useCallback(() => {
     if (debounceAutoSave.current) clearTimeout(debounceAutoSave.current);
+    setSalAutoSaveStatus("unsaved");
+    hasChangesRef.current = true;
     debounceAutoSave.current = setTimeout(persistDraftSilent, 800);
   }, [persistDraftSilent]);
 
-  const handleSaveDraft = useCallback(() => {
+  // Mark as unsaved and trigger debounce when draft data changes
+  useEffect(() => {
+    hasChangesRef.current = true;
+    setSalAutoSaveStatus((prev) => (prev === "saving" || prev === "error" ? prev : "unsaved"));
+    if (debounceAutoSave.current) clearTimeout(debounceAutoSave.current);
+    debounceAutoSave.current = setTimeout(persistDraftSilent, 800);
+  }, [lines, economicRules, materialUsage, salTitle, salDate, persistDraftSilent]);
+
+  // Periodic auto-save every 30s if there are changes
+  useEffect(() => {
+    intervalAutoSave.current = setInterval(() => {
+      if (hasChangesRef.current) {
+        persistDraftSilent();
+      }
+    }, 30000);
+    return () => {
+      if (intervalAutoSave.current) clearInterval(intervalAutoSave.current);
+      if (debounceAutoSave.current) clearTimeout(debounceAutoSave.current);
+    };
+  }, [persistDraftSilent]);
+
+  const handleSaveDraft = useCallback(async () => {
     const project = data.project;
     const pid = project?.id;
     if (!project || !pid) return;
@@ -632,6 +737,13 @@ export function SalCreationScreen() {
     });
     // Also persist a draft SAL in the store so it appears in the project
     createSalProject({
+      client: project.contractor,
+      description: `${project.frameworkAgreementCode} - ${project.applicationContractCode}`,
+      id: pid,
+      name: project.title,
+      year: data.selectedTariffBook?.year ?? 2026,
+    });
+    saveSalProject({
       client: project.contractor,
       description: `${project.frameworkAgreementCode} - ${project.applicationContractCode}`,
       id: pid,
@@ -679,6 +791,13 @@ export function SalCreationScreen() {
     const draftSal = editingDraftSalId.current
       ? updateSalDraft(editingDraftSalId.current, draftPayload)
       : createSal(draftPayload);
+    if (draftSal) {
+      if (editingDraftSalId.current) {
+        await updateBackendSalDocument(draftSal.id, draftSal);
+      } else {
+        await saveSalDocument(pid, draftSal);
+      }
+    }
     const draftSalId = draftSal?.id ?? editingDraftSalId.current;
     if (draftSalId) {
       editingDraftSalId.current = draftSalId;
@@ -731,6 +850,8 @@ export function SalCreationScreen() {
 
   const toolbarConfig = useMemo(
     () => ({
+      autoSaveLastSaved: salAutoSaveLastSaved,
+      autoSaveStatus: salAutoSaveStatus,
       budgetResidual: summary.budgetResidual,
       discountAmount: summary.discountAmount,
       lineCount: lineViews.length,
@@ -743,6 +864,8 @@ export function SalCreationScreen() {
       data.voices.length,
       lineViews.length,
       salTitle,
+      salAutoSaveLastSaved,
+      salAutoSaveStatus,
       summary.budgetResidual,
       summary.discountAmount,
       summary.total,
@@ -753,17 +876,25 @@ export function SalCreationScreen() {
     useAppStore.getState().setSalToolbar(toolbarConfig);
   }, [toolbarConfig]);
 
+  const actionHandlersRef = useRef({ goPrimary, handleSaveDraft, phase });
+  actionHandlersRef.current = { goPrimary, handleSaveDraft, phase };
+
   useEffect(() => {
-    const handleSalToolbarAction = (event: Event) => {
+    const handler = (event: Event) => {
       const actionId = (event as CustomEvent<string>).detail;
+      const { goPrimary, handleSaveDraft, phase } = actionHandlersRef.current;
+      if (phase === "completed") return;
       if (actionId === "sal-save-draft") {
         handleSaveDraft();
+        return;
+      }
+      if (actionId === "sal-confirm") {
+        goPrimary();
       }
     };
-
-    window.addEventListener("sal-create-action", handleSalToolbarAction);
-    return () => window.removeEventListener("sal-create-action", handleSalToolbarAction);
-  }, [handleSaveDraft]);
+    window.addEventListener("sal-create-action", handler);
+    return () => window.removeEventListener("sal-create-action", handler);
+  }, []);
 
   return (
     <main className="relative w-full max-w-full overflow-x-hidden px-3 pb-6 pt-1 md:px-4">
@@ -802,7 +933,6 @@ export function SalCreationScreen() {
             dataSelectedTariffBook={data.selectedTariffBook}
             dataSelectTariffBook={data.selectTariffBook}
             economicRules={economicRules}
-            goPrimary={goPrimary}
             handleApplyTemplate={handleApplyTemplate}
             handlePasteLine={handlePasteLine}
             lineViews={lineViews}
@@ -829,8 +959,8 @@ export function SalCreationScreen() {
             setSurcharge={setSurcharge}
             summary={summary}
             upsertLine={upsertLine}
-            phase={phase}
             project={data.project}
+            phase={phase}
             tariffBookId={data.selectedTariffBook?.id ?? ""}
           />
         )}
@@ -868,7 +998,6 @@ function SalEditorContent({
   dataSelectTariffBook,
   project,
   economicRules,
-  goPrimary,
   handleApplyTemplate,
   handlePasteLine,
   lineViews,
@@ -909,7 +1038,6 @@ function SalEditorContent({
   dataSelectTariffBook: (id: string) => Promise<void>;
   project: SalProjectContext | null;
   economicRules: SalEconomicRules;
-  goPrimary: () => void;
   handleApplyTemplate: (t: SalTemplate) => void;
   handlePasteLine: (d: SalLineDraft) => void;
   lineViews: SalLineView[];
@@ -967,7 +1095,6 @@ function SalEditorContent({
           summary={summary}
           tariffBooks={dataTariffBookOptions}
           voicesCount={dataVoicesLength}
-          onPrimary={goPrimary}
         />
       ) : null}
       {phase === "voices" ? (
@@ -977,7 +1104,6 @@ function SalEditorContent({
           onFactorChange={setFactor}
           onNotesChange={setNotes}
           onPasteLine={handlePasteLine}
-          onPrimary={goPrimary}
           onReorder={setLines}
           onRemove={removeLine}
           onSurcharge={setSurcharge}
@@ -999,7 +1125,6 @@ function SalEditorContent({
           onAutoSave={onAutoSave}
           onMaterialUsageChange={onMaterialUsageChange}
           onMaterialsChange={onMaterialsChange}
-          onPrimary={goPrimary}
           summary={summary}
           previousSalLines={previousSalLines}
           compareLines={compareLines}
@@ -1011,7 +1136,6 @@ function SalEditorContent({
           economicRules={economicRules}
           lineViews={lineViews}
           materialUsage={materialUsage}
-          onPrimary={goPrimary}
           summary={summary}
         />
       ) : null}
@@ -1034,7 +1158,6 @@ function SetupStep({
   summary,
   tariffBooks,
   voicesCount,
-  onPrimary,
   onSelectContract,
 }: {
   contracts: { id: string; title: string; contractor?: string }[];
@@ -1050,7 +1173,6 @@ function SetupStep({
   summary: SalEconomicSummary;
   tariffBooks: SalTariffBookOption[];
   voicesCount: number;
-  onPrimary: () => void;
   onSelectContract?: ((id: string) => void) | undefined;
 }) {
   const [projectOpen, setProjectOpen] = useState(false);
@@ -1291,16 +1413,6 @@ function SetupStep({
         summary={summary}
         voicesCount={voicesCount}
       />
-
-      <div className="flex items-center justify-end">
-        <m.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
-          onClick={onPrimary}
-          type="button"
-        >
-          Continua <ArrowRight className="size-4" />
-        </m.button>
-      </div>
     </div>
   );
 }
@@ -1407,7 +1519,6 @@ function VoicesStep({
   onFactorChange,
   onNotesChange,
   onPasteLine,
-  onPrimary,
   onReorder,
   onRemove,
   onSurcharge,
@@ -1423,7 +1534,6 @@ function VoicesStep({
   onFactorChange: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
   onNotesChange: (lineId: string, notes: string) => void;
   onPasteLine: (line: SalLineDraft) => void;
-  onPrimary: () => void;
   onReorder: (l: SalLineDraft[]) => void;
   onRemove: (lineId: string) => void;
   onSurcharge: (lineId: string, p: number) => void;
@@ -1434,8 +1544,6 @@ function VoicesStep({
   onOpenTemplateDialog: () => void;
   tariffBookId: string;
 }) {
-  const totalQty = lineViews.reduce((s, l) => s + l.quantity, 0);
-  const linked = lineViews.reduce((s, l) => s + l.linkedCharges.length, 0);
   const autocompleteOptions = useMemo(
     () =>
       voices.map((v) => ({
@@ -1607,34 +1715,6 @@ function VoicesStep({
           <SalBudgetLive summary={summary} />
         </div>
       </section>
-
-      <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_94%,transparent)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/70 backdrop-blur-md">
-        <div />
-        <div className="hidden flex-wrap items-center gap-3 text-12px lg:flex">
-          <span className="font-semibold text-[var(--accent-primary)]">
-            Totale: <Currency value={summary.total} />
-          </span>
-          <span className="text-[var(--border-subtle)]">·</span>
-          <span className="font-medium text-[var(--text-secondary)]">{lines.length} voci</span>
-          <span className="text-[var(--border-subtle)]">·</span>
-          <span className="text-[var(--text-secondary)]">
-            Qtà: <NumberValue value={totalQty} />
-          </span>
-          {linked > 0 && (
-            <>
-              <span className="text-[var(--border-subtle)]">·</span>
-              <span className="text-[var(--text-secondary)]">{linked} magg.</span>
-            </>
-          )}
-        </div>
-        <m.button
-          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-5 text-12px font-bold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
-          onClick={onPrimary}
-          type="button"
-        >
-          Continua <ArrowRight className="size-4" />
-        </m.button>
-      </div>
     </div>
   );
 }
@@ -1649,7 +1729,6 @@ function ReviewStep({
   onAutoSave,
   onMaterialUsageChange,
   onMaterialsChange,
-  onPrimary,
   summary,
   previousSalLines,
   compareLines,
@@ -1663,7 +1742,6 @@ function ReviewStep({
   onAutoSave: () => void;
   onMaterialUsageChange: (usage: Record<string, number>) => void;
   onMaterialsChange: (mats: DesktopMaterial[]) => void;
-  onPrimary: () => void;
   summary: SalEconomicSummary;
   previousSalLines: SalLineView[];
   compareLines: SalLineView[] | null;
@@ -2032,15 +2110,6 @@ function ReviewStep({
           </div>
         </div>
       </div>
-      <div className="flex justify-end">
-        <m.button
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
-          onClick={onPrimary}
-          type="button"
-        >
-          Continua <ArrowRight className="size-4" />
-        </m.button>
-      </div>
     </div>
   );
 }
@@ -2050,13 +2119,11 @@ function ConfirmStep({
   economicRules,
   lineViews,
   materialUsage,
-  onPrimary,
   summary,
 }: {
   economicRules: SalEconomicRules;
   lineViews: SalLineView[];
   materialUsage: Record<string, number>;
-  onPrimary: () => void;
   summary: SalEconomicSummary;
 }) {
   const usageCount = Object.values(materialUsage).filter((q) => q > 0).length;
@@ -2145,16 +2212,6 @@ function ConfirmStep({
           icon={<Printer className="size-4 text-[var(--info-base)]" />}
           label="Stampa contabilità"
         />
-      </div>
-      <div className="flex justify-end">
-        <m.button
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-semibold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
-          onClick={onPrimary}
-          type="button"
-        >
-          <CheckCircle2 className="size-4" />
-          Conferma SAL
-        </m.button>
       </div>
     </div>
   );

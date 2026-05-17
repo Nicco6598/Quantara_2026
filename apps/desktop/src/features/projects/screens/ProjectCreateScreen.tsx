@@ -10,8 +10,14 @@ import {
 } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
-
+import {
+  clearAutoDraft,
+  loadAutoDraft,
+  saveAutoDraft,
+  useAutoSave,
+} from "@/hooks/use-auto-save";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   type CreateDesktopContractRequest,
@@ -27,6 +33,8 @@ import { dispatchDataChanged } from "@/lib/sync-events";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+
+const PROJECT_AUTO_DRAFT_KEY = STORAGE_KEYS.projectAutoDraft;
 
 type ProjectFormState = {
   applicationContractCode: string;
@@ -185,9 +193,49 @@ export function ProjectCreateScreen() {
   const validation = useMemo(() => getProjectValidation(draft), [draft]);
   const canGoNext = step === 1 && validation.identityError === null;
 
-  // Sync toolbar state
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const restoredDraftRef = useRef<ProjectFormState | null>(null);
+
+  useEffect(() => {
+    if (!initialValues) {
+      const savedDraft = loadAutoDraft<ProjectFormState>(PROJECT_AUTO_DRAFT_KEY);
+      if (savedDraft && savedDraft.title) {
+        restoredDraftRef.current = savedDraft;
+        setShowRestoreDialog(true);
+      }
+    }
+  }, [initialValues]);
+
+  const handleRestoreDraft = useCallback(() => {
+    if (restoredDraftRef.current) {
+      dispatch({ type: "SET_DRAFT", payload: restoredDraftRef.current });
+    }
+    setShowRestoreDialog(false);
+  }, []);
+
+  const handleDiscardDraft = useCallback(() => {
+    clearAutoDraft(PROJECT_AUTO_DRAFT_KEY);
+    setShowRestoreDialog(false);
+  }, []);
+
+  const handleProjectAutoSave = useCallback(
+    (data: unknown) => {
+      saveAutoDraft(PROJECT_AUTO_DRAFT_KEY, data);
+    },
+    [],
+  );
+
+  const autoSave = useAutoSave({
+    data: draft,
+    intervalMs: 30000,
+    key: PROJECT_AUTO_DRAFT_KEY,
+    onSave: handleProjectAutoSave,
+  });
+
   useEffect(() => {
     useAppStore.getState().setProjectToolbar({
+      autoSaveLastSaved: autoSave.lastSaved,
+      autoSaveStatus: autoSave.status,
       canGoNext,
       canSubmit: validation.canSubmit,
       currentStep: step,
@@ -196,7 +244,7 @@ export function ProjectCreateScreen() {
       isSaving: savingRef.current,
       totalSteps: 2,
     });
-  }, [canGoNext, error, initialValues, step, validation.canSubmit]);
+  }, [autoSave.lastSaved, autoSave.status, canGoNext, error, initialValues, step, validation.canSubmit]);
 
   const validationRef = useRef(validation);
   validationRef.current = validation;
@@ -341,6 +389,17 @@ export function ProjectCreateScreen() {
 
   return (
     <main className="relative mx-auto w-full max-w-5xl px-4 pb-10 pt-6 md:px-6">
+      {showRestoreDialog && (
+        <ConfirmDialog
+          confirmLabel="Ripristina"
+          isOpen={showRestoreDialog}
+          onCancel={handleDiscardDraft}
+          onConfirm={handleRestoreDraft}
+          title="Ripristina bozza"
+        >
+          {`È stata trovata una bozza salvata "${restoredDraftRef.current?.title}". Vuoi ripristinarla?`}
+        </ConfirmDialog>
+      )}
       <div className="flex items-start justify-between gap-5">
         <div>
           <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">

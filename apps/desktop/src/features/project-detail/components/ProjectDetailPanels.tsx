@@ -1,15 +1,17 @@
 import { m } from "framer-motion";
 import {
+  CalendarDays,
   Check,
   CheckCircle2,
   Clock3,
+  ListChecks,
+  type LucideIcon,
   MoreVertical,
   Play,
   Search,
   ThumbsUp,
   Trash2,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useRef, useState } from "react";
@@ -20,7 +22,6 @@ import { StatusPill } from "@/components/shared/StatusPill";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { DesktopTariffBook } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
-import { useSelectionStore } from "@/store/selection-store";
 
 export function Panel({ children, className }: { children: ReactNode; className?: string }) {
   return <BezelSurface innerClassName={cn("p-5", className)}>{children}</BezelSurface>;
@@ -166,118 +167,192 @@ export function InfoBlock({ label, note, value }: { label: string; note?: string
 export function SalCard({
   cardStatus,
   date,
-  id,
+  incidence,
+  lineCount,
   onClose,
   onContinue,
   onDelete,
   period,
+  progressiveLabel,
   sal,
   status,
   tone,
   value,
+  isSelected,
+  onSelect,
 }: {
   cardStatus: string;
   date: string;
-  id: string;
+  incidence: number;
+  lineCount: number;
   onClose: () => void;
   onContinue?: (() => void) | undefined;
   onDelete: () => void;
   period: string;
+  progressiveLabel: string;
   sal: string;
   status: string;
   tone: "danger" | "info" | "success" | "warning";
   value: string;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }) {
   const isDraft = cardStatus === "draft";
   const isReview = cardStatus === "in-review";
   const isApproved = cardStatus === "approved";
   const isClosed = cardStatus === "closed";
-  const isSelected = useSelectionStore((state) => state.ids.has(id));
+  const isFinal = isClosed || isApproved;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLDivElement>(null);
 
+  const isSelectable = onSelect !== undefined;
+  const springEase = [0.22, 1, 0.36, 1] as const;
+
   return (
-    <div
+    <m.article
       className={cn(
-        "group relative flex items-center justify-between gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-3 py-3 ring-1 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--bg-muted)_84%,var(--surface-base)_16%)]",
+        "group relative grid gap-3.5 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_62%,var(--surface-base)_38%)] px-4 py-4 ring-1 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--bg-muted)_76%,var(--surface-base)_24%)] sm:px-5 md:grid-cols-[minmax(220px,1fr)_176px_120px_minmax(240px,max-content)] md:items-center md:gap-4",
         isSelected
-          ? "ring-[var(--accent-primary)]/50 bg-[var(--selection-bg)]"
+          ? "bg-[var(--selection-bg)] ring-[var(--accent-primary)]/50"
           : "ring-[var(--border-subtle)]/60 hover:ring-[var(--border-subtle)]",
       )}
+      layout="position"
+      transition={{ duration: 0.25, ease: springEase }}
     >
-      <button
-        className="absolute inset-0 cursor-pointer rounded-xl"
-        onClick={() => useSelectionStore.getState().toggle(id)}
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            useSelectionStore.getState().toggle(id);
-          }
-        }}
-        aria-label={`Seleziona ${sal}`}
-        type="button"
-      />
-
-      <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-3">
-        <m.button
-          aria-checked={isSelected}
-          className={cn(
-            "flex size-[20px] shrink-0 items-center justify-center rounded-5px border transition-all",
-            isSelected
-              ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] opacity-100"
-              : "border-[var(--border-subtle)] bg-[var(--surface-base)] opacity-0 group-hover:opacity-100",
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            useSelectionStore.getState().toggle(id);
+      {isSelectable && (
+        <button
+          className="absolute inset-0 cursor-pointer rounded-xl"
+          onClick={onSelect}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect();
+            }
           }}
-          role="checkbox"
+          aria-label={`Seleziona ${progressiveLabel}`}
           type="button"
+        />
+      )}
+
+      <div
+        className={cn(
+          "relative z-10 flex min-w-0 items-center gap-3.5",
+          isSelectable && "pointer-events-none",
+        )}
+      >
+        <m.div
+          animate={{
+            marginRight: isSelectable ? 0 : -14,
+            opacity: isSelectable ? 1 : 0,
+            width: isSelectable ? 20 : 0,
+          }}
+          className="shrink-0 overflow-hidden"
+          initial={false}
+          transition={{ duration: 0.25, ease: springEase }}
         >
-          {isSelected && (
-            <svg
-              aria-label="Selezionato"
-              className="size-2.5 text-[var(--text-inverse)]"
-              fill="none"
-              viewBox="0 0 12 12"
-            >
-              <path
-                d="M2.5 6L5 8.5L9.5 3.5"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-              />
-            </svg>
-          )}
-        </m.button>
+          <m.button
+            aria-checked={isSelected}
+            aria-hidden={!isSelectable}
+            className={cn(
+              "pointer-events-auto flex size-[20px] shrink-0 items-center justify-center rounded-5px border transition-all",
+              isSelected
+                ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] opacity-100"
+                : "border-[var(--border-subtle)] bg-[var(--surface-base)] opacity-100",
+            )}
+            disabled={!isSelectable}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect?.();
+            }}
+            role="checkbox"
+            tabIndex={isSelectable ? 0 : -1}
+            type="button"
+          >
+            {isSelected ? (
+              <svg
+                aria-label="Selezionato"
+                className="size-2.5 text-[var(--text-inverse)]"
+                fill="none"
+                viewBox="0 0 12 12"
+              >
+                <path
+                  d="M2.5 6L5 8.5L9.5 3.5"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                />
+              </svg>
+            ) : null}
+          </m.button>
+        </m.div>
 
         <span
           className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-lg",
-            isClosed
+            "flex size-11 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset",
+            isFinal
               ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-              : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+              : isReview
+                ? "bg-[var(--info-soft)] text-[var(--info-base)]"
+                : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+            isFinal
+              ? "ring-[color-mix(in_srgb,var(--success-base)_18%,transparent)]"
+              : isReview
+                ? "ring-[color-mix(in_srgb,var(--info-base)_18%,transparent)]"
+                : "ring-[color-mix(in_srgb,var(--warning-base)_18%,transparent)]",
           )}
         >
-          {isClosed ? <CheckCircle2 className="size-5" /> : <Clock3 className="size-5" />}
+          {isFinal ? <CheckCircle2 className="size-5" /> : <Clock3 className="size-5" />}
         </span>
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-13px font-semibold text-[var(--text-primary)]">
-              {sal}
+          <div className="truncate text-14px font-semibold text-[var(--text-primary)]">{sal}</div>
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="rounded-md bg-[var(--bg-muted)] px-1.5 py-0.5 text-10px font-semibold text-[var(--text-tertiary)]">
+              {progressiveLabel}
             </span>
-            <StatusPill tone={tone}>{status}</StatusPill>
+            <span className="min-w-0 truncate text-11px font-medium text-[var(--text-secondary)]">
+              {period}
+            </span>
           </div>
-          <div className="mt-0.5 truncate text-12px font-medium text-[var(--text-secondary)]">
-            {period} &middot; {value}
-          </div>
-          <div className="mt-0.5 text-11px font-medium text-[var(--text-secondary)]">{date}</div>
         </div>
       </div>
 
-      <div className="pointer-events-auto relative z-10 flex shrink-0 items-center gap-1">
+      <div className="relative z-10 min-w-0 rounded-lg bg-[color-mix(in_srgb,var(--surface-base)_64%,var(--accent-primary)_6%)] px-3.5 py-2.5 ring-1 ring-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)] md:bg-transparent md:px-0 md:py-0 md:ring-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-10px font-semibold uppercase tracking-0_1em text-[var(--accent-primary)]">
+            <ListChecks className="size-3.5 shrink-0" />
+            Importo SAL
+          </div>
+          <div className="mt-1 truncate text-18px font-semibold leading-none tabular-nums text-[var(--text-primary)] md:text-19px">
+            {value}
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-md bg-[var(--bg-muted)] px-1.5 py-0.5 text-10px font-semibold text-[var(--text-secondary)]">
+              {incidence}% contratto
+            </span>
+            <span className="rounded-md bg-[var(--bg-muted)] px-1.5 py-0.5 text-10px font-semibold text-[var(--text-secondary)]">
+              {lineCount} {lineCount === 1 ? "voce" : "voci"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 flex min-w-0 items-center gap-2.5 rounded-lg bg-[var(--surface-base)]/45 px-3.5 py-2.5 md:bg-transparent md:px-0 md:py-0">
+        <CalendarDays className="size-4 shrink-0 text-[var(--text-tertiary)] md:hidden" />
+        <div className="min-w-0">
+          <div className="text-10px font-semibold uppercase tracking-0_1em text-[var(--text-tertiary)] md:hidden">
+            Data
+          </div>
+          <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--text-primary)] md:mt-0">
+            {date}
+          </div>
+        </div>
+      </div>
+
+      <div className="pointer-events-auto relative z-10 flex min-w-0 items-center justify-between gap-2.5 rounded-lg bg-[var(--surface-base)]/45 px-3.5 py-2.5 md:justify-end md:bg-transparent md:px-0 md:py-0">
+        <StatusPill tone={tone}>{status}</StatusPill>
+
         {isDraft ? (
           <Button
             size="sm"
@@ -302,10 +377,10 @@ export function SalCard({
             <ThumbsUp className="size-3.5" />
             Approva
           </Button>
-        ) : isClosed || isApproved ? (
+        ) : isFinal ? (
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-11px font-semibold",
+              "hidden items-center gap-1.5 rounded-full px-3 py-1 text-11px font-semibold sm:inline-flex",
               "bg-[var(--success-soft)] text-[var(--success-base)]",
             )}
           >
@@ -362,7 +437,7 @@ export function SalCard({
           </DropdownMenu>
         </div>
       </div>
-    </div>
+    </m.article>
   );
 }
 

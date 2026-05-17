@@ -1,4 +1,4 @@
-pub const CURRENT_SCHEMA_VERSION: i32 = 4;
+pub const CURRENT_SCHEMA_VERSION: i32 = 5;
 const INITIAL_SCHEMA: &str = include_str!("../../migrations/0001_initial.sql");
 
 pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
@@ -15,6 +15,7 @@ pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<(
 
     connection.execute_batch(include_str!("../../migrations/0003_materials.sql"))?;
     connection.execute_batch(include_str!("../../migrations/0004_indexes.sql"))?;
+    connection.execute_batch(include_str!("../../migrations/0005_sal_workflow.sql"))?;
 
     Ok(())
 }

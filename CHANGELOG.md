@@ -2,6 +2,32 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.30 — 2026-05-16
+
+### SAL ora nel database
+
+- **Le SAL non si perdono più** — prima i documenti SAL venivano salvati solo nella memoria locale del browser. Se cambiavi sessione o ricaricavi l'app, potevano scomparire. Ora le SAL sono salvate nel database principale, insieme a progetti e contratti. Restano al sicuro e sono sempre disponibili.
+- **Migrazione automatica dei dati esistenti** — se avevi già delle SAL salvate, Quantara le sposta automaticamente nel database al primo avvio. Non devi fare nulla.
+
+### Creazione SAL più pulita
+
+- **"Conferma SAL" sempre a portata di mano** — il pulsante per confermare la SAL ora vive nella barra in alto (step 4), accanto a "Salva bozza". Niente più bisogno di cercare il bottone giusto in fondo alla pagina.
+- **Meno pulsanti, meno confusione** — rimossi i bottoni "Continua" e "Conferma" dal fondo degli step. La navigazione avviene solo dalla barra superiore, così sai sempre dove sei e cosa puoi fare.
+- **"Chiudi" conferma davvero** — quando completavi una SAL e cliccavi "Chiudi", a volte il documento restava in bozza invece di essere confermato. Ora il comportamento è corretto: ciò che vedi è ciò che ottieni.
+
+### Dettaglio progetto più accurato
+
+- **Date SAL corrette** — la data mostrata sulle card SAL ora riflette quella reale del documento, non una data di fallback. Prima in alcuni casi vedevi la data di chiusura del progetto invece di quella della SAL.
+- **Registro SAL più leggibile** — le card SAL mostrano subito nome, importo, data, stato, percentuale sul contratto e numero di voci. Il numero progressivo della SAL resta visibile, ma non ruba più spazio al nome scelto dall'utente.
+- **Ordinamento SAL corretto** — cliccando su "SAL", l'elenco viene ordinato in base al numero progressivo reale, non al testo del titolo. Le righe si riposizionano con un'animazione fluida.
+- **Selezione multipla più chiara** — la checkbox compare solo quando attivi la selezione multipla e lo spazio del testo si adatta senza salti visivi.
+- **Grafico SAL ridisegnato** — lo storico SAL ora mostra barre chiare sulle date reali dei documenti, con mesi evidenziati e giorni leggibili. Il grafico usa meglio lo spazio disponibile e il tooltip resta vicino al cursore.
+- **Grafico budget più leggibile nel tempo** — anche il grafico dell'andamento budget ora separa i mesi dai giorni: i mesi sono più evidenti, le date restano leggere. È più facile capire dove ci si trova nel calendario.
+
+### Più affidabile
+
+- **Memoria locale gestita meglio** — quando lo spazio di archiviazione del browser è quasi pieno, Quantara ora riesce a liberare correttamente spazio vecchio per salvare i nuovi dati. Prima poteva bloccarsi senza salvare nulla.
+
 ## 0.3.25 — 2026-05-16
 
 ### Correzioni

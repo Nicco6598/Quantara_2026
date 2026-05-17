@@ -3,26 +3,31 @@ import {
   Activity,
   ChevronRight,
   Clock3,
+  Download,
   FileText,
   Layers3,
   Plus,
   Radio,
   ReceiptText,
+  Trash2,
   TrendingUp,
   UsersRound,
   WalletCards,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
-import { ContextToolbar } from "@/components/shared/ContextToolbar";
-import { MOTION_VARIANTS } from "@/motion";
+import { SalHistoryBars, SpendingTrend } from "@/components/shared/charts";
+import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { useMultiSelect } from "@/hooks/use-multi-select";
+import { useTableSort } from "@/hooks/use-table-sort";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   listDesktopContracts,
@@ -30,18 +35,21 @@ import {
   restoreMaterialsFromSalUsage,
   updateDesktopContract,
 } from "@/lib/desktopData";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { formatMoney } from "@/lib/formatters";
+import {
+  deleteSalDocument,
+  listDesktopSalDocuments,
+  listDesktopSalProjects,
+  migrateSalLocalStorageToBackend,
+  saveSalDocument,
+} from "@/lib/sal-data";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
-
 import { cn } from "@/lib/utils";
-
+import { MOTION_VARIANTS } from "@/motion";
+import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
-
-import { useSelectionStore } from "@/store/selection-store";
-
-import { SpendingTrend, SalHistoryBars } from "@/components/shared/charts";
+import { useUndoStore } from "@/store/undo-store";
 import {
   DeleteConfirmDialog,
   InfoBlock,
@@ -119,6 +127,35 @@ export function ProjectDetailScreen() {
 
     return projects[0] ?? null;
   }, [projects]);
+
+  // Load SALs from backend (SQLite in Tauri, localStorage fallback in browser)
+  useEffect(() => {
+    let active = true;
+    const pid = selectedProject?.id;
+    if (!pid) return;
+
+    // Migrazione one-time: sposta vecchi dati localStorage → SQLite
+    migrateSalLocalStorageToBackend().then(() => {
+      if (!active) return;
+      Promise.all([listDesktopSalDocuments(pid), listDesktopSalProjects()])
+        .then(([docsResult, projsResult]) => {
+          if (!active) return;
+          useSalWorkflowStore.getState().initializeFromBackend(
+            docsResult.data,
+            projsResult.data.filter((p) => p.id === pid),
+            [],
+          );
+        })
+        .catch(() => {
+          /* silent */
+        });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedProject?.id]);
+
   const salDocumentById = useMemo(
     () => new Map(salDocuments.map((document) => [document.id, document])),
     [salDocuments],
@@ -183,19 +220,26 @@ export function ProjectDetailScreen() {
 
   const [filterSalStatus, setFilterSalStatus] = useState<string>("Tutti");
 
-  const salRows = useMemo(
-    () =>
-      salViews.map((row) => ({
+  const salRows = useMemo(() => {
+    const total = salViews.length;
+    return salViews.map((row, index) => {
+      const progressiveNumber = total - index;
+      return {
         amount: row.total,
         cardStatus: row.status,
-        date: row.closedAt ?? row.date,
+        date: row.date,
         id: row.id,
+        incidence:
+          financials.contractual > 0 ? Math.round((row.total / financials.contractual) * 100) : 0,
         isClosed: row.status === "closed",
         isApproved: row.status === "approved",
         isDraft: row.status === "draft",
         isReview: row.status === "in-review",
+        lineCount: row.lines.length,
         period: row.description || row.title,
+        progressiveNumber,
         sal: row.title,
+        progressiveLabel: total > 1 ? `SAL ${progressiveNumber}/${total}` : row.title,
         status:
           row.status === "closed"
             ? "Approvata"
@@ -209,14 +253,36 @@ export function ProjectDetailScreen() {
           : row.status === "in-review"
             ? "info"
             : "warning") as "danger" | "info" | "success" | "warning",
-      })),
-    [salViews],
-  );
+      };
+    });
+  }, [financials.contractual, salViews]);
 
   const filteredSalRows = useMemo(
     () => salRows.filter((r) => filterSalStatus === "Tutti" || r.status === filterSalStatus),
     [salRows, filterSalStatus],
   );
+
+  const sortableSalRows = useMemo(
+    () =>
+      filteredSalRows.map((r) => ({
+        ...r,
+        sortProgressive: r.progressiveNumber,
+        sortTitle: r.sal,
+        sortDate: r.date,
+        sortAmount: r.amount,
+        sortStatus: r.status,
+      })),
+    [filteredSalRows],
+  );
+
+  const {
+    sortedItems: sortedSalRows,
+    sortKey: salSortKey,
+    sortDirection: salSortDirection,
+    onSort: onSalSort,
+  } = useTableSort(sortableSalRows);
+
+  const salMultiSelect = useMultiSelect(sortedSalRows);
 
   const detail = useMemo(
     () =>
@@ -224,7 +290,7 @@ export function ProjectDetailScreen() {
         ? buildProjectDetail(
             selectedProject,
             financials,
-            salRows[0]?.sal ?? "SAL da creare",
+            salRows[0]?.progressiveLabel ?? "SAL da creare",
             salRows,
           )
         : null,
@@ -283,6 +349,7 @@ export function ProjectDetailScreen() {
         await restoreMaterialsFromSalUsage(sal.materialUsage);
       }
       deleteSal(salId);
+      deleteSalDocument(salId);
       dispatchDataChanged();
       setDeleteTargetId(null);
       notify({
@@ -402,7 +469,7 @@ export function ProjectDetailScreen() {
           : "",
     },
     {
-      caption: salRows[0] ? `${salRows[0].sal} del ${salRows[0].date}` : "Nessuna SAL",
+      caption: salRows[0] ? `${salRows[0].progressiveLabel} del ${salRows[0].date}` : "Nessuna SAL",
       icon: Clock3,
       label: "Ultima SAL",
       tone: "warning" as const,
@@ -493,7 +560,7 @@ export function ProjectDetailScreen() {
             <div className="rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-3 ring-1 ring-[var(--border-subtle)]/60">
               <span className="text-10px font-medium text-[var(--text-tertiary)]">Ultima SAL</span>
               <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-                {salRows[0]?.sal ?? "—"}
+                {salRows[0]?.progressiveLabel ?? "—"}
               </div>
               <div className="mt-0.5 text-11px text-[var(--text-tertiary)]">
                 {salRows[0]?.date ?? "Nessuna SAL"}
@@ -599,47 +666,124 @@ export function ProjectDetailScreen() {
                 <FileText className="size-4 text-[var(--info-base)]" />
                 Registro SAL
               </div>
-              <Button icon={Plus} onClick={handleCreateSal} size="sm" variant="secondary">
-                Nuova SAL
-              </Button>
+              <div className="flex items-center gap-2">
+                <MultiSelectToggle
+                  isEnabled={salMultiSelect.isEnabled}
+                  onToggle={salMultiSelect.toggleEnable}
+                  count={salMultiSelect.count}
+                />
+                <Button icon={Plus} onClick={handleCreateSal} size="sm" variant="secondary">
+                  Nuova SAL
+                </Button>
+              </div>
             </div>
 
-            <div className="mt-4 space-y-2">
-              <ContextToolbar
-                actions={[
-                  {
-                    ...ContextToolbar.actions.export,
-                    run: () =>
+            {salMultiSelect.count > 0 && (
+              <div className="mt-3">
+                <MultiSelectBulkBar
+                  count={salMultiSelect.count}
+                  entityLabel="SAL"
+                  allSelected={salMultiSelect.allSelected}
+                  someSelected={salMultiSelect.someSelected}
+                  onSelectAll={() => salMultiSelect.selectAll(sortedSalRows.map((r) => r.id))}
+                  onClear={salMultiSelect.clear}
+                  onClose={salMultiSelect.disable}
+                >
+                  <button
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3.5 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
+                    onClick={() =>
                       notify({
                         message: "Esportazione in arrivo con un prossimo aggiornamento.",
                         title: "Esporta",
                         tone: "info",
-                      }),
-                  },
-                  {
-                    ...ContextToolbar.actions.delete,
-                    run: async () => {
-                      const ids = [...useSelectionStore.getState().ids];
+                      })
+                    }
+                    type="button"
+                  >
+                    <Download className="size-4" />
+                    Esporta
+                  </button>
+                  <button
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3.5 text-12px font-bold text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
+                    onClick={() => {
+                      const ids = [...salMultiSelect.selectedIds];
                       const count = ids.length;
+                      const deletedSals = ids
+                        .map((id) => salDocuments.find((d) => d.id === id))
+                        .filter((d): d is NonNullable<typeof d> => d !== undefined);
+
                       for (const id of ids) {
                         const sal = salDocuments.find((d) => d.id === id);
                         if (sal?.materialUsage) {
-                          await restoreMaterialsFromSalUsage(sal.materialUsage);
+                          void restoreMaterialsFromSalUsage(sal.materialUsage);
                         }
                         if (sal) deleteSal(sal.id);
+                        deleteSalDocument(id);
                       }
-                      useSelectionStore.getState().clear();
                       dispatchDataChanged();
+
+                      const execute = () => {
+                        for (const sal of deletedSals) {
+                          deleteSal(sal.id);
+                          deleteSalDocument(sal.id);
+                        }
+                        dispatchDataChanged();
+                      };
+                      const undo = async () => {
+                        for (const sal of deletedSals) {
+                          const salInput = {
+                            projectId: sal.projectId,
+                            date: sal.date,
+                            description: sal.description,
+                            notes: sal.notes,
+                            title: sal.title,
+                            lines: sal.lines,
+                            voices: [] as never[],
+                            status: sal.status,
+                            ...(sal.economicRules ? { economicRules: sal.economicRules } : {}),
+                            ...(sal.materialUsage ? { materialUsage: sal.materialUsage } : {}),
+                            ...(typeof sal.total === "number" ? { total: sal.total } : {}),
+                          };
+                          useSalWorkflowStore.getState().createSal(salInput);
+                          await saveSalDocument(sal.projectId, sal);
+                          if (sal.materialUsage) {
+                            await restoreMaterialsFromSalUsage(sal.materialUsage);
+                          }
+                        }
+                        dispatchDataChanged();
+                      };
+
+                      useUndoStore.getState().push({
+                        label: `${count} SAL eliminat${count === 1 ? "a" : "e"}`,
+                        execute,
+                        undo,
+                      });
                       notify({
+                        actionLabel: "Annulla",
                         message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
+                        onAction: async () => {
+                          await undo();
+                          notify({
+                            message: "Azione annullata",
+                            title: "Annullato",
+                            tone: "info",
+                          });
+                        },
                         title: "Eliminate",
                         tone: "success",
                       });
-                    },
-                  },
-                ]}
-                entityLabel="SAL"
-              />
+                      salMultiSelect.disable();
+                    }}
+                    type="button"
+                  >
+                    <Trash2 className="size-4" />
+                    Elimina
+                  </button>
+                </MultiSelectBulkBar>
+              </div>
+            )}
+
+            <div className="mt-4 space-y-2">
               {/* Status filter tabs */}
               <div className="flex flex-wrap items-center gap-1.5 px-1 pt-3">
                 {["Tutti", "Bozza", "In revisione", "Approvata"].map((s) => (
@@ -665,50 +809,104 @@ export function ProjectDetailScreen() {
                 ))}
               </div>
               {salViews.length > 1 ? (
-                <div className="px-1 pt-4">
+                <div className="pt-4">
                   <SalHistoryBars views={salViews} />
                 </div>
               ) : null}
-              {filteredSalRows.map((row) => (
-                <SalCard
-                  key={row.id}
-                  cardStatus={row.cardStatus}
-                  date={row.date}
-                  id={row.id}
-                  onClose={() =>
-                    handleSetSalStatus(
-                      row.id,
-                      row.isDraft ? "in-review" : row.isReview ? "approved" : "closed",
-                    )
-                  }
-                  onContinue={
-                    row.isDraft
-                      ? () => {
-                          try {
-                            window.sessionStorage.setItem(
-                              SESSION_STORAGE_KEYS.selectedProjectDetail,
-                              JSON.stringify(selectedProject),
-                            );
-                            window.sessionStorage.setItem(
-                              SESSION_STORAGE_KEYS.salResumeDraft,
-                              row.id,
-                            );
-                          } catch {
-                            /* no-op */
-                          }
-                          navigate("sal-create");
-                        }
-                      : undefined
-                  }
-                  onDelete={() => setDeleteTargetId(row.id)}
-                  period={row.period}
-                  sal={row.sal}
-                  status={row.status}
-                  tone={row.tone}
-                  value={formatMoney({ amount: row.amount, currency: "EUR" })}
-                />
-              ))}
-              {filteredSalRows.length === 0 ? (
+              {sortedSalRows.length > 0 ? (
+                <>
+                  <div className="mx-1 mb-2 hidden rounded-xl bg-[var(--bg-muted)]/40 px-4 py-2.5 md:grid md:grid-cols-[minmax(220px,1fr)_176px_120px_minmax(240px,max-content)] md:items-center md:gap-4">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="text-11px font-semibold uppercase tracking-0_1em text-[var(--text-secondary)]">
+                        SAL
+                      </span>
+                      <SortIndicator
+                        active={salSortKey === "sortProgressive"}
+                        direction={salSortKey === "sortProgressive" ? salSortDirection : null}
+                        onClick={() => onSalSort("sortProgressive")}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-11px font-semibold uppercase tracking-0_1em text-[var(--text-secondary)]">
+                        Importo
+                      </span>
+                      <SortIndicator
+                        active={salSortKey === "sortAmount"}
+                        direction={salSortKey === "sortAmount" ? salSortDirection : null}
+                        onClick={() => onSalSort("sortAmount")}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-11px font-semibold uppercase tracking-0_1em text-[var(--text-secondary)]">
+                        Data
+                      </span>
+                      <SortIndicator
+                        active={salSortKey === "sortDate"}
+                        direction={salSortKey === "sortDate" ? salSortDirection : null}
+                        onClick={() => onSalSort("sortDate")}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-11px font-semibold uppercase tracking-0_1em text-[var(--text-secondary)]">
+                        Stato
+                      </span>
+                      <SortIndicator
+                        active={salSortKey === "sortStatus"}
+                        direction={salSortKey === "sortStatus" ? salSortDirection : null}
+                        onClick={() => onSalSort("sortStatus")}
+                      />
+                    </div>
+                  </div>
+                  {sortedSalRows.map((row) => (
+                    <SalCard
+                      key={row.id}
+                      cardStatus={row.cardStatus}
+                      date={row.date}
+                      incidence={row.incidence}
+                      lineCount={row.lineCount}
+                      isSelected={
+                        salMultiSelect.isEnabled && salMultiSelect.selectedIds.has(row.id)
+                      }
+                      {...(salMultiSelect.isEnabled
+                        ? { onSelect: () => salMultiSelect.toggle(row.id) }
+                        : {})}
+                      onClose={() =>
+                        handleSetSalStatus(
+                          row.id,
+                          row.isDraft ? "in-review" : row.isReview ? "approved" : "closed",
+                        )
+                      }
+                      onContinue={
+                        row.isDraft
+                          ? () => {
+                              try {
+                                window.sessionStorage.setItem(
+                                  SESSION_STORAGE_KEYS.selectedProjectDetail,
+                                  JSON.stringify(selectedProject),
+                                );
+                                window.sessionStorage.setItem(
+                                  SESSION_STORAGE_KEYS.salResumeDraft,
+                                  row.id,
+                                );
+                              } catch {
+                                /* no-op */
+                              }
+                              navigate("sal-create");
+                            }
+                          : undefined
+                      }
+                      onDelete={() => setDeleteTargetId(row.id)}
+                      period={row.period}
+                      progressiveLabel={row.progressiveLabel}
+                      sal={row.sal}
+                      status={row.status}
+                      tone={row.tone}
+                      value={formatMoney({ amount: row.amount, currency: "EUR" })}
+                    />
+                  ))}
+                </>
+              ) : null}
+              {sortedSalRows.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 rounded-xl border-[0.5px] border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-4 py-8 text-center">
                   <FileText className="size-8 text-[var(--text-secondary)]" />
                   <p className="text-13px font-medium text-[var(--text-secondary)]">

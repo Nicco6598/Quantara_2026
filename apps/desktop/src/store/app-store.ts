@@ -45,6 +45,8 @@ type TariffImportToolbarState = {
 };
 
 type SalToolbarState = {
+  autoSaveLastSaved: string | null;
+  autoSaveStatus: "idle" | "saving" | "saved" | "error" | "unsaved";
   budgetResidual: number;
   discountAmount: number;
   lineCount: number;
@@ -54,6 +56,8 @@ type SalToolbarState = {
 };
 
 type ProjectToolbarState = {
+  autoSaveLastSaved: string | null;
+  autoSaveStatus: "idle" | "saving" | "saved" | "error" | "unsaved";
   currentStep: number;
   canGoNext: boolean;
   canSubmit: boolean;
@@ -203,6 +207,8 @@ export const useAppStore = create<AppStore>()(
       pendingWorkflowAction: null,
       projectPendingStep: null,
       projectToolbar: {
+        autoSaveLastSaved: null,
+        autoSaveStatus: "idle",
         canGoNext: false,
         canSubmit: false,
         currentStep: 1,
@@ -213,6 +219,8 @@ export const useAppStore = create<AppStore>()(
       },
       salPendingStep: null,
       salToolbar: {
+        autoSaveLastSaved: null,
+        autoSaveStatus: "idle",
         budgetResidual: 0,
         discountAmount: 0,
         lineCount: 0,

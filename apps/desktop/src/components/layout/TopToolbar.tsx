@@ -10,7 +10,9 @@ import {
   Trash,
 } from "@phosphor-icons/react";
 import { AnimatePresence, m } from "framer-motion";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { AutoSaveIndicator } from "@/components/shared/AutoSaveIndicator";
 import { MOTION_DURATION, SPRING_EASE } from "@/motion";
 import { cn } from "@/lib/utils";
 import {
@@ -322,6 +324,22 @@ function TariffImportControls({ onAction }: { onAction: (actionId: string) => vo
 
 function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void }) {
   const salToolbar = useSalToolbarState();
+  const salCurrentStep = useSalCurrentStep();
+  const [showSavedFlash, setShowSavedFlash] = useState(false);
+
+  useEffect(() => {
+    if (salToolbar.autoSaveStatus === "saved") {
+      setShowSavedFlash(true);
+      const t = setTimeout(() => setShowSavedFlash(false), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [salToolbar.autoSaveStatus]);
+
+  const isUnsaved = salToolbar.autoSaveStatus === "unsaved";
+  const isSaving = salToolbar.autoSaveStatus === "saving";
+  const showSaved = showSavedFlash && salToolbar.autoSaveStatus === "saved";
+
+  const buttonLabel = showSaved ? "Salvato" : isSaving ? "Salvataggio..." : "Salva bozza";
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -349,16 +367,49 @@ function SalToolbarControls({ onAction }: { onAction: (actionId: string) => void
           </>
         ) : null}
       </div>
+      {salCurrentStep === 4 ? (
+        <m.button
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90"
+          onClick={() => onAction("sal-confirm")}
+          type="button"
+        >
+          <CheckCircle size={14} weight="bold" />
+          <span>Conferma SAL</span>
+        </m.button>
+      ) : null}
       <m.button
-        className="top-toolbar-action group flex h-10 items-center gap-2 rounded-full border border-[var(--warning-base)]/30 bg-[color-mix(in_srgb,var(--warning-base)_12%,var(--surface-base)_88%)] px-3.5 text-12px font-bold text-[var(--warning-base)] transition-colors hover:bg-[color-mix(in_srgb,var(--warning-base)_20%,var(--surface-base)_80%)]"
+        className={cn(
+          "relative inline-flex h-10 items-center gap-2 rounded-full border px-4 text-12px font-bold transition-all duration-300",
+          showSaved
+            ? "border-[var(--success-base)]/30 bg-[var(--success-soft)] text-[var(--success-base)]"
+            : isSaving
+              ? "border-[var(--info-base)]/30 bg-[var(--info-soft)] text-[var(--info-base)]"
+              : isUnsaved
+                ? "border-[var(--warning-base)]/50 bg-[color-mix(in_srgb,var(--warning-base)_14%,var(--surface-base)_86%)] text-[var(--warning-base)] hover:bg-[color-mix(in_srgb,var(--warning-base)_22%,var(--surface-base)_78%)]"
+                : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+        )}
         onClick={() => onAction("sal-save-draft")}
-        title="Salva bozza SAL"
         type="button"
       >
-        <span className="flex size-5 items-center justify-center rounded-full bg-[var(--warning-soft)]">
-          <FloppyDisk size={12} weight="bold" />
-        </span>
-        <span>Salva bozza</span>
+        {isUnsaved && (
+          <span className="absolute -top-0.5 -right-0.5 flex size-2.5">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--warning-base)] opacity-75" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-[var(--warning-base)]" />
+          </span>
+        )}
+        {showSaved ? (
+          <CheckCircle2 size={14} />
+        ) : isSaving ? (
+          <Loader2 size={14} className="animate-spin" />
+        ) : (
+          <FloppyDisk size={14} weight="bold" />
+        )}
+        <span>{buttonLabel}</span>
+        {salToolbar.autoSaveLastSaved && !showSaved && !isSaving && (
+          <span className="ml-1 text-10px font-medium opacity-50">
+            {new Date(salToolbar.autoSaveLastSaved).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
       </m.button>
     </div>
   );
@@ -416,6 +467,11 @@ function ProjectToolbarControls({ onAction }: { onAction: (actionId: string) => 
           {projectToolbar.error}
         </span>
       ) : null}
+
+      <AutoSaveIndicator
+        lastSaved={projectToolbar.autoSaveLastSaved}
+        status={projectToolbar.autoSaveStatus}
+      />
 
       <div className="flex items-center gap-1.5">
         {projectToolbar.currentStep === 1 ? (

@@ -1,147 +1,342 @@
-import { useMemo } from "react";
+import { m } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import { useChartColors } from "./useChartColors";
-import { UplotChart } from "./UplotChart";
-import type uPlot from "uplot";
 
 type SalHistoryBarsProps = {
   views: Array<{ date: string; closedAt?: string; total: number; status: string }>;
 };
 
-function buildMonthlySpend(views: Array<{ date: string; closedAt?: string; total: number }>): {
-  labels: string[];
-  values: number[];
-  timestamps: number[];
-} {
-  if (views.length === 0) return { labels: [], values: [], timestamps: [] };
+type TimelinePoint = {
+  date: Date;
+  key: string;
+  total: number;
+  ts: number;
+};
 
-  const byMonth = new Map<string, { total: number; ts: number }>();
-  let firstDate: Date | null = null;
+type TooltipState = {
+  point: TimelinePoint;
+  x: number;
+  y: number;
+} | null;
 
-  for (const v of views) {
-    const d = new Date(v.closedAt || v.date);
-    if (!firstDate || d < firstDate) firstDate = d;
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const existing = byMonth.get(key);
-    byMonth.set(key, {
-      total: (existing?.total ?? 0) + v.total,
-      ts: existing?.ts ?? Math.floor(new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000),
+const DAY_SECONDS = 24 * 60 * 60;
+const FALLBACK_SVG_WIDTH = 1000;
+const SVG_HEIGHT = 178;
+const PLOT = {
+  bottom: 112,
+  left: 68,
+  right: 24,
+  top: 14,
+};
+
+function toDayStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function toTimestamp(date: Date) {
+  return Math.floor(date.getTime() / 1000);
+}
+
+function addDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * DAY_SECONDS * 1000);
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString("it-IT", {
+    currency: "EUR",
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    style: "currency",
+  });
+}
+
+function buildSalTimeline(views: Array<{ date: string; closedAt?: string; total: number }>) {
+  const byDay = new Map<string, TimelinePoint>();
+
+  for (const view of views) {
+    const date = toDayStart(new Date(view.closedAt || view.date));
+    const key = date.toISOString().slice(0, 10);
+    const existing = byDay.get(key);
+
+    byDay.set(key, {
+      date,
+      key,
+      total: (existing?.total ?? 0) + view.total,
+      ts: existing?.ts ?? toTimestamp(date),
     });
   }
 
-  const months = [
-    "",
-    "Gen",
-    "Feb",
-    "Mar",
-    "Apr",
-    "Mag",
-    "Giu",
-    "Lug",
-    "Ago",
-    "Set",
-    "Ott",
-    "Nov",
-    "Dic",
-  ];
-
-  const now = new Date();
-  const firstY = (firstDate as Date).getFullYear();
-  const firstM = (firstDate as Date).getMonth() + 1;
-  const rangeMonths = (now.getFullYear() - firstY) * 12 + now.getMonth() + 1 - firstM + 1;
-
-  const labels: string[] = [];
-  const values: number[] = [];
-  const timestamps: number[] = [];
-
-  for (let i = 0; i < rangeMonths; i++) {
-    let y = firstY;
-    let m = firstM + i;
-    while (m > 12) {
-      m -= 12;
-      y++;
-    }
-
-    const key = `${y}-${String(m).padStart(2, "0")}`;
-    labels.push(months[m] as string);
-    const entry = byMonth.get(key);
-    values.push(entry?.total ?? 0);
-    timestamps.push(entry?.ts ?? Math.floor(new Date(y, m - 1, 1).getTime() / 1000));
+  const points = [...byDay.values()].sort((left, right) => left.ts - right.ts);
+  if (points.length === 0) {
+    return {
+      avgAmount: 0,
+      dateTicks: [] as Date[],
+      monthTicks: [] as Array<{ date: Date; labelDate: Date }>,
+      points,
+      rangeMax: 0,
+      rangeMin: 0,
+      yTicks: [] as number[],
+    };
   }
 
-  return { labels, values, timestamps };
+  const firstDate = points[0]?.date as Date;
+  const lastDate = points[points.length - 1]?.date as Date;
+  const dataSpanDays = Math.max(
+    1,
+    Math.ceil((toTimestamp(lastDate) - toTimestamp(firstDate)) / DAY_SECONDS),
+  );
+  const edgePaddingDays = Math.max(0.75, Math.min(1.5, dataSpanDays * 0.035));
+  const rangeMinDate = addDays(firstDate, -edgePaddingDays);
+  const rangeMaxDate = addDays(lastDate, edgePaddingDays);
+  const nextMonthStart = toDayStart(new Date(lastDate.getFullYear(), lastDate.getMonth() + 1, 1));
+
+  const dateTickSet = new Map<number, Date>();
+  const monthTickSet = new Map<number, { date: Date; labelDate: Date }>();
+  const firstMonth = firstDate.getMonth();
+  const firstYear = firstDate.getFullYear();
+  const rangeMonths =
+    (nextMonthStart.getFullYear() - firstYear) * 12 + nextMonthStart.getMonth() - firstMonth + 1;
+
+  for (let i = 0; i < rangeMonths; i++) {
+    const monthStart = toDayStart(new Date(firstYear, firstMonth + i, 1));
+    const monthMarker = i === 0 && monthStart < firstDate ? firstDate : monthStart;
+    if (monthMarker >= firstDate && monthMarker <= rangeMaxDate) {
+      monthTickSet.set(toTimestamp(monthMarker), { date: monthMarker, labelDate: monthStart });
+    }
+
+    const monday = new Date(monthStart);
+    monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7));
+    while (monday.getMonth() === monthStart.getMonth()) {
+      if (monday >= firstDate && monday <= rangeMaxDate) {
+        dateTickSet.set(toTimestamp(monday), new Date(monday));
+      }
+      monday.setDate(monday.getDate() + 7);
+    }
+  }
+
+  monthTickSet.set(toTimestamp(rangeMaxDate), { date: rangeMaxDate, labelDate: nextMonthStart });
+
+  const maxValue = Math.max(...points.map((point) => point.total));
+  const yMax = Math.max(1, Math.ceil(maxValue / 10000) * 10000);
+  const avgAmount = points.reduce((sum, point) => sum + point.total, 0) / points.length;
+
+  return {
+    avgAmount,
+    dateTicks: [...dateTickSet.values()].sort(
+      (left, right) => toTimestamp(left) - toTimestamp(right),
+    ),
+    monthTicks: [...monthTickSet.values()].sort(
+      (left, right) => toTimestamp(left.date) - toTimestamp(right.date),
+    ),
+    points,
+    rangeMax: toTimestamp(rangeMaxDate),
+    rangeMin: toTimestamp(rangeMinDate),
+    yTicks: [0, yMax / 2, yMax],
+  };
 }
 
 export function SalHistoryBars({ views }: SalHistoryBarsProps) {
   const { colors } = useChartColors();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<TooltipState>(null);
+  const [measuredWidth, setMeasuredWidth] = useState(FALLBACK_SVG_WIDTH);
 
-  const { labels, values, timestamps } = useMemo(() => buildMonthlySpend(views), [views]);
+  const timeline = useMemo(() => buildSalTimeline(views), [views]);
 
-  if (labels.length === 0) return null;
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
 
-  const totalInRange = values.reduce((s, v) => s + v, 0);
-  const monthsWithData = values.filter((v) => v > 0).length;
-  const avgMonthlySpend = monthsWithData > 0 ? totalInRange / monthsWithData : 0;
-  const avgLine = values.map(() => avgMonthlySpend);
+    const updateWidth = () => {
+      setMeasuredWidth(Math.max(640, Math.round(element.getBoundingClientRect().width)));
+    };
+    updateWidth();
 
-  const data: uPlot.AlignedData = [timestamps, values, avgLine];
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  if (timeline.points.length === 0) return null;
+
+  const svgWidth = measuredWidth;
+  const plotWidth = svgWidth - PLOT.left - PLOT.right;
+  const plotHeight = PLOT.bottom - PLOT.top;
+  const range = Math.max(1, timeline.rangeMax - timeline.rangeMin);
+  const yMax = timeline.yTicks[timeline.yTicks.length - 1] ?? 1;
+  const barWidth = Math.max(
+    14,
+    Math.min(40, plotWidth / Math.max(8, timeline.points.length * 2.6)),
+  );
+  const avgY = PLOT.bottom - (timeline.avgAmount / yMax) * plotHeight;
+
+  const xForTs = (ts: number) => PLOT.left + ((ts - timeline.rangeMin) / range) * plotWidth;
+  const yForValue = (value: number) => PLOT.bottom - (value / yMax) * plotHeight;
+
+  function handleTooltipMove(event: React.MouseEvent<SVGRectElement>, point: TimelinePoint) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltip({
+      point,
+      x: event.clientX - rect.left + 14,
+      y: event.clientY - rect.top + 14,
+    });
+  }
 
   return (
-    <UplotChart
-      data={data}
-      height={180}
-      options={{
-        title: "",
-        legend: { show: true },
-        series: [
-          {},
-          {
-            type: "bars",
-            label: "Spesa mensile",
-            stroke: colors.chart1,
-            fill: `${colors.chart1}55`,
-            width: 1,
-            points: { show: false },
-          } as unknown as uPlot.Series,
-          {
-            label: "Media mensile",
-            stroke: colors.chart5,
-            dash: [4, 3] as number[],
-            width: 1,
-            points: { show: false } as const,
-          },
-        ],
-        axes: [
-          {
-            stroke: colors.textTertiary,
-            grid: { show: false },
-            ticks: { stroke: "transparent" as const },
-            font: "10px system-ui",
-            splits: timestamps,
-            values: (_self: unknown, ticks: number[]) =>
-              ticks.map((t) => {
-                const d = new Date(t * 1000);
-                return d.toLocaleDateString("it-IT", { month: "short", year: "2-digit" });
-              }),
-            size: 60,
-          },
-          {
-            stroke: colors.textTertiary,
-            grid: { stroke: `${colors.borderSubtle}33` },
-            ticks: { stroke: "transparent" as const },
-            font: "10px system-ui",
-            size: 64,
-            values: (_self: unknown, ticks: number[]) =>
-              ticks.map((t) =>
-                t.toLocaleString("it-IT", {
-                  style: "currency",
-                  currency: "EUR",
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                }),
-              ),
-          },
-        ],
-      }}
-    />
+    <m.div
+      animate={{ opacity: 1, scaleY: 1 }}
+      className="w-full"
+      initial={{ opacity: 0, scaleY: 0.97 }}
+      transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <BezelSurface className="w-full" innerClassName="p-2 pb-2">
+        <div className="relative w-full" ref={containerRef}>
+          <svg
+            aria-label="Storico SAL"
+            className="block h-[180px] w-full overflow-visible"
+            role="img"
+            viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
+          >
+            {timeline.yTicks.map((tick) => {
+              const y = yForValue(tick);
+              return (
+                <g key={tick}>
+                  <line
+                    stroke={`${colors.borderSubtle}66`}
+                    strokeDasharray={tick === 0 ? undefined : "3 3"}
+                    x1={PLOT.left}
+                    x2={svgWidth - PLOT.right}
+                    y1={y}
+                    y2={y}
+                  />
+                  <text
+                    fill={colors.textTertiary}
+                    fontSize="10"
+                    fontWeight="600"
+                    textAnchor="end"
+                    x={PLOT.left - 10}
+                    y={y + 4}
+                  >
+                    {formatMoney(tick)}
+                  </text>
+                </g>
+              );
+            })}
+
+            <line
+              stroke={colors.chart5}
+              strokeDasharray="4 3"
+              strokeWidth="1.5"
+              x1={PLOT.left}
+              x2={svgWidth - PLOT.right}
+              y1={avgY}
+              y2={avgY}
+            />
+
+            {timeline.points.map((point) => {
+              const x = xForTs(point.ts);
+              const y = yForValue(point.total);
+              const height = Math.max(5, PLOT.bottom - y);
+              return (
+                <g key={point.key}>
+                  <rect
+                    fill={`${colors.chart1}55`}
+                    height={height}
+                    rx="5"
+                    stroke={colors.chart1}
+                    strokeWidth="1.5"
+                    width={barWidth}
+                    x={x - barWidth / 2}
+                    y={PLOT.bottom - height}
+                  />
+                  {/* biome-ignore lint/a11y/noStaticElementInteractions: SVG hover targets expose contextual chart values without changing state. */}
+                  <rect
+                    aria-label={`SAL del ${point.date.toLocaleDateString("it-IT")}: ${formatMoney(point.total)}`}
+                    fill="transparent"
+                    height={plotHeight}
+                    onMouseLeave={() => setTooltip(null)}
+                    onMouseMove={(event) => handleTooltipMove(event, point)}
+                    width={Math.max(barWidth + 26, 34)}
+                    x={x - Math.max(barWidth + 26, 34) / 2}
+                    y={PLOT.top}
+                  />
+                </g>
+              );
+            })}
+
+            {timeline.monthTicks.map(({ date, labelDate }) => (
+              <text
+                fill={colors.accentPrimary}
+                fontSize="11"
+                fontWeight="800"
+                key={`month-${toTimestamp(date)}`}
+                textAnchor="middle"
+                x={xForTs(toTimestamp(date))}
+                y={137}
+              >
+                {labelDate.toLocaleDateString("it-IT", { month: "short" }).toUpperCase()}
+              </text>
+            ))}
+
+            {timeline.dateTicks.map((date) => (
+              <text
+                fill={colors.textTertiary}
+                fontSize="10"
+                fontWeight="500"
+                key={`date-${toTimestamp(date)}`}
+                textAnchor="middle"
+                x={xForTs(toTimestamp(date))}
+                y={158}
+              >
+                {date.toLocaleDateString("it-IT", { day: "2-digit" })}
+              </text>
+            ))}
+          </svg>
+
+          <div className="mt-1 flex items-center gap-4 border-t border-[var(--border-subtle)]/50 pt-2 text-11px font-medium text-[var(--text-tertiary)]">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2.5 rounded-[3px] border border-[var(--chart-1)] bg-[color-mix(in_srgb,var(--chart-1)_35%,transparent)]" />
+              Importo SAL
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-px w-4 border-t border-dashed border-[var(--chart-5)]" />
+              Media SAL
+            </span>
+          </div>
+
+          {tooltip ? (
+            <div
+              className="pointer-events-none absolute z-50 min-w-[180px] rounded-14px border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/95 px-3 py-2 text-11px font-medium text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl"
+              style={{
+                left: tooltip.x,
+                top: tooltip.y,
+                transform:
+                  tooltip.x > (containerRef.current?.clientWidth ?? 0) - 220
+                    ? "translateX(calc(-100% - 28px))"
+                    : undefined,
+              }}
+            >
+              <div className="text-10px font-semibold text-[var(--text-secondary)]">
+                {tooltip.point.date.toLocaleDateString("it-IT", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </div>
+              <div className="mt-1.5 flex items-center gap-2 text-12px font-semibold text-[var(--text-primary)]">
+                <span className="size-2 rounded-full bg-[var(--chart-1)]" />
+                Importo SAL: {formatMoney(tooltip.point.total)}
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-11px font-semibold text-[var(--text-secondary)]">
+                <span className="h-px w-3 border-t border-dashed border-[var(--chart-5)]" />
+                Media SAL: {formatMoney(timeline.avgAmount)}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </BezelSurface>
+    </m.div>
   );
 }

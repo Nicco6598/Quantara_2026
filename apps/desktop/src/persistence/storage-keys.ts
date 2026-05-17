@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   contractorRegistry: "quantara.contractorRegistry.v1",
   projectContractors: "quantara.projectContractors.v1",
   projectDraft: "quantara.projectDraft.v2",
+  projectAutoDraft: "quantara.projectAutoDraft.v1",
   releaseNotesAfterUpdate: "quantara.pending-release-notes",
   salCreationDraft: "quantara.salCreationDraft.v1",
   salTemplates: "quantara-sal-templates-v1",
@@ -12,6 +13,7 @@ export const STORAGE_KEYS = {
   tariffFavoriteBookIds: "quantara.tariffs.favoriteBookIds",
   previewContracts: "quantara.preview.contracts.v1",
   previewMaterials: "quantara.preview.materials.v1",
+  filterTemplates: "quantara-filter-templates-v1",
 } as const;
 
 export const SESSION_STORAGE_KEYS = {

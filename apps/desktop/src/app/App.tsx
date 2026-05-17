@@ -20,6 +20,7 @@ import { UpdateExperienceDialog } from "@/components/shared/UpdateExperienceDial
 import { UpdateReleaseNotesDialog } from "@/components/shared/UpdateReleaseNotesDialog";
 import { useGlobalEscapeListener } from "@/hooks/useEscapeStack";
 import { useNavigate } from "@/hooks/useNavigate";
+import { useUndoKeyboardShortcuts } from "@/hooks/use-undo-keyboard-shortcuts";
 import {
   APP_UPDATE_AVAILABLE_EVENT,
   type AvailableAppUpdate,
@@ -507,6 +508,7 @@ function AppShell() {
   }, [motionMode]);
 
   useGlobalEscapeListener();
+  useUndoKeyboardShortcuts();
 
   const handleTopbarAction = useCallback(
     (actionId: string) => {
@@ -561,6 +563,11 @@ function AppShell() {
       }
 
       if (actionId === "sal-save-draft") {
+        window.dispatchEvent(new CustomEvent("sal-create-action", { detail: actionId }));
+        return;
+      }
+
+      if (actionId === "sal-confirm") {
         window.dispatchEvent(new CustomEvent("sal-create-action", { detail: actionId }));
         return;
       }

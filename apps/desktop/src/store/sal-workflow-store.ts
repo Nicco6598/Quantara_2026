@@ -35,6 +35,11 @@ type SalWorkflowStore = {
   projects: SalProject[];
   salDocuments: SalDocument[];
   tariffVoices: SalTariffVoice[];
+  initializeFromBackend: (
+    docs: SalDocument[],
+    projs: SalProject[],
+    voices: SalTariffVoice[],
+  ) => void;
   createProject: (input: Omit<SalProject, "id"> & { id?: string }) => SalProject;
   createSal: (input: CreateSalInput) => SalDocument;
   updateSalDraft: (id: string, input: Partial<CreateSalInput>) => SalDocument | null;
@@ -60,6 +65,27 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
       projects: [],
       salDocuments: [],
       tariffVoices: [],
+
+      initializeFromBackend: (docs, projs, voices) => {
+        const existing = get();
+        const mergedDocs = [...docs];
+        for (const ed of existing.salDocuments) {
+          if (!mergedDocs.find((d) => d.id === ed.id)) {
+            mergedDocs.push(ed);
+          }
+        }
+        const mergedProjects = [...projs];
+        for (const ep of existing.projects) {
+          if (!mergedProjects.find((p) => p.id === ep.id)) {
+            mergedProjects.push(ep);
+          }
+        }
+        set({
+          salDocuments: mergedDocs,
+          projects: mergedProjects,
+          tariffVoices: voices,
+        });
+      },
 
       createProject: (input) => {
         const project: SalProject = input.id
@@ -268,15 +294,10 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
     {
       name: STORAGE_KEYS.salWorkflow,
       version: 3,
-      // Caps prevent localStorage quota exceeded errors.
-      // Most users have <20 projects, <50 SAL documents, <2000 tariff voices.
-      // Data beyond caps remains in memory and SQLite.
+      // SAL data is now persisted to SQLite. Only UI state survives reload.
       partialize: (state) => ({
         activeProjectId: state.activeProjectId,
         activeSalId: state.activeSalId,
-        projects: state.projects.slice(0, 100),
-        salDocuments: state.salDocuments.slice(0, 200),
-        tariffVoices: state.tariffVoices.slice(0, 5000),
       }),
       migrate(persisted: unknown, version: number) {
         if (version === 0 || version === 1) {

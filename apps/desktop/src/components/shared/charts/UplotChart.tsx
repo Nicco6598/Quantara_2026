@@ -244,9 +244,19 @@ export function UplotChart({
             return;
           }
 
+          const l = self.cursor.left ?? 0;
+          const t = self.cursor.top ?? 0;
+          const pointLeft = self.valToPos(xVal as number, "x");
+          const primarySeries = self.series[1] as Record<string, unknown> | undefined;
+
+          if (primarySeries?.type === "bars" && Math.abs(pointLeft - l) > 32) {
+            tooltip.style.opacity = "0";
+            return;
+          }
+
           const d = new Date((xVal as number) * 1000);
           const dateStr = d.toLocaleDateString("it-IT", {
-            day: "numeric",
+            day: "2-digit",
             month: "short",
             year: "numeric",
           });
@@ -267,15 +277,31 @@ export function UplotChart({
 
           tooltip.innerHTML = html;
 
-          const rect = containerRef.current?.getBoundingClientRect() ?? new DOMRect();
-          const l = self.cursor.left ?? 0;
+          const container = containerRef.current;
+          const containerWidth = container?.clientWidth ?? 0;
+          const containerHeight = container?.clientHeight ?? 0;
+          const plotLeft = self.bbox.left / devicePixelRatio;
+          const plotTop = self.bbox.top / devicePixelRatio;
+          const offsetX = 14;
+          const offsetY = 14;
+          const cursorX = plotLeft + l;
+          const cursorY = plotTop + t;
+          const preferredRight = cursorX + offsetX;
+          const preferredLeft = cursorX - tooltip.offsetWidth - offsetX;
+          const maxLeft = Math.max(8, containerWidth - tooltip.offsetWidth - 8);
+          const left =
+            preferredRight + tooltip.offsetWidth <= containerWidth - 8
+              ? preferredRight
+              : preferredLeft;
+          const preferredTop = cursorY + offsetY;
+          const fallbackTop = cursorY - tooltip.offsetHeight - offsetY;
+          const unclampedTop =
+            preferredTop + tooltip.offsetHeight <= containerHeight - 8 ? preferredTop : fallbackTop;
+          const maxTop = Math.max(8, containerHeight - tooltip.offsetHeight - 8);
+          const clampedLeft = Math.max(8, Math.min(left, maxLeft));
+          const top = Math.max(8, Math.min(unclampedTop, maxTop));
 
-          const left = rect.left + l + 12;
-          let top = rect.top - tooltip.offsetHeight - 8;
-
-          if (top < rect.top) top = rect.top + 12;
-
-          tooltip.style.left = `${left}px`;
+          tooltip.style.left = `${clampedLeft}px`;
           tooltip.style.top = `${top}px`;
           tooltip.style.opacity = "1";
         },
@@ -299,7 +325,7 @@ export function UplotChart({
 
     const tooltip = document.createElement("div");
     tooltip.className =
-      "pointer-events-none fixed z-50 rounded-14px border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/94 px-3 py-2 text-11px font-medium text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl opacity-0 transition-opacity duration-200";
+      "pointer-events-none absolute z-50 rounded-14px border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/94 px-3 py-2 text-11px font-medium text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl opacity-0 transition-opacity duration-200";
 
     containerRef.current.appendChild(tooltip);
 
@@ -339,7 +365,7 @@ export function UplotChart({
       transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
     >
       <BezelSurface innerClassName="p-3 pb-2">
-        <div ref={containerRef} className="w-full" />
+        <div ref={containerRef} className="relative w-full" />
       </BezelSurface>
     </m.div>
   );

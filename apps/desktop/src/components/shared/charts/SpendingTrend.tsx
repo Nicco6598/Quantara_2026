@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { useChartColors } from "./useChartColors";
+import { useMemo, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { buildSpendingTrend } from "./chart-helpers";
 import { UplotChart } from "./UplotChart";
-import { cn } from "@/lib/utils";
+import { useChartColors } from "./useChartColors";
 
 type Timeframe = "3M" | "6M" | "1Y" | "ALL";
 
@@ -11,6 +11,60 @@ type SpendingTrendProps = {
   views: Array<{ date: string; closedAt?: string; total: number }>;
   contractualAmount: number;
 };
+
+function toDayStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function toTimestamp(date: Date) {
+  return Math.floor(date.getTime() / 1000);
+}
+
+function buildCalendarAxisTicks(dates: number[]) {
+  if (dates.length === 0) {
+    return { dateTicks: [] as number[], monthTicks: [] as Array<{ ts: number; label: string }> };
+  }
+
+  const first = toDayStart(new Date((dates[0] as number) * 1000));
+  const last = toDayStart(new Date((dates[dates.length - 1] as number) * 1000));
+  const firstYear = first.getFullYear();
+  const firstMonth = first.getMonth();
+  const lastYear = last.getFullYear();
+  const lastMonth = last.getMonth();
+  const rangeMonths = (lastYear - firstYear) * 12 + lastMonth - firstMonth + 1;
+  const rangeDays = Math.max(1, Math.ceil((toTimestamp(last) - toTimestamp(first)) / 86400));
+  const mondayStep = rangeDays > 220 ? 4 : rangeDays > 120 ? 2 : 1;
+
+  const dateTickSet = new Set<number>();
+  const monthTicks: Array<{ ts: number; label: string }> = [];
+
+  for (let i = 0; i < rangeMonths; i++) {
+    const monthStart = toDayStart(new Date(firstYear, firstMonth + i, 1));
+    const monthMarker = i === 0 && monthStart < first ? first : monthStart;
+    if (monthMarker >= first && monthMarker <= last) {
+      monthTicks.push({
+        label: monthStart.toLocaleDateString("it-IT", { month: "short" }).toUpperCase(),
+        ts: toTimestamp(monthMarker),
+      });
+    }
+
+    const monday = new Date(monthStart);
+    monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7));
+    let mondayIndex = 0;
+    while (monday.getMonth() === monthStart.getMonth()) {
+      if (monday >= first && monday <= last && mondayIndex % mondayStep === 0) {
+        dateTickSet.add(toTimestamp(monday));
+      }
+      mondayIndex++;
+      monday.setDate(monday.getDate() + 7);
+    }
+  }
+
+  return {
+    dateTicks: [...dateTickSet].sort((left, right) => left - right),
+    monthTicks,
+  };
+}
 
 function buildPreCumulative(
   all: Array<{ date: string; closedAt?: string; total: number }>,
@@ -79,6 +133,11 @@ export function SpendingTrend({ views, contractualAmount }: SpendingTrendProps) 
     }
     return raw;
   }, [views, filtered, contractualAmount]);
+  const { dateTicks, monthTicks } = useMemo(() => buildCalendarAxisTicks(dates), [dates]);
+  const monthLabelByTick = useMemo(
+    () => new Map(monthTicks.map((tick) => [tick.ts, tick.label])),
+    [monthTicks],
+  );
 
   function handleSelect(tf: Timeframe) {
     setTimeframe(tf);
@@ -157,19 +216,41 @@ export function SpendingTrend({ views, contractualAmount }: SpendingTrendProps) 
           ],
           axes: [
             {
+              stroke: colors.accentPrimary,
+              grid: { show: false },
+              ticks: { stroke: "transparent" as const },
+              font: "700 11px system-ui",
+              scale: "x",
+              side: 2,
+              size: 28,
+              splits: monthTicks.map((tick) => tick.ts),
+              values: (_self: unknown, ticks: number[]) =>
+                ticks.map(
+                  (tick) =>
+                    monthLabelByTick.get(tick) ??
+                    new Date(tick * 1000)
+                      .toLocaleDateString("it-IT", { month: "short" })
+                      .toUpperCase(),
+                ),
+            },
+            {
               stroke: colors.textTertiary,
               grid: { stroke: `${colors.borderSubtle}44`, width: 1 },
               ticks: { stroke: "transparent" as const },
-              font: "10px system-ui",
+              font: "500 10px system-ui",
+              scale: "x",
+              side: 2,
+              size: 26,
+              splits: dateTicks,
               values: (_self: unknown, ticks: number[]) =>
                 ticks.map((t) =>
                   new Date(t * 1000).toLocaleDateString("it-IT", {
-                    month: "short",
-                    year: "2-digit",
+                    day: "2-digit",
                   }),
                 ),
             },
             {
+              scale: "y",
               stroke: colors.textTertiary,
               grid: { stroke: `${colors.borderSubtle}44`, width: 1 },
               ticks: { stroke: "transparent" as const },

@@ -16,25 +16,30 @@ import {
   FilterDateInput,
   FilterSearch,
   FilterSelect,
+  FilterTemplatePicker,
 } from "@/components/filters";
 import { Button } from "@/components/shared/Button";
-import { ContextToolbar } from "@/components/shared/ContextToolbar";
+import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { SavedViewSelector } from "@/components/shared/SavedViewSelector";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SeverityBar, severityToneForPercentage } from "@/components/shared/SeverityBar";
+import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
+import { useMultiSelect } from "@/hooks/use-multi-select";
+import { useTableSort } from "@/hooks/use-table-sort";
 import { listDesktopContracts, restoreMaterialsFromSalUsage } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
+import { saveSalDocument } from "@/lib/sal-data";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
-import { useSelectionStore } from "@/store/selection-store";
+import { useUndoStore } from "@/store/undo-store";
 
 const STATUS_OPTIONS = ["Tutti", "Bozza", "In revisione", "Approvata", "Chiuso"] as const;
 
@@ -53,7 +58,6 @@ export function AccountingScreen() {
   const [filterQuery, setFilterQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const selectedSalIds = useSelectionStore((state) => state.ids);
 
   const loadContracts = useCallback(() => {
     let active = true;
@@ -173,11 +177,31 @@ export function AccountingScreen() {
       );
   }, [salDocuments, salViews, filteredSalIds]);
 
+  const sortableRows = useMemo(
+    () =>
+      filteredData.map(({ doc, view }) => ({
+        id: doc.id,
+        doc,
+        view,
+        sortTitle: doc.title,
+        sortDate: doc.date,
+        sortAmount: view?.total ?? 0,
+        sortStatus: doc.status,
+      })),
+    [filteredData],
+  );
+
+  const { sortedItems: sortedRows, sortKey, sortDirection, onSort } = useTableSort(sortableRows);
+
+  const multiSelect = useMultiSelect(sortedRows);
+
   const selection = useMemo(() => {
-    const ids = selectedSalIds;
-    if (ids.size === 0) return filteredData;
-    return filteredData.filter(({ doc }) => ids.has(doc.id));
-  }, [filteredData, selectedSalIds]);
+    const ids = multiSelect.selectedIds;
+    if (ids.size === 0) return sortedRows.map((r) => ({ doc: r.doc, view: r.view }));
+    return sortedRows
+      .filter((r) => ids.has(r.doc.id))
+      .map((r) => ({ doc: r.doc, view: r.view }));
+  }, [sortedRows, multiSelect.selectedIds]);
 
   const metrics = useMemo(() => {
     const total = selection.reduce((s, { view }) => s + (view?.total ?? 0), 0);
@@ -187,19 +211,6 @@ export function AccountingScreen() {
     return { total, budget, draftCount, closedCount, count: selection.length };
   }, [selection, contracts]);
 
-  const toggleSal = useCallback((id: string) => {
-    useSelectionStore.getState().toggle(id);
-  }, []);
-
-  const toggleAll = useCallback(() => {
-    const store = useSelectionStore.getState();
-    if (store.ids.size === filteredData.length) {
-      store.clear();
-    } else {
-      store.selectAll(filteredData.map(({ doc }) => doc.id));
-    }
-  }, [filteredData]);
-
   const clearFilters = useCallback(() => {
     setFilterProject("all");
     setFilterContractor("Tutti");
@@ -207,6 +218,15 @@ export function AccountingScreen() {
     setFilterQuery("");
     setDateFrom("");
     setDateTo("");
+  }, []);
+
+  const applyTemplateFilters = useCallback((filters: Record<string, unknown>) => {
+    if (typeof filters.filterProject === "string") setFilterProject(filters.filterProject);
+    if (typeof filters.filterContractor === "string") setFilterContractor(filters.filterContractor);
+    if (typeof filters.filterStatus === "string") setFilterStatus(filters.filterStatus);
+    if (typeof filters.filterQuery === "string") setFilterQuery(filters.filterQuery);
+    if (typeof filters.dateFrom === "string") setDateFrom(filters.dateFrom);
+    if (typeof filters.dateTo === "string") setDateTo(filters.dateTo);
   }, []);
 
   const hasActiveFilters =
@@ -229,8 +249,8 @@ export function AccountingScreen() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                    {selectedSalIds.size > 0
-                      ? `${selectedSalIds.size} selezionati`
+                    {multiSelect.count > 0
+                      ? `${multiSelect.count} selezionati`
                       : `${selection.length} nel filtro`}
                   </div>
                   <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
@@ -308,6 +328,23 @@ export function AccountingScreen() {
               }}
               route="accounting"
             />
+            <FilterTemplatePicker
+              scope="accounting"
+              currentFilters={{
+                filterProject,
+                filterContractor,
+                filterStatus,
+                filterQuery,
+                dateFrom,
+                dateTo,
+              }}
+              onApplyFilters={applyTemplateFilters}
+            />
+            <MultiSelectToggle
+              isEnabled={multiSelect.isEnabled}
+              onToggle={multiSelect.toggleEnable}
+              count={multiSelect.count}
+            />
           </div>
         </div>
       </section>
@@ -324,87 +361,209 @@ export function AccountingScreen() {
                       SAL da includere
                     </h3>
                   </div>
-                  <button
-                    className="text-12px font-semibold text-[var(--accent-primary)] hover:underline"
-                    onClick={toggleAll}
-                    type="button"
-                  >
-                    {selectedSalIds.size === filteredData.length
-                      ? "Deseleziona tutti"
-                      : "Seleziona tutti"}
-                  </button>
+                  {multiSelect.isEnabled && (
+                    <button
+                      className="text-12px font-semibold text-[var(--accent-primary)] hover:underline"
+                      onClick={() => {
+                        if (multiSelect.allSelected) {
+                          multiSelect.clear();
+                        } else {
+                          multiSelect.selectAll(sortedRows.map((r) => r.doc.id));
+                        }
+                      }}
+                      type="button"
+                    >
+                      {multiSelect.allSelected ? "Deseleziona tutti" : "Seleziona tutti"}
+                    </button>
+                  )}
                 </div>
 
-                <ContextToolbar
-                  actions={[
-                    {
-                      icon: <Download className="size-4" />,
-                      label: "Esporta",
-                      run: () =>
-                        notify({
-                          message: "Esportazione in arrivo con un prossimo aggiornamento.",
-                          title: "Esporta",
-                          tone: "info",
-                        }),
-                    },
-                    {
-                      icon: <Trash2 className="size-4" />,
-                      label: "Elimina",
-                      tone: "danger",
-                      run: async () => {
-                        const ids = [...useSelectionStore.getState().ids];
-                        const count = ids.length;
-                        for (const id of ids) {
-                          const doc = useSalWorkflowStore
-                            .getState()
-                            .salDocuments.find((d) => d.id === id);
-                          if (doc?.materialUsage) {
-                            await restoreMaterialsFromSalUsage(doc.materialUsage);
-                          }
-                          useSalWorkflowStore.getState().deleteSal(id);
+                {multiSelect.count > 0 && (
+                  <div className="px-2 pt-3">
+                    <MultiSelectBulkBar
+                      count={multiSelect.count}
+                      entityLabel="SAL"
+                      allSelected={multiSelect.allSelected}
+                      someSelected={multiSelect.someSelected}
+                      onSelectAll={() => multiSelect.selectAll(sortedRows.map((r) => r.doc.id))}
+                      onClear={multiSelect.clear}
+                      onClose={multiSelect.disable}
+                    >
+                      <button
+                        className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3.5 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
+                        onClick={() =>
+                          notify({
+                            message: "Esportazione in arrivo con un prossimo aggiornamento.",
+                            title: "Esporta",
+                            tone: "info",
+                          })
                         }
-                        useSelectionStore.getState().clear();
-                        dispatchDataChanged();
-                        notify({
-                          message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
-                          title: "Eliminate",
-                          tone: "success",
-                        });
-                      },
-                    },
-                  ]}
-                  entityLabel="SAL"
-                />
+                        type="button"
+                      >
+                        <Download className="size-4" />
+                        Esporta
+                      </button>
+                      <button
+                        className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3.5 text-12px font-bold text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
+                        onClick={() => {
+                          const ids = [...multiSelect.selectedIds];
+                          const count = ids.length;
+                          const deletedSals = ids
+                            .map((id) =>
+                              useSalWorkflowStore.getState().salDocuments.find((d) => d.id === id),
+                            )
+                            .filter((d): d is NonNullable<typeof d> => d !== undefined);
 
-                {filteredData.length > 0 ? (
+                          for (const id of ids) {
+                            const doc = useSalWorkflowStore
+                              .getState()
+                              .salDocuments.find((d) => d.id === id);
+                            if (doc?.materialUsage) {
+                              void restoreMaterialsFromSalUsage(doc.materialUsage);
+                            }
+                            useSalWorkflowStore.getState().deleteSal(id);
+                          }
+                          dispatchDataChanged();
+
+                          const execute = () => {
+                            for (const doc of deletedSals) {
+                              useSalWorkflowStore.getState().deleteSal(doc.id);
+                            }
+                            dispatchDataChanged();
+                          };
+                          const undo = async () => {
+                            for (const doc of deletedSals) {
+                              const salInput = {
+                                projectId: doc.projectId,
+                                date: doc.date,
+                                description: doc.description,
+                                notes: doc.notes,
+                                title: doc.title,
+                                lines: doc.lines,
+                                voices: [] as never[],
+                                status: doc.status,
+                                ...(doc.economicRules ? { economicRules: doc.economicRules } : {}),
+                                ...(doc.materialUsage ? { materialUsage: doc.materialUsage } : {}),
+                                ...(typeof doc.total === "number" ? { total: doc.total } : {}),
+                              };
+                              useSalWorkflowStore.getState().createSal(salInput);
+                              await saveSalDocument(doc.projectId, doc);
+                              if (doc.materialUsage) {
+                                await restoreMaterialsFromSalUsage(doc.materialUsage);
+                              }
+                            }
+                            dispatchDataChanged();
+                          };
+
+                          useUndoStore.getState().push({
+                            label: `${count} SAL eliminat${count === 1 ? "a" : "e"}`,
+                            execute,
+                            undo,
+                          });
+                          notify({
+                            actionLabel: "Annulla",
+                            message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
+                            onAction: async () => {
+                              await undo();
+                              notify({
+                                message: "Azione annullata",
+                                title: "Annullato",
+                                tone: "info",
+                              });
+                            },
+                            title: "Eliminate",
+                            tone: "success",
+                          });
+                          multiSelect.disable();
+                        }}
+                        type="button"
+                      >
+                        <Trash2 className="size-4" />
+                        Elimina
+                      </button>
+                    </MultiSelectBulkBar>
+                  </div>
+                )}
+
+                {sortedRows.length > 0 ? (
                   <div className="mt-4 overflow-hidden rounded-14px border-[0.5px] border-[var(--border-subtle)]">
-                    {filteredData.map(({ doc, view }) => {
+                    <div className="grid grid-cols-[1fr_auto] border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/40 px-4 py-2.5 2xl:px-5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-11px font-semibold uppercase tracking-0_1em text-[var(--text-secondary)]">
+                          Titolo
+                        </span>
+                        <SortIndicator
+                          active={sortKey === "sortTitle"}
+                          direction={sortKey === "sortTitle" ? sortDirection : null}
+                          onClick={() => onSort("sortTitle")}
+                        />
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-11px font-semibold uppercase tracking-0_1em text-[var(--text-secondary)]">
+                            Data
+                          </span>
+                          <SortIndicator
+                            active={sortKey === "sortDate"}
+                            direction={sortKey === "sortDate" ? sortDirection : null}
+                            onClick={() => onSort("sortDate")}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-11px font-semibold uppercase tracking-0_1em text-[var(--text-secondary)]">
+                            Importo
+                          </span>
+                          <SortIndicator
+                            active={sortKey === "sortAmount"}
+                            direction={sortKey === "sortAmount" ? sortDirection : null}
+                            onClick={() => onSort("sortAmount")}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-11px font-semibold uppercase tracking-0_1em text-[var(--text-secondary)]">
+                            Stato
+                          </span>
+                          <SortIndicator
+                            active={sortKey === "sortStatus"}
+                            direction={sortKey === "sortStatus" ? sortDirection : null}
+                            onClick={() => onSort("sortStatus")}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    {sortedRows.map(({ doc, view }) => {
                       if (!view) return null;
-                      const selected = selectedSalIds.has(doc.id);
+                      const selected = multiSelect.selectedIds.has(doc.id);
 
                       return (
                         <button
                           className={cn(
                             "flex w-full items-center justify-between gap-4 border-b border-[var(--border-subtle)] p-4 text-left last:border-b-0 2xl:px-5 2xl:py-5",
-                            selected
-                              ? "bg-[var(--selection-bg)]"
+                            multiSelect.isEnabled
+                              ? selected
+                                ? "bg-[var(--selection-bg)]"
+                                : "transition-colors hover:bg-[var(--bg-muted)]"
                               : "transition-colors hover:bg-[var(--bg-muted)]",
                           )}
                           key={doc.id}
-                          onClick={() => toggleSal(doc.id)}
+                          onClick={() => {
+                            if (multiSelect.isEnabled) multiSelect.toggle(doc.id);
+                          }}
                           type="button"
                         >
                           <div className="flex items-center gap-3">
-                            <span
-                              className={cn(
-                                "flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
-                                selected
-                                  ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                                  : "border-[var(--border-subtle)]",
-                              )}
-                            >
-                              {selected ? <CheckCircle2 className="size-3.5" /> : null}
-                            </span>
+                            {multiSelect.isEnabled && (
+                              <span
+                                className={cn(
+                                  "flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+                                  selected
+                                    ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+                                    : "border-[var(--border-subtle)]",
+                                )}
+                              >
+                                {selected ? <CheckCircle2 className="size-3.5" /> : null}
+                              </span>
+                            )}
                             <div>
                               <div className="text-14px font-semibold text-[var(--text-primary)]">
                                 {doc.title}
@@ -449,19 +608,19 @@ export function AccountingScreen() {
 
               <div className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden rounded-22px bg-[var(--info-soft)]/35 p-5 text-center 2xl:min-h-[420px] 2xl:p-7">
                 <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                  {selectedSalIds.size > 0 ? "Totale selezionato" : "Nessuna selezione"}
+                  {multiSelect.count > 0 ? "Totale selezionato" : "Nessuna selezione"}
                 </div>
                 <div className="mt-5 text-38px font-bold leading-none tracking-tight text-[var(--text-primary)] 2xl:mt-7 2xl:text-50px">
                   {formatMoney({ amount: metrics.total, currency: "EUR" })}
                 </div>
-                {selectedSalIds.size > 0 ? (
+                {multiSelect.count > 0 ? (
                   <>
                     <div className="mt-9 h-px w-64 max-w-full bg-[var(--border-subtle)]" />
                     <div className="mt-7 flex size-16 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
                       <FileBadge className="size-8" />
                     </div>
                     <p className="mt-7 max-w-[260px] text-14px font-medium leading-6 text-[var(--text-secondary)]">
-                      {selectedSalIds.size} SAL pronti per il report contabile.
+                      {multiSelect.count} SAL pront{multiSelect.count === 1 ? "o" : "i"} per il report contabile.
                     </p>
                     <Button
                       className="mt-5 h-12 w-full justify-between"

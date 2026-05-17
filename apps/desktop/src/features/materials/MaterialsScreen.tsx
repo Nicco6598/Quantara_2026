@@ -13,33 +13,35 @@ import {
   Warehouse,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { ClearFiltersButton, FilterSearch } from "@/components/filters";
+import { ClearFiltersButton, FilterSearch, FilterTemplatePicker } from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { ContextToolbar } from "@/components/shared/ContextToolbar";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { MOTION_VARIANTS } from "@/motion";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { MetricCard } from "@/components/shared/MetricCard";
+import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { QuickAction } from "@/components/shared/QuickAction";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import { SeverityBar } from "@/components/shared/SeverityBar";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
+import { useMultiSelect } from "@/hooks/use-multi-select";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import {
   type DesktopMaterial,
+  createDesktopMaterial,
   deleteDesktopMaterial,
   listDesktopMaterials,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
-import { useSelectionStore } from "@/store/selection-store";
+import { useUndoStore } from "@/store/undo-store";
 import { AddMaterialModal } from "./components/AddMaterialModal";
 import {
   CATEGORIES,
@@ -139,6 +141,18 @@ export function MaterialsScreen() {
     return { totalStock, critical, zero, committed, avgCoverage };
   }, [materials]);
 
+  const applyTemplateFilters = useCallback(
+    (filters: Record<string, unknown>) => {
+      if (typeof filters.selectedCategory === "string" || filters.selectedCategory === null) {
+        dispatch({ type: "SET_SELECTED_CATEGORY", payload: filters.selectedCategory as string | null });
+      }
+      if (typeof filters.searchQuery === "string") {
+        dispatch({ type: "SET_SEARCH_QUERY", payload: filters.searchQuery });
+      }
+    },
+    [],
+  );
+
   const handleDelete = useCallback(
     async (materialId: string) => {
       try {
@@ -166,10 +180,18 @@ export function MaterialsScreen() {
     [materials, notify, state.selectedMaterialId],
   );
 
-  const selectedMaterialIds = useSelectionStore((s) => s.ids);
-  const toggleMaterialSelection = useCallback((id: string) => {
-    useSelectionStore.getState().toggle(id);
-  }, []);
+  const multiSelect = useMultiSelect(filteredMaterials);
+
+  const handleCardClick = useCallback(
+    (id: string) => {
+      if (multiSelect.isEnabled) {
+        multiSelect.toggle(id);
+      } else {
+        dispatch({ type: "SET_SELECTED_MATERIAL_ID", payload: id });
+      }
+    },
+    [multiSelect.isEnabled, multiSelect.toggle],
+  );
 
   return (
     <ScreenLayout gradient="success-info">
@@ -252,11 +274,119 @@ export function MaterialsScreen() {
             onCreateMaterial={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
           />
 
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2 lg:px-4">
+            <FilterTemplatePicker
+              scope="materials"
+              currentFilters={{
+                selectedCategory: state.selectedCategory,
+                searchQuery: state.searchQuery,
+              }}
+              onApplyFilters={applyTemplateFilters}
+            />
+            <MultiSelectToggle
+              isEnabled={multiSelect.isEnabled}
+              onToggle={multiSelect.toggleEnable}
+              count={multiSelect.count}
+            />
+          </div>
+
+          {multiSelect.count > 0 && (
+            <div className="px-3 pt-3 lg:px-4">
+              <MultiSelectBulkBar
+                count={multiSelect.count}
+                entityLabel="materiali"
+                allSelected={multiSelect.allSelected}
+                someSelected={multiSelect.someSelected}
+                onSelectAll={() => multiSelect.selectAll(filteredMaterials.map((m) => m.id))}
+                onClear={multiSelect.clear}
+                onClose={multiSelect.disable}
+              >
+                <button
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3.5 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
+                  onClick={() =>
+                    notify({
+                      message: "Export materiali disponibile in un prossimo aggiornamento.",
+                      title: "In arrivo",
+                      tone: "info",
+                    })
+                  }
+                  type="button"
+                >
+                  <Download className="size-4" />
+                  Esporta
+                </button>
+                <button
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3.5 text-12px font-bold text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
+                  onClick={() => {
+                    const ids = [...multiSelect.selectedIds];
+                    const deletedMaterials = filteredMaterials.filter((m) => ids.includes(m.id));
+                    for (const id of ids) {
+                      void deleteDesktopMaterial(id).catch(() => {});
+                    }
+                    dispatchDataChanged();
+
+                    const execute = () => {
+                      for (const mat of deletedMaterials) {
+                        void deleteDesktopMaterial(mat.id).catch(() => {});
+                      }
+                      dispatchDataChanged();
+                    };
+                    const undo = async () => {
+                      for (const mat of deletedMaterials) {
+                        try {
+                          await createDesktopMaterial({
+                            id: mat.id,
+                            code: mat.code,
+                            description: mat.description,
+                            category: mat.category,
+                            unit: mat.unit,
+                            quantity: mat.quantity,
+                            minQuantity: mat.minQuantity,
+                            notes: mat.notes,
+                          });
+                        } catch {
+                          // skip failed restores
+                        }
+                      }
+                      dispatchDataChanged();
+                    };
+
+                    useUndoStore.getState().push({
+                      label: `${ids.length} materiali eliminati`,
+                      execute,
+                      undo,
+                    });
+                    notify({
+                      actionLabel: "Annulla",
+                      message: `${ids.length} materiali eliminati.`,
+                      onAction: async () => {
+                        await undo();
+                        notify({
+                          message: "Azione annullata",
+                          title: "Annullato",
+                          tone: "info",
+                        });
+                      },
+                      title: "Eliminati",
+                      tone: "success",
+                    });
+                    multiSelect.disable();
+                  }}
+                  type="button"
+                >
+                  <Trash2 className="size-4" />
+                  Elimina
+                </button>
+              </MultiSelectBulkBar>
+            </div>
+          )}
+
           <MaterialListSection
             filteredMaterials={filteredMaterials}
             totalMaterials={materials.length}
-            selectedIds={selectedMaterialIds}
-            onToggleSelection={toggleMaterialSelection}
+            isMultiSelectEnabled={multiSelect.isEnabled}
+            selectedIds={multiSelect.selectedIds}
+            onCardClick={handleCardClick}
             onDeleteMaterial={(id) => dispatch({ type: "SET_DELETE_CONFIRM_ID", payload: id })}
             onEditMaterial={(id) => {
               const mat = materials.find((m) => m.id === id);
@@ -355,16 +485,18 @@ function getMaterialUsageInfo(materialId: string): MaterialUsageInfo {
 
 function MaterialCard({
   checked,
+  showCheckbox,
   material,
   onDelete,
   onEdit,
-  onToggleSelection,
+  onCardClick,
 }: {
   checked: boolean;
+  showCheckbox: boolean;
   material: DesktopMaterial;
   onDelete: () => void;
   onEdit: () => void;
-  onToggleSelection: (id: string) => void;
+  onCardClick: (id: string) => void;
 }) {
   const usageInfo = getMaterialUsageInfo(material.id);
   const committed = usageInfo.inDraft + usageInfo.inConfirmed;
@@ -389,19 +521,20 @@ function MaterialCard({
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-start gap-4">
-            <span
-              className={cn(
-                "mt-0.5 transition-opacity duration-200",
-                checked ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-              )}
-            >
-              <SelectionCheckbox checked={checked} id={material.id} onToggle={onToggleSelection} />
-            </span>
+            {showCheckbox && (
+              <span className="mt-0.5">
+                <SelectionCheckbox
+                  checked={checked}
+                  id={material.id}
+                  onToggle={() => onCardClick(material.id)}
+                />
+              </span>
+            )}
             <button
               className="min-w-0 flex-1 rounded-lg pt-0.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleSelection(material.id);
+                onCardClick(material.id);
               }}
               type="button"
             >
@@ -895,89 +1028,49 @@ function CategoryFilterBar({
 function MaterialListSection({
   filteredMaterials,
   totalMaterials,
+  isMultiSelectEnabled,
   selectedIds,
-  onToggleSelection,
+  onCardClick,
   onDeleteMaterial,
   onEditMaterial,
   onCreateMaterial,
 }: {
   filteredMaterials: DesktopMaterial[];
   totalMaterials: number;
+  isMultiSelectEnabled: boolean;
   selectedIds: Set<string>;
-  onToggleSelection: (id: string) => void;
+  onCardClick: (id: string) => void;
   onDeleteMaterial: (id: string) => void;
   onEditMaterial: (id: string) => void;
   onCreateMaterial: () => void;
 }) {
-  const { notify } = useToast();
-
   const allIds = useMemo(() => filteredMaterials.map((m) => m.id), [filteredMaterials]);
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
 
   return (
     <>
-      <ContextToolbar
-        actions={[
-          {
-            icon: <Download className="size-4" />,
-            label: "Esporta",
-            run: () =>
-              notify({
-                message: "Export materiali disponibile in un prossimo aggiornamento.",
-                title: "In arrivo",
-                tone: "info",
-              }),
-          },
-          {
-            icon: <Trash2 className="size-4" />,
-            label: "Elimina",
-            run: async () => {
-              const ids = [...useSelectionStore.getState().ids];
-              for (const id of ids) {
-                try {
-                  await deleteDesktopMaterial(id);
-                } catch {
-                  // continue deleting remaining materials
-                }
-              }
-              useSelectionStore.getState().clear();
-              dispatchDataChanged();
-              notify({
-                message: `${ids.length} materiali eliminati.`,
-                title: "Eliminati",
-                tone: "success",
-              });
-            },
-            tone: "danger",
-          },
-        ]}
-        entityLabel="materiali"
-      />
-      <div className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-3">
-        <div className="col-span-full flex items-center justify-start pb-1">
+      {!isMultiSelectEnabled && (
+        <div className="flex items-center justify-start border-b border-[var(--border-subtle)] px-3 py-2 lg:px-4">
           <button
             className="text-12px font-semibold text-[var(--accent-primary)] hover:underline"
-            onClick={() => {
-              if (allSelected) {
-                useSelectionStore.getState().clear();
-              } else {
-                useSelectionStore.getState().selectAll(allIds);
-              }
-            }}
+            onClick={onCreateMaterial}
             type="button"
           >
-            {allSelected ? "Deseleziona tutti" : "Seleziona tutti"}
+            + Nuovo materiale
           </button>
         </div>
+      )}
+      <div className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-3">
         {filteredMaterials.length > 0 ? (
           filteredMaterials.map((mat) => (
             <MaterialCard
               key={mat.id}
               checked={selectedIds.has(mat.id)}
+              showCheckbox={isMultiSelectEnabled}
               material={mat}
               onDelete={() => onDeleteMaterial(mat.id)}
               onEdit={() => onEditMaterial(mat.id)}
-              onToggleSelection={onToggleSelection}
+              onCardClick={onCardClick}
             />
           ))
         ) : (
@@ -1006,6 +1099,26 @@ function MaterialListSection({
         <span className="text-11px font-medium text-[var(--text-secondary)]">
           {filteredMaterials.length} di {totalMaterials} materiali
         </span>
+        {isMultiSelectEnabled && (
+          <button
+            className="text-12px font-semibold text-[var(--accent-primary)] hover:underline"
+            onClick={() => {
+              if (allSelected) {
+                // clear all
+                for (const id of allIds) {
+                  if (selectedIds.has(id)) onCardClick(id);
+                }
+              } else {
+                for (const id of allIds) {
+                  if (!selectedIds.has(id)) onCardClick(id);
+                }
+              }
+            }}
+            type="button"
+          >
+            {allSelected ? "Deseleziona tutti" : "Seleziona tutti"}
+          </button>
+        )}
       </div>
     </>
   );

@@ -1,6 +1,6 @@
 function handleQuotaExceeded(key: string, value: string, storage: Storage): void {
   console.warn(`[storage] Quota exceeded for key "${key}", clearing stale entries`);
-  const keys = Object.keys(storage).filter((k) => k.startsWith("quantara:") && k !== key);
+  const keys = Object.keys(storage).filter((k) => k.startsWith("quantara") && k !== key);
   for (const k of keys.slice(0, Math.min(3, keys.length))) {
     storage.removeItem(k);
   }
