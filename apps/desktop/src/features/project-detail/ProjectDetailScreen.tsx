@@ -189,6 +189,11 @@ export function ProjectDetailScreen() {
     return views;
   }, [salDocuments, selectedProject, tariffVoices]);
 
+  const salChartViews = useMemo(
+    () => salViews.map(({ closedAt: _closedAt, ...view }) => view),
+    [salViews],
+  );
+
   const financials = useMemo(() => {
     const contractual = selectedProject?.budget.amount ?? 0;
     let approvedAmount = 0;
@@ -591,7 +596,7 @@ export function ProjectDetailScreen() {
             <TrendingUp className="size-4" />
             Andamento spesa
           </div>
-          <SpendingTrend contractualAmount={financials.contractual} views={salViews} />
+          <SpendingTrend contractualAmount={financials.contractual} views={salChartViews} />
         </section>
       ) : null}
 
@@ -810,7 +815,7 @@ export function ProjectDetailScreen() {
               </div>
               {salViews.length > 1 ? (
                 <div className="pt-4">
-                  <SalHistoryBars views={salViews} />
+                  <SalHistoryBars views={salChartViews} />
                 </div>
               ) : null}
               {sortedSalRows.length > 0 ? (

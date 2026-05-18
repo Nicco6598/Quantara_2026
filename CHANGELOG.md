@@ -2,6 +2,29 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.31 — 2026-05-18
+
+### Tariffari — import e revisione
+
+- **I tariffari appena importati si vedono subito** — dopo un import non serve più chiudere e riaprire Quantara: il catalogo si aggiorna immediatamente e i filtri non nascondono il nuovo tariffario appena salvato.
+- **Reimport più intelligente** — se carichi di nuovo lo stesso tariffario, Quantara aggiorna quello già presente invece di creare una copia inutile.
+- **Revisione import più chiara** — nella preview import i controlli laterali mostrano lo stato complessivo di tutti i file caricati, così capisci subito se l'intero import è pronto o se c'è ancora qualcosa da sistemare.
+- **Scorciatoie da tastiera nella preview** — puoi passare tra i file, segnare una revisione, salvare in bozza, confermare o rimuovere un file usando i comandi rapidi mostrati nella legenda.
+
+### Progetti — selezione tariffari
+
+- **Filtro anno nei tariffari del progetto** — quando crei o modifichi un progetto puoi filtrare i tariffari per anno, anche selezionando più annualità insieme.
+
+### SAL — ricerca, date e nomi
+
+- **Ricerca voci SAL più precisa** — se cerchi una sigla che identifica un tariffario, Quantara mostra prima le voci di quel tariffario. Ad esempio, cercando "AS" non vengono più mischiate voci di tutti gli altri tariffari.
+- **Nomi SAL progressivi** — le nuove SAL non partono più tutte con lo stesso nome. Quantara propone automaticamente "SAL 01", "SAL 02", "SAL 03" e così via.
+- **Date coerenti nei grafici** — i grafici del dettaglio progetto ora usano la stessa data SAL mostrata nel registro, non la data tecnica di chiusura.
+
+### Aggiornamenti — note versione
+
+- **Note update più ordinate** — il popup degli aggiornamenti gestisce meglio le note di versione anche quando arrivano in un formato più semplice, evitando righe tutte in grassetto e non espandibili.
+
 ## 0.3.30 — 2026-05-17
 
 ### SAL ora nel database

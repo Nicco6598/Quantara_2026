@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type AutocompleteOption = {
+  id?: string;
   label: string;
   value: string;
   keywords?: string;
@@ -15,6 +16,7 @@ type AutocompleteInputProps = {
   options: AutocompleteOption[];
   onSelect: (option: AutocompleteOption) => void;
   placeholder?: string;
+  filterOptions?: (options: AutocompleteOption[], query: string) => AutocompleteOption[];
 };
 
 const RESULTS_MAX_HEIGHT = 520;
@@ -23,6 +25,7 @@ const ITEM_HEIGHT = 60;
 type DropdownPos = { left: number; top: number; width: number };
 
 export function AutocompleteInput({
+  filterOptions,
   options,
   onSelect,
   placeholder = "Cerca per codice o descrizione...",
@@ -40,13 +43,14 @@ export function AutocompleteInput({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [] as AutocompleteOption[];
+    if (filterOptions) return filterOptions(options, query);
     return options.filter(
       (opt) =>
         opt.value.toLowerCase().includes(q) ||
         opt.label.toLowerCase().includes(q) ||
         opt.keywords?.toLowerCase().includes(q),
     );
-  }, [options, query]);
+  }, [filterOptions, options, query]);
 
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,

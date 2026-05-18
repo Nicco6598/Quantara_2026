@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   CircleAlert,
   FileText,
   Percent,
@@ -33,6 +34,7 @@ import { motionDuration, motionEase, motionSpring } from "@/motion";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+import { cn } from "@/lib/utils";
 
 const PROJECT_AUTO_DRAFT_KEY = STORAGE_KEYS.projectAutoDraft;
 const PROJECT_STEPPER_SPRING = { type: "spring", ...motionSpring.panel } as const;
@@ -98,6 +100,8 @@ export function ProjectCreateScreen() {
   const [tariffBooks, setTariffBooks] = useState<DesktopTariffBook[]>([]);
   const [contractorOptions, setContractorOptions] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [tariffYearFilterOpen, setTariffYearFilterOpen] = useState(false);
+  const [tariffYearFilters, setTariffYearFilters] = useState<number[]>([]);
   const savingRef = useRef(false);
 
   const initialValues = useMemo(() => {
@@ -132,16 +136,24 @@ export function ProjectCreateScreen() {
   }));
   const { draft, step, error, tariffSearchQuery } = ui;
 
+  const availableTariffYears = useMemo(
+    () => [...new Set(tariffBooks.map((book) => book.year))].toSorted((a, b) => b - a),
+    [tariffBooks],
+  );
+
   const filteredTariffBooks = useMemo(() => {
     const q = tariffSearchQuery.trim().toLowerCase();
-    if (!q) return tariffBooks;
-    return tariffBooks.filter(
-      (book) =>
+    const selectedYears = new Set(tariffYearFilters);
+    return tariffBooks.filter((book) => {
+      if (selectedYears.size > 0 && !selectedYears.has(book.year)) return false;
+      if (!q) return true;
+      return (
         book.name.toLowerCase().includes(q) ||
         book.sourceName.toLowerCase().includes(q) ||
-        String(book.year).includes(q),
-    );
-  }, [tariffBooks, tariffSearchQuery]);
+        String(book.year).includes(q)
+      );
+    });
+  }, [tariffBooks, tariffSearchQuery, tariffYearFilters]);
 
   const firstTariffBook = tariffBooks[0];
 
@@ -654,20 +666,98 @@ export function ProjectCreateScreen() {
                   </p>
                 ) : (
                   <>
-                    <div className="relative mt-4">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
-                      <input
-                        className="h-10 w-full rounded-12px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-9 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                        onChange={(e) =>
-                          dispatch({ type: "SET_TARIFF_SEARCH", payload: e.target.value })
-                        }
-                        placeholder={`Cerca tra ${tariffBooks.length} tariffari...`}
-                        value={tariffSearchQuery}
-                      />
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+                        <input
+                          className="h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-9 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                          onChange={(e) =>
+                            dispatch({ type: "SET_TARIFF_SEARCH", payload: e.target.value })
+                          }
+                          placeholder={`Cerca tra ${tariffBooks.length} tariffari...`}
+                          value={tariffSearchQuery}
+                        />
+                      </div>
+                      <div className="relative">
+                        <button
+                          className="inline-flex h-11 w-full min-w-[168px] items-center justify-between rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] sm:w-auto"
+                          onClick={() => setTariffYearFilterOpen((open) => !open)}
+                          type="button"
+                        >
+                          {tariffYearFilters.length === 0
+                            ? "Tutti gli anni"
+                            : tariffYearFilters.length === 1
+                              ? String(tariffYearFilters[0])
+                              : `${tariffYearFilters.length} anni`}
+                          <ChevronDown
+                            className={cn(
+                              "size-4 text-[var(--text-secondary)] transition-transform",
+                              tariffYearFilterOpen && "rotate-180",
+                            )}
+                          />
+                        </button>
+                        {tariffYearFilterOpen ? (
+                          <>
+                            <button
+                              aria-label="Chiudi filtro anno"
+                              className="fixed inset-0 z-40 cursor-default"
+                              onClick={() => setTariffYearFilterOpen(false)}
+                              type="button"
+                            />
+                            <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[190px] overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
+                              <button
+                                className={cn(
+                                  "flex w-full items-center justify-between rounded-10px px-3 py-2 text-left text-13px font-medium transition-colors",
+                                  tariffYearFilters.length === 0
+                                    ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                                    : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+                                )}
+                                onClick={() => {
+                                  setTariffYearFilters([]);
+                                  setTariffYearFilterOpen(false);
+                                }}
+                                type="button"
+                              >
+                                Tutti gli anni
+                                {tariffYearFilters.length === 0 ? (
+                                  <Check className="size-3.5" strokeWidth={3} />
+                                ) : null}
+                              </button>
+                              {availableTariffYears.map((year) => {
+                                const selected = tariffYearFilters.includes(year);
+                                return (
+                                  <button
+                                    className={cn(
+                                      "flex w-full items-center justify-between rounded-10px px-3 py-2 text-left text-13px font-medium transition-colors",
+                                      selected
+                                        ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                                        : "text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+                                    )}
+                                    key={year}
+                                    onClick={() => {
+                                      setTariffYearFilters((current) =>
+                                        selected
+                                          ? current.filter((item) => item !== year)
+                                          : [...current, year].toSorted((a, b) => b - a),
+                                      );
+                                    }}
+                                    type="button"
+                                  >
+                                    {year}
+                                    {selected ? (
+                                      <Check className="size-3.5" strokeWidth={3} />
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
                     {filteredTariffBooks.length === 0 ? (
                       <p className="mt-3 text-12px text-[var(--text-secondary)]">
-                        Nessun tariffario corrisponde alla ricerca.
+                        Nessun tariffario corrisponde ai filtri.
                       </p>
                     ) : (
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">

@@ -123,6 +123,93 @@ const SAL_PRIMARY_LABELS: Record<Exclude<SalWorkflowPhase, "completed">, string>
   voices: "Verifica SAL",
 };
 
+function buildDefaultSalTitle(existingCount: number) {
+  return `SAL ${String(existingCount + 1).padStart(2, "0")} - Periodo corrente`;
+}
+
+type SalAutocompleteOption = {
+  id?: string;
+  label: string;
+  value: string;
+  keywords?: string;
+  metadata?: string;
+};
+
+function normalizeSalSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function buildTariffSearchTokens(voice: SalVoiceDraft) {
+  const normalizedName = normalizeSalSearch(voice.tariffBookName);
+  const normalizedId = normalizeSalSearch(voice.tariffBookId);
+  const words = normalizedName.split(" ").filter(Boolean);
+  const acronym = words
+    .filter((word) => !/^\d+$/.test(word))
+    .map((word) => word[0])
+    .join("");
+
+  return new Set([normalizedName, normalizedId, acronym, ...words].filter(Boolean));
+}
+
+function tariffTokenMatchesQuery(token: string, queryPart: string) {
+  if (!token || !queryPart) return false;
+  if (queryPart.length <= 2) return token === queryPart;
+  return token === queryPart || token.startsWith(queryPart);
+}
+
+function defaultSalVoiceOptionMatches(option: SalAutocompleteOption, normalizedQuery: string) {
+  return (
+    option.value.toLowerCase().includes(normalizedQuery) ||
+    option.label.toLowerCase().includes(normalizedQuery) ||
+    Boolean(option.keywords?.toLowerCase().includes(normalizedQuery))
+  );
+}
+
+function filterSalVoiceOptionsByTariffIntent({
+  options,
+  query,
+  tariffTokensByBookId,
+  voiceByOptionId,
+}: {
+  options: SalAutocompleteOption[];
+  query: string;
+  tariffTokensByBookId: Map<string, Set<string>>;
+  voiceByOptionId: Map<string, SalVoiceDraft>;
+}) {
+  const normalizedQuery = normalizeSalSearch(query);
+  if (!normalizedQuery) return [];
+
+  const queryParts = normalizedQuery.split(" ").filter(Boolean);
+  const matchedTariffIds = new Set<string>();
+  const matchedQueryParts = new Set<string>();
+
+  for (const part of queryParts) {
+    for (const [tariffBookId, tokens] of tariffTokensByBookId) {
+      if ([...tokens].some((token) => tariffTokenMatchesQuery(token, part))) {
+        matchedTariffIds.add(tariffBookId);
+        matchedQueryParts.add(part);
+      }
+    }
+  }
+
+  if (matchedTariffIds.size === 0) {
+    return options.filter((option) => defaultSalVoiceOptionMatches(option, normalizedQuery));
+  }
+
+  const remainingQuery = queryParts.filter((part) => !matchedQueryParts.has(part)).join(" ");
+
+  return options.filter((option) => {
+    const voice = option.id ? voiceByOptionId.get(option.id) : undefined;
+    if (!voice || !matchedTariffIds.has(voice.tariffBookId)) return false;
+    return remainingQuery ? defaultSalVoiceOptionMatches(option, remainingQuery) : true;
+  });
+}
+
 export function SalCreationScreen() {
   const { notify } = useToast();
   const navigate = useNavigate();
@@ -309,18 +396,25 @@ export function SalCreationScreen() {
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [compareLines, setCompareLines] = useState<SalLineView[] | null>(null);
 
+  const suggestedSalTitle = useMemo(() => {
+    const projectId = data.project?.id;
+    if (!projectId) return buildDefaultSalTitle(0);
+    const existingCount = salDocuments.filter((sal) => sal.projectId === projectId).length;
+    return buildDefaultSalTitle(existingCount);
+  }, [data.project?.id, salDocuments]);
+
   // Set default discount from project when it loads
   useEffect(() => {
     const project = data.project;
     if (project) {
-      setSalTitle((prev) => prev || project.salTitle);
+      setSalTitle((prev) => prev || suggestedSalTitle);
       setEconomicRules((prev) => ({
         ...prev,
         discountEnabled: project.tenderDiscountPercent > 0,
         discountPercent: project.tenderDiscountPercent,
       }));
     }
-  }, [data.project, setEconomicRules, setSalTitle]);
+  }, [data.project, setEconomicRules, setSalTitle, suggestedSalTitle]);
 
   const closedProjectSals = useMemo(() => {
     const projectId = data.project?.id;
@@ -617,7 +711,7 @@ export function SalCreationScreen() {
       })),
       notes: "",
       projectId: data.project.id,
-      title: salTitle.trim() || data.project.salTitle,
+      title: salTitle.trim() || suggestedSalTitle,
       total: summary.total,
       ...(materialUsagePayload.length > 0 ? { materialUsage: materialUsagePayload } : {}),
       voices: lineViews.map((l) => ({
@@ -662,7 +756,7 @@ export function SalCreationScreen() {
       dispatchDataChanged();
     }
 
-    setCreatedSalTitle(salTitle.trim() || data.project.salTitle);
+    setCreatedSalTitle(salTitle.trim() || suggestedSalTitle);
     clearSalCreationDraft(data.project.id);
     if (editingDraftSalId.current) {
       clearSalCreationDraftBySalId(editingDraftSalId.current);
@@ -670,7 +764,7 @@ export function SalCreationScreen() {
     sessionStorage.setItem(CREATED_FLAG_KEY, "1");
     setPhase("completed");
     notify({
-      message: `${salTitle.trim() || data.project.salTitle} confermata.`,
+      message: `${salTitle.trim() || suggestedSalTitle} confermata.`,
       title: "SAL confermata",
       tone: "success",
     });
@@ -798,7 +892,7 @@ export function SalCreationScreen() {
       });
     const draftPayload = {
       date: salDate,
-      description: salTitle.trim() || project.salTitle,
+      description: salTitle.trim() || suggestedSalTitle,
       lines: lineViews.map((l) => ({
         id: l.id,
         quantity: l.quantity,
@@ -808,7 +902,7 @@ export function SalCreationScreen() {
       notes: "",
       projectId: pid,
       status: "draft" as const,
-      title: salTitle.trim() || project.salTitle,
+      title: salTitle.trim() || suggestedSalTitle,
       total: summary.total,
       ...(draftMaterialUsage.length > 0 ? { materialUsage: draftMaterialUsage } : {}),
       voices: lineViews.map((l) => ({
@@ -841,7 +935,7 @@ export function SalCreationScreen() {
         materialUsage,
         phase,
         salDate,
-        salTitle: salTitle.trim() || project.salTitle,
+        salTitle: salTitle.trim() || suggestedSalTitle,
         selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
       });
     }
@@ -873,6 +967,7 @@ export function SalCreationScreen() {
     salDate,
     phase,
     salTitle,
+    suggestedSalTitle,
     notify,
     lineViews,
     createSalProject,
@@ -889,15 +984,15 @@ export function SalCreationScreen() {
       budgetResidual: summary.budgetResidual,
       discountAmount: summary.discountAmount,
       lineCount: lineViews.length,
-      salTitle: salTitle.trim() || data.project?.salTitle || "Nuovo SAL",
+      salTitle: salTitle.trim() || suggestedSalTitle,
       total: summary.total,
       voicesCount: data.voices.length,
     }),
     [
-      data.project?.salTitle,
       data.voices.length,
       lineViews.length,
       salTitle,
+      suggestedSalTitle,
       salAutoSaveLastSaved,
       salAutoSaveStatus,
       summary.budgetResidual,
@@ -989,6 +1084,7 @@ export function SalCreationScreen() {
             previousSalLines={previousSalLines}
             removeLine={removeLine}
             salTitle={salTitle}
+            suggestedSalTitle={suggestedSalTitle}
             setFactor={setFactor}
             setIsTemplateDialogOpen={setIsTemplateDialogOpen}
             setLines={setLines}
@@ -1062,6 +1158,7 @@ function SalEditorContent({
   removeLine,
   salDate,
   salTitle,
+  suggestedSalTitle,
   setFactor,
   setIsTemplateDialogOpen,
   setLines,
@@ -1109,6 +1206,7 @@ function SalEditorContent({
   removeLine: (lineId: string) => void;
   salDate: string;
   salTitle: string;
+  suggestedSalTitle: string;
   setFactor: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
   setIsTemplateDialogOpen: Dispatch<SetStateAction<boolean>>;
   setLines: (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => void;
@@ -1146,6 +1244,7 @@ function SalEditorContent({
           project={project}
           salDate={salDate}
           salTitle={salTitle}
+          suggestedSalTitle={suggestedSalTitle}
           selectedTariffBooks={dataSelectedTariffBooks}
           selectedTariffBook={dataSelectedTariffBook}
           selectTariffBook={async (id) => {
@@ -1439,6 +1538,7 @@ function SetupStep({
   project,
   salDate,
   salTitle,
+  suggestedSalTitle,
   selectedTariffBooks,
   selectedTariffBook,
   selectTariffBook,
@@ -1454,6 +1554,7 @@ function SetupStep({
   project: SalProjectContext | null;
   salDate: string;
   salTitle: string;
+  suggestedSalTitle: string;
   selectedTariffBooks: SalTariffBookOption[];
   selectedTariffBook: SalTariffBookOption | null;
   selectTariffBook: (id: string) => Promise<void>;
@@ -1613,7 +1714,7 @@ function SetupStep({
             className="mt-2 h-11 w-full rounded-10px border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
             id="sal-title-input"
             onChange={(e) => setSalTitle(e.target.value)}
-            placeholder={project.salTitle}
+            placeholder={suggestedSalTitle}
             value={salTitle}
           />
         </div>
@@ -1859,13 +1960,27 @@ function VoicesStep({
   const autocompleteOptions = useMemo(
     () =>
       voices.map((v) => ({
+        id: v.id,
         label: v.description,
-        metadata: `${v.category} · ${v.unit} · ${v.unitPrice.toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
+        metadata: `${v.tariffBookName} · ${v.category} · ${v.unit} · ${v.unitPrice.toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
         value: v.code,
-        keywords: `${v.code} ${v.description} ${v.category}`,
+        keywords: `${v.code} ${v.description} ${v.category} ${v.tariffBookName} ${v.tariffBookId}`,
       })),
     [voices],
   );
+  const voiceByOptionId = useMemo(
+    () => new Map(voices.map((voice) => [voice.id, voice])),
+    [voices],
+  );
+  const tariffTokensByBookId = useMemo(() => {
+    const result = new Map<string, Set<string>>();
+    for (const voice of voices) {
+      if (!result.has(voice.tariffBookId)) {
+        result.set(voice.tariffBookId, buildTariffSearchTokens(voice));
+      }
+    }
+    return result;
+  }, [voices]);
   const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
   const lastInteractedRef = useRef<string | null>(null);
   const idCounter = useRef(0);
@@ -1985,7 +2100,9 @@ function VoicesStep({
               <AutocompleteInput
                 options={autocompleteOptions}
                 onSelect={(o) => {
-                  const v = voices.find((x) => x.code === o.value);
+                  const v =
+                    (o.id ? voiceByOptionId.get(o.id) : undefined) ??
+                    voices.find((x) => x.code === o.value);
                   if (v) {
                     const exists = lines.some((l) => l.voice.id === v.id);
                     if (exists) {
@@ -2005,6 +2122,14 @@ function VoicesStep({
                     }
                   }
                 }}
+                filterOptions={(options, query) =>
+                  filterSalVoiceOptionsByTariffIntent({
+                    options,
+                    query,
+                    tariffTokensByBookId,
+                    voiceByOptionId,
+                  })
+                }
                 placeholder={`Cerca codice, descrizione o categoria (${voices.length} voci)...`}
               />
               <div className="flex items-center gap-2 text-11px font-semibold text-[var(--text-secondary)]">

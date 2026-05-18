@@ -286,6 +286,7 @@ export function TariffImportPreviewPanel({
   importPreviews,
   onCancel,
   onConfirm,
+  onActiveIndexChange,
   onDraftedFilesChange,
   onMetadatasChange,
   onPageCanConfirmChange,
@@ -298,6 +299,7 @@ export function TariffImportPreviewPanel({
   importPreviews: TariffPdfMetadata[];
   onCancel: () => void;
   onConfirm: (metadatas: TariffImportPreviewResult[]) => Promise<void>;
+  onActiveIndexChange: (index: number) => void;
   onDraftedFilesChange: (next: Set<number>) => void;
   onMetadatasChange: (metadatas: TariffPdfMetadata[]) => void;
   onPageCanConfirmChange: (value: boolean) => void;
@@ -355,6 +357,7 @@ export function TariffImportPreviewPanel({
           metadatas={importPreviews}
           onCancel={onCancel}
           onConfirm={onConfirm}
+          onActiveIndexChange={onActiveIndexChange}
           onDraftedFilesChange={onDraftedFilesChange}
           onMetadatasChange={onMetadatasChange}
           onPageCanConfirmChange={onPageCanConfirmChange}

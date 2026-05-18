@@ -531,11 +531,23 @@ export function TariffsScreen() {
     let importedCount = 0;
     let totalVoices = 0;
     const allSavedVoices: DesktopTariffVoice[] = [];
+    const existingBookIdByMetadataKey = new Map(
+      tariffBooksState.data.map((book) => [
+        getMetadataKey({
+          name: book.name,
+          sourceName: book.sourceName,
+          voices: [],
+          year: book.year,
+        }),
+        book.id,
+      ]),
+    );
 
     const ops = metadatas
       .filter((m) => m.voices.length > 0)
       .map(async (metadata) => {
-        const existingBookId = metadata.existingBookId;
+        const existingBookId =
+          metadata.existingBookId ?? existingBookIdByMetadataKey.get(getMetadataKey(metadata));
         const tariffBookId = existingBookId ?? createTariffBookId(metadata);
         const voices = metadata.voices.map((voice) => ({
           ...voice,
@@ -606,10 +618,34 @@ export function TariffsScreen() {
     clearImport();
 
     if (importedCount > 0) {
+      const lastSavedResult = results.findLast((result) => result !== null);
+
+      setActiveCatalogTab("all");
+      setProjectFilter("all");
+      setQuery("");
+      setStatusFilter("all");
+      setYearFilter("all");
+
       if (allSavedVoices.length > 0) {
-        setVoicesState({ data: allSavedVoices, source: "desktop" });
+        setVoicesState({ data: lastSavedResult?.voices ?? allSavedVoices, source: "desktop" });
       }
       dispatchDataChanged();
+      try {
+        const tariffBooks = await listDesktopTariffBooks(fallbackTariffBooks);
+        setTariffBooksState(tariffBooks);
+        const voiceCountResult = await listDesktopTariffVoiceCounts(
+          tariffBooks.data,
+          fallbackTariffVoices,
+        );
+        const counts = new Map(
+          voiceCountResult.data.map((entry) => [entry.tariffBookId, entry.count]),
+        );
+        setVoiceCountByBookId(
+          Object.fromEntries(tariffBooks.data.map((book) => [book.id, counts.get(book.id) ?? 0])),
+        );
+      } catch {
+        /* state was already updated optimistically */
+      }
       notify({
         message: `${importedCount} tariffari (${totalVoices.toLocaleString("it-IT")} voci) salvati in locale.`,
         title: "Importazione completata",
@@ -821,6 +857,9 @@ export function TariffsScreen() {
           importPreviews={importPreviews}
           onCancel={clearImport}
           onConfirm={handleConfirmImport}
+          onActiveIndexChange={(index) => {
+            dispatchImport({ type: "SET_INDEX", index });
+          }}
           onDraftedFilesChange={updateDraftedImportFiles}
           onMetadatasChange={(nextMetadatas) => {
             dispatchImport({ type: "SET_PREVIEWS", previews: nextMetadatas });

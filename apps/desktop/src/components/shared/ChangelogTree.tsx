@@ -59,6 +59,15 @@ function TreeNodeItem({
   const [collapsed, setCollapsed] = useState(depth === 0 ? (defaultCollapsed ?? true) : false);
   const hasChildren = node.children.length > 0;
 
+  if (!hasChildren && depth > 0) {
+    return (
+      <div className={cn("flex items-start gap-2.5", depth > 1 ? "pl-3" : "pl-1")}>
+        <span className="mt-2.5 size-1 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
+        <span className="min-w-0 text-13px leading-5 text-[var(--text-primary)]">{node.text}</span>
+      </div>
+    );
+  }
+
   if (depth === 0) {
     return (
       <div>

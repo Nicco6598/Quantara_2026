@@ -49,6 +49,159 @@ import { ValidationLine } from "./ValidationLine";
 
 type InspectorTab = "checks" | "categories" | "issues";
 
+type ImportReviewSummary = {
+  blockingIssueCount: number;
+  completionPercent: number;
+  filesWithoutVoices: number;
+  hasVoices: boolean;
+  issueCount: number;
+  isReviewReady: boolean;
+  sourceIssues: number;
+  validation: ImportValidation;
+  warningRows: number;
+  yearIssues: number;
+};
+
+const emptyImportValidation: ImportValidation = {
+  duplicateCount: 0,
+  duplicateExamples: [],
+  duplicateRows: [],
+  invalidCount: 0,
+  invalidExamples: [],
+  invalidRows: [],
+  validCount: 0,
+  warningCount: 0,
+};
+
+function buildImportReviewSummary(
+  metadatas: readonly TariffPdfMetadata[],
+  editableVoicesList: readonly DesktopTariffVoice[][],
+  validations: readonly ImportValidation[],
+): ImportReviewSummary {
+  const duplicateExamples = new Set<string>();
+  let duplicateCount = 0;
+  let filesWithoutVoices = 0;
+  let invalidCount = 0;
+  let sourceIssues = 0;
+  let totalVoices = 0;
+  let validCount = 0;
+  let warningRows = 0;
+  let yearIssues = 0;
+
+  metadatas.forEach((metadata, index) => {
+    const voices = editableVoicesList[index] ?? [];
+    const validation = validations[index] ?? emptyImportValidation;
+
+    totalVoices += voices.length;
+    warningRows += voices.filter((voice) => (voice.warnings?.length ?? 0) > 0).length;
+    validCount += validation.validCount;
+    invalidCount += validation.invalidCount;
+    duplicateCount += validation.duplicateCount;
+    validation.duplicateExamples.forEach((code) => {
+      duplicateExamples.add(code);
+    });
+
+    if (voices.length === 0) filesWithoutVoices += 1;
+    if (metadata.sourceName === "Ente da confermare") sourceIssues += 1;
+    if (metadata.year < 1900 || metadata.year > 2200) yearIssues += 1;
+  });
+
+  const blockingIssueCount = invalidCount + duplicateCount;
+  const metadataIssues = sourceIssues + yearIssues;
+  const issueCount = filesWithoutVoices + blockingIssueCount + metadataIssues;
+
+  return {
+    blockingIssueCount,
+    completionPercent: totalVoices > 0 ? Math.round((validCount / totalVoices) * 100) : 0,
+    filesWithoutVoices,
+    hasVoices: filesWithoutVoices === 0,
+    issueCount,
+    isReviewReady: metadatas.length > 0 && issueCount === 0,
+    sourceIssues,
+    validation: {
+      ...emptyImportValidation,
+      duplicateCount,
+      duplicateExamples: [...duplicateExamples].slice(0, 8),
+      invalidCount,
+      validCount,
+      warningCount: warningRows,
+    },
+    warningRows,
+    yearIssues,
+  };
+}
+
+function isMacPlatform() {
+  if (typeof navigator === "undefined") return false;
+  return /mac|iphone|ipad|ipod/i.test(navigator.platform);
+}
+
+function Kbd({ children }: { children: string }) {
+  return (
+    <kbd className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-1.5 py-0.5 text-10px font-bold leading-none text-[var(--text-secondary)] shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--border-subtle)_70%,transparent)]">
+      {children}
+    </kbd>
+  );
+}
+
+function ShortcutHint({ action, keys }: { action: string; keys: string[] }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+      <span>{action}</span>
+      <span className="inline-flex items-center gap-1">
+        {keys.map((key) => (
+          <Kbd key={key}>{key}</Kbd>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+function ImportShortcutLegend({ compact = false }: { compact?: boolean }) {
+  const modKey = isMacPlatform() ? "⌘" : "Ctrl";
+  const deleteKey = isMacPlatform() ? "⌫" : "Del";
+  const groups = [
+    {
+      label: "Navigazione",
+      hints: [{ action: "File", keys: [modKey, "Shift", "←/→"] }],
+    },
+    {
+      label: "Stato",
+      hints: [
+        { action: "Revisiona", keys: [modKey, "Shift", "R"] },
+        { action: "Bozza", keys: [modKey, "Shift", "B"] },
+      ],
+    },
+    {
+      label: "Azioni",
+      hints: [
+        { action: "Conferma", keys: [modKey, "Shift", "Enter"] },
+        { action: "Rimuovi", keys: [modKey, "Shift", deleteKey] },
+      ],
+    },
+  ];
+
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-x-5 gap-y-2 text-11px font-semibold text-[var(--text-secondary)]",
+        compact && "rounded-14px bg-[var(--bg-muted)]/45 px-3 py-2",
+      )}
+    >
+      {groups.map((group) => (
+        <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1.5" key={group.label}>
+          <span className="text-10px font-bold uppercase tracking-caption text-[var(--text-tertiary)]">
+            {group.label}
+          </span>
+          {group.hints.map((hint) => (
+            <ShortcutHint action={hint.action} keys={hint.keys} key={hint.action} />
+          ))}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function MetricsBar({
   totalVoices,
   validation,
@@ -247,60 +400,63 @@ function ModalFooter({
   confirmChanges: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
-        <Button onClick={onCancel} variant="outline">
-          Annulla
+    <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)]/70 px-5 py-4">
+      <ImportShortcutLegend />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={onCancel} variant="outline">
+            Annulla
+          </Button>
+          <Button icon={Save} onClick={saveDraft} variant="secondary">
+            Salva bozza
+          </Button>
+          {loadedDraft ? (
+            <Button icon={Archive} onClick={discardDraft} variant="outline">
+              Elimina bozza
+            </Button>
+          ) : null}
+          {metadatas.length > 0 ? (
+            <Button icon={Trash2} onClick={removeActiveFile} variant="outline">
+              Cancella file
+            </Button>
+          ) : null}
+          {metadatas.length > 1 ? (
+            <Button icon={Save} onClick={toggleActiveFileDraft} variant="secondary">
+              {draftedFiles.has(localActiveIndex) ? "Salvato in bozza" : "Salva in bozza"}
+            </Button>
+          ) : null}
+          {metadatas.length > 1 && !modalReviewedFiles.has(localActiveIndex) ? (
+            <Button
+              disabled={draftedFiles.has(localActiveIndex)}
+              icon={CheckCircle2}
+              onClick={markActiveFileReviewed}
+              variant="secondary"
+            >
+              Segna come revisionato
+            </Button>
+          ) : null}
+          {metadatas.length > 1 && (modalReviewedFiles.size > 0 || draftedFiles.size > 0) ? (
+            <span className="text-12px font-medium text-[var(--text-secondary)]">
+              <span className="text-[var(--success-base)]">{modalReviewedFiles.size}</span>/
+              {metadatas.length} revisionati{" "}
+              <span className="text-[var(--warning-base)]">{draftedFiles.size}</span>/
+              {metadatas.length} in bozza
+            </span>
+          ) : null}
+        </div>
+        <Button
+          disabled={!canConfirm || isBusy}
+          icon={CheckCircle2}
+          onClick={confirmChanges}
+          variant="primary"
+        >
+          {metadatas.length > 1
+            ? modalReviewedFiles.size === metadatas.length
+              ? `Conferma tutti (${metadatas.length})`
+              : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
+            : "Conferma importazione"}
         </Button>
-        <Button icon={Save} onClick={saveDraft} variant="secondary">
-          Salva bozza
-        </Button>
-        {loadedDraft ? (
-          <Button icon={Archive} onClick={discardDraft} variant="outline">
-            Elimina bozza
-          </Button>
-        ) : null}
-        {metadatas.length > 0 ? (
-          <Button icon={Trash2} onClick={removeActiveFile} variant="outline">
-            Cancella file
-          </Button>
-        ) : null}
-        {metadatas.length > 1 ? (
-          <Button icon={Save} onClick={toggleActiveFileDraft} variant="secondary">
-            {draftedFiles.has(localActiveIndex) ? "Salvato in bozza" : "Salva in bozza"}
-          </Button>
-        ) : null}
-        {metadatas.length > 1 && !modalReviewedFiles.has(localActiveIndex) ? (
-          <Button
-            disabled={draftedFiles.has(localActiveIndex)}
-            icon={CheckCircle2}
-            onClick={markActiveFileReviewed}
-            variant="secondary"
-          >
-            Segna come revisionato
-          </Button>
-        ) : null}
-        {metadatas.length > 1 && (modalReviewedFiles.size > 0 || draftedFiles.size > 0) ? (
-          <span className="text-12px font-medium text-[var(--text-secondary)]">
-            <span className="text-[var(--success-base)]">{modalReviewedFiles.size}</span>/
-            {metadatas.length} revisionati{" "}
-            <span className="text-[var(--warning-base)]">{draftedFiles.size}</span>/
-            {metadatas.length} in bozza
-          </span>
-        ) : null}
       </div>
-      <Button
-        disabled={!canConfirm || isBusy}
-        icon={CheckCircle2}
-        onClick={confirmChanges}
-        variant="primary"
-      >
-        {metadatas.length > 1
-          ? modalReviewedFiles.size === metadatas.length
-            ? `Conferma tutti (${metadatas.length})`
-            : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
-          : "Conferma importazione"}
-      </Button>
     </div>
   );
 }
@@ -514,6 +670,7 @@ export function TariffImportPreviewModal({
   metadatas,
   onCancel,
   onConfirm,
+  onActiveIndexChange,
   onDraftedFilesChange,
   onMetadatasChange,
   onPageCanConfirmChange,
@@ -526,6 +683,7 @@ export function TariffImportPreviewModal({
   metadatas: TariffPdfMetadata[];
   onCancel: () => void;
   onConfirm: (metadatas: TariffImportPreviewResult[]) => void;
+  onActiveIndexChange?: (index: number) => void;
   onDraftedFilesChange?: (draftedFiles: Set<number>) => void;
   onMetadatasChange?: (metadatas: TariffPdfMetadata[]) => void;
   onPageCanConfirmChange?: (canConfirm: boolean) => void;
@@ -583,34 +741,12 @@ export function TariffImportPreviewModal({
     () => metadatas.map((_, i) => getImportValidation(editableVoicesList[i] ?? [])),
     [metadatas, editableVoicesList],
   );
-  const activeValidation =
-    validations[localActiveIndex] ??
-    ({
-      canSubmit: false,
-      checks: {
-        amount: false,
-        identity: false,
-        safetyCosts: false,
-        safetyCostsWithinBudget: false,
-      },
-      identityError: null,
-      invalidCount: 0,
-      invalidExamples: [],
-      invalidRows: [],
-      duplicateCount: 0,
-      duplicateExamples: [],
-      duplicateRows: [],
-      validCount: 0,
-      warningCount: 0,
-      submitError: null,
-    } as ImportValidation);
+  const activeValidation = validations[localActiveIndex] ?? emptyImportValidation;
+  const reviewSummary = useMemo(
+    () => buildImportReviewSummary(metadatas, editableVoicesList, validations),
+    [editableVoicesList, metadatas, validations],
+  );
   const hasVoices = activeVoices.length > 0;
-  const blockingIssueCount = activeValidation.invalidCount + activeValidation.duplicateCount;
-  const completionPercent =
-    activeVoices.length > 0
-      ? Math.round((activeValidation.validCount / activeVoices.length) * 100)
-      : 0;
-  const isReviewReady = hasVoices && blockingIssueCount === 0;
   const canConfirm =
     metadatas.length > 0 &&
     metadatas.every((_, i) => {
@@ -784,12 +920,13 @@ export function TariffImportPreviewModal({
   const switchFile = useCallback(
     (index: number) => {
       flushGridDraftChanges();
+      onActiveIndexChange?.(index);
       startTransition(() => {
         setCategorySections([]);
         dispatch({ type: "SWITCH_FILE", index });
       });
     },
-    [flushGridDraftChanges],
+    [flushGridDraftChanges, onActiveIndexChange],
   );
 
   const removeActiveFile = useCallback(() => {
@@ -958,6 +1095,85 @@ export function TariffImportPreviewModal({
     return () => window.removeEventListener("tariff-preview-action", handleToolbarAction);
   }, [removeActiveFile, saveActiveFileAsDraft, toggleActiveFileReviewed]);
 
+  useEffect(() => {
+    const handleKeyboardShortcut = (event: KeyboardEvent) => {
+      if (deleteTarget) return;
+
+      const key = event.key.toLowerCase();
+      const mod = event.ctrlKey || event.metaKey;
+      const isImportShortcut =
+        (mod && key === "enter") ||
+        (mod &&
+          event.shiftKey &&
+          !event.altKey &&
+          (key === "arrowleft" ||
+            key === "arrowright" ||
+            key === "r" ||
+            key === "b" ||
+            key === "backspace" ||
+            key === "delete"));
+
+      if (!isImportShortcut) return;
+
+      if (mod && key === "enter" && canConfirm && !isBusy) {
+        event.preventDefault();
+        event.stopPropagation();
+        confirmChanges();
+        return;
+      }
+
+      if (mod && event.shiftKey && !event.altKey) {
+        if (key === "arrowleft" && localActiveIndex > 0) {
+          event.preventDefault();
+          event.stopPropagation();
+          switchFile(localActiveIndex - 1);
+          return;
+        }
+
+        if (key === "arrowright" && localActiveIndex < metadatas.length - 1) {
+          event.preventDefault();
+          event.stopPropagation();
+          switchFile(localActiveIndex + 1);
+          return;
+        }
+
+        if (key === "r") {
+          event.preventDefault();
+          event.stopPropagation();
+          markActiveFileReviewed();
+          return;
+        }
+
+        if (key === "b") {
+          event.preventDefault();
+          event.stopPropagation();
+          toggleActiveFileDraft();
+          return;
+        }
+
+        if (key === "backspace" || key === "delete") {
+          event.preventDefault();
+          event.stopPropagation();
+          removeActiveFile();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyboardShortcut, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyboardShortcut, { capture: true });
+  }, [
+    canConfirm,
+    confirmChanges,
+    deleteTarget,
+    isBusy,
+    localActiveIndex,
+    markActiveFileReviewed,
+    metadatas.length,
+    removeActiveFile,
+    switchFile,
+    toggleActiveFileDraft,
+  ]);
+
   function focusImportCell(rowIndex: number, field: string) {
     setGridScrollTarget({
       field: field as keyof DesktopTariffVoice,
@@ -988,6 +1204,7 @@ export function TariffImportPreviewModal({
     <>
       <div className="flex w-full flex-col gap-5 pb-28 xl:pb-0 xl:pr-[410px]">
         <MetricsBar totalVoices={activeVoices.length} validation={activeValidation} />
+        <ImportShortcutLegend compact />
         <div className="min-w-0">
           <VoicesPanel
             activeValidation={activeValidation}
@@ -1004,13 +1221,8 @@ export function TariffImportPreviewModal({
         </div>
       </div>
       <TariffImportReviewInspector
-        activeMetadata={activeMetadata}
-        activeValidation={activeValidation}
-        blockingIssueCount={blockingIssueCount}
-        completionPercent={completionPercent}
-        hasVoices={hasVoices}
+        globalReviewSummary={reviewSummary}
         invalidRows={invalidRows}
-        isReviewReady={isReviewReady}
         onFocusCategory={focusImportCategory}
         onFocusCell={focusImportCell}
         sections={categorySections}
@@ -1084,13 +1296,8 @@ export function TariffImportPreviewModal({
               </div>
             </div>
             <TariffImportReviewInspector
-              activeMetadata={activeMetadata}
-              activeValidation={activeValidation}
-              blockingIssueCount={blockingIssueCount}
-              completionPercent={completionPercent}
-              hasVoices={hasVoices}
+              globalReviewSummary={reviewSummary}
               invalidRows={invalidRows}
-              isReviewReady={isReviewReady}
               onFocusCategory={focusImportCategory}
               onFocusCell={focusImportCell}
               sections={categorySections}
@@ -1122,48 +1329,28 @@ export function TariffImportPreviewModal({
 }
 
 function TariffImportReviewInspector({
-  activeMetadata,
-  activeValidation,
-  blockingIssueCount,
-  completionPercent,
-  hasVoices,
+  globalReviewSummary,
   invalidRows,
-  isReviewReady,
   onFocusCategory,
   onFocusCell,
   sections,
   variant,
 }: {
-  activeMetadata: TariffPdfMetadata | undefined;
-  activeValidation: ImportValidation;
-  blockingIssueCount: number;
-  completionPercent: number;
-  hasVoices: boolean;
+  globalReviewSummary: ImportReviewSummary;
   invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
-  isReviewReady: boolean;
   onFocusCategory: (categoryId: string) => void;
   onFocusCell: (rowIndex: number, field: string) => void;
   sections: TariffGridSectionSummary[];
   variant: "modal" | "page";
 }) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("checks");
-  const issueCount =
-    (hasVoices ? 0 : 1) +
-    activeValidation.invalidCount +
-    activeValidation.duplicateCount +
-    (activeMetadata?.sourceName === "Ente da confermare" ? 1 : 0) +
-    ((activeMetadata?.year ?? 0) >= 1900 && (activeMetadata?.year ?? 0) <= 2200 ? 0 : 1);
+  const issueCount = globalReviewSummary.issueCount;
 
   const body = (
     <InspectorContent
-      activeMetadata={activeMetadata}
       activeTab={activeTab}
-      activeValidation={activeValidation}
-      blockingIssueCount={blockingIssueCount}
-      completionPercent={completionPercent}
-      hasVoices={hasVoices}
+      globalReviewSummary={globalReviewSummary}
       invalidRows={invalidRows}
-      isReviewReady={isReviewReady}
       issueCount={issueCount}
       onFocusCategory={onFocusCategory}
       onFocusCell={onFocusCell}
@@ -1192,28 +1379,18 @@ function TariffImportReviewInspector({
 }
 
 function InspectorContent({
-  activeMetadata,
   activeTab,
-  activeValidation,
-  blockingIssueCount,
-  completionPercent,
-  hasVoices,
+  globalReviewSummary,
   invalidRows,
-  isReviewReady,
   issueCount,
   onFocusCategory,
   onFocusCell,
   onTabChange,
   sections,
 }: {
-  activeMetadata: TariffPdfMetadata | undefined;
   activeTab: InspectorTab;
-  activeValidation: ImportValidation;
-  blockingIssueCount: number;
-  completionPercent: number;
-  hasVoices: boolean;
+  globalReviewSummary: ImportReviewSummary;
   invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
-  isReviewReady: boolean;
   issueCount: number;
   onFocusCategory: (categoryId: string) => void;
   onFocusCell: (rowIndex: number, field: string) => void;
@@ -1224,8 +1401,8 @@ function InspectorContent({
     <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_16%,transparent)]">
       <div className="rounded-18px bg-[var(--surface-base)] p-3">
         <InspectorHeader
-          completionPercent={completionPercent}
-          isReviewReady={isReviewReady}
+          completionPercent={globalReviewSummary.completionPercent}
+          isReviewReady={globalReviewSummary.isReviewReady}
           issueCount={issueCount}
         />
         <InspectorTabs
@@ -1243,24 +1420,14 @@ function InspectorContent({
         </div>
         <div className="mt-3">
           {activeTab === "checks" ? (
-            <ControlPanel
-              activeMetadata={activeMetadata}
-              activeValidation={activeValidation}
-              blockingIssueCount={blockingIssueCount}
-              completionPercent={completionPercent}
-              hasVoices={hasVoices}
-              isReviewReady={isReviewReady}
-              compact
-            />
+            <ControlPanel globalReviewSummary={globalReviewSummary} compact />
           ) : null}
           {activeTab === "categories" ? (
             <CategoryJumpPanel onFocusCategory={onFocusCategory} sections={sections} compact />
           ) : null}
           {activeTab === "issues" ? (
             <InterventionPanel
-              activeMetadata={activeMetadata}
-              activeValidation={activeValidation}
-              hasVoices={hasVoices}
+              globalReviewSummary={globalReviewSummary}
               invalidRows={invalidRows}
               onFocusCell={onFocusCell}
               compact
@@ -1433,30 +1600,21 @@ function CategoryJumpPanel({
 }
 
 function InterventionPanel({
-  activeMetadata,
-  activeValidation,
   compact = false,
-  hasVoices,
+  globalReviewSummary,
   invalidRows,
   onFocusCell,
 }: {
-  activeMetadata: TariffPdfMetadata | undefined;
-  activeValidation: ImportValidation;
   compact?: boolean;
-  hasVoices: boolean;
+  globalReviewSummary: ImportReviewSummary;
   invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
   onFocusCell: (rowIndex: number, field: string) => void;
 }) {
-  const sourceNeedsReview = activeMetadata?.sourceName === "Ente da confermare";
-  const yearNeedsReview = !(
-    (activeMetadata?.year ?? 0) >= 1900 && (activeMetadata?.year ?? 0) <= 2200
-  );
   const hasBlockingIssues =
-    !hasVoices ||
-    activeValidation.invalidCount > 0 ||
-    activeValidation.duplicateCount > 0 ||
-    sourceNeedsReview ||
-    yearNeedsReview;
+    !globalReviewSummary.hasVoices ||
+    globalReviewSummary.validation.invalidCount > 0 ||
+    globalReviewSummary.validation.duplicateCount > 0 ||
+    globalReviewSummary.issueCount > globalReviewSummary.blockingIssueCount;
 
   return (
     <div
@@ -1479,40 +1637,51 @@ function InterventionPanel({
           Gestione anomalie
         </div>
         <span className="rounded-full bg-[var(--surface-base)]/70 px-2 py-0.5 text-11px font-bold tabular-nums">
-          {activeValidation.warningCount}
+          {globalReviewSummary.validation.warningCount}
         </span>
       </div>
 
       <div className="mt-3 space-y-2">
-        <IssueLine count={hasVoices ? 0 : 1} label="PDF senza voci importabili" ok={hasVoices} />
         <IssueLine
-          count={activeValidation.invalidCount}
+          count={globalReviewSummary.filesWithoutVoices}
+          label="File senza voci importabili"
+          ok={globalReviewSummary.hasVoices}
+        />
+        <IssueLine
+          count={globalReviewSummary.warningRows}
+          label="Righe con warning parser"
+          ok={globalReviewSummary.warningRows === 0}
+        />
+        <IssueLine
+          count={globalReviewSummary.validation.invalidCount}
           label="Righe con dati mancanti"
-          ok={activeValidation.invalidCount === 0}
+          ok={globalReviewSummary.validation.invalidCount === 0}
         />
         <IssueLine
-          count={activeValidation.duplicateCount}
+          count={globalReviewSummary.validation.duplicateCount}
           label="Codici duplicati"
-          ok={activeValidation.duplicateCount === 0}
+          ok={globalReviewSummary.validation.duplicateCount === 0}
         />
         <IssueLine
-          count={sourceNeedsReview ? 1 : 0}
+          count={globalReviewSummary.sourceIssues}
           label="Ente da confermare"
-          ok={!sourceNeedsReview}
+          ok={globalReviewSummary.sourceIssues === 0}
         />
         <IssueLine
-          count={yearNeedsReview ? 1 : 0}
+          count={globalReviewSummary.yearIssues}
           label="Anno non coerente"
-          ok={!yearNeedsReview}
+          ok={globalReviewSummary.yearIssues === 0}
         />
       </div>
 
-      {activeValidation.duplicateExamples.length > 0 ? (
+      {globalReviewSummary.validation.duplicateExamples.length > 0 ? (
         <div className="mt-3 rounded-lg bg-[var(--surface-base)]/65 px-3 py-2">
           <div className="text-10px font-bold uppercase tracking-caption opacity-75">
             Duplicati principali
           </div>
-          <div className="mt-1 font-bold">{activeValidation.duplicateExamples.join(", ")}</div>
+          <div className="mt-1 font-bold">
+            {globalReviewSummary.validation.duplicateExamples.join(", ")}
+          </div>
         </div>
       ) : null}
 
@@ -1556,21 +1725,11 @@ function IssueLine({ count, label, ok }: { count: number; label: string; ok: boo
 }
 
 function ControlPanel({
-  activeMetadata,
-  activeValidation,
-  blockingIssueCount,
   compact = false,
-  completionPercent,
-  hasVoices,
-  isReviewReady,
+  globalReviewSummary,
 }: {
-  activeMetadata: TariffPdfMetadata | undefined;
-  activeValidation: ImportValidation;
-  blockingIssueCount: number;
   compact?: boolean;
-  completionPercent: number;
-  hasVoices: boolean;
-  isReviewReady: boolean;
+  globalReviewSummary: ImportReviewSummary;
 }) {
   return (
     <div
@@ -1583,7 +1742,7 @@ function ControlPanel({
       <div
         className={cn(
           "border-b p-4",
-          isReviewReady
+          globalReviewSummary.isReviewReady
             ? "border-[var(--success-base)]/15 bg-[var(--surface-base)]"
             : "border-[var(--warning-base)]/15 bg-[var(--surface-base)]",
         )}
@@ -1595,58 +1754,62 @@ function ControlPanel({
               Centro controllo
             </div>
             <div className="mt-2 text-15px font-bold leading-tight text-[var(--text-primary)]">
-              {isReviewReady ? "Import pronto" : "Verifiche richieste"}
+              {globalReviewSummary.isReviewReady ? "Import pronto" : "Verifiche richieste"}
             </div>
           </div>
           <span
             className={cn(
               "shrink-0 rounded-full px-2.5 py-1 text-11px font-bold",
-              isReviewReady
+              globalReviewSummary.isReviewReady
                 ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
                 : "bg-[var(--warning-base)] text-[var(--text-inverse)]",
             )}
           >
-            {completionPercent}%
+            {globalReviewSummary.completionPercent}%
           </span>
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
           <div
             className={cn(
               "h-full rounded-full transition-[width] duration-300",
-              isReviewReady ? "bg-[var(--success-base)]" : "bg-[var(--warning-base)]",
+              globalReviewSummary.isReviewReady
+                ? "bg-[var(--success-base)]"
+                : "bg-[var(--warning-base)]",
             )}
-            style={{ width: `${completionPercent}%` }}
+            style={{ width: `${globalReviewSummary.completionPercent}%` }}
           />
         </div>
       </div>
       <div className="grid grid-cols-3 divide-x divide-[var(--border-subtle)]/70 border-b border-[var(--border-subtle)]/70">
-        <ControlStat label="Valide" tone="success" value={activeValidation.validCount} />
-        <ControlStat label="Warning" tone="warning" value={activeValidation.warningCount} />
+        <ControlStat
+          label="Valide"
+          tone="success"
+          value={globalReviewSummary.validation.validCount}
+        />
+        <ControlStat
+          label="Warning"
+          tone="warning"
+          value={globalReviewSummary.validation.warningCount}
+        />
         <ControlStat
           label="Blocchi"
-          tone={blockingIssueCount > 0 ? "warning" : "neutral"}
-          value={blockingIssueCount}
+          tone={globalReviewSummary.blockingIssueCount > 0 ? "warning" : "neutral"}
+          value={globalReviewSummary.blockingIssueCount}
         />
       </div>
       <div className="space-y-4 p-4">
         <div className="space-y-2 text-12px font-medium text-[var(--text-secondary)]">
-          <ValidationLine ok={hasVoices} text="Voci prezzo rilevate" />
+          <ValidationLine ok={globalReviewSummary.hasVoices} text="Voci prezzo rilevate" />
           <ValidationLine
-            ok={activeValidation.invalidCount === 0}
-            text={`${activeValidation.invalidCount.toLocaleString("it-IT")} voci con dati mancanti`}
+            ok={globalReviewSummary.validation.invalidCount === 0}
+            text={`${globalReviewSummary.validation.invalidCount.toLocaleString("it-IT")} voci con dati mancanti`}
           />
           <ValidationLine
-            ok={activeValidation.duplicateCount === 0}
-            text={`${activeValidation.duplicateCount.toLocaleString("it-IT")} codici duplicati`}
+            ok={globalReviewSummary.validation.duplicateCount === 0}
+            text={`${globalReviewSummary.validation.duplicateCount.toLocaleString("it-IT")} codici duplicati`}
           />
-          <ValidationLine
-            ok={activeMetadata?.sourceName !== "Ente da confermare"}
-            text="Ente riconosciuto"
-          />
-          <ValidationLine
-            ok={(activeMetadata?.year ?? 0) >= 1900 && (activeMetadata?.year ?? 0) <= 2200}
-            text="Anno coerente"
-          />
+          <ValidationLine ok={globalReviewSummary.sourceIssues === 0} text="Ente riconosciuto" />
+          <ValidationLine ok={globalReviewSummary.yearIssues === 0} text="Anno coerente" />
         </div>
       </div>
     </div>
