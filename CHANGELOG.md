@@ -2,6 +2,31 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.32 — 2026-05-18
+
+### SAL — libretto misure più vicino al lavoro reale
+
+- **Registro SAL più leggibile** — le voci ora sono organizzate come un vero libretto misure: la riga principale resta compatta, mentre indici, note e dettaglio della misura si aprono sotto la voce quando servono.
+- **Maggiorazioni MG più chiare** — le voci MG non vengono più mischiate alle righe normali del registro. Ora hanno uno spazio dedicato, con percentuale, base di calcolo, importo e voci a cui si riferiscono.
+- **Voci OS separate** — gli oneri sicurezza sono raccolti in una sezione distinta e indicati come non soggetti a ribasso, così il totale è più facile da controllare.
+- **Sommano sempre visibile nel dettaglio** — aprendo una voce, il dettaglio mostra la misura corrente e la riga "sommano", in modo più simile al libretto Excel usato in contabilità.
+- **Fattore 1 default a zero** — quando aggiungi una voce al registro misure, il primo fattore parte da 0 invece di 1. La quantità iniziale è zero finché non inserisci tu le misure reali.
+
+### SAL — tariffari coerenti con il progetto
+
+- **Solo i tariffari del progetto** — nella creazione SAL (nuova o ripresa da bozza) vengono mostrati esclusivamente i tariffari associati al progetto nel dettaglio. Se un tariffario viene rimosso dal progetto, le voci che lo usavano nella bozza vengono silenziosamente escluse.
+- **Selezione tariffari più ordinata** — quando ci sono molti tariffari, il selettore nello step Impostazioni ha un campo di ricerca e un'area scrollabile con pulsante "Mostra tutti", evitando la lista infinita di pill.
+
+### Dettaglio progetto — gestione tariffari migliorata
+
+- **Modal tariffari più ampio** — la finestra per aggiungere o rimuovere tariffari è ora più larga e responsive (`max-w-lg` → `lg:max-w-2xl`), con più spazio per i nomi lunghi.
+- **Sezione "Associati" e "Disponibili"** — i tariffari già collegati compaiono in alto con stile distinto, quelli non ancora associati sotto. In ricerca la lista torna piatta.
+
+### SAL — ricerca voci più ordinata
+
+- **Risultati ricerca che non si sovrappongono** — descrizioni e titoli lunghi non invadono più la voce successiva. Ogni risultato ha il suo spazio e resta leggibile anche con testi molto estesi.
+- **Codice voce più stabile** — il codice a sinistra occupa tutta l'altezza della riga e resta separato dalla descrizione, così si distingue subito quale voce stai selezionando.
+
 ## 0.3.31 — 2026-05-18
 
 ### Tariffari — import e revisione

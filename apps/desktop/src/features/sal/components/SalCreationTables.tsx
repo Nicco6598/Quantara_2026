@@ -1,6 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { m } from "framer-motion";
-import { Check, ChevronDown, Copy, Download, MoreHorizontal, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Copy, Download, MoreHorizontal, Percent, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 import { Currency } from "@/components/shared/Currency";
 import { DragDropReorder } from "@/components/shared/DragDropReorder";
@@ -40,16 +40,57 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onReorder: (lines: SalLineDraft[]) => void;
   onSurcharge: (lineId: string, percent: number) => void;
 }) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(() => new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
-  const VIRTUAL_THRESHOLD = 20;
-  const useVirtual = lines.length > VIRTUAL_THRESHOLD;
+  const tableLines = useMemo(() => lines.filter((line) => !isMgRow(line.voice)), [lines]);
+  const workLines = useMemo(
+    () => tableLines.filter((line) => !line.voice.isSafetyCost),
+    [tableLines],
+  );
+  const safetyLines = useMemo(
+    () => tableLines.filter((line) => line.voice.isSafetyCost),
+    [tableLines],
+  );
+  const mgLines = useMemo(() => lines.filter((line) => isMgRow(line.voice)), [lines]);
+  const hasExpandedRows = expandedRows.size > 0;
+  const VIRTUAL_THRESHOLD = 24;
+  const hasSafetySection = safetyLines.length > 0;
+  const useVirtual = tableLines.length > VIRTUAL_THRESHOLD && !hasExpandedRows && !hasSafetySection;
 
   const rowVirtualizer = useVirtualizer({
-    count: lines.length,
+    count: tableLines.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 52,
+    estimateSize: () => 58,
     overscan: 5,
   });
+
+  const handleToggleRow = (lineId: string) => {
+    setExpandedRows((current) => {
+      const next = new Set(current);
+      if (next.has(lineId)) next.delete(lineId);
+      else next.add(lineId);
+      return next;
+    });
+  };
+
+  const handleReorderVisibleLines = (orderedVisibleLines: SalLineDraft[]) => {
+    const orderedVisibleIds = new Set(orderedVisibleLines.map((line) => line.id));
+    const hiddenMgLines = lines.filter((line) => isMgRow(line.voice));
+    const remainingLines = lines.filter(
+      (line) => !orderedVisibleIds.has(line.id) && !isMgRow(line.voice),
+    );
+    onReorder([...orderedVisibleLines, ...remainingLines, ...hiddenMgLines]);
+  };
+
+  const handleReorderWorkLines = (orderedWorkLines: SalLineDraft[]) => {
+    const hiddenMgLines = lines.filter((line) => isMgRow(line.voice));
+    onReorder([...orderedWorkLines, ...safetyLines, ...hiddenMgLines]);
+  };
+
+  const handleReorderSafetyLines = (orderedSafetyLines: SalLineDraft[]) => {
+    const hiddenMgLines = lines.filter((line) => isMgRow(line.voice));
+    onReorder([...workLines, ...orderedSafetyLines, ...hiddenMgLines]);
+  };
 
   return (
     <div className="overflow-hidden rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/70">
@@ -61,7 +102,11 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
           <div className="mt-0.5 text-12px font-medium text-[var(--text-secondary)]">
             {lines.length === 0
               ? "Nessuna voce inserita"
-              : `${lines.length} voc${lines.length === 1 ? "e" : "i"} in lavorazione`}
+              : `${tableLines.length} voc${tableLines.length === 1 ? "e" : "i"} misurabil${tableLines.length === 1 ? "e" : "i"}${
+                  mgLines.length > 0
+                    ? ` · ${mgLines.length} maggiorazion${mgLines.length === 1 ? "e" : "i"} MG`
+                    : ""
+                }${safetyLines.length > 0 ? ` · ${safetyLines.length} OS` : ""}`}
           </div>
         </div>
         <div className="hidden items-center gap-2 text-11px font-semibold text-[var(--text-secondary)] md:flex">
@@ -74,36 +119,34 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
         </div>
       </div>
 
+      {mgLines.length > 0 ? (
+        <MgChargesPanel lines={tableLines} mgLines={mgLines} onRemove={onRemove} />
+      ) : null}
+
       <div className="overflow-x-auto">
         <div ref={scrollRef} className="max-h-[620px] overflow-y-auto">
           <div className="min-w-[1460px]">
-            <div className="sticky top-0 z-20 grid grid-cols-[44px_128px_minmax(300px,1.2fr)_70px_108px_86px_86px_86px_112px_126px_118px_86px_130px_76px] border-b border-[var(--border-subtle)] bg-[var(--surface-base)] text-10px font-semibold uppercase tracking-0_12em text-[var(--text-secondary)] shadow-[0_8px_18px_color-mix(in_srgb,var(--text-primary)_6%,transparent)]">
+            <div className="sticky top-0 z-20 grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)] bg-[var(--surface-base)] text-10px font-semibold uppercase tracking-0_12em text-[var(--text-secondary)] shadow-[0_8px_18px_color-mix(in_srgb,var(--text-primary)_6%,transparent)]">
               {[
                 { label: "N.", dragSpace: !useVirtual },
                 { label: "Codice voce" },
                 { label: "Voce / categoria" },
                 { label: "UM" },
                 { label: "Prezzo unit." },
-                { label: "Fatt. 1" },
-                { label: "Fatt. 2" },
-                { label: "Fatt. 3" },
                 { label: "Qtà calc." },
                 { label: "Importo lordo" },
                 { label: "Ribasso" },
-                { label: "Magg. %" },
+                { label: "Magg. man." },
                 { label: "Netto SAL" },
                 { label: "Azioni" },
               ].map((col) => {
                 const label = col.label;
                 const isRight =
                   label === "Prezzo unit." ||
-                  label === "Fatt. 1" ||
-                  label === "Fatt. 2" ||
-                  label === "Fatt. 3" ||
                   label === "Qtà calc." ||
                   label === "Importo lordo" ||
                   label === "Ribasso" ||
-                  label === "Magg. %" ||
+                  label === "Magg. man." ||
                   label === "Netto SAL";
                 return (
                   <div
@@ -120,7 +163,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
               })}
             </div>
 
-            {lines.length === 0 ? (
+            {tableLines.length === 0 ? (
               <div className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-4 py-12 text-center">
                 <p className="text-14px font-semibold text-[var(--text-primary)]">
                   Aggiungi una voce dal campo di ricerca.
@@ -133,7 +176,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
             ) : useVirtual ? (
               <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: "relative" }}>
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const line = lines[virtualRow.index];
+                  const line = tableLines[virtualRow.index];
                   if (!line) return null;
                   return (
                     <div
@@ -149,32 +192,91 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
                       <SelectedVoiceRow
                         index={virtualRow.index}
                         line={line}
+                        expanded={expandedRows.has(line.id)}
                         isCopied={copiedVoiceId === line.id}
                         onCopy={() => onCopyLine(line.id)}
                         onFactorChange={onFactorChange}
                         onNotesChange={onNotesChange}
                         onRemove={onRemove}
                         onSurcharge={onSurcharge}
+                        onToggle={() => handleToggleRow(line.id)}
                       />
                     </div>
                   );
                 })}
               </div>
+            ) : hasSafetySection ? (
+              <>
+                <RegisterSectionHeader
+                  amount={workLines.reduce((sum, line) => sum + line.totalAmount, 0)}
+                  count={workLines.length}
+                  label="Lavori soggetti a ribasso"
+                  tone="work"
+                />
+                <DragDropReorder
+                  items={workLines}
+                  onReorder={handleReorderWorkLines}
+                  renderItem={(line: SalLineView, index: number) => (
+                    <SelectedVoiceRow
+                      index={index}
+                      key={line.id}
+                      line={line}
+                      expanded={expandedRows.has(line.id)}
+                      isCopied={copiedVoiceId === line.id}
+                      onCopy={() => onCopyLine(line.id)}
+                      onFactorChange={onFactorChange}
+                      onNotesChange={onNotesChange}
+                      onRemove={onRemove}
+                      onSurcharge={onSurcharge}
+                      onToggle={() => handleToggleRow(line.id)}
+                    />
+                  )}
+                  uniqueId={(line: SalLineView) => line.id}
+                />
+                <RegisterSectionHeader
+                  amount={safetyLines.reduce((sum, line) => sum + line.totalAmount, 0)}
+                  count={safetyLines.length}
+                  label="Voci OS non soggette a ribasso"
+                  tone="safety"
+                />
+                <DragDropReorder
+                  items={safetyLines}
+                  onReorder={handleReorderSafetyLines}
+                  renderItem={(line: SalLineView, index: number) => (
+                    <SelectedVoiceRow
+                      index={workLines.length + index}
+                      key={line.id}
+                      line={line}
+                      expanded={expandedRows.has(line.id)}
+                      isCopied={copiedVoiceId === line.id}
+                      onCopy={() => onCopyLine(line.id)}
+                      onFactorChange={onFactorChange}
+                      onNotesChange={onNotesChange}
+                      onRemove={onRemove}
+                      onSurcharge={onSurcharge}
+                      onToggle={() => handleToggleRow(line.id)}
+                    />
+                  )}
+                  uniqueId={(line: SalLineView) => line.id}
+                />
+              </>
             ) : (
               <DragDropReorder
-                items={lines}
-                onReorder={onReorder}
+                items={tableLines}
+                onReorder={handleReorderVisibleLines}
                 renderItem={(line: SalLineView, index: number) => (
                   <SelectedVoiceRow
                     index={index}
                     key={line.id}
                     line={line}
+                    expanded={expandedRows.has(line.id)}
                     isCopied={copiedVoiceId === line.id}
                     onCopy={() => onCopyLine(line.id)}
                     onFactorChange={onFactorChange}
                     onNotesChange={onNotesChange}
                     onRemove={onRemove}
                     onSurcharge={onSurcharge}
+                    onToggle={() => handleToggleRow(line.id)}
                   />
                 )}
                 uniqueId={(line: SalLineView) => line.id}
@@ -187,51 +289,217 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   );
 });
 
+function RegisterSectionHeader({
+  amount,
+  count,
+  label,
+  tone,
+}: {
+  amount: number;
+  count: number;
+  label: string;
+  tone: "safety" | "work";
+}) {
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/70 text-11px",
+        tone === "safety"
+          ? "bg-[color-mix(in_srgb,var(--danger-soft)_30%,var(--surface-base)_70%)]"
+          : "bg-[color-mix(in_srgb,var(--accent-primary)_6%,var(--surface-base)_94%)]",
+      )}
+    >
+      <div className="col-span-3 flex min-h-10 items-center gap-2 px-3 font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+        <span
+          className={cn(
+            "h-2 w-2 rounded-full",
+            tone === "safety" ? "bg-[var(--danger-base)]" : "bg-[var(--accent-primary)]",
+          )}
+        />
+        {label}
+      </div>
+      <div className="col-span-5 flex items-center justify-end px-2 text-[var(--text-secondary)]">
+        {count} voc{count === 1 ? "e" : "i"}
+      </div>
+      <div
+        className={cn(
+          "col-span-2 flex items-center justify-end px-2 font-black tabular-nums",
+          tone === "safety" ? "text-[var(--danger-base)]" : "text-[var(--accent-primary)]",
+        )}
+      >
+        <Currency value={amount} />
+      </div>
+      <div />
+    </div>
+  );
+}
+
 const MG_SEGMENT = "MG";
 
 function isMgRow(voice: SalLineView["voice"]): boolean {
   return voice.code.split(".")[1]?.toUpperCase() === MG_SEGMENT;
 }
 
+function getMgTariffPrefix(voiceCode: string): string | null {
+  const firstSegment = voiceCode.split(".")[0];
+  return firstSegment && firstSegment.toUpperCase() !== MG_SEGMENT ? firstSegment : null;
+}
+
+function MgChargesPanel({
+  lines,
+  mgLines,
+  onRemove,
+}: {
+  lines: SalLineView[];
+  mgLines: SalLineView[];
+  onRemove: (lineId: string) => void;
+}) {
+  return (
+    <div className="border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--info-soft)_18%,var(--surface-base)_82%)] px-3 py-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--info-base)_12%,var(--surface-base)_88%)] text-[var(--info-base)]">
+            <Percent className="size-3.5" />
+          </span>
+          <div className="min-w-0">
+            <div className="text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              Maggiorazioni MG
+            </div>
+            <div className="truncate text-12px text-[var(--text-secondary)]">
+              Tenute fuori dal registro misure e distribuite sulle voci di riferimento.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-2 lg:grid-cols-2">
+        {mgLines.map((mgLine) => {
+          const prefix = getMgTariffPrefix(mgLine.voice.code);
+          const affectedLines = prefix
+            ? lines.filter((line) => line.voice.code.startsWith(`${prefix}.`))
+            : lines;
+          const charge = mgLine.linkedCharges.find((entry) => entry.code.startsWith("MG."));
+          return (
+            <div
+              className="rounded-lg bg-[var(--surface-base)] p-3 ring-1 ring-[color-mix(in_srgb,var(--info-base)_16%,var(--border-subtle)_84%)]"
+              key={mgLine.id}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-12px font-bold text-[var(--info-base)]">
+                      {mgLine.voice.code}
+                    </span>
+                    <span className="rounded-md bg-[color-mix(in_srgb,var(--info-base)_10%,var(--surface-base)_90%)] px-1.5 py-0.5 text-10px font-bold text-[var(--info-base)]">
+                      {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
+                    </span>
+                    <span className="text-10px font-semibold uppercase tracking-0_12em text-[var(--text-tertiary)]">
+                      {prefix ? `voci ${prefix}` : "tutte le voci"}
+                    </span>
+                  </div>
+                  <div className="mt-1 line-clamp-2 text-12px leading-snug text-[var(--text-primary)]">
+                    {mgLine.voice.description}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-start gap-2">
+                  <div className="text-right">
+                    <div className="text-13px font-black tabular-nums text-[var(--info-base)]">
+                      +<Currency value={charge?.total ?? mgLine.totalAmount} />
+                    </div>
+                    <div className="mt-0.5 text-10px text-[var(--text-secondary)]">
+                      base <Currency value={charge?.baseAmount ?? 0} />
+                    </div>
+                  </div>
+                  <button
+                    aria-label={`Rimuovi maggiorazione ${mgLine.voice.code}`}
+                    className="flex size-7 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+                    onClick={() => onRemove(mgLine.id)}
+                    type="button"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {affectedLines.length === 0 ? (
+                  <span className="rounded-md bg-[var(--warning-soft)] px-2 py-1 text-10px font-semibold text-[var(--warning-base)]">
+                    Nessuna voce collegata
+                  </span>
+                ) : (
+                  affectedLines.slice(0, 8).map((line) => (
+                    <span
+                      className="max-w-[220px] truncate rounded-md bg-[var(--bg-muted)] px-2 py-1 text-10px font-semibold text-[var(--text-secondary)]"
+                      key={`${mgLine.id}-${line.id}`}
+                      title={line.voice.description}
+                    >
+                      {line.voice.code}
+                    </span>
+                  ))
+                )}
+                {affectedLines.length > 8 ? (
+                  <span className="rounded-md bg-[var(--bg-muted)] px-2 py-1 text-10px font-semibold text-[var(--text-tertiary)]">
+                    +{affectedLines.length - 8}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const SelectedVoiceRow = memo(function SelectedVoiceRow({
   index,
   line,
+  expanded,
   isCopied,
   onCopy,
   onFactorChange,
   onNotesChange,
   onRemove,
   onSurcharge,
+  onToggle,
 }: {
   index: number;
   line: SalLineView;
+  expanded: boolean;
   isCopied: boolean;
   onCopy: () => void;
   onFactorChange: (lineId: string, field: "factor1" | "factor2" | "factor3", value: number) => void;
   onNotesChange: (lineId: string, notes: string) => void;
   onRemove: (lineId: string) => void;
   onSurcharge: (lineId: string, percent: number) => void;
+  onToggle: () => void;
 }) {
   const linkedTotal = line.linkedCharges.reduce((sum, c) => sum + c.total, 0);
   const laborPct = line.voice.laborPercentage ?? 0;
-  const isMg = isMgRow(line.voice);
-  const mgTariffPrefix = isMg
-    ? line.voice.code?.split(".")[0]?.toUpperCase() === MG_SEGMENT
-      ? null
-      : (line.voice.code?.split(".")[0] ?? null)
-    : null;
+  const hasDetails = Boolean(line.notes.trim()) || linkedTotal > 0 || laborPct > 0;
 
   return (
     <>
       <div
         data-line-id={line.id}
         className={cn(
-          "grid grid-cols-[44px_128px_minmax(300px,1.2fr)_70px_108px_86px_86px_86px_112px_126px_118px_86px_130px_76px] border-b border-[var(--border-subtle)]/60 text-12px transition-colors hover:bg-[color-mix(in_srgb,var(--info-soft)_20%,var(--surface-base)_80%)]",
+          "grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/60 text-12px transition-colors hover:bg-[color-mix(in_srgb,var(--info-soft)_20%,var(--surface-base)_80%)]",
           index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/24",
-          isMg && "bg-[color-mix(in_srgb,var(--accent-primary)_6%,var(--surface-base)_94%)]",
+          expanded && "bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base)_96%)]",
         )}
       >
-        <GridCell muted>{index + 1}</GridCell>
+        <GridCell muted>
+          <button
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "Comprimi" : "Espandi"} dettagli ${line.voice.code}`}
+            className="flex h-8 w-full items-center justify-center gap-1 rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+            onClick={onToggle}
+            type="button"
+          >
+            <ChevronDown
+              className={cn("size-3.5 transition-transform", !expanded && "-rotate-90")}
+            />
+            <span className="font-semibold tabular-nums">{index + 1}</span>
+          </button>
+        </GridCell>
         <GridCell strong title={line.voice.code}>
           <span className="truncate">{line.voice.code}</span>
         </GridCell>
@@ -245,11 +513,6 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
                 <span className="truncate text-10px text-[var(--text-secondary)]">
                   {line.voice.category}
                 </span>
-                {isMg ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--info-base)_12%,var(--surface-base)_88%)] px-1.5 py-0.5 text-10px font-bold text-[var(--info-base)]">
-                    MG{mgTariffPrefix ? ` · solo ${mgTariffPrefix}` : ""}
-                  </span>
-                ) : null}
                 {laborPct > 0 ? (
                   <span className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] px-1.5 py-0.5 text-10px font-bold text-[var(--accent-primary)]">
                     <span className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
@@ -267,47 +530,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
         </GridCell>
         <GridCell muted>{line.voice.unit}</GridCell>
         <GridCell align="right">
-          {isMg ? (
-            <span className="font-bold text-[var(--info-base)]">{line.voice.unitPrice}%</span>
-          ) : (
-            <Currency value={line.voice.unitPrice} />
-          )}
-        </GridCell>
-        <GridCell align="right" editable={!isMg}>
-          {isMg ? (
-            <span className="text-[var(--text-tertiary)]">—</span>
-          ) : (
-            <InlineEdit
-              ariaLabel={`Fattore 1 per ${line.voice.code}`}
-              className="w-full"
-              onCommit={(value) => onFactorChange(line.id, "factor1", value)}
-              value={line.factor1}
-            />
-          )}
-        </GridCell>
-        <GridCell align="right" editable={!isMg}>
-          {isMg ? (
-            <span className="text-[var(--text-tertiary)]">—</span>
-          ) : (
-            <InlineEdit
-              ariaLabel={`Fattore 2 per ${line.voice.code}`}
-              className="w-full"
-              onCommit={(value) => onFactorChange(line.id, "factor2", value)}
-              value={line.factor2}
-            />
-          )}
-        </GridCell>
-        <GridCell align="right" editable={!isMg}>
-          {isMg ? (
-            <span className="text-[var(--text-tertiary)]">—</span>
-          ) : (
-            <InlineEdit
-              ariaLabel={`Fattore 3 per ${line.voice.code}`}
-              className="w-full"
-              onCommit={(value) => onFactorChange(line.id, "factor3", value)}
-              value={line.factor3}
-            />
-          )}
+          <Currency value={line.voice.unitPrice} />
         </GridCell>
         <GridCell align="right" strong>
           <NumberValue value={line.quantity} />
@@ -387,31 +610,117 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
           </div>
         </GridCell>
       </div>
-      <div
-        className={cn(
-          "border-b border-[var(--border-subtle)]/60",
-          index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/24",
-        )}
-      >
-        <div className="mx-5 pb-3 pt-1">
-          <textarea
-            className="w-full resize-none overflow-hidden rounded-lg border border-[color-mix(in_srgb,var(--border-subtle)_50%,transparent)] bg-[var(--surface-base)] px-3 py-2 text-12px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-            placeholder={
-              linkedTotal > 0
-                ? `Magg. ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`
-                : "Nota..."
-            }
-            rows={1}
-            value={line.notes}
-            onChange={(e) => {
-              onNotesChange(line.id, e.target.value);
-              const style = e.currentTarget.style;
-              style.height = "auto";
-              style.height = `${Math.max(e.currentTarget.scrollHeight, 36)}px`;
-            }}
-          />
+      {expanded ? (
+        <div
+          className={cn(
+            "border-b border-[var(--border-subtle)]/70 px-4 py-3",
+            index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/24",
+          )}
+        >
+          <div className="ml-[58px] grid min-w-0 gap-3 xl:grid-cols-[minmax(520px,0.95fr)_minmax(360px,1fr)]">
+            <div className="min-w-0 rounded-lg bg-[color-mix(in_srgb,var(--bg-muted)_58%,var(--surface-base)_42%)] p-3 ring-1 ring-[var(--border-subtle)]/70">
+              <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <span className="whitespace-nowrap text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                  Libretto misura
+                </span>
+                <span className="whitespace-nowrap text-10px text-[var(--text-tertiary)]">
+                  {line.factor1.toLocaleString("it-IT")} × {line.factor2.toLocaleString("it-IT")} ×{" "}
+                  {line.factor3.toLocaleString("it-IT")} ={" "}
+                  {line.quantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
+                </span>
+              </div>
+              <div className="mb-3 overflow-x-auto rounded-md ring-1 ring-[var(--border-subtle)]/70">
+                <div className="grid min-w-[560px] grid-cols-[minmax(180px,1fr)_56px_74px_74px_74px_96px] bg-[var(--surface-base)] text-10px font-bold uppercase tracking-0_12em text-[var(--text-tertiary)]">
+                  {["Descrizione", "UM", "F1", "F2", "F3", "Qtà"].map((label) => (
+                    <div
+                      className="border-r border-[var(--border-subtle)]/60 px-2 py-1.5 last:border-r-0"
+                      key={label}
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid min-w-[560px] grid-cols-[minmax(180px,1fr)_56px_74px_74px_74px_96px] border-t border-[var(--border-subtle)]/60 bg-[var(--surface-base)] text-11px">
+                  <div className="border-r border-[var(--border-subtle)]/60 px-2 py-2 text-[var(--text-primary)]">
+                    {line.notes.trim() || "Misura corrente"}
+                  </div>
+                  <div className="border-r border-[var(--border-subtle)]/60 px-2 py-2 text-[var(--text-secondary)]">
+                    {line.voice.unit}
+                  </div>
+                  {[
+                    { key: "factor1", value: line.factor1 },
+                    { key: "factor2", value: line.factor2 },
+                    { key: "factor3", value: line.factor3 },
+                  ].map((factor) => (
+                    <div
+                      className="border-r border-[var(--border-subtle)]/60 px-2 py-2 text-right font-mono tabular-nums text-[var(--text-primary)]"
+                      key={`${line.id}-${factor.key}`}
+                    >
+                      {factor.value.toLocaleString("it-IT")}
+                    </div>
+                  ))}
+                  <div className="px-2 py-2 text-right font-mono font-bold tabular-nums text-[var(--text-primary)]">
+                    {line.quantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
+                  </div>
+                </div>
+                <div className="grid min-w-[560px] grid-cols-[minmax(180px,1fr)_56px_74px_74px_74px_96px] border-t border-[var(--border-subtle)]/60 bg-[color-mix(in_srgb,var(--accent-primary)_5%,var(--surface-base)_95%)] text-11px font-bold">
+                  <div className="col-span-5 px-2 py-2 text-right text-[var(--text-secondary)]">
+                    sommano {line.voice.unit}
+                  </div>
+                  <div className="px-2 py-2 text-right font-mono tabular-nums text-[var(--accent-primary)]">
+                    {line.quantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {(["factor1", "factor2", "factor3"] as const).map((field, fieldIndex) => (
+                  <div className="block" key={field}>
+                    <span className="mb-1 block text-10px font-semibold uppercase tracking-0_12em text-[var(--text-tertiary)]">
+                      F{fieldIndex + 1}
+                    </span>
+                    <InlineEdit
+                      ariaLabel={`Fattore ${fieldIndex + 1} per ${line.voice.code}`}
+                      className="h-9 w-full rounded-md bg-[var(--surface-base)] px-2 text-right text-12px font-semibold ring-1 ring-[var(--border-subtle)]"
+                      onCommit={(value) => onFactorChange(line.id, field, value)}
+                      value={line[field]}
+                    />
+                  </div>
+                ))}
+              </div>
+              {linkedTotal > 0 || hasDetails ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-11px text-[var(--text-secondary)]">
+                  {linkedTotal > 0 ? (
+                    <span className="rounded-md bg-[color-mix(in_srgb,var(--info-base)_10%,var(--surface-base)_90%)] px-2 py-1 font-semibold text-[var(--info-base)]">
+                      Maggiorazioni collegate +<Currency value={linkedTotal} />
+                    </span>
+                  ) : null}
+                  {laborPct > 0 ? (
+                    <span>Manodopera {laborPct.toLocaleString("it-IT")}%</span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <div className="rounded-lg bg-[color-mix(in_srgb,var(--bg-muted)_58%,var(--surface-base)_42%)] p-3 ring-1 ring-[var(--border-subtle)]/70">
+              <label className="block">
+                <span className="mb-2 block text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                  Note riga
+                </span>
+                <textarea
+                  className="min-h-20 w-full resize-y rounded-lg border border-[color-mix(in_srgb,var(--border-subtle)_65%,transparent)] bg-[var(--surface-base)] px-3 py-2 text-12px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                  placeholder={
+                    linkedTotal > 0
+                      ? `Annota criterio maggiorazioni: ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`
+                      : "Aggiungi note di misura, riferimenti o riserve..."
+                  }
+                  rows={3}
+                  value={line.notes}
+                  onChange={(e) => onNotesChange(line.id, e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : null}
     </>
   );
 });

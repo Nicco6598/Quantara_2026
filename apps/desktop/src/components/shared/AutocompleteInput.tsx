@@ -20,7 +20,7 @@ type AutocompleteInputProps = {
 };
 
 const RESULTS_MAX_HEIGHT = 520;
-const ITEM_HEIGHT = 60;
+const ITEM_HEIGHT = 92;
 
 type DropdownPos = { left: number; top: number; width: number };
 
@@ -56,6 +56,7 @@ export function AutocompleteInput({
     count: filtered.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ITEM_HEIGHT,
+    measureElement: (element) => element.getBoundingClientRect().height,
     overscan: 8,
   });
 
@@ -77,7 +78,7 @@ export function AutocompleteInput({
     const el = inputField ?? containerRef.current;
     const rect = el.getBoundingClientRect();
     const viewportW = window.innerWidth;
-    const w = Math.min(rect.width, viewportW - 24);
+    const w = Math.min(Math.max(rect.width, 680), viewportW - 24);
     const l = Math.min(Math.max(rect.left, 12), viewportW - w - 12);
     setFloating({ left: l, top: rect.bottom + 8, width: w });
   }, []);
@@ -213,8 +214,9 @@ export function AutocompleteInput({
                   if (!option) return null;
                   return (
                     <button
+                      ref={rowVirtualizer.measureElement}
                       className={cn(
-                        "flex w-full items-start gap-3 rounded-14px px-3 py-3 text-left text-13px transition-colors duration-[180ms]",
+                        "flex min-h-[84px] w-full items-start gap-3 border-b border-[var(--border-subtle)]/55 px-3 py-3 text-left text-13px transition-colors duration-[180ms] first:rounded-t-18px last:rounded-b-18px last:border-b-0",
                         virtualRow.index === activeIndex
                           ? "bg-[var(--bg-muted)]"
                           : "hover:bg-[var(--bg-muted)]",
@@ -232,22 +234,23 @@ export function AutocompleteInput({
                         top: 0,
                         left: 0,
                         width: "100%",
-                        height: `${virtualRow.size}px`,
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
                     >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-14px bg-[var(--bg-muted-strong)] font-mono text-11px font-bold text-[var(--accent-primary)]">
-                        {option.value.slice(0, 4)}
+                      <span className="flex w-20 self-stretch shrink-0 items-center justify-center rounded-10px bg-[var(--bg-muted-strong)] px-2 text-center font-mono text-10px font-bold leading-tight text-[var(--accent-primary)]">
+                        <span className="line-clamp-2 break-all">{option.value}</span>
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block font-semibold leading-snug text-[var(--text-primary)]">
-                          <span className="font-mono text-[var(--accent-primary)]">
+                        <span className="grid min-w-0 gap-1">
+                          <span className="font-mono text-11px font-bold text-[var(--accent-primary)]">
                             {option.value}
-                          </span>{" "}
-                          {option.label}
+                          </span>
+                          <span className="line-clamp-2 break-words font-semibold leading-snug text-[var(--text-primary)]">
+                            {option.label}
+                          </span>
                         </span>
                         {option.metadata && (
-                          <span className="mt-1 block text-11px leading-snug text-[var(--text-secondary)]">
+                          <span className="mt-1 line-clamp-2 break-words text-11px leading-snug text-[var(--text-secondary)]">
                             {option.metadata}
                           </span>
                         )}

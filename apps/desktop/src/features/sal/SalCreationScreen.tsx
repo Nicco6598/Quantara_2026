@@ -504,11 +504,11 @@ export function SalCreationScreen() {
           ...current,
           {
             id: `draft-${voice.id}`,
-            factor1: 1,
+            factor1: 0,
             factor2: 1,
             factor3: 1,
             notes: "",
-            quantity: 1,
+            quantity: 0,
             sourceType: "voice",
             surchargePercent: 0,
             voice,
@@ -1566,6 +1566,25 @@ function SetupStep({
   onSelectContract?: ((id: string) => void) | undefined;
 }) {
   const [projectOpen, setProjectOpen] = useState(false);
+  const [tariffSearch, setTariffSearch] = useState("");
+  const [tariffExpanded, setTariffExpanded] = useState(false);
+  const TARIFF_VISIBLE_LIMIT = 12;
+
+  const filteredTariffBooks = useMemo(() => {
+    if (!tariffSearch.trim()) return tariffBooks;
+    const q = tariffSearch.toLowerCase();
+    return tariffBooks.filter(
+      (b) =>
+        b.name.toLowerCase().includes(q) ||
+        String(b.year).includes(q) ||
+        b.id.toLowerCase().includes(q),
+    );
+  }, [tariffBooks, tariffSearch]);
+
+  const visibleTariffBooks = tariffExpanded
+    ? filteredTariffBooks
+    : filteredTariffBooks.slice(0, TARIFF_VISIBLE_LIMIT);
+  const hasMoreTariffs = filteredTariffBooks.length > TARIFF_VISIBLE_LIMIT;
   if (!project) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-12 text-center">
@@ -1762,33 +1781,78 @@ function SetupStep({
         {tariffBooks.length === 0 ? (
           <p className="mt-2 text-12px text-[var(--text-secondary)]">Nessun tariffario caricato.</p>
         ) : (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {tariffBooks.map((book) => {
-              const isSelected = selectedTariffBooks.some((b) => b.id === book.id);
-              return (
-                <m.button
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-12px font-semibold transition-all",
-                    isSelected
-                      ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] text-[var(--accent-primary)]"
-                      : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]",
-                  )}
-                  key={book.id}
-                  layout
-                  onClick={() => void selectTariffBook(book.id)}
-                  type="button"
-                >
-                  {isSelected ? (
-                    <Check className="size-3.5" strokeWidth={3} />
-                  ) : (
-                    <span className="size-3.5 rounded-full border-2 border-[var(--border-subtle)]" />
-                  )}
-                  <span>{book.name}</span>
-                  <span className="text-11px text-[var(--text-secondary)]">{book.year}</span>
-                </m.button>
-              );
-            })}
-          </div>
+          <>
+            {tariffBooks.length > 6 && (
+              <div className="mt-4">
+                <div className="relative">
+                  <svg
+                    aria-label="Cerca tariffario"
+                    className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-tertiary)]"
+                    fill="none"
+                    role="img"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <input
+                    className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-8 pr-3 text-12px outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                    onChange={(e) => {
+                      setTariffSearch(e.target.value);
+                      setTariffExpanded(true);
+                    }}
+                    placeholder="Cerca tariffario per nome, anno o codice..."
+                    value={tariffSearch}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="mt-3 max-h-[200px] overflow-y-auto rounded-lg border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/30 p-2">
+              <div className="flex flex-wrap gap-2">
+                {visibleTariffBooks.map((book) => {
+                  const isSelected = selectedTariffBooks.some((b) => b.id === book.id);
+                  return (
+                    <m.button
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-12px font-semibold transition-all",
+                        isSelected
+                          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] text-[var(--accent-primary)]"
+                          : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]",
+                      )}
+                      key={book.id}
+                      layout
+                      onClick={() => void selectTariffBook(book.id)}
+                      type="button"
+                    >
+                      {isSelected ? (
+                        <Check className="size-3.5" strokeWidth={3} />
+                      ) : (
+                        <span className="size-3.5 rounded-full border-2 border-[var(--border-subtle)]" />
+                      )}
+                      <span>{book.name}</span>
+                      <span className="text-11px text-[var(--text-secondary)]">{book.year}</span>
+                    </m.button>
+                  );
+                })}
+              </div>
+            </div>
+            {hasMoreTariffs && (
+              <button
+                className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg px-4 py-2 text-11px font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--bg-muted)]/30"
+                onClick={() => setTariffExpanded((o) => !o)}
+                type="button"
+              >
+                <ChevronDown
+                  className={cn("size-3.5 transition-transform", tariffExpanded && "rotate-180")}
+                />
+                {tariffExpanded
+                  ? "Mostra meno"
+                  : `Mostra tutti (${filteredTariffBooks.length} tariffari)`}
+              </button>
+            )}
+          </>
         )}
         <div className="mt-3 text-11px text-[var(--text-secondary)]">
           I tariffari associati al progetto vengono presi come predefiniti. Puoi modificare la
@@ -2108,11 +2172,11 @@ function VoicesStep({
                     if (exists) {
                       onPasteLine({
                         id: `draft-${v.id}-${idCounter.current++}`,
-                        factor1: 1,
+                        factor1: 0,
                         factor2: 1,
                         factor3: 1,
                         notes: "",
-                        quantity: 1,
+                        quantity: 0,
                         sourceType: "voice",
                         surchargePercent: 0,
                         voice: v,

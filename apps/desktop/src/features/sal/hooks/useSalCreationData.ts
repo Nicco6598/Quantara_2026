@@ -142,7 +142,7 @@ export function useSalCreationData() {
   );
 
   async function restoreTariffBookIds(tariffBookIds: string[]) {
-    const validIds = tariffBookIds.filter((id) => state.tariffBooks.some((book) => book.id === id));
+    const validIds = tariffBookIds.filter((id) => tariffBookOptions.some((book) => book.id === id));
     if (validIds.length === 0) return;
 
     setState((current) => ({
@@ -170,7 +170,7 @@ export function useSalCreationData() {
   }
 
   async function selectTariffBook(tariffBookId: string) {
-    const exists = state.tariffBooks.some((book) => book.id === tariffBookId);
+    const exists = tariffBookOptions.some((book) => book.id === tariffBookId);
     if (!exists) return;
     const isSelected = state.selectedTariffBookIds.includes(tariffBookId);
     const nextSelectedIds = isSelected

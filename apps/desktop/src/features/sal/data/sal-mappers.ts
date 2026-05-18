@@ -31,17 +31,18 @@ export function mapTariffBooksForContract(
   books: readonly DesktopTariffBook[],
   contract: DesktopContract | null,
 ): SalTariffBookOption[] {
+  const priorities = contract?.tariffPriorities ?? [];
+  if (priorities.length === 0) return [];
+
   const priorityByBook = new Map(
-    (contract?.tariffPriorities ?? []).map((priority) => [
-      priority.tariffBookId,
-      priority.priority,
-    ]),
+    priorities.map((priority) => [priority.tariffBookId, priority.priority]),
   );
 
   return books
+    .filter((book) => priorityByBook.has(book.id))
     .map((book) => ({
       ...book,
-      isPriority: priorityByBook.has(book.id),
+      isPriority: true,
       priority: priorityByBook.get(book.id) ?? Number.MAX_SAFE_INTEGER,
     }))
     .sort((left, right) => {

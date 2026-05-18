@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   Clock3,
+  FileText,
   ListChecks,
   type LucideIcon,
   MoreVertical,
@@ -418,23 +419,38 @@ export function TariffPanelDialog({
   onToggleTariffBook: (bookId: string) => void;
   onConfirm: () => void;
 }) {
+  const selectedBooks = tariffBooks.filter((b) => pendingTariffIds.includes(b.id));
+  const availableBooks = filteredTariffBooks.filter((b) => !pendingTariffIds.includes(b.id));
+  const isSearching = searchQuery.trim().length > 0;
+
   return (
-    <Dialog isOpen={isOpen} onClose={onClose} zIndex={75}>
-      <div>
-        <h3 className="text-16px font-semibold text-[var(--text-primary)]">
-          Tariffari del progetto
-        </h3>
-        <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
-          {pendingTariffIds.length} selezionat
-          {pendingTariffIds.length !== 1 ? "i" : "o"} · {tariffBooks.length} disponibili
-        </p>
+    <Dialog
+      className="max-w-lg sm:max-w-xl lg:max-w-2xl"
+      isOpen={isOpen}
+      onClose={onClose}
+      zIndex={75}
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--info-base)]">
+          <FileText className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-16px font-semibold text-[var(--text-primary)]">
+            Tariffari del progetto
+          </h3>
+          <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
+            {pendingTariffIds.length === 0
+              ? "Nessun tariffario associato"
+              : `${pendingTariffIds.length} associat${pendingTariffIds.length !== 1 ? "i" : "o"} · ${tariffBooks.length} disponibili`}
+          </p>
+        </div>
       </div>
 
       <div className="mt-4">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
           <input
-            className="h-10 w-full rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            className="h-10 w-full rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 pl-10 pr-10 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
             onChange={(e) => onSearchQueryChange(e.target.value)}
             placeholder="Cerca per nome, ente o anno…"
             value={searchQuery}
@@ -451,39 +467,41 @@ export function TariffPanelDialog({
         </div>
       </div>
 
-      <div className="mt-4 max-h-[340px] overflow-y-auto">
-        {filteredTariffBooks.length === 0 ? (
-          <p className="py-6 text-center text-12px font-medium text-[var(--text-tertiary)]">
-            {searchQuery
-              ? "Nessun tariffario corrisponde alla ricerca."
-              : "Nessun tariffario disponibile."}
-          </p>
-        ) : (
-          <div className="space-y-1">
-            {filteredTariffBooks.map((book) => {
-              const isSelected = pendingTariffIds.includes(book.id);
-              return (
+      <div className="mt-4 max-h-[400px] overflow-y-auto">
+        {!isSearching && selectedBooks.length > 0 ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-3.5 text-[var(--success-base)]" />
+              <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                Associati al progetto
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {selectedBooks.map((book) => (
                 <m.button
                   key={book.id}
                   layout
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-14px border px-3.5 py-3 text-left transition-colors",
-                    isSelected
-                      ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)]"
-                      : "border-transparent hover:bg-[var(--bg-muted)]",
-                  )}
+                  className="flex w-full items-center gap-3 rounded-14px border border-[var(--accent-primary)]/30 bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] px-3.5 py-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_12%,var(--surface-base)_88%)]"
                   onClick={() => onToggleTariffBook(book.id)}
                   type="button"
                 >
-                  <span
-                    className={cn(
-                      "flex size-5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
-                      isSelected
-                        ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                        : "border-[var(--border-subtle)]",
-                    )}
-                  >
-                    {isSelected ? <Check className="size-3.5" strokeWidth={3} /> : null}
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-[4px] border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)] text-[var(--text-inverse)]">
+                    <m.svg
+                      animate={{ scale: [0.6, 1.15, 1] }}
+                      className="size-3.5"
+                      initial={false}
+                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M20 6L9 17l-5-5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3}
+                      />
+                    </m.svg>
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-13px font-semibold text-[var(--text-primary)]">
@@ -494,21 +512,136 @@ export function TariffPanelDialog({
                     </span>
                   </span>
                 </m.button>
-              );
-            })}
+              ))}
+            </div>
+
+            {availableBooks.length > 0 && (
+              <div className="border-t border-[var(--border-subtle)]/50 pt-3">
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-[var(--border-subtle)]" />
+                  <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                    Disponibili
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {availableBooks.map((book) => (
+                    <TariffBookRow
+                      key={book.id}
+                      book={book}
+                      isSelected={false}
+                      onToggle={() => onToggleTariffBook(book.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {filteredTariffBooks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <FileText className="mb-2 size-6 text-[var(--text-tertiary)]" />
+                <p className="text-12px font-medium text-[var(--text-tertiary)]">
+                  {isSearching
+                    ? "Nessun tariffario corrisponde alla ricerca."
+                    : "Nessun tariffario disponibile."}
+                </p>
+              </div>
+            ) : (
+              filteredTariffBooks.map((book) => (
+                <TariffBookRow
+                  key={book.id}
+                  book={book}
+                  isSelected={pendingTariffIds.includes(book.id)}
+                  onToggle={() => onToggleTariffBook(book.id)}
+                />
+              ))
+            )}
           </div>
         )}
       </div>
 
       <DialogActions className="mt-4">
+        <div className="flex items-center gap-2 text-11px text-[var(--text-secondary)]">
+          <span className="rounded-md bg-[var(--bg-muted)] px-2 py-1">
+            {pendingTariffIds.length} selezionat
+            {pendingTariffIds.length !== 1 ? "i" : "o"}
+          </span>
+        </div>
         <Button onClick={onClose} variant="ghost">
           Annulla
         </Button>
-        <Button icon={Check} onClick={onConfirm} variant="primary">
+        <Button
+          disabled={pendingTariffIds.length === 0}
+          icon={Check}
+          onClick={onConfirm}
+          variant="primary"
+        >
           Salva
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function TariffBookRow({
+  book,
+  isSelected,
+  onToggle,
+}: {
+  book: DesktopTariffBook;
+  isSelected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <m.button
+      key={book.id}
+      layout
+      className={cn(
+        "flex w-full items-center gap-3 rounded-14px border px-3.5 py-3 text-left transition-colors",
+        isSelected
+          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)]"
+          : "border-transparent hover:bg-[var(--bg-muted)]",
+      )}
+      onClick={onToggle}
+      type="button"
+    >
+      <span
+        className={cn(
+          "flex size-5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+          isSelected
+            ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)]"
+            : "border-[var(--border-subtle)]",
+        )}
+      >
+        {isSelected && (
+          <m.svg
+            animate={{ scale: [0.6, 1.15, 1] }}
+            className="size-3.5"
+            initial={false}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M20 6L9 17l-5-5"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={3}
+            />
+          </m.svg>
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-13px font-semibold text-[var(--text-primary)]">
+          {book.name}
+        </span>
+        <span className="mt-0.5 block truncate text-11px font-medium text-[var(--text-secondary)]">
+          {book.sourceName} · {book.year}
+        </span>
+      </span>
+    </m.button>
   );
 }
 

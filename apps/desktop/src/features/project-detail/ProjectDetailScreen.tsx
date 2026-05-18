@@ -987,28 +987,19 @@ export function ProjectDetailScreen() {
                           ...MOTION_VARIANTS.row.transition,
                           delay: index * 0.035,
                         }}
-                        className="flex items-center justify-between gap-2 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]/50"
+                        className="group flex items-center gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]/50 transition-colors hover:bg-[var(--bg-muted)]/50"
                       >
-                        <div className="min-w-0">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
+                          <FileText className="size-3.5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
                           <div className="truncate text-12px font-semibold text-[var(--text-primary)]">
                             {book.name}
                           </div>
                           <div className="mt-0.5 flex items-center gap-1.5 text-11px text-[var(--text-tertiary)]">
-                            <span>{book.year}</span>
+                            <span>{book.sourceName}</span>
                             <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                            <span
-                              className={
-                                book.status === "active"
-                                  ? "text-[var(--success-base)]"
-                                  : "text-[var(--warning-base)]"
-                              }
-                            >
-                              {book.status === "active"
-                                ? "Attivo"
-                                : book.status === "draft"
-                                  ? "Bozza"
-                                  : book.status}
-                            </span>
+                            <span>{book.year}</span>
                           </div>
                         </div>
                       </m.div>
