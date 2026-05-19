@@ -1,81 +1,39 @@
-import { m } from "framer-motion";
-import {
-  ArrowRight,
-  Building2,
-  Calculator,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  FileSpreadsheet,
-  FileText,
-  Package,
-  Printer,
-  Wallet,
-} from "lucide-react";
-import {
-  type Dispatch,
-  type SetStateAction,
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
-import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
-
+import { CheckCircle2 } from "lucide-react";
+import { AnimatePresence, m } from "framer-motion";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
-import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useNavigate } from "@/hooks/useNavigate";
-import { dispatchDataChanged } from "@/lib/sync-events";
-import { cn } from "@/lib/utils";
-import { motionDuration, motionEase, motionSpring } from "@/motion";
-import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
-import { useSalWorkflowService } from "@/services/sal-service";
-import { useSalWorkflowStore } from "@/store/sal-workflow-store";
-import { useAppStore } from "@/store/app-store";
-import type { SalTemplate } from "@/store/template-store";
-import type { DesktopMaterial } from "@/lib/desktopData";
 import { updateDesktopMaterial } from "@/lib/desktopData";
 import {
   saveSalDocument,
   saveSalProject,
   updateSalDocument as updateBackendSalDocument,
 } from "@/lib/sal-data";
-import { SalComparisonView } from "./components/SalComparisonView";
-import {
-  Currency,
-  DocumentPreview,
-  OutputRow,
-  SelectedVoicesPanel,
-} from "./components/SalCreationTables";
-import {
-  EconomicEquation,
-  FeedbackBanner,
-  SalBudgetLive,
-  SalCostRecap,
-  StepMetric,
-} from "./components/SalCreationSummary";
+import { dispatchDataChanged } from "@/lib/sync-events";
+import { cn } from "@/lib/utils";
+import { motionVariants } from "@/motion";
+import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
+import { useSalWorkflowService } from "@/services/sal-service";
+import { useAppStore } from "@/store/app-store";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
+import type { SalTemplate } from "@/store/template-store";
+import { SalHeader } from "./components/SalHeader";
+import { SalSearchBar } from "./components/SalSearchBar";
 import { SaveAsTemplateDialog } from "./components/SaveAsTemplateDialog";
-import { TemplatePicker } from "./components/TemplatePicker";
-import {
-  buildLineViews,
-  buildVerificationChecks,
-  defaultSalEconomicRules,
-  summarizeSalLines,
-} from "./domain/sal-calculations";
+import { defaultSalEconomicRules } from "./domain/sal-calculations";
 import {
   clearSalCreationDraft,
   clearSalCreationDraftBySalId,
   lineDraftsFromStoredSal,
-  loadSalCreationDraft,
   loadSalCreationDraftBySalId,
   saveSalCreationDraft,
   saveSalCreationDraftBySalId,
 } from "./domain/sal-creation-draft";
-import { buildSalDocumentView } from "./domain/sal-workflow";
 import { useSalCreationData } from "./hooks/useSalCreationData";
+import { useSalDerivedViews } from "./hooks/useSalDerivedViews";
+import { useSalDraftAutosave } from "./hooks/useSalDraftAutosave";
+import { useSalLineActions } from "./hooks/useSalLineActions";
 import { PHASE_ORDER, salFormReducer, surchargeKindFromPercent } from "./state/sal-form-state";
 import { getNextPhase, type SalWorkflowPhase } from "./state/workflow";
 import type {
@@ -83,131 +41,22 @@ import type {
   SalEconomicSummary,
   SalLineDraft,
   SalLineView,
+  SalMeasurementRowDraft,
   SalProjectContext,
   SalTariffBookOption,
-  SalVoiceDraft,
+  SalVerificationCheck,
 } from "./types";
+import { createMeasurementId } from "./types";
+
+import { ProjectStep } from "./steps/ProjectStep";
+import { MeasureStep } from "./steps/MeasureStep";
+import { VerifyStep } from "./steps/VerifyStep";
+import { ConfirmStep } from "./steps/ConfirmStep";
 
 const CREATED_FLAG_KEY = SESSION_STORAGE_KEYS.salCreated;
-const SAL_STEPPER_SPRING = { type: "spring", ...motionSpring.panel } as const;
-const SAL_STEPPER_REVEAL = {
-  duration: motionDuration.deliberate,
-  ease: motionEase.emphasized,
-} as const;
-
-const SAL_PHASES: Exclude<SalWorkflowPhase, "completed">[] = [
-  "context",
-  "voices",
-  "review",
-  "confirm",
-];
-
-const SAL_PHASE_LABELS: Record<Exclude<SalWorkflowPhase, "completed">, string> = {
-  confirm: "Conferma",
-  context: "Impostazioni",
-  review: "Verifica",
-  voices: "Voci",
-};
-
-const SAL_PHASE_DESCRIPTIONS: Record<Exclude<SalWorkflowPhase, "completed">, string> = {
-  confirm: "Chiusura SAL",
-  context: "Progetto e tariffario",
-  review: "Controlli e materiali",
-  voices: "Misure e importi",
-};
-
-const SAL_PRIMARY_LABELS: Record<Exclude<SalWorkflowPhase, "completed">, string> = {
-  confirm: "Conferma SAL",
-  context: "Vai alle voci",
-  review: "Vai alla conferma",
-  voices: "Verifica SAL",
-};
 
 function buildDefaultSalTitle(existingCount: number) {
   return `SAL ${String(existingCount + 1).padStart(2, "0")} - Periodo corrente`;
-}
-
-type SalAutocompleteOption = {
-  id?: string;
-  label: string;
-  value: string;
-  keywords?: string;
-  metadata?: string;
-};
-
-function normalizeSalSearch(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function buildTariffSearchTokens(voice: SalVoiceDraft) {
-  const normalizedName = normalizeSalSearch(voice.tariffBookName);
-  const normalizedId = normalizeSalSearch(voice.tariffBookId);
-  const words = normalizedName.split(" ").filter(Boolean);
-  const acronym = words
-    .filter((word) => !/^\d+$/.test(word))
-    .map((word) => word[0])
-    .join("");
-
-  return new Set([normalizedName, normalizedId, acronym, ...words].filter(Boolean));
-}
-
-function tariffTokenMatchesQuery(token: string, queryPart: string) {
-  if (!token || !queryPart) return false;
-  if (queryPart.length <= 2) return token === queryPart;
-  return token === queryPart || token.startsWith(queryPart);
-}
-
-function defaultSalVoiceOptionMatches(option: SalAutocompleteOption, normalizedQuery: string) {
-  return (
-    option.value.toLowerCase().includes(normalizedQuery) ||
-    option.label.toLowerCase().includes(normalizedQuery) ||
-    Boolean(option.keywords?.toLowerCase().includes(normalizedQuery))
-  );
-}
-
-function filterSalVoiceOptionsByTariffIntent({
-  options,
-  query,
-  tariffTokensByBookId,
-  voiceByOptionId,
-}: {
-  options: SalAutocompleteOption[];
-  query: string;
-  tariffTokensByBookId: Map<string, Set<string>>;
-  voiceByOptionId: Map<string, SalVoiceDraft>;
-}) {
-  const normalizedQuery = normalizeSalSearch(query);
-  if (!normalizedQuery) return [];
-
-  const queryParts = normalizedQuery.split(" ").filter(Boolean);
-  const matchedTariffIds = new Set<string>();
-  const matchedQueryParts = new Set<string>();
-
-  for (const part of queryParts) {
-    for (const [tariffBookId, tokens] of tariffTokensByBookId) {
-      if ([...tokens].some((token) => tariffTokenMatchesQuery(token, part))) {
-        matchedTariffIds.add(tariffBookId);
-        matchedQueryParts.add(part);
-      }
-    }
-  }
-
-  if (matchedTariffIds.size === 0) {
-    return options.filter((option) => defaultSalVoiceOptionMatches(option, normalizedQuery));
-  }
-
-  const remainingQuery = queryParts.filter((part) => !matchedQueryParts.has(part)).join(" ");
-
-  return options.filter((option) => {
-    const voice = option.id ? voiceByOptionId.get(option.id) : undefined;
-    if (!voice || !matchedTariffIds.has(voice.tariffBookId)) return false;
-    return remainingQuery ? defaultSalVoiceOptionMatches(option, remainingQuery) : true;
-  });
 }
 
 export function SalCreationScreen() {
@@ -222,15 +71,17 @@ export function SalCreationScreen() {
     salDocuments,
     tariffVoices,
   } = useSalWorkflowService();
+
   const [formState, dispatch] = useReducer(salFormReducer, {
     lines: [],
     economicRules: defaultSalEconomicRules,
     salTitle: "",
     salDate: new Date().toISOString().slice(0, 10),
-    phase: "context",
+    phase: "project",
     materialUsage: {},
     materials: [],
   });
+
   const formStateRef = useRef(formState);
   formStateRef.current = formState;
   const { lines, economicRules, materialUsage, materials, salTitle, salDate, phase } = formState;
@@ -271,11 +122,6 @@ export function SalCreationScreen() {
   );
 
   const editingDraftSalId = useRef<string | null>(null);
-  const idCounter = useRef(0);
-  const [salAutoSaveStatus, setSalAutoSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "error" | "unsaved"
-  >("idle");
-  const [salAutoSaveLastSaved, setSalAutoSaveLastSaved] = useState<string | null>(null);
 
   // Guard: if SAL was already created in this session, redirect to project-detail
   useEffect(() => {
@@ -294,7 +140,7 @@ export function SalCreationScreen() {
     const draftSal = salDocuments.find(
       (sal) => sal.id === resumeSalId && sal.projectId === project.id && sal.status === "draft",
     );
-    const draft = loadSalCreationDraftBySalId(resumeSalId) ?? loadSalCreationDraft(project.id);
+    const draft = loadSalCreationDraftBySalId(resumeSalId);
 
     if (!draft && draftSal && draftSal.lines.length > 0 && data.voices.length === 0) {
       return;
@@ -329,54 +175,20 @@ export function SalCreationScreen() {
           lines: lineDraftsFromStoredSal(draftSal, data.voices),
           salDate: draftSal.date ?? new Date().toISOString().slice(0, 10),
           salTitle: draftSal.title || project.salTitle,
-          phase: draftSal.lines.length > 0 ? "voices" : "context",
+          phase: draftSal.lines.length > 0 ? "measure" : "project",
         },
       });
     }
   }, [data.project, data.voices, data.restoreTariffBookIds, salDocuments]);
-
-  // Restore auto-saved draft on mount if no explicit resume
-  const hasRestoredDraft = useRef(false);
-  useEffect(() => {
-    if (hasRestoredDraft.current) return;
-    const resumeSalId = sessionStorage.getItem(SESSION_STORAGE_KEYS.salResumeDraft);
-    if (resumeSalId) return; // handled by the effect above
-
-    const project = data.project;
-    if (!project) return;
-
-    const draft = loadSalCreationDraft(project.id);
-    if (!draft || (draft.lines.length === 0 && !draft.salTitle)) return;
-
-    hasRestoredDraft.current = true;
-    setSalAutoSaveStatus("saved");
-    setSalAutoSaveLastSaved(new Date().toISOString());
-    dispatch({
-      type: "ALL",
-      partial: {
-        lines: draft.lines,
-        economicRules: draft.economicRules,
-        materialUsage: draft.materialUsage ?? {},
-        salDate: draft.salDate ?? new Date().toISOString().slice(0, 10),
-        salTitle: draft.salTitle || project.salTitle,
-        phase: draft.phase,
-      },
-    });
-    if (draft.selectedTariffBookIds?.length > 0) {
-      data.restoreTariffBookIds(draft.selectedTariffBookIds);
-    }
-  }, [data.project, data.restoreTariffBookIds]);
-
-  const voicesMap = useMemo(() => new Map(data.voices.map((v) => [v.id, v])), [data.voices]);
 
   // Subscribe to step navigation from TopToolbar
   useEffect(() => {
     const unsub = useAppStore.subscribe((state, prev) => {
       if (state.salPendingStep !== prev.salPendingStep && state.salPendingStep !== null) {
         const stepToPhase: Record<number, SalWorkflowPhase> = {
-          1: "context",
-          2: "voices",
-          3: "review",
+          1: "project",
+          2: "measure",
+          3: "verify",
           4: "confirm",
         };
         const targetPhase = stepToPhase[state.salPendingStep];
@@ -419,35 +231,24 @@ export function SalCreationScreen() {
   const closedProjectSals = useMemo(() => {
     const projectId = data.project?.id;
     if (!projectId) return [];
-
     return salDocuments
       .filter((sal) => sal.projectId === projectId && sal.status === "closed")
       .sort((a, b) => (b.closedAt ?? b.date).localeCompare(a.closedAt ?? a.date));
   }, [data.project?.id, salDocuments]);
 
-  const previousProgressiveAmount = useMemo(
-    () =>
-      closedProjectSals.reduce(
-        (sum, sal) => sum + buildSalDocumentView(sal, tariffVoices).total,
-        0,
-      ),
-    [closedProjectSals, tariffVoices],
+  const { checks, lineViews, previousSalLines, summary, voicesMap } = useSalDerivedViews({
+    closedProjectSals,
+    economicRules,
+    lines,
+    project: data.project,
+    tariffVoices,
+    voices: data.voices,
+  });
+  const materialById = useMemo(
+    () => new Map(materials.map((material) => [material.id, material])),
+    [materials],
   );
 
-  // Line views computed on every edit (needed for real-time display)
-  const lineViews = useMemo(() => buildLineViews(lines, economicRules), [lines, economicRules]);
-
-  // Summary: only recompute when line views or contract data change
-  const summary = useMemo(() => {
-    const contractAmount = data.project?.contractAmount ?? 0;
-    return summarizeSalLines(lineViews, contractAmount, previousProgressiveAmount);
-  }, [lineViews, data.project?.contractAmount, previousProgressiveAmount]);
-
-  // Verification checks: only computed when entering review/confirm phase
-  const checks = useMemo(
-    () => buildVerificationChecks(lineViews, summary, economicRules),
-    [lineViews, summary, economicRules],
-  );
   const hasDangerChecks = checks.some((check) => check.tone === "danger");
   const canContinue = canContinueSalPhase({
     checks,
@@ -467,138 +268,18 @@ export function SalCreationScreen() {
         hasDangerChecks,
       );
 
-  const previousSalLines = useMemo(() => {
-    if (voicesMap.size === 0) return [];
-    const latest = closedProjectSals[0];
-    if (!latest) return [];
-    return buildLineViews(
-      (() => {
-        const result: SalLineDraft[] = [];
-        for (const l of latest.lines) {
-          const voice = voicesMap.get(l.voiceId);
-          if (!voice) continue;
-          result.push({
-            id: l.id,
-            factor1: l.quantity,
-            factor2: 1,
-            factor3: 1,
-            notes: "",
-            quantity: l.quantity,
-            sourceType: "voice",
-            surchargePercent: l.surcharge === "night" ? 25 : l.surcharge === "day" ? 10 : 0,
-            voice,
-          });
-        }
-        return result;
-      })(),
-      defaultSalEconomicRules,
-    );
-  }, [closedProjectSals, voicesMap]);
-
-  const upsertLine = useCallback(
-    (voice: SalVoiceDraft) => {
-      const exists = lines.some((l) => l.voice.id === voice.id);
-      setLines((current) => {
-        if (exists) return current.filter((l) => l.voice.id !== voice.id);
-        return [
-          ...current,
-          {
-            id: `draft-${voice.id}`,
-            factor1: 0,
-            factor2: 1,
-            factor3: 1,
-            notes: "",
-            quantity: 0,
-            sourceType: "voice",
-            surchargePercent: 0,
-            voice,
-          },
-        ];
-      });
-      if (exists) {
-        notify({
-          message: `${voice.code} rimossa dalla bozza.`,
-          title: "Voce rimossa",
-          tone: "warning",
-        });
-      } else {
-        notify({
-          message: `${voice.code} aggiunta alla bozza.`,
-          title: "Voce aggiunta",
-          tone: "success",
-        });
-      }
-    },
-    [lines, notify, setLines],
-  );
-
-  const setSurcharge = useCallback(
-    (lineId: string, pct: number) => {
-      setLines((current) =>
-        current.map((l) => (l.id === lineId ? { ...l, surchargePercent: pct } : l)),
-      );
-    },
-    [setLines],
-  );
-
-  const setFactor = useCallback(
-    (lineId: string, field: "factor1" | "factor2" | "factor3", value: number) => {
-      setLines((current) =>
-        current.map((l) =>
-          l.id === lineId
-            ? {
-                ...l,
-                [field]: Number.isFinite(value) && value >= 0 ? value : 0,
-                quantity:
-                  field === "factor1"
-                    ? (Number.isFinite(value) && value >= 0 ? value : 0) * l.factor2 * l.factor3
-                    : field === "factor2"
-                      ? l.factor1 * (Number.isFinite(value) && value >= 0 ? value : 0) * l.factor3
-                      : l.factor1 * l.factor2 * (Number.isFinite(value) && value >= 0 ? value : 0),
-              }
-            : l,
-        ),
-      );
-    },
-    [setLines],
-  );
-
-  const removeLine = useCallback(
-    (lineId: string) => {
-      const line = lines.find((l) => l.id === lineId);
-      setLines((current) => current.filter((l) => l.id !== lineId));
-      if (line)
-        notify({
-          message: `${line.voice.code} eliminata dalla bozza.`,
-          title: "Voce rimossa",
-          tone: "warning",
-        });
-    },
-    [lines, notify, setLines],
-  );
-
-  const setNotes = useCallback(
-    (lineId: string, notes: string) => {
-      setLines((current) => current.map((l) => (l.id === lineId ? { ...l, notes } : l)));
-    },
-    [setLines],
-  );
-
-  const handlePasteLine = useCallback(
-    (draft: SalLineDraft) => {
-      const newId = `draft-${draft.voice.id}-${idCounter.current++}`;
-      setLines((current) => [
-        ...current,
-        { ...draft, id: newId, quantity: draft.factor1 * draft.factor2 * draft.factor3 },
-      ]);
-      notify({
-        message: `${draft.voice.code} duplicata via incolla.`,
-        title: "Voce incollata",
-        tone: "success",
-      });
-    },
-    [notify, setLines],
-  );
+  const {
+    addMeasurementRow,
+    addVoiceAsNewLine,
+    duplicateMeasurementRow,
+    pasteLine: handlePasteLine,
+    removeLine,
+    removeMeasurementRow,
+    setNotes,
+    setSurcharge,
+    updateMeasurementRow,
+    upsertLine,
+  } = useSalLineActions({ lines, notify, setLines });
 
   const handleApplyTemplate = useCallback(
     (template: SalTemplate) => {
@@ -606,13 +287,22 @@ export function SalCreationScreen() {
       for (const entry of template.voiceEntries) {
         const voice = voicesMap.get(entry.voiceId);
         if (!voice) continue;
-        newLines.push({
-          id: `draft-${entry.voiceId}`,
+        const row: SalMeasurementRowDraft = {
+          date: new Date().toISOString().slice(0, 10),
+          description: "",
           factor1: entry.factor1,
           factor2: entry.factor2,
           factor3: entry.factor3,
+          id: createMeasurementId(),
           notes: "",
-          quantity: entry.factor1 * entry.factor2 * entry.factor3,
+          order: 0,
+          partialQuantity: entry.factor1 * entry.factor2 * entry.factor3,
+          unit: voice.unit,
+        };
+        newLines.push({
+          id: `draft-${entry.voiceId}`,
+          measurementRows: [row],
+          notes: "",
           sourceType: "voice",
           surchargePercent: entry.surchargePercent,
           voice,
@@ -629,7 +319,6 @@ export function SalCreationScreen() {
       }
 
       setLines(newLines);
-      // Mantieni il ribasso del progetto — il template non sovrascrive la % del contratto
       setEconomicRules((prev) => ({
         ...template.economicRules,
         discountPercent: prev.discountPercent,
@@ -657,9 +346,9 @@ export function SalCreationScreen() {
     if (phase !== "confirm" && phase !== "completed") {
       const nextPhase = getNextPhase(phase);
       const phaseNames: Record<string, string> = {
-        context: "Impostazioni",
-        voices: "Voci",
-        review: "Verifica",
+        project: "Progetto",
+        measure: "Misura",
+        verify: "Verifica",
         confirm: "Conferma",
       };
       notify({
@@ -690,7 +379,7 @@ export function SalCreationScreen() {
     const materialUsagePayload = Object.entries(materialUsage)
       .filter(([_, qty]) => qty > 0)
       .map(([materialId, qty]) => {
-        const mat = materials.find((m) => m.id === materialId);
+        const mat = materialById.get(materialId);
         return {
           materialId,
           code: mat?.code ?? materialId,
@@ -705,6 +394,21 @@ export function SalCreationScreen() {
       description: "Periodo corrente",
       lines: lineViews.map((l) => ({
         id: l.id,
+        measurementRows: l.measurementRows.map((r) => ({
+          id: r.id,
+          voiceId: l.voice.id,
+          date: r.date,
+          station: r.station,
+          section: r.section,
+          description: r.description,
+          factor1: r.factor1,
+          factor2: r.factor2,
+          factor3: r.factor3,
+          partialQuantity: r.partialQuantity,
+          unit: r.unit,
+          notes: r.notes,
+          order: r.order,
+        })),
         quantity: l.quantity,
         surcharge: surchargeKindFromPercent(l.surchargePercent),
         voiceId: l.voice.id,
@@ -744,7 +448,7 @@ export function SalCreationScreen() {
     if (materialUsagePayload.length > 0) {
       await Promise.all(
         materialUsagePayload.map(async (mu) => {
-          const mat = materials.find((m) => m.id === mu.materialId);
+          const mat = materialById.get(mu.materialId);
           if (mat) {
             await updateDesktopMaterial(mu.materialId, {
               ...mat,
@@ -770,85 +474,20 @@ export function SalCreationScreen() {
     });
   }
 
-  const debounceAutoSave = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const intervalAutoSave = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hasChangesRef = useRef(false);
-  const projectIdRef = useRef(data.project?.id ?? "");
-  projectIdRef.current = data.project?.id ?? "";
-
-  const draftDataRef = useRef({
+  const {
+    lastSaved: salAutoSaveLastSaved,
+    markChanged: handleAutoSave,
+    status: salAutoSaveStatus,
+  } = useSalDraftAutosave({
     economicRules,
     lines,
     materialUsage,
     phase,
+    projectId: data.project?.id ?? "",
     salDate,
     salTitle,
-    selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
+    selectedTariffBooks: data.selectedTariffBooks,
   });
-
-  // Keep refs in sync
-  useEffect(() => {
-    draftDataRef.current = {
-      economicRules,
-      lines,
-      materialUsage,
-      phase,
-      salDate,
-      salTitle,
-      selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
-    };
-  });
-
-  const persistDraftSilent = useCallback(() => {
-    const pid = projectIdRef.current;
-    if (!pid) return;
-    setSalAutoSaveStatus("saving");
-    try {
-      const d = draftDataRef.current;
-      saveSalCreationDraft(pid, {
-        economicRules: d.economicRules,
-        lines: d.lines,
-        materialUsage: d.materialUsage,
-        phase: d.phase,
-        salDate: d.salDate,
-        salTitle: d.salTitle,
-        selectedTariffBookIds: d.selectedTariffBookIds,
-      });
-      hasChangesRef.current = false;
-      setSalAutoSaveLastSaved(new Date().toISOString());
-      setSalAutoSaveStatus("saved");
-    } catch {
-      setSalAutoSaveStatus("error");
-    }
-  }, []);
-
-  const handleAutoSave = useCallback(() => {
-    if (debounceAutoSave.current) clearTimeout(debounceAutoSave.current);
-    setSalAutoSaveStatus("unsaved");
-    hasChangesRef.current = true;
-    debounceAutoSave.current = setTimeout(persistDraftSilent, 800);
-  }, [persistDraftSilent]);
-
-  // Mark as unsaved and trigger debounce when draft data changes
-  useEffect(() => {
-    hasChangesRef.current = true;
-    setSalAutoSaveStatus((prev) => (prev === "saving" || prev === "error" ? prev : "unsaved"));
-    if (debounceAutoSave.current) clearTimeout(debounceAutoSave.current);
-    debounceAutoSave.current = setTimeout(persistDraftSilent, 800);
-  }, [persistDraftSilent]);
-
-  // Periodic auto-save every 30s if there are changes
-  useEffect(() => {
-    intervalAutoSave.current = setInterval(() => {
-      if (hasChangesRef.current) {
-        persistDraftSilent();
-      }
-    }, 30000);
-    return () => {
-      if (intervalAutoSave.current) clearInterval(intervalAutoSave.current);
-      if (debounceAutoSave.current) clearTimeout(debounceAutoSave.current);
-    };
-  }, [persistDraftSilent]);
 
   const handleSaveDraft = useCallback(async () => {
     const project = data.project;
@@ -863,7 +502,6 @@ export function SalCreationScreen() {
       salTitle,
       selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
     });
-    // Also persist a draft SAL in the store so it appears in the project
     createSalProject({
       client: project.contractor,
       description: `${project.frameworkAgreementCode} - ${project.applicationContractCode}`,
@@ -881,7 +519,7 @@ export function SalCreationScreen() {
     const draftMaterialUsage = Object.entries(materialUsage)
       .filter(([_, qty]) => qty > 0)
       .map(([mid, qty]) => {
-        const mat = materials.find((m) => m.id === mid);
+        const mat = materialById.get(mid);
         return {
           materialId: mid,
           code: mat?.code ?? mid,
@@ -895,6 +533,21 @@ export function SalCreationScreen() {
       description: salTitle.trim() || suggestedSalTitle,
       lines: lineViews.map((l) => ({
         id: l.id,
+        measurementRows: l.measurementRows.map((r) => ({
+          id: r.id,
+          voiceId: l.voice.id,
+          date: r.date,
+          station: r.station,
+          section: r.section,
+          description: r.description,
+          factor1: r.factor1,
+          factor2: r.factor2,
+          factor3: r.factor3,
+          partialQuantity: r.partialQuantity,
+          unit: r.unit,
+          notes: r.notes,
+          order: r.order,
+        })),
         quantity: l.quantity,
         surcharge: surchargeKindFromPercent(l.surchargePercent),
         voiceId: l.voice.id,
@@ -939,8 +592,6 @@ export function SalCreationScreen() {
         selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
       });
     }
-    // Materials are NOT deducted on draft save — only on final SAL confirmation.
-    // This avoids double-deduction when saving draft then confirming.
 
     notify({
       message: "Bozza salvata. La trovi nel registro SAL del progetto.",
@@ -963,7 +614,7 @@ export function SalCreationScreen() {
     economicRules,
     lines,
     materialUsage,
-    materials,
+    materialById,
     salDate,
     phase,
     salTitle,
@@ -1026,931 +677,165 @@ export function SalCreationScreen() {
   }, []);
 
   return (
-    <main className="relative w-full max-w-full overflow-x-hidden px-3 pb-6 pt-1 md:px-4">
-      <div className="mt-2 space-y-3">
-        {phase === "completed" ? (
-          <CompletedView
-            createdSalTitle={createdSalTitle}
-            onClose={() => {
-              try {
-                window.sessionStorage.setItem(
-                  SESSION_STORAGE_KEYS.selectedProjectDetail,
-                  JSON.stringify({ id: data.project?.id }),
-                );
-              } catch {
-                /* no-op */
-              }
-              navigate("project-detail", undefined, true);
-            }}
-            onNew={() => {
-              setLines([]);
-              setPhase("context");
-            }}
-            summary={summary}
-          />
-        ) : (
-          <SalEditorContent
-            autoSaveLastSaved={salAutoSaveLastSaved}
-            autoSaveStatus={salAutoSaveStatus}
-            canContinue={canContinue}
-            checks={checks}
-            compareLines={compareLines}
-            contracts={data.contracts}
-            dataError={data.error}
-            dataSetContract={data.setContract}
-            dataTariffBookOptions={data.tariffBookOptions}
-            dataVoices={data.voices}
-            dataVoicesLength={data.voices.length}
-            dataSelectedTariffBooks={data.selectedTariffBooks}
-            dataSelectedTariffBook={data.selectedTariffBook}
-            dataSelectTariffBook={data.selectTariffBook}
-            economicRules={economicRules}
-            handleApplyTemplate={handleApplyTemplate}
-            handlePasteLine={handlePasteLine}
-            lineViews={lineViews}
-            lines={lines}
-            materialUsage={materialUsage}
-            materials={materials}
-            notify={notify}
-            onAutoSave={handleAutoSave}
-            onPhaseChange={(nextPhase) => setPhase(nextPhase)}
-            onPrimary={goPrimary}
-            onSaveDraft={handleSaveDraft}
-            onMaterialUsageChange={(usage) =>
-              dispatch({ type: "MATERIAL_USAGE", materialUsage: usage })
-            }
-            onMaterialsChange={(mats) => dispatch({ type: "ALL", partial: { materials: mats } })}
-            onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
-            previousSalLines={previousSalLines}
-            removeLine={removeLine}
-            salTitle={salTitle}
-            suggestedSalTitle={suggestedSalTitle}
-            setFactor={setFactor}
-            setIsTemplateDialogOpen={setIsTemplateDialogOpen}
-            setLines={setLines}
-            setNotes={setNotes}
-            setSalDate={setSalDate}
-            salDate={salDate}
-            setSalTitle={setSalTitle}
-            setSurcharge={setSurcharge}
-            summary={summary}
-            upsertLine={upsertLine}
-            project={data.project}
-            phase={phase}
-            primaryDisabledReason={currentDisabledReason}
-            tariffBookId={data.selectedTariffBook?.id ?? ""}
-          />
-        )}
+    <div className="flex h-[calc(100dvh-48px)] flex-col">
+      <SalHeader
+        phase={phase}
+        salTitle={salTitle}
+        suggestedSalTitle={suggestedSalTitle}
+        projectTitle={data.project?.title ?? null}
+        total={summary.total}
+        canContinue={canContinue}
+        primaryDisabledReason={currentDisabledReason}
+        onPrimary={goPrimary}
+        onSaveDraft={handleSaveDraft}
+        onPhaseChange={(p) => setPhase(p)}
+        searchBar={
+          phase === "measure" ? (
+            <SalSearchBar
+              voices={data.voices}
+              tariffBookId={data.selectedTariffBook?.id ?? ""}
+              linesCount={lines.length}
+              onSelectVoice={(voice) => {
+                const exists = lines.some((l) => l.voice.id === voice.id);
+                if (exists) addVoiceAsNewLine(voice);
+                else upsertLine(voice);
+              }}
+              onApplyTemplate={handleApplyTemplate}
+              onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
+            />
+          ) : undefined
+        }
+      />
+
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <AnimatePresence initial={false} mode="wait">
+          <m.div
+            animate={motionVariants.route.animate}
+            className="min-h-full"
+            exit={{ opacity: 0, scale: 0.996, y: -8 }}
+            initial={{ opacity: 0, scale: 0.992, y: 16 }}
+            key={phase}
+            transition={motionVariants.route.transition}
+          >
+            {phase === "completed" ? (
+              <CompletedView
+                createdSalTitle={createdSalTitle}
+                onClose={() => {
+                  try {
+                    window.sessionStorage.setItem(
+                      SESSION_STORAGE_KEYS.selectedProjectDetail,
+                      JSON.stringify({ id: data.project?.id }),
+                    );
+                  } catch {
+                    /* no-op */
+                  }
+                  navigate("project-detail", undefined, true);
+                }}
+                onNew={() => {
+                  setLines([]);
+                  setPhase("project");
+                }}
+                summary={summary}
+              />
+            ) : (
+              <>
+                {data.error && (
+                  <div className="mb-4 rounded-xl border border-[var(--danger-base)]/20 bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)]">
+                    {data.error}
+                  </div>
+                )}
+
+                {phase === "project" && (
+                  <ProjectStep
+                    contracts={data.contracts}
+                    onSelectContract={data.setContract}
+                    project={data.project}
+                    salDate={salDate}
+                    salTitle={salTitle}
+                    suggestedSalTitle={suggestedSalTitle}
+                    selectedTariffBooks={data.selectedTariffBooks}
+                    selectedTariffBook={data.selectedTariffBook}
+                    selectTariffBook={data.selectTariffBook}
+                    setSalDate={setSalDate}
+                    setSalTitle={setSalTitle}
+                    summary={summary}
+                    tariffBooks={data.tariffBookOptions}
+                    voicesCount={data.voices.length}
+                  />
+                )}
+
+                {phase === "measure" && (
+                  <MeasureStep
+                    checks={checks}
+                    lineViews={lineViews}
+                    onAddMeasurementRow={addMeasurementRow}
+                    onDuplicateMeasurementRow={duplicateMeasurementRow}
+                    onRemoveMeasurementRow={removeMeasurementRow}
+                    onUpdateMeasurementRow={updateMeasurementRow}
+                    onRemove={removeLine}
+                    onNotesChange={setNotes}
+                    onSurcharge={setSurcharge}
+                    onPasteLine={handlePasteLine}
+                    summary={summary}
+                  />
+                )}
+
+                {phase === "verify" && (
+                  <VerifyStep
+                    checks={checks}
+                    economicRules={economicRules}
+                    lineViews={lineViews}
+                    materialUsage={materialUsage}
+                    materials={materials}
+                    onAutoSave={handleAutoSave}
+                    onMaterialUsageChange={(usage) =>
+                      dispatch({ type: "MATERIAL_USAGE", materialUsage: usage })
+                    }
+                    onMaterialsChange={(mats) =>
+                      dispatch({ type: "ALL", partial: { materials: mats } })
+                    }
+                    summary={summary}
+                    previousSalLines={previousSalLines}
+                    compareLines={compareLines}
+                    onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
+                  />
+                )}
+
+                {phase === "confirm" && (
+                  <ConfirmStep
+                    economicRules={economicRules}
+                    lineViews={lineViews}
+                    summary={summary}
+                  />
+                )}
+              </>
+            )}
+          </m.div>
+        </AnimatePresence>
       </div>
+
       {isTemplateDialogOpen && (
         <SaveAsTemplateDialog
           economicRules={economicRules}
           onClose={() => setIsTemplateDialogOpen(false)}
           tariffBookId={data.selectedTariffBook?.id ?? ""}
-          voiceEntries={lines.map((l) => ({
-            voiceId: l.voice.id,
-            factor1: l.factor1,
-            factor2: l.factor2,
-            factor3: l.factor3,
-            surchargePercent: l.surchargePercent,
-          }))}
+          voiceEntries={lines.map((l) => {
+            const firstRow = l.measurementRows[0];
+            return {
+              voiceId: l.voice.id,
+              factor1: firstRow?.factor1 ?? 0,
+              factor2: firstRow?.factor2 ?? 1,
+              factor3: firstRow?.factor3 ?? 1,
+              surchargePercent: l.surchargePercent,
+            };
+          })}
         />
       )}
-    </main>
-  );
-}
-
-/* ── Editor content ── */
-function SalEditorContent({
-  autoSaveLastSaved,
-  autoSaveStatus,
-  canContinue,
-  checks,
-  compareLines,
-  contracts,
-  dataError,
-  dataSetContract,
-  dataTariffBookOptions,
-  dataVoices,
-  dataVoicesLength,
-  dataSelectedTariffBooks,
-  dataSelectedTariffBook,
-  dataSelectTariffBook,
-  project,
-  economicRules,
-  handleApplyTemplate,
-  handlePasteLine,
-  lineViews,
-  lines,
-  materialUsage,
-  materials,
-  notify,
-  onAutoSave,
-  onPhaseChange,
-  onPrimary,
-  onMaterialUsageChange,
-  onMaterialsChange,
-  onSaveDraft,
-  onToggleCompare,
-  previousSalLines,
-  phase,
-  primaryDisabledReason,
-  removeLine,
-  salDate,
-  salTitle,
-  suggestedSalTitle,
-  setFactor,
-  setIsTemplateDialogOpen,
-  setLines,
-  setNotes,
-  setSalDate,
-  setSalTitle,
-  setSurcharge,
-  summary,
-  tariffBookId,
-  upsertLine,
-}: {
-  autoSaveLastSaved: string | null;
-  autoSaveStatus: "idle" | "saving" | "saved" | "error" | "unsaved";
-  canContinue: boolean;
-  checks: ReturnType<typeof buildVerificationChecks>;
-  compareLines: SalLineView[] | null;
-  contracts: { id: string; title: string; contractor?: string }[];
-  dataError: string | null;
-  dataSetContract: ((id: string) => void) | undefined;
-  dataTariffBookOptions: SalTariffBookOption[];
-  dataVoices: SalVoiceDraft[];
-  dataVoicesLength: number;
-  dataSelectedTariffBooks: SalTariffBookOption[];
-  dataSelectedTariffBook: SalTariffBookOption | null;
-  dataSelectTariffBook: (id: string) => Promise<void>;
-  project: SalProjectContext | null;
-  economicRules: SalEconomicRules;
-  handleApplyTemplate: (t: SalTemplate) => void;
-  handlePasteLine: (d: SalLineDraft) => void;
-  lineViews: SalLineView[];
-  lines: SalLineDraft[];
-  materialUsage: Record<string, number>;
-  materials: DesktopMaterial[];
-  notify: ReturnType<typeof useToast>["notify"];
-  onAutoSave: () => void;
-  onPhaseChange: (phase: Exclude<SalWorkflowPhase, "completed">) => void;
-  onPrimary: () => void;
-  onMaterialUsageChange: (usage: Record<string, number>) => void;
-  onMaterialsChange: (mats: DesktopMaterial[]) => void;
-  onSaveDraft: () => void;
-  onToggleCompare: () => void;
-  previousSalLines: SalLineView[];
-  phase: SalWorkflowPhase;
-  primaryDisabledReason: string | null;
-  removeLine: (lineId: string) => void;
-  salDate: string;
-  salTitle: string;
-  suggestedSalTitle: string;
-  setFactor: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
-  setIsTemplateDialogOpen: Dispatch<SetStateAction<boolean>>;
-  setLines: (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => void;
-  setNotes: (lineId: string, notes: string) => void;
-  setSalDate: (date: string) => void;
-  setSalTitle: (updater: string | ((prev: string) => string)) => void;
-  setSurcharge: (lineId: string, p: number) => void;
-  summary: SalEconomicSummary;
-  tariffBookId: string;
-  upsertLine: (v: SalVoiceDraft) => void;
-}) {
-  return (
-    <>
-      <SalLocalWizardControls
-        autoSaveLastSaved={autoSaveLastSaved}
-        autoSaveStatus={autoSaveStatus}
-        canContinue={canContinue}
-        lineCount={lineViews.length}
-        onPhaseChange={onPhaseChange}
-        onPrimary={onPrimary}
-        onSaveDraft={onSaveDraft}
-        phase={phase}
-        primaryDisabledReason={primaryDisabledReason}
-        project={project}
-        total={summary.total}
-      />
-      {dataError ? (
-        <FeedbackBanner tone="danger" title="Caricamento fallito" message={dataError} />
-      ) : null}
-      {phase === "context" ? (
-        <SetupStep
-          contracts={contracts}
-          economicRules={economicRules}
-          onSelectContract={dataSetContract}
-          project={project}
-          salDate={salDate}
-          salTitle={salTitle}
-          suggestedSalTitle={suggestedSalTitle}
-          selectedTariffBooks={dataSelectedTariffBooks}
-          selectedTariffBook={dataSelectedTariffBook}
-          selectTariffBook={async (id) => {
-            await dataSelectTariffBook(id);
-            const book = dataTariffBookOptions.find((b) => b.id === id);
-            if (book)
-              notify({
-                message: `${book.name} (${book.year}) selezionato.`,
-                title: "Tariffario",
-                tone: "success",
-              });
-          }}
-          setSalDate={setSalDate}
-          setSalTitle={setSalTitle}
-          summary={summary}
-          tariffBooks={dataTariffBookOptions}
-          voicesCount={dataVoicesLength}
-        />
-      ) : null}
-      {phase === "voices" ? (
-        <VoicesStep
-          lineViews={lineViews}
-          lines={lines}
-          onFactorChange={setFactor}
-          onNotesChange={setNotes}
-          onPasteLine={handlePasteLine}
-          onReorder={setLines}
-          onRemove={removeLine}
-          onSurcharge={setSurcharge}
-          onToggle={upsertLine}
-          summary={summary}
-          voices={dataVoices}
-          onApplyTemplate={handleApplyTemplate}
-          onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
-          tariffBookId={tariffBookId}
-        />
-      ) : null}
-      {phase === "review" ? (
-        <ReviewStep
-          checks={checks}
-          economicRules={economicRules}
-          lineViews={lineViews}
-          materialUsage={materialUsage}
-          materials={materials}
-          onAutoSave={onAutoSave}
-          onMaterialUsageChange={onMaterialUsageChange}
-          onMaterialsChange={onMaterialsChange}
-          summary={summary}
-          previousSalLines={previousSalLines}
-          compareLines={compareLines}
-          onToggleCompare={onToggleCompare}
-        />
-      ) : null}
-      {phase === "confirm" ? (
-        <ConfirmStep
-          economicRules={economicRules}
-          lineViews={lineViews}
-          materialUsage={materialUsage}
-          summary={summary}
-        />
-      ) : null}
-    </>
-  );
-}
-
-function SalLocalWizardControls({
-  autoSaveLastSaved,
-  autoSaveStatus,
-  canContinue,
-  lineCount,
-  onPhaseChange,
-  onPrimary,
-  onSaveDraft,
-  phase,
-  primaryDisabledReason,
-  project,
-  total,
-}: {
-  autoSaveLastSaved: string | null;
-  autoSaveStatus: "idle" | "saving" | "saved" | "error" | "unsaved";
-  canContinue: boolean;
-  lineCount: number;
-  onPhaseChange: (phase: Exclude<SalWorkflowPhase, "completed">) => void;
-  onPrimary: () => void;
-  onSaveDraft: () => void;
-  phase: SalWorkflowPhase;
-  primaryDisabledReason: string | null;
-  project: SalProjectContext | null;
-  total: number;
-}) {
-  const currentPhaseIndex = Math.max(
-    0,
-    SAL_PHASES.indexOf(phase as Exclude<SalWorkflowPhase, "completed">),
-  );
-  const progress = ((currentPhaseIndex + 1) / SAL_PHASES.length) * 100;
-  const statusLabel =
-    autoSaveStatus === "saving"
-      ? "Salvataggio..."
-      : autoSaveStatus === "saved"
-        ? `Bozza aggiornata${autoSaveLastSaved ? ` alle ${formatDraftTime(autoSaveLastSaved)}` : ""}`
-        : autoSaveStatus === "error"
-          ? "Salvataggio non riuscito"
-          : autoSaveStatus === "unsaved"
-            ? "Modifiche non ancora salvate"
-            : "Bozza locale attiva";
-
-  return (
-    <section className="overflow-hidden rounded-22px bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/70">
-      <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 text-11px font-semibold text-[var(--text-secondary)]">
-            <span className="rounded-md bg-[var(--bg-muted)] px-2.5 py-1 text-12px text-[var(--text-primary)]">
-              Step {currentPhaseIndex + 1}/{SAL_PHASES.length}
-            </span>
-            <span className="text-12px text-[var(--text-primary)]">
-              {SAL_PHASE_LABELS[phase as Exclude<SalWorkflowPhase, "completed">]}
-            </span>
-            <span className="hidden text-[var(--border-subtle)] sm:inline">/</span>
-            <span className="truncate">{project?.title ?? "Nuovo SAL"}</span>
-          </div>
-          <div className="mt-3 grid gap-2 md:grid-cols-4">
-            {SAL_PHASES.map((step, index) => {
-              const isCurrent = step === phase;
-              const isDone = index < currentPhaseIndex;
-              return (
-                <m.button
-                  key={step}
-                  animate={{
-                    scale: isCurrent ? 1.012 : 1,
-                    y: isCurrent ? -1 : 0,
-                  }}
-                  className={cn(
-                    "relative overflow-hidden rounded-18px px-3.5 py-3 text-left ring-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
-                    isCurrent
-                      ? "ring-[color-mix(in_srgb,var(--accent-primary)_28%,transparent)]"
-                      : isDone
-                        ? "bg-[var(--success-soft)]/45 ring-[color-mix(in_srgb,var(--success-base)_18%,transparent)] hover:bg-[var(--success-soft)]/65"
-                        : "bg-[var(--bg-muted)]/45 ring-[var(--border-subtle)]/60 hover:bg-[var(--bg-muted)]/75",
-                  )}
-                  initial={false}
-                  layout
-                  onClick={() => onPhaseChange(step)}
-                  transition={SAL_STEPPER_SPRING}
-                  type="button"
-                  whileTap={{ scale: 0.985 }}
-                >
-                  {isCurrent ? (
-                    <m.span
-                      className="absolute inset-0 rounded-18px bg-[color-mix(in_srgb,var(--accent-primary)_9%,var(--surface-base)_91%)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_45%,transparent)]"
-                      layoutId="sal-stepper-active-surface"
-                      transition={SAL_STEPPER_SPRING}
-                    />
-                  ) : null}
-                  <div className="relative flex items-center gap-2.5">
-                    <m.span
-                      animate={{ scale: isCurrent ? 1.08 : 1 }}
-                      className={cn(
-                        "flex size-8 shrink-0 items-center justify-center rounded-13px text-12px font-bold shadow-[inset_0_1px_0_color-mix(in_srgb,white_30%,transparent)]",
-                        isCurrent
-                          ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                          : isDone
-                            ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
-                            : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]",
-                      )}
-                      layout
-                      transition={SAL_STEPPER_SPRING}
-                    >
-                      {!isCurrent && isDone ? <Check className="size-3.5" /> : index + 1}
-                    </m.span>
-                    <div className="min-w-0">
-                      <div className="truncate text-14px font-bold text-[var(--text-primary)]">
-                        {SAL_PHASE_LABELS[step]}
-                      </div>
-                      <div className="mt-1 truncate text-12px font-medium text-[var(--text-secondary)]">
-                        {SAL_PHASE_DESCRIPTIONS[step]}
-                      </div>
-                    </div>
-                  </div>
-                </m.button>
-              );
-            })}
-          </div>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted)]">
-            <m.div
-              animate={{ scaleX: progress / 100 }}
-              className="h-full w-full origin-left rounded-full bg-[var(--accent-primary)]"
-              initial={false}
-              transition={SAL_STEPPER_REVEAL}
-            />
-          </div>
-        </div>
-
-        <div className="flex w-full flex-col gap-2.5 lg:w-[340px]">
-          <div className="overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--bg-muted)_12%)] ring-1 ring-[var(--border-subtle)]/65 shadow-[inset_0_1px_0_color-mix(in_srgb,white_42%,transparent)]">
-            <div className="bg-[color-mix(in_srgb,var(--accent-primary)_7%,transparent)] px-4 py-3">
-              <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-                Totale SAL corrente
-              </div>
-              <m.div
-                key={Math.round(total * 100)}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="mt-1 text-24px font-black leading-none tabular-nums text-[var(--accent-primary)]"
-                initial={{ opacity: 0.45, y: 7, scale: 0.985 }}
-                transition={SAL_STEPPER_REVEAL}
-              >
-                <Currency value={total} />
-              </m.div>
-              <div className="mt-2 flex items-center gap-2 text-11px font-medium text-[var(--text-secondary)]">
-                <span className="flex size-5 items-center justify-center rounded-8px bg-[var(--surface-base)] text-10px font-black text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]/60">
-                  {lineCount}
-                </span>
-                <span>voc{lineCount === 1 ? "e" : "i"} in bozza</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 px-4 py-3">
-              <span
-                className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-11px",
-                  autoSaveStatus === "error"
-                    ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-                    : autoSaveStatus === "unsaved" || autoSaveStatus === "saving"
-                      ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-                      : "bg-[var(--success-soft)] text-[var(--success-base)]",
-                )}
-              >
-                <CheckCircle2 className="size-4" />
-              </span>
-              <div className="min-w-0">
-                <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-                  Stato bozza
-                </div>
-                <div className="mt-0.5 truncate text-12px font-semibold text-[var(--text-primary)]">
-                  {statusLabel}
-                </div>
-              </div>
-            </div>
-          </div>
-          {primaryDisabledReason ? (
-            <div className="rounded-md bg-[var(--warning-soft)] px-3 py-2 text-11px font-medium text-[var(--warning-base)]">
-              {primaryDisabledReason}
-            </div>
-          ) : null}
-          <div className="flex gap-2">
-            <m.button
-              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] px-4 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]/75 shadow-[inset_0_1px_0_color-mix(in_srgb,white_40%,transparent)] transition-colors hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-45"
-              disabled={!project}
-              initial={false}
-              onClick={onSaveDraft}
-              transition={SAL_STEPPER_SPRING}
-              type="button"
-              whileTap={{ scale: 0.985, y: 1 }}
-            >
-              <FileText className="size-4" />
-              Salva bozza
-            </m.button>
-            <m.button
-              aria-disabled={!canContinue}
-              className={cn(
-                "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full px-4 text-12px font-black shadow-[inset_0_1px_0_color-mix(in_srgb,white_28%,transparent)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]",
-                canContinue
-                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] hover:bg-[color-mix(in_srgb,var(--accent-primary)_88%,black_12%)]"
-                  : "bg-[color-mix(in_srgb,var(--accent-primary)_52%,var(--surface-base)_48%)] text-[var(--text-inverse)] opacity-85 hover:bg-[color-mix(in_srgb,var(--accent-primary)_62%,var(--surface-base)_38%)]",
-              )}
-              initial={false}
-              onClick={onPrimary}
-              transition={SAL_STEPPER_SPRING}
-              type="button"
-              whileTap={{ scale: 0.985, y: 1 }}
-            >
-              {SAL_PRIMARY_LABELS[phase as Exclude<SalWorkflowPhase, "completed">]}
-              <ArrowRight className="size-4" />
-            </m.button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function formatDraftTime(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-}
-
-/* ── Setup ── */
-function SetupStep({
-  contracts,
-  economicRules,
-  project,
-  salDate,
-  salTitle,
-  suggestedSalTitle,
-  selectedTariffBooks,
-  selectedTariffBook,
-  selectTariffBook,
-  setSalDate,
-  setSalTitle,
-  summary,
-  tariffBooks,
-  voicesCount,
-  onSelectContract,
-}: {
-  contracts: { id: string; title: string; contractor?: string }[];
-  economicRules: SalEconomicRules;
-  project: SalProjectContext | null;
-  salDate: string;
-  salTitle: string;
-  suggestedSalTitle: string;
-  selectedTariffBooks: SalTariffBookOption[];
-  selectedTariffBook: SalTariffBookOption | null;
-  selectTariffBook: (id: string) => Promise<void>;
-  setSalDate: (date: string) => void;
-  setSalTitle: Dispatch<SetStateAction<string>>;
-  summary: SalEconomicSummary;
-  tariffBooks: SalTariffBookOption[];
-  voicesCount: number;
-  onSelectContract?: ((id: string) => void) | undefined;
-}) {
-  const [projectOpen, setProjectOpen] = useState(false);
-  const [tariffSearch, setTariffSearch] = useState("");
-  const [tariffExpanded, setTariffExpanded] = useState(false);
-  const TARIFF_VISIBLE_LIMIT = 12;
-
-  const filteredTariffBooks = useMemo(() => {
-    if (!tariffSearch.trim()) return tariffBooks;
-    const q = tariffSearch.toLowerCase();
-    return tariffBooks.filter(
-      (b) =>
-        b.name.toLowerCase().includes(q) ||
-        String(b.year).includes(q) ||
-        b.id.toLowerCase().includes(q),
-    );
-  }, [tariffBooks, tariffSearch]);
-
-  const visibleTariffBooks = tariffExpanded
-    ? filteredTariffBooks
-    : filteredTariffBooks.slice(0, TARIFF_VISIBLE_LIMIT);
-  const hasMoreTariffs = filteredTariffBooks.length > TARIFF_VISIBLE_LIMIT;
-  if (!project) {
-    return (
-      <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-12 text-center">
-        <Building2 className="mx-auto size-8 text-[var(--text-secondary)]" />
-        <p className="mt-3 text-14px font-semibold text-[var(--text-primary)]">
-          Nessun contratto disponibile
-        </p>
-        <p className="mt-1 text-13px text-[var(--text-secondary)]">
-          Crea o apri un progetto prima di generare una SAL.
-        </p>
-      </div>
-    );
-  }
-
-  const showContractSelector = contracts.length > 1 && onSelectContract;
-
-  return (
-    <div className="space-y-6 rounded-2xl bg-[var(--surface-base)]/80 p-4 ring-1 ring-[var(--border-subtle)]/70 md:p-6">
-      <div className="rounded-xl bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-        {showContractSelector ? (
-          <div className="relative">
-            <m.button
-              className="flex w-full items-center gap-5 text-left"
-              onClick={() => setProjectOpen(!projectOpen)}
-              type="button"
-            >
-              <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
-                <Building2 className="size-7" />
-              </span>
-              <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="min-w-0 border-b border-[var(--border-subtle)]/70 pb-3 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-6">
-                  <div className="text-12px font-medium text-[var(--text-secondary)]">Progetto</div>
-                  <div className="mt-1 truncate text-15px font-bold text-[var(--text-primary)]">
-                    {project.title}
-                  </div>
-                </div>
-                <div className="min-w-0">
-                  <div className="text-12px font-medium text-[var(--text-secondary)]">Cliente</div>
-                  <div className="mt-1 truncate text-15px font-bold text-[var(--text-primary)]">
-                    {project.contractor}
-                  </div>
-                </div>
-              </div>
-              <span
-                className={cn(
-                  "flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-12px font-bold transition-colors",
-                  projectOpen
-                    ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
-                    : "border-[var(--border-subtle)] text-[var(--accent-primary)] hover:bg-[var(--bg-muted)]",
-                )}
-              >
-                Cambia progetto
-                <ChevronDown
-                  className={cn("size-3 transition-transform", projectOpen && "rotate-180")}
-                />
-              </span>
-            </m.button>
-            {projectOpen && (
-              <>
-                <button
-                  className="fixed inset-0 z-40 cursor-default"
-                  onClick={() => setProjectOpen(false)}
-                  type="button"
-                  aria-label="Chiudi"
-                />
-                <div className="absolute left-0 top-full z-50 mt-1.5 w-full min-w-[300px] overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
-                  {contracts.map((c) => {
-                    const isActive = c.id === project.id;
-                    return (
-                      <m.button
-                        className={cn(
-                          "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-all",
-                          isActive
-                            ? "bg-[var(--accent-primary)]/10 ring-1 ring-[var(--accent-primary)]/30"
-                            : "hover:bg-[var(--bg-muted)]",
-                        )}
-                        key={c.id}
-                        onClick={() => {
-                          if (!isActive && onSelectContract) onSelectContract(c.id);
-                          setProjectOpen(false);
-                        }}
-                        type="button"
-                      >
-                        <span
-                          className={cn(
-                            "flex size-9 shrink-0 items-center justify-center rounded-10px",
-                            isActive
-                              ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                              : "bg-[var(--info-soft)] text-[var(--info-base)]",
-                          )}
-                        >
-                          <Building2 className="size-4" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-13px font-bold text-[var(--text-primary)]">
-                            {c.title}
-                          </div>
-                          <div className="mt-0.5 truncate text-11px text-[var(--text-secondary)]">
-                            {c.contractor ?? "—"}
-                          </div>
-                        </div>
-                        {isActive && (
-                          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)] text-[var(--text-inverse)]">
-                            <Check className="size-3.5" strokeWidth={3} />
-                          </span>
-                        )}
-                      </m.button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-5">
-            <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
-              <Building2 className="size-7" />
-            </span>
-            <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <div className="min-w-0 border-b border-[var(--border-subtle)]/70 pb-3 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-6">
-                <div className="text-12px font-medium text-[var(--text-secondary)]">Progetto</div>
-                <div className="mt-1 truncate text-15px font-bold text-[var(--text-primary)]">
-                  {project.title}
-                </div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-12px font-medium text-[var(--text-secondary)]">Cliente</div>
-                <div className="mt-1 truncate text-15px font-bold text-[var(--text-primary)]">
-                  {project.contractor}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            className="text-13px font-semibold text-[var(--text-primary)]"
-            htmlFor="sal-title-input"
-          >
-            Nome SAL
-          </label>
-          <input
-            className="mt-2 h-11 w-full rounded-10px border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-            id="sal-title-input"
-            onChange={(e) => setSalTitle(e.target.value)}
-            placeholder={suggestedSalTitle}
-            value={salTitle}
-          />
-        </div>
-        <div>
-          <label
-            className="text-13px font-semibold text-[var(--text-primary)]"
-            htmlFor="sal-date-input"
-          >
-            Data SAL
-          </label>
-          <input
-            className="mt-2 h-11 w-full rounded-10px border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-            id="sal-date-input"
-            onChange={(e) => setSalDate(e.target.value)}
-            type="date"
-            value={salDate}
-          />
-        </div>
-      </div>
-
-      <div className="border-t border-[var(--border-subtle)]/70 pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-17px font-semibold text-[var(--text-primary)]">
-              Tariffari del progetto
-            </h3>
-            <div className="mt-1 flex items-center gap-1.5 text-12px text-[var(--text-secondary)]">
-              {selectedTariffBooks.length > 0 ? (
-                <>
-                  <CheckCircle2 className="size-4 text-[var(--success-base)]" />
-                  <span>
-                    {selectedTariffBooks.length} selezionat
-                    {selectedTariffBooks.length !== 1 ? "i" : "o"}
-                    {selectedTariffBook ? ` · ${voicesCount} voci` : ""}
-                  </span>
-                </>
-              ) : (
-                <span className="font-semibold text-[var(--warning-base)]">
-                  Seleziona almeno un tariffario
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        {tariffBooks.length === 0 ? (
-          <p className="mt-2 text-12px text-[var(--text-secondary)]">Nessun tariffario caricato.</p>
-        ) : (
-          <>
-            {tariffBooks.length > 6 && (
-              <div className="mt-4">
-                <div className="relative">
-                  <svg
-                    aria-label="Cerca tariffario"
-                    className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-tertiary)]"
-                    fill="none"
-                    role="img"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    viewBox="0 0 24 24"
-                  >
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.35-4.35" />
-                  </svg>
-                  <input
-                    className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-8 pr-3 text-12px outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                    onChange={(e) => {
-                      setTariffSearch(e.target.value);
-                      setTariffExpanded(true);
-                    }}
-                    placeholder="Cerca tariffario per nome, anno o codice..."
-                    value={tariffSearch}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="mt-3 max-h-[200px] overflow-y-auto rounded-lg border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/30 p-2">
-              <div className="flex flex-wrap gap-2">
-                {visibleTariffBooks.map((book) => {
-                  const isSelected = selectedTariffBooks.some((b) => b.id === book.id);
-                  return (
-                    <m.button
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-12px font-semibold transition-all",
-                        isSelected
-                          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] text-[var(--accent-primary)]"
-                          : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]",
-                      )}
-                      key={book.id}
-                      layout
-                      onClick={() => void selectTariffBook(book.id)}
-                      type="button"
-                    >
-                      {isSelected ? (
-                        <Check className="size-3.5" strokeWidth={3} />
-                      ) : (
-                        <span className="size-3.5 rounded-full border-2 border-[var(--border-subtle)]" />
-                      )}
-                      <span>{book.name}</span>
-                      <span className="text-11px text-[var(--text-secondary)]">{book.year}</span>
-                    </m.button>
-                  );
-                })}
-              </div>
-            </div>
-            {hasMoreTariffs && (
-              <button
-                className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg px-4 py-2 text-11px font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--bg-muted)]/30"
-                onClick={() => setTariffExpanded((o) => !o)}
-                type="button"
-              >
-                <ChevronDown
-                  className={cn("size-3.5 transition-transform", tariffExpanded && "rotate-180")}
-                />
-                {tariffExpanded
-                  ? "Mostra meno"
-                  : `Mostra tutti (${filteredTariffBooks.length} tariffari)`}
-              </button>
-            )}
-          </>
-        )}
-        <div className="mt-3 text-11px text-[var(--text-secondary)]">
-          I tariffari associati al progetto vengono presi come predefiniti. Puoi modificare la
-          selezione qui per questa SAL. Per modificare i tariffari del progetto, vai al{" "}
-          <span className="font-semibold text-[var(--info-base)]">dettaglio progetto</span>.
-        </div>
-      </div>
-
-      <SetupMetricsCards
-        economicRules={economicRules}
-        project={project}
-        summary={summary}
-        voicesCount={voicesCount}
-      />
     </div>
   );
 }
 
-/* ── Setup metrics cards ── */
-function SetupMetricsCards({
-  economicRules,
-  project,
-  summary,
-  voicesCount,
-}: {
-  economicRules: SalEconomicRules;
-  project: SalProjectContext;
-  summary: SalEconomicSummary;
-  voicesCount: number;
-}) {
-  return (
-    <div className="border-t border-[var(--border-subtle)]/70 pt-5">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-          <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
-            <Wallet className="size-5" />
-          </span>
-          <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
-            Budget totale
-          </div>
-          <div className="mt-1 text-18px font-black text-[var(--text-primary)]">
-            <Currency value={project.contractAmount} />
-          </div>
-        </div>
-        <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-          <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
-            <Calculator className="size-5" />
-          </span>
-          <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
-            Residuo stimato
-          </div>
-          <div className="mt-1 text-18px font-black text-[var(--success-base)]">
-            <Currency value={summary.budgetResidual} />
-          </div>
-        </div>
-        <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-          <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--accent-primary)]">
-            <Calculator className="size-5" />
-          </span>
-          <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
-            Ribasso gara
-          </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-18px font-black text-[var(--text-primary)]">
-              {economicRules.discountPercent.toLocaleString("it-IT")}%
-            </span>
-            {!economicRules.discountEnabled && (
-              <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-bold text-[var(--warning-base)]">
-                Disattivato
-              </span>
-            )}
-          </div>
-          {economicRules.discountEnabled && (
-            <div className="mt-3 text-12px font-medium text-[var(--danger-base)]">
-              Sconto: -<Currency value={summary.discountAmount} />
-            </div>
-          )}
-          <div className="mt-2 text-11px text-[var(--text-secondary)]">
-            Dal contratto · non modificabile in SAL
-          </div>
-        </div>
-        <div className="rounded-lg bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/70">
-          <span className="flex size-11 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info-base)]">
-            <FileText className="size-5" />
-          </span>
-          <div className="mt-4 text-12px font-medium text-[var(--text-secondary)]">
-            Voci disponibili
-          </div>
-          <div className="mt-1 text-18px font-black text-[var(--info-base)]">{voicesCount}</div>
-          <div className="mt-2 text-11px text-[var(--text-secondary)]">
-            nel tariffario selezionato
-          </div>
-        </div>
-      </div>
-      <EconomicEquation className="mt-4" summary={summary} />
-    </div>
-  );
-}
+/* ─── Helpers ─── */
 
 function canContinueSalPhase({
   checks,
@@ -1960,17 +845,17 @@ function canContinueSalPhase({
   project,
   selectedTariffBooks,
 }: {
-  checks: ReturnType<typeof buildVerificationChecks>;
+  checks: SalVerificationCheck[];
   lineViews: SalLineView[];
   lines: SalLineDraft[];
   phase: SalWorkflowPhase;
   project: SalProjectContext | null;
   selectedTariffBooks: SalTariffBookOption[];
 }): boolean {
-  if (phase === "context") return Boolean(project && selectedTariffBooks.length > 0);
-  if (phase === "voices")
+  if (phase === "project") return Boolean(project && selectedTariffBooks.length > 0);
+  if (phase === "measure")
     return lines.length > 0 && lineViews.every((l) => l.status === "complete");
-  if (phase === "review") return checks.every((c) => c.tone !== "danger") && lines.length > 0;
+  if (phase === "verify") return checks.every((c) => c.tone !== "danger") && lines.length > 0;
   if (phase === "confirm") return lines.length > 0 && !checks.some((c) => c.tone === "danger");
   return true;
 }
@@ -1984,741 +869,13 @@ function disabledReason(
 ): string {
   if (!project)
     return "Nessun contratto disponibile. Torna a Progetti e crea un progetto prima di generare una SAL.";
-  if (phase === "context" && !tariffBook)
+  if (phase === "project" && !tariffBook)
     return "Nessun tariffario disponibile. Importa un tariffario o crea un progetto con tariffario associato.";
   return "Completa i campi richiesti prima di proseguire.";
 }
 
-/* ── Voices ── */
-function VoicesStep({
-  lineViews,
-  lines,
-  onFactorChange,
-  onNotesChange,
-  onPasteLine,
-  onReorder,
-  onRemove,
-  onSurcharge,
-  onToggle,
-  summary,
-  voices,
-  onApplyTemplate,
-  onOpenTemplateDialog,
-  tariffBookId,
-}: {
-  lineViews: SalLineView[];
-  lines: SalLineDraft[];
-  onFactorChange: (lineId: string, f: "factor1" | "factor2" | "factor3", v: number) => void;
-  onNotesChange: (lineId: string, notes: string) => void;
-  onPasteLine: (line: SalLineDraft) => void;
-  onReorder: (l: SalLineDraft[]) => void;
-  onRemove: (lineId: string) => void;
-  onSurcharge: (lineId: string, p: number) => void;
-  onToggle: (v: SalVoiceDraft) => void;
-  summary: SalEconomicSummary;
-  voices: SalVoiceDraft[];
-  onApplyTemplate: (t: SalTemplate) => void;
-  onOpenTemplateDialog: () => void;
-  tariffBookId: string;
-}) {
-  const autocompleteOptions = useMemo(
-    () =>
-      voices.map((v) => ({
-        id: v.id,
-        label: v.description,
-        metadata: `${v.tariffBookName} · ${v.category} · ${v.unit} · ${v.unitPrice.toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
-        value: v.code,
-        keywords: `${v.code} ${v.description} ${v.category} ${v.tariffBookName} ${v.tariffBookId}`,
-      })),
-    [voices],
-  );
-  const voiceByOptionId = useMemo(
-    () => new Map(voices.map((voice) => [voice.id, voice])),
-    [voices],
-  );
-  const tariffTokensByBookId = useMemo(() => {
-    const result = new Map<string, Set<string>>();
-    for (const voice of voices) {
-      if (!result.has(voice.tariffBookId)) {
-        result.set(voice.tariffBookId, buildTariffSearchTokens(voice));
-      }
-    }
-    return result;
-  }, [voices]);
-  const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
-  const lastInteractedRef = useRef<string | null>(null);
-  const idCounter = useRef(0);
+/* ─── Completed view ─── */
 
-  const handleCopyLine = useCallback(
-    (lineId: string) => {
-      const line = lineViews.find((l) => l.id === lineId);
-      if (!line) return;
-      setCopiedLine({
-        id: line.id,
-        factor1: line.factor1,
-        factor2: line.factor2,
-        factor3: line.factor3,
-        notes: "",
-        quantity: line.quantity,
-        sourceType: line.sourceType,
-        surchargePercent: line.surchargePercent,
-        voice: line.voice,
-      });
-    },
-    [lineViews],
-  );
-
-  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
-    const activeEl = document.activeElement;
-    const isInput =
-      activeEl?.tagName === "INPUT" ||
-      activeEl?.tagName === "TEXTAREA" ||
-      (activeEl as HTMLElement | null)?.isContentEditable;
-
-    if (isInput) return;
-
-    const key = e.key.toLowerCase();
-    const mod = e.ctrlKey || e.metaKey;
-
-    if (mod && key === "c" && lastInteractedRef.current) {
-      const lineId = lastInteractedRef.current;
-      const line = lineViews.find((l) => l.id === lineId);
-      if (line) {
-        e.preventDefault();
-        setCopiedLine({
-          id: line.id,
-          factor1: line.factor1,
-          factor2: line.factor2,
-          factor3: line.factor3,
-          notes: "",
-          quantity: line.quantity,
-          sourceType: line.sourceType,
-          surchargePercent: line.surchargePercent,
-          voice: line.voice,
-        });
-      }
-    }
-
-    if (mod && key === "v" && copiedLine) {
-      e.preventDefault();
-      const uniqueVoice = {
-        ...copiedLine.voice,
-        id: `${copiedLine.voice.id}-copy-${idCounter.current++}`,
-      };
-      const pastedLine: SalLineDraft = {
-        ...copiedLine,
-        id: `draft-${uniqueVoice.id}`,
-        voice: uniqueVoice,
-        notes: "",
-        quantity: copiedLine.factor1 * copiedLine.factor2 * copiedLine.factor3,
-      };
-      onPasteLine(pastedLine);
-      setCopiedLine(null);
-    }
-  });
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  return (
-    <div
-      role="none"
-      className="space-y-3"
-      onClick={(e) => {
-        const row = (e.target as HTMLElement).closest("[data-line-id]");
-        if (row) {
-          lastInteractedRef.current = row.getAttribute("data-line-id");
-        }
-      }}
-      onKeyDown={() => {}}
-    >
-      <section className="overflow-hidden rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/70">
-        <div className="grid gap-3 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_58%,var(--surface-base)_42%)] p-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-          <div className="min-w-0">
-            <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-              Misure
-            </div>
-            <div className="mt-1 text-15px font-bold text-[var(--text-primary)]">
-              Inserisci le voci come in un foglio di calcolo
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <TemplatePicker onApply={onApplyTemplate} tariffBookId={tariffBookId} />
-            {lines.length > 0 && (
-              <m.button
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--surface-base)] px-3 text-11px font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-                onClick={onOpenTemplateDialog}
-                type="button"
-              >
-                Salva template
-              </m.button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid gap-3 p-3">
-          <div className="min-w-0 space-y-3">
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-              <AutocompleteInput
-                options={autocompleteOptions}
-                onSelect={(o) => {
-                  const v =
-                    (o.id ? voiceByOptionId.get(o.id) : undefined) ??
-                    voices.find((x) => x.code === o.value);
-                  if (v) {
-                    const exists = lines.some((l) => l.voice.id === v.id);
-                    if (exists) {
-                      onPasteLine({
-                        id: `draft-${v.id}-${idCounter.current++}`,
-                        factor1: 0,
-                        factor2: 1,
-                        factor3: 1,
-                        notes: "",
-                        quantity: 0,
-                        sourceType: "voice",
-                        surchargePercent: 0,
-                        voice: v,
-                      });
-                    } else {
-                      onToggle(v);
-                    }
-                  }
-                }}
-                filterOptions={(options, query) =>
-                  filterSalVoiceOptionsByTariffIntent({
-                    options,
-                    query,
-                    tariffTokensByBookId,
-                    voiceByOptionId,
-                  })
-                }
-                placeholder={`Cerca codice, descrizione o categoria (${voices.length} voci)...`}
-              />
-              <div className="flex items-center gap-2 text-11px font-semibold text-[var(--text-secondary)]">
-                <span className="rounded-md bg-[var(--bg-muted)] px-2 py-1">Invio seleziona</span>
-                <span className="rounded-md bg-[var(--bg-muted)] px-2 py-1">Tab tra celle</span>
-              </div>
-            </div>
-            <SelectedVoicesPanel
-              lines={lineViews}
-              copiedVoiceId={copiedLine?.id ?? null}
-              onCopyLine={handleCopyLine}
-              onFactorChange={onFactorChange}
-              onNotesChange={onNotesChange}
-              onRemove={onRemove}
-              onReorder={onReorder}
-              onSurcharge={onSurcharge}
-            />
-          </div>
-
-          <SalBudgetLive summary={summary} />
-        </div>
-      </section>
-    </div>
-  );
-}
-
-/* ── Review ── */
-function ReviewStep({
-  checks,
-  economicRules,
-  lineViews,
-  materialUsage,
-  materials,
-  onAutoSave,
-  onMaterialUsageChange,
-  onMaterialsChange,
-  summary,
-  previousSalLines,
-  compareLines,
-  onToggleCompare,
-}: {
-  checks: ReturnType<typeof buildVerificationChecks>;
-  economicRules: SalEconomicRules;
-  lineViews: SalLineView[];
-  materialUsage: Record<string, number>;
-  materials: DesktopMaterial[];
-  onAutoSave: () => void;
-  onMaterialUsageChange: (usage: Record<string, number>) => void;
-  onMaterialsChange: (mats: DesktopMaterial[]) => void;
-  summary: SalEconomicSummary;
-  previousSalLines: SalLineView[];
-  compareLines: SalLineView[] | null;
-  onToggleCompare: () => void;
-}) {
-  const [materialsLoadEpoch, setMaterialsLoadEpoch] = useState(0);
-  const [isSearchingMaterials, setIsSearchingMaterials] = useState(false);
-  const [materialSearch, setMaterialSearch] = useState("");
-  const [materialExpanded, setMaterialExpanded] = useState(false);
-  const onMaterialsChangeRef = useRef(onMaterialsChange);
-  onMaterialsChangeRef.current = onMaterialsChange;
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: materialsLoadEpoch triggers re-fetch on DATA_CHANGED_EVENT
-  useEffect(() => {
-    setIsSearchingMaterials(true);
-    import("@/lib/desktopData").then(({ listDesktopMaterials }) =>
-      listDesktopMaterials([]).then((res) => {
-        onMaterialsChangeRef.current(res.data);
-        setIsSearchingMaterials(false);
-      }),
-    );
-  }, [materialsLoadEpoch]);
-
-  const refreshMaterials = useCallback(() => {
-    setMaterialsLoadEpoch((epoch) => epoch + 1);
-    return undefined;
-  }, []);
-
-  useDataChangedListener(refreshMaterials, 0);
-
-  const filteredMaterials = useMemo(() => {
-    if (!materialSearch.trim()) return materials;
-    const q = materialSearch.toLowerCase();
-    return materials.filter(
-      (m) =>
-        m.code.toLowerCase().includes(q) ||
-        m.description.toLowerCase().includes(q) ||
-        (m.category ?? "").toLowerCase().includes(q),
-    );
-  }, [materials, materialSearch]);
-
-  const displayMaterials = materialExpanded ? filteredMaterials : filteredMaterials.slice(0, 5);
-  const hasMoreMaterials = filteredMaterials.length > 5;
-
-  const usageCount = Object.values(materialUsage).filter((q) => q > 0).length;
-  const usageTotalQty = Object.values(materialUsage).reduce((a, b) => a + b, 0);
-
-  return (
-    <div className="space-y-3">
-      {/* Checks + compare button */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/50">
-        <div className="flex flex-1 flex-wrap items-center gap-1.5">
-          {checks.map((c) => (
-            <span
-              key={c.id}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-11px font-medium ${c.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success-base)]" : c.tone === "warning" ? "bg-[var(--warning-soft)] text-[var(--warning-base)]" : "bg-[var(--danger-soft)] text-[var(--danger-base)]"}`}
-              title={c.detail}
-            >
-              {c.result}
-            </span>
-          ))}
-        </div>
-        {previousSalLines.length > 0 && (
-          <m.button
-            className={cn(
-              "shrink-0 inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-12px font-semibold ring-1 transition-colors",
-              compareLines
-                ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] ring-[var(--accent-primary)]/30 hover:bg-[var(--accent-primary)]/20"
-                : "bg-[var(--accent-primary)] text-[var(--text-inverse)] ring-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/90 shadow-sm",
-            )}
-            onClick={onToggleCompare}
-            type="button"
-          >
-            <ArrowRight className={cn("size-3.5", compareLines && "rotate-180")} />
-            {compareLines ? "Nascondi confronto" : "Confronta con SAL precedente"}
-          </m.button>
-        )}
-      </div>
-
-      {compareLines && <SalComparisonView before={previousSalLines} after={lineViews} />}
-
-      {/* ── Materiali in cantiere ── */}
-      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]">
-        <div className="flex items-center justify-between gap-3 border-b border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base)_96%)] px-4 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] text-[var(--accent-primary)]">
-              <Package className="size-4" />
-            </span>
-            <div>
-              <div className="text-11px font-semibold text-[var(--text-primary)]">
-                Materiali in cantiere
-              </div>
-              {usageCount > 0 && (
-                <div className="text-10px text-[var(--text-secondary)]">
-                  {usageCount} material{usageCount !== 1 ? "i" : "e"} ·{" "}
-                  {usageTotalQty.toLocaleString("it-IT")} unità
-                </div>
-              )}
-            </div>
-          </div>
-          {isSearchingMaterials && (
-            <span className="text-11px text-[var(--text-secondary)]">Caricamento...</span>
-          )}
-        </div>
-
-        {/* Search */}
-        {materials.length > 0 && (
-          <div className="border-b border-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)] px-3 py-2">
-            <div className="relative">
-              <svg
-                aria-label="Cerca"
-                className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-tertiary)]"
-                fill="none"
-                role="img"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-              <input
-                className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-8 pr-3 text-12px outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
-                onChange={(e) => {
-                  setMaterialSearch(e.target.value);
-                  setMaterialExpanded(true);
-                }}
-                placeholder="Cerca codice, descrizione o categoria..."
-                value={materialSearch}
-              />
-            </div>
-          </div>
-        )}
-
-        {materials.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
-            <Package className="mb-2 size-8 text-[var(--text-tertiary)]" />
-            <p className="text-13px font-semibold text-[var(--text-primary)]">
-              {isSearchingMaterials ? "Caricamento materiali..." : "Nessun materiale disponibile"}
-            </p>
-            {!isSearchingMaterials && (
-              <p className="mt-1 max-w-xs text-11px text-[var(--text-secondary)]">
-                I materiali presenti a magazzino appaiono qui per tracciare il consumo in cantiere.
-              </p>
-            )}
-          </div>
-        ) : filteredMaterials.length === 0 ? (
-          <div className="px-4 py-6 text-center text-12px text-[var(--text-tertiary)]">
-            Nessun materiale corrisponde alla ricerca.
-          </div>
-        ) : (
-          <div className="max-h-[400px] overflow-y-auto">
-            {displayMaterials.map((mat) => {
-              const available = mat.quantity ?? 0;
-              const minQ = mat.minQuantity ?? 0;
-              const used = materialUsage[mat.id] ?? 0;
-              const remaining = Math.max(0, available - used);
-              const exceedsAvailable = used > available;
-              const barCoverage =
-                available > 0 ? Math.min(100, Math.round((remaining / available) * 100)) : 0;
-              const stockTone =
-                minQ > 0
-                  ? remaining < minQ
-                    ? "danger"
-                    : remaining <= minQ * 1.5
-                      ? "warning"
-                      : "success"
-                  : "success";
-              return (
-                <div
-                  key={mat.id}
-                  className="flex items-center gap-3 border-b border-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)] px-4 py-2.5 last:border-b-0"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="truncate text-12px font-semibold text-[var(--text-primary)]">
-                        {mat.description}
-                      </span>
-                      <span className="shrink-0 text-10px text-[var(--text-tertiary)]">
-                        {mat.code}
-                      </span>
-                      {exceedsAvailable && (
-                        <span className="shrink-0 rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-9px font-bold text-[var(--danger-base)]">
-                          Eccesso
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-10px text-[var(--text-secondary)]">
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex h-1.5 w-16 overflow-hidden rounded-full bg-[var(--border-subtle)] sm:w-20">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-500",
-                              stockTone === "danger" && "bg-[var(--danger-base)]",
-                              stockTone === "warning" && "bg-[var(--warning-base)]",
-                              stockTone === "success" && "bg-[var(--success-base)]",
-                            )}
-                            style={{ width: `${barCoverage}%` }}
-                          />
-                        </div>
-                        <span
-                          className={cn(
-                            "w-7 text-right font-bold tabular-nums",
-                            stockTone === "danger" && "text-[var(--danger-base)]",
-                            stockTone === "warning" && "text-[var(--warning-base)]",
-                            stockTone === "success" && "text-[var(--success-base)]",
-                          )}
-                        >
-                          {barCoverage}%
-                        </span>
-                      </div>
-                      <span>{mat.category}</span>
-                      <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                      <span>
-                        disp.{" "}
-                        <span className="font-semibold tabular-nums text-[var(--text-primary)]">
-                          {available.toLocaleString("it-IT")}
-                        </span>{" "}
-                        {mat.unit}
-                      </span>
-                      {minQ > 0 && (
-                        <>
-                          <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                          <span>
-                            soglia{" "}
-                            <span className="font-semibold tabular-nums text-[var(--text-primary)]">
-                              {minQ.toLocaleString("it-IT")}
-                            </span>
-                          </span>
-                        </>
-                      )}
-                      {used > 0 && (
-                        <>
-                          <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                          <span>
-                            usati{" "}
-                            <span className="font-semibold tabular-nums text-[var(--accent-primary)]">
-                              {used.toLocaleString("it-IT")}
-                            </span>
-                          </span>
-                          <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-                          <span>
-                            restano{" "}
-                            <span
-                              className={cn(
-                                "font-semibold tabular-nums",
-                                remaining < minQ
-                                  ? "text-[var(--danger-base)]"
-                                  : remaining <= minQ * 1.5
-                                    ? "text-[var(--warning-base)]"
-                                    : "text-[var(--success-base)]",
-                              )}
-                            >
-                              {remaining.toLocaleString("it-IT")}
-                            </span>
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <div className="flex items-center overflow-hidden rounded-md border border-[var(--border-subtle)]">
-                      <button
-                        className="flex size-7 items-center justify-center text-13px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] disabled:opacity-30"
-                        disabled={used <= 0}
-                        onClick={() =>
-                          onMaterialUsageChange({
-                            ...materialUsage,
-                            [mat.id]: Math.max(0, used - 1),
-                          })
-                        }
-                        type="button"
-                      >
-                        −
-                      </button>
-                      <input
-                        className="h-7 w-14 border-x border-[var(--border-subtle)] bg-[var(--surface-base)] px-1 text-center text-11px font-semibold tabular-nums outline-none transition focus:bg-[var(--bg-muted)]"
-                        min={0}
-                        onBlur={onAutoSave}
-                        onChange={(e) => {
-                          const qty = Math.max(
-                            0,
-                            Number.parseFloat(e.target.value.replace(",", ".")) || 0,
-                          );
-                          onMaterialUsageChange({ ...materialUsage, [mat.id]: qty });
-                        }}
-                        placeholder="0"
-                        type="text"
-                        inputMode="decimal"
-                        value={used || ""}
-                      />
-                      <button
-                        className="flex size-7 items-center justify-center text-13px text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-                        onClick={() =>
-                          onMaterialUsageChange({ ...materialUsage, [mat.id]: used + 1 })
-                        }
-                        type="button"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Expand / collapse toggle */}
-        {hasMoreMaterials && (
-          <button
-            className="flex w-full items-center justify-center gap-1 border-t border-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)] px-4 py-2 text-11px font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--bg-muted)]/30"
-            onClick={() => setMaterialExpanded((o) => !o)}
-            type="button"
-          >
-            <ChevronDown
-              className={cn("size-3.5 transition-transform", materialExpanded && "rotate-180")}
-            />
-            {materialExpanded
-              ? "Mostra meno"
-              : `Mostra tutti (${filteredMaterials.length} materiali)`}
-          </button>
-        )}
-
-        {/* Summary footer */}
-        {usageCount > 0 && (
-          <div className="flex items-center justify-between border-t border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_2%,var(--surface-base)_98%)] px-4 py-2 text-11px text-[var(--text-secondary)]">
-            <span>
-              <span className="font-semibold text-[var(--text-primary)]">{usageCount}</span>{" "}
-              material{usageCount !== 1 ? "i" : "e"} con consumo
-            </span>
-            <span>
-              Totale{" "}
-              <span className="font-semibold tabular-nums text-[var(--text-primary)]">
-                {usageTotalQty.toLocaleString("it-IT")}
-              </span>{" "}
-              unità
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
-        <SalCostRecap
-          economicRules={economicRules}
-          lineViews={lineViews}
-          summary={summary}
-          showBudget
-        />
-        <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/60">
-          <div className="flex items-center justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] px-5 py-4">
-            <div>
-              <div className="text-10px font-medium uppercase tracking-overline text-[var(--text-secondary)]">
-                Anteprima verifica
-              </div>
-              <div className="mt-1 text-13px font-medium text-[var(--text-primary)]">
-                Libretto con ribasso evidenziato
-              </div>
-            </div>
-            <span className="rounded-full bg-[var(--success-soft)] px-3 py-1 text-10px font-semibold text-[var(--success-base)]">
-              Netto calcolato
-            </span>
-          </div>
-          <div className="p-4">
-            <DocumentPreview compact lines={lineViews} summary={summary} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Confirm ── */
-function ConfirmStep({
-  economicRules,
-  lineViews,
-  materialUsage,
-  summary,
-}: {
-  economicRules: SalEconomicRules;
-  lineViews: SalLineView[];
-  materialUsage: Record<string, number>;
-  summary: SalEconomicSummary;
-}) {
-  const usageCount = Object.values(materialUsage).filter((q) => q > 0).length;
-  const usageTotalQty = Object.values(materialUsage).reduce((a, b) => a + b, 0);
-  return (
-    <div className="space-y-3">
-      <FeedbackBanner
-        message="La verifica è completata. La documentazione è pronta per la conferma."
-        title="Pronta per conferma"
-        tone="success"
-      />
-      {usageCount > 0 ? (
-        <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-base)] px-4 py-3 ring-1 ring-[var(--border-subtle)]/60">
-          <Package className="size-4 text-[var(--text-secondary)]" />
-          <span className="text-13px font-medium text-[var(--text-primary)]">
-            {usageCount} material{usageCount !== 1 ? "i" : "e"} tracciat
-            {usageCount !== 1 ? "i" : "o"}
-          </span>
-          <span className="text-[var(--border-subtle)]">·</span>
-          <span className="text-12px text-[var(--text-secondary)]">
-            {usageTotalQty.toLocaleString("it-IT")} unità totali
-          </span>
-        </div>
-      ) : null}
-      <div className="responsive-grid-elastic gap-3">
-        <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-          <div className="text-10px font-semibold uppercase tracking-caption text-[var(--text-secondary)]">
-            Totale SAL
-          </div>
-          <div className="mt-1 text-26px font-bold text-[var(--accent-primary)]">
-            <Currency value={summary.total} />
-          </div>
-        </div>
-        <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-          <div className="text-10px font-semibold uppercase tracking-caption text-[var(--text-secondary)]">
-            Budget residuo
-          </div>
-          <div
-            className={cn(
-              "mt-1 text-26px font-bold",
-              summary.budgetResidual < 0
-                ? "text-[var(--danger-base)]"
-                : "text-[var(--success-base)]",
-            )}
-          >
-            <Currency value={summary.budgetResidual} />
-          </div>
-          <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
-            Impegnato <Currency value={summary.previousProgressiveAmount} />
-          </div>
-        </div>
-        <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-          <div className="text-10px font-semibold uppercase tracking-caption text-[var(--text-secondary)]">
-            Voci / quantità
-          </div>
-          <div className="mt-1 text-26px font-bold text-[var(--info-base)]">
-            {summary.voiceCount}
-          </div>
-          <div className="mt-0.5 text-11px text-[var(--text-secondary)]">
-            Importo lordo <Currency value={summary.grossAmount} />
-          </div>
-        </div>
-      </div>
-      <SalCostRecap
-        economicRules={economicRules}
-        lineViews={lineViews}
-        summary={summary}
-        showBudget
-      />
-      <div
-        className="responsive-grid-elastic gap-2"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))" }}
-      >
-        <OutputRow
-          disabled
-          icon={<FileText className="size-4 text-[var(--danger-base)]" />}
-          label="PDF libretto"
-        />
-        <OutputRow
-          disabled
-          icon={<FileSpreadsheet className="size-4 text-[var(--success-base)]" />}
-          label="Excel dettaglio"
-        />
-        <OutputRow
-          disabled
-          icon={<Printer className="size-4 text-[var(--info-base)]" />}
-          label="Stampa contabilità"
-        />
-      </div>
-    </div>
-  );
-}
-
-/* ── Completed ── */
 function CompletedView({
   createdSalTitle,
   onClose,
@@ -2731,38 +888,80 @@ function CompletedView({
   summary: SalEconomicSummary;
 }) {
   return (
-    <div className="space-y-4">
-      <FeedbackBanner
-        message={`${createdSalTitle} confermata con successo.`}
-        title="Operazione completata"
-        tone="success"
-      />
-      <div className="responsive-grid-elastic gap-3">
-        <StepMetric accent label="Totale SAL" value={<Currency value={summary.total} />} />
-        <StepMetric
-          accent={summary.budgetResidual >= 0}
-          danger={summary.budgetResidual < 0}
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div className="rounded-xl border border-[var(--success-base)]/20 bg-[var(--success-soft)] px-4 py-3.5 text-[var(--success-base)]">
+        <div className="flex items-center gap-2.5">
+          <CheckCircle2 className="size-5" />
+          <div className="min-w-0">
+            <div className="text-13px font-semibold">Operazione completata</div>
+            <div className="mt-0.5 text-12px opacity-75">
+              {createdSalTitle} confermata con successo.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricCard label="Totale SAL" value={<Currency value={summary.total} />} accent />
+        <MetricCard
           label="Budget residuo"
           value={<Currency value={summary.budgetResidual} />}
+          tone={summary.budgetResidual >= 0 ? "success" : "danger"}
         />
-        <StepMetric label="Stato" value="Confermata" />
+        <MetricCard label="Stato" value="Confermata" />
       </div>
+
       <div className="flex justify-end gap-2">
-        <m.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--bg-muted)] px-4 text-12px font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-          onClick={onClose}
-          type="button"
-        >
+        <Button onClick={onClose} size="sm" type="button" variant="outline">
           Chiudi
-        </m.button>
-        <m.button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-4 text-12px font-bold text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-primary)]/90"
-          onClick={onNew}
-          type="button"
-        >
+        </Button>
+        <Button onClick={onNew} size="sm" type="button" variant="primary">
           Nuova revisione
-        </m.button>
+        </Button>
       </div>
     </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  accent,
+  tone,
+}: {
+  label: string;
+  value: React.ReactNode;
+  accent?: boolean;
+  tone?: "success" | "danger";
+}) {
+  return (
+    <div className="rounded-xl bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/50">
+      <div className="text-10px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+        {label}
+      </div>
+      <div
+        className={cn(
+          "mt-1 text-22px font-bold leading-none",
+          accent && "text-[var(--accent-primary)]",
+          tone === "success" && "text-[var(--success-base)]",
+          tone === "danger" && "text-[var(--danger-base)]",
+          !accent && !tone && "text-[var(--text-primary)]",
+        )}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function Currency({ value }: { value: number }) {
+  return (
+    <span className="tabular-nums">
+      {value.toLocaleString("it-IT", {
+        style: "currency",
+        currency: "EUR",
+        minimumFractionDigits: 2,
+      })}
+    </span>
   );
 }

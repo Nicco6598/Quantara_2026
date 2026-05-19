@@ -35,6 +35,7 @@ export type {
   SalEconomicRules,
   SalLine,
   SalMaterialUsage,
+  SalMeasurementRowPersist,
   SalProject,
   SalSurchargeKind,
   SalTariffVoice,

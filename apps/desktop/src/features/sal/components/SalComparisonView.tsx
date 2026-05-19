@@ -34,12 +34,12 @@ export function SalComparisonView({
   return (
     <div className="space-y-3">
       {/* Totals comparison bar */}
-      <div className="rounded-14px bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
+      <div className="rounded-xl bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/50">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
               <div className="min-w-0">
-                <div className="text-10px font-medium uppercase tracking-caption text-[var(--text-secondary)]">
+                <div className="text-10px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
                   {beforeLabel}
                 </div>
                 <div className="mt-0.5 text-18px font-semibold text-[var(--text-primary)]">
@@ -48,7 +48,7 @@ export function SalComparisonView({
               </div>
               <ArrowRight className="size-5 shrink-0 text-[var(--text-tertiary)]" />
               <div className="min-w-0">
-                <div className="text-10px font-medium uppercase tracking-caption text-[var(--text-secondary)]">
+                <div className="text-10px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
                   {afterLabel}
                 </div>
                 <div className="mt-0.5 text-18px font-semibold text-[var(--text-primary)]">
@@ -59,13 +59,13 @@ export function SalComparisonView({
           </div>
           <div
             className={cn(
-              "shrink-0 rounded-10px px-3 py-2 text-center",
+              "shrink-0 rounded-lg px-3 py-2 text-center",
               totals.diff > 0 && "bg-[var(--warning-soft)]",
               totals.diff < 0 && "bg-[var(--success-soft)]",
               totals.diff === 0 && "bg-[var(--bg-muted)]",
             )}
           >
-            <div className="text-9px font-medium uppercase tracking-caption text-[var(--text-secondary)]">
+            <div className="text-9px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               Differenza
             </div>
             <div
@@ -82,8 +82,8 @@ export function SalComparisonView({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)]/40 pt-3">
-          <span className="text-11px font-medium text-[var(--text-secondary)]">
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)]/30 pt-3">
+          <span className="text-11px font-medium text-[var(--text-tertiary)]">
             {totals.oldCount} voci → {totals.newCount} voci
           </span>
           {hasChanges && (
@@ -133,16 +133,16 @@ export function SalComparisonView({
 function BeforeColumn({ diffs, label }: { diffs: DiffResult[]; label: string }) {
   const items = diffs.filter((d) => d.status !== "added");
   return (
-    <div className="rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
-      <div className="border-b border-[var(--border-subtle)]/40 px-4 py-3">
-        <div className="text-10px font-medium uppercase tracking-0_14em text-[var(--info-base)]">
+    <div className="rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
+      <div className="border-b border-[var(--border-subtle)]/30 px-4 py-3">
+        <div className="text-10px font-medium uppercase tracking-wider text-[var(--info-base)]">
           {label}
         </div>
         <div className="mt-0.5 text-11px font-medium text-[var(--text-tertiary)]">
           {items.length} voci
         </div>
       </div>
-      <div className="divide-y divide-[var(--border-subtle)]/20 max-h-[460px] overflow-y-auto">
+      <div className="divide-y divide-[var(--border-subtle)]/15 max-h-[460px] overflow-y-auto">
         {items.map((d) => (
           <DiffRow key={`${d.voiceId}-b`} diff={d} side="before" />
         ))}
@@ -159,16 +159,16 @@ function BeforeColumn({ diffs, label }: { diffs: DiffResult[]; label: string }) 
 function AfterColumn({ diffs, label }: { diffs: DiffResult[]; label: string }) {
   const items = diffs.filter((d) => d.status !== "removed");
   return (
-    <div className="rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
-      <div className="border-b border-[var(--border-subtle)]/40 px-4 py-3">
-        <div className="text-10px font-medium uppercase tracking-0_14em text-[var(--accent-primary)]">
+    <div className="rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
+      <div className="border-b border-[var(--border-subtle)]/30 px-4 py-3">
+        <div className="text-10px font-medium uppercase tracking-wider text-[var(--accent-primary)]">
           {label}
         </div>
         <div className="mt-0.5 text-11px font-medium text-[var(--text-tertiary)]">
           {items.length} voci
         </div>
       </div>
-      <div className="divide-y divide-[var(--border-subtle)]/20 max-h-[460px] overflow-y-auto">
+      <div className="divide-y divide-[var(--border-subtle)]/15 max-h-[460px] overflow-y-auto">
         {items.map((d) => (
           <DiffRow key={`${d.voiceId}-a`} diff={d} side="after" />
         ))}
@@ -192,11 +192,11 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
 
   const bgClass =
     diff.status === "added"
-      ? "bg-[var(--success-soft)]/20"
+      ? "bg-[var(--success-soft)]/15"
       : diff.status === "removed"
-        ? "bg-[var(--danger-soft)]/20"
+        ? "bg-[var(--danger-soft)]/15"
         : diff.status === "modified"
-          ? "bg-[var(--warning-soft)]/15"
+          ? "bg-[var(--warning-soft)]/10"
           : "";
 
   const qty = side === "before" ? (diff.oldQuantity ?? 0) : diff.newQuantity;
@@ -236,7 +236,7 @@ function DiffRow({ diff, side }: { diff: DiffResult; side: "before" | "after" })
             <span
               className={cn(
                 "font-semibold",
-                isChanged ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]",
+                isChanged ? "text-[var(--text-primary)]" : "text-[var(--text-tertiary)]",
               )}
             >
               {diff.code}

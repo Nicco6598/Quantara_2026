@@ -2,6 +2,29 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.3.40 — 2026-05-19
+
+### SAL — creazione più veloce e controllabile
+
+- **Cockpit misure più operativo** — durante l'inserimento voci ora hai totale corrente, residuo budget, voci incomplete e controlli rapidi sempre visibili accanto al registro. Non devi più arrivare allo step di verifica per capire se qualcosa non torna.
+- **Verifica visiva mentre lavori** — le righe incomplete vengono evidenziate direttamente nel registro misure, con stato chiaro e più leggibile. L'operatore vede subito quali voci richiedono ancora quantità o correzioni.
+- **Passaggi più morbidi tra gli step** — il cambio tra Progetto, Misure, Verifica, Conferma e completamento ora usa una transizione fluida, evitando lo stacco secco tra una vista e l'altra.
+- **Header SAL più compatto** — la barra superiore è stata ridisegnata come barra di lavoro: titolo, progetto, avanzamento, totale e azioni principali occupano meno spazio e restano più facili da leggere.
+
+### SAL — ricevuta contabile più leggibile
+
+- **Riepilogo SAL semplificato** — la ricevuta economica è stata ripensata con una struttura più pulita: metriche essenziali in alto, sezioni lineari per lavorazioni, maggiorazioni MG e sicurezza, e formula economica laterale.
+- **Dettagli solo quando servono** — misure, maggiorazioni e note si aprono riga per riga. La vista principale resta più leggera, ma il dettaglio contabile è ancora disponibile per il controllo puntuale.
+- **Contrasti e testi migliorati** — aumentata la dimensione dei testi piccoli nella ricevuta e ridotto l'uso di testo troppo tenue. I temi scuri hanno colori secondari più leggibili, soprattutto per etichette, importi e stati.
+- **Maggiorazioni MG più facili da controllare** — la sezione MG mostra base, percentuale, voci applicate e totale in modo più diretto, senza mischiare troppe informazioni nella stessa riga.
+
+### SAL — prestazioni e manutenzione
+
+- **Calcolo MG più efficiente** — le maggiorazioni non riscorrono più tutte le righe a ogni passaggio. Quantara usa indici e gruppi per prefisso tariffario, rendendo il calcolo più leggero su SAL grandi.
+- **Lookup materiali più rapidi** — durante salvataggio e conferma SAL i materiali vengono cercati tramite indice, non con ricerche ripetute nella lista.
+- **Autosave più stabile** — il salvataggio automatico della bozza è stato isolato e non marca più la SAL come modificata a ogni render inutile.
+- **Codice SAL più manutenibile** — la schermata di creazione è stata alleggerita spostando azioni sulle righe, dati derivati, autosave e helper misura in moduli dedicati.
+
 ## 0.3.32 — 2026-05-18
 
 ### SAL — libretto misure più vicino al lavoro reale

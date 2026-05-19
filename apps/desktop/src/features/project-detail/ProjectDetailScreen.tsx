@@ -17,8 +17,8 @@ import {
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { SalHistoryBars, SpendingTrend } from "@/components/shared/charts";
-import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { MetricCard } from "@/components/shared/MetricCard";
+import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
@@ -341,6 +341,7 @@ export function ProjectDetailScreen() {
         SESSION_STORAGE_KEYS.selectedProjectDetail,
         JSON.stringify(selectedProject),
       );
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEYS.salResumeDraft);
     } catch {
       // Continue with navigation even if session storage is unavailable.
     }

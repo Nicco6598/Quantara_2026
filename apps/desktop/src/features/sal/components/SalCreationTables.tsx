@@ -1,17 +1,32 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { m } from "framer-motion";
-import { Check, ChevronDown, Copy, Download, MoreHorizontal, Percent, Trash2 } from "lucide-react";
-import { memo, type ReactNode, useMemo, useRef, useState } from "react";
+import {
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  MoreHorizontal,
+  Percent,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/shared/Button";
 import { Currency } from "@/components/shared/Currency";
-import { DragDropReorder } from "@/components/shared/DragDropReorder";
-import { SPRING_EASE } from "@/motion";
-import { InlineEdit } from "@/components/shared/InlineEdit";
 import { StatusPill } from "@/components/shared/StatusPill";
+import { SPRING_EASE } from "@/motion";
 
 export { Currency };
 
 import { cn } from "@/lib/utils";
-import type { SalEconomicRules, SalEconomicSummary, SalLineDraft, SalLineView } from "../types";
+import { buildMeasurementTarget } from "../domain/sal-measurement-target";
+import { extractMgTariffPrefix, isMgCode } from "../domain/sal-calculations";
+import type {
+  SalEconomicRules,
+  SalEconomicSummary,
+  SalLineView,
+  SalMeasurementRowDraft,
+} from "../types";
 
 export function NumberValue({ value }: { value: number }) {
   return (
@@ -25,23 +40,32 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   lines,
   copiedVoiceId,
   onCopyLine,
-  onFactorChange,
+  onAddMeasurementRow,
+  onDuplicateMeasurementRow,
   onNotesChange,
   onRemove,
-  onReorder,
+  onRemoveMeasurementRow,
   onSurcharge,
+  onUpdateMeasurementRow,
 }: {
   lines: SalLineView[];
   copiedVoiceId: string | null;
   onCopyLine: (lineId: string) => void;
-  onFactorChange: (lineId: string, field: "factor1" | "factor2" | "factor3", value: number) => void;
+  onAddMeasurementRow: (lineId: string) => void;
+  onDuplicateMeasurementRow: (lineId: string, measurementId: string) => void;
   onNotesChange: (lineId: string, notes: string) => void;
   onRemove: (lineId: string) => void;
-  onReorder: (lines: SalLineDraft[]) => void;
+  onRemoveMeasurementRow: (lineId: string, measurementId: string) => void;
   onSurcharge: (lineId: string, percent: number) => void;
+  onUpdateMeasurementRow: (
+    lineId: string,
+    measurementId: string,
+    updates: Partial<SalMeasurementRowDraft>,
+  ) => void;
 }) {
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(() => new Set());
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(
+    () => new Set(lines.map((l) => l.id)),
+  );
   const tableLines = useMemo(() => lines.filter((line) => !isMgRow(line.voice)), [lines]);
   const workLines = useMemo(
     () => tableLines.filter((line) => !line.voice.isSafetyCost),
@@ -52,17 +76,22 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     [tableLines],
   );
   const mgLines = useMemo(() => lines.filter((line) => isMgRow(line.voice)), [lines]);
-  const hasExpandedRows = expandedRows.size > 0;
-  const VIRTUAL_THRESHOLD = 24;
+  const allExpanded = expandedRows.size === tableLines.length;
   const hasSafetySection = safetyLines.length > 0;
-  const useVirtual = tableLines.length > VIRTUAL_THRESHOLD && !hasExpandedRows && !hasSafetySection;
 
-  const rowVirtualizer = useVirtualizer({
-    count: tableLines.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 58,
-    overscan: 5,
-  });
+  useEffect(() => {
+    setExpandedRows((current) => {
+      const next = new Set(current);
+      let changed = false;
+      for (const line of tableLines) {
+        if (!next.has(line.id)) {
+          next.add(line.id);
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [tableLines]);
 
   const handleToggleRow = (lineId: string) => {
     setExpandedRows((current) => {
@@ -73,33 +102,41 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     });
   };
 
-  const handleReorderVisibleLines = (orderedVisibleLines: SalLineDraft[]) => {
-    const orderedVisibleIds = new Set(orderedVisibleLines.map((line) => line.id));
-    const hiddenMgLines = lines.filter((line) => isMgRow(line.voice));
-    const remainingLines = lines.filter(
-      (line) => !orderedVisibleIds.has(line.id) && !isMgRow(line.voice),
-    );
-    onReorder([...orderedVisibleLines, ...remainingLines, ...hiddenMgLines]);
+  const handleToggleAll = () => {
+    if (allExpanded) {
+      setExpandedRows(new Set());
+    } else {
+      setExpandedRows(new Set(tableLines.map((l) => l.id)));
+    }
   };
 
-  const handleReorderWorkLines = (orderedWorkLines: SalLineDraft[]) => {
-    const hiddenMgLines = lines.filter((line) => isMgRow(line.voice));
-    onReorder([...orderedWorkLines, ...safetyLines, ...hiddenMgLines]);
-  };
-
-  const handleReorderSafetyLines = (orderedSafetyLines: SalLineDraft[]) => {
-    const hiddenMgLines = lines.filter((line) => isMgRow(line.voice));
-    onReorder([...workLines, ...orderedSafetyLines, ...hiddenMgLines]);
-  };
+  const renderRow = (line: SalLineView, index: number) => (
+    <SelectedVoiceRow
+      key={line.id}
+      index={index}
+      line={line}
+      expanded={expandedRows.has(line.id)}
+      isCopied={copiedVoiceId === line.id}
+      onCopy={() => onCopyLine(line.id)}
+      onAddMeasurementRow={onAddMeasurementRow}
+      onDuplicateMeasurementRow={onDuplicateMeasurementRow}
+      onNotesChange={onNotesChange}
+      onRemove={onRemove}
+      onRemoveMeasurementRow={onRemoveMeasurementRow}
+      onSurcharge={onSurcharge}
+      onToggle={() => handleToggleRow(line.id)}
+      onUpdateMeasurementRow={onUpdateMeasurementRow}
+    />
+  );
 
   return (
-    <div className="overflow-hidden rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/70">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_62%,var(--surface-base)_38%)] px-3 py-2">
+    <div className="overflow-hidden rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)]/40 px-4 py-2.5">
         <div className="min-w-0">
-          <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+          <div className="text-11px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
             Registro misure
           </div>
-          <div className="mt-0.5 text-12px font-medium text-[var(--text-secondary)]">
+          <div className="mt-0.5 text-12px text-[var(--text-tertiary)]">
             {lines.length === 0
               ? "Nessuna voce inserita"
               : `${tableLines.length} voc${tableLines.length === 1 ? "e" : "i"} misurabil${tableLines.length === 1 ? "e" : "i"}${
@@ -109,13 +146,18 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
                 }${safetyLines.length > 0 ? ` · ${safetyLines.length} OS` : ""}`}
           </div>
         </div>
-        <div className="hidden items-center gap-2 text-11px font-semibold text-[var(--text-secondary)] md:flex">
-          <span className="rounded-md bg-[var(--surface-base)] px-2 py-1 ring-1 ring-[var(--border-subtle)]">
-            Celle editabili
-          </span>
-          <span className="rounded-md bg-[var(--surface-base)] px-2 py-1 ring-1 ring-[var(--border-subtle)]">
-            Ctrl+C / Ctrl+V
-          </span>
+        <div className="hidden items-center gap-2 text-11px text-[var(--text-tertiary)] md:flex">
+          <button
+            className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--bg-muted)] px-2 font-medium text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)]/60 hover:text-[var(--text-primary)]"
+            onClick={handleToggleAll}
+            type="button"
+          >
+            <ChevronDown
+              className={cn("size-3 transition-transform", !allExpanded ? "" : "-rotate-180")}
+            />
+            {allExpanded ? "Comprimi" : "Espandi"}
+          </button>
+          <span className="rounded-md bg-[var(--bg-muted)] px-2 py-1">Ctrl+C / Ctrl+V</span>
         </div>
       </div>
 
@@ -124,165 +166,73 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
       ) : null}
 
       <div className="overflow-x-auto">
-        <div ref={scrollRef} className="max-h-[620px] overflow-y-auto">
-          <div className="min-w-[1460px]">
-            <div className="sticky top-0 z-20 grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)] bg-[var(--surface-base)] text-10px font-semibold uppercase tracking-0_12em text-[var(--text-secondary)] shadow-[0_8px_18px_color-mix(in_srgb,var(--text-primary)_6%,transparent)]">
-              {[
-                { label: "N.", dragSpace: !useVirtual },
-                { label: "Codice voce" },
-                { label: "Voce / categoria" },
-                { label: "UM" },
-                { label: "Prezzo unit." },
-                { label: "Qtà calc." },
-                { label: "Importo lordo" },
-                { label: "Ribasso" },
-                { label: "Magg. man." },
-                { label: "Netto SAL" },
-                { label: "Azioni" },
-              ].map((col) => {
-                const label = col.label;
-                const isRight =
-                  label === "Prezzo unit." ||
-                  label === "Qtà calc." ||
-                  label === "Importo lordo" ||
-                  label === "Ribasso" ||
-                  label === "Magg. man." ||
-                  label === "Netto SAL";
-                return (
-                  <div
-                    className={cn(
-                      "flex min-h-9 items-center border-r border-[var(--border-subtle)]/70 px-2 last:border-r-0",
-                      isRight && "justify-end text-right",
-                      col.dragSpace && "pl-7",
-                    )}
-                    key={label}
-                  >
-                    {label}
-                  </div>
-                );
-              })}
-            </div>
-
-            {tableLines.length === 0 ? (
-              <div className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-4 py-12 text-center">
-                <p className="text-14px font-semibold text-[var(--text-primary)]">
-                  Aggiungi una voce dal campo di ricerca.
-                </p>
-                <p className="max-w-md text-13px leading-5 text-[var(--text-secondary)]">
-                  La griglia si popola come un foglio misure: fattori, maggiorazione, note e totali
-                  restano modificabili in riga.
-                </p>
-              </div>
-            ) : useVirtual ? (
-              <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: "relative" }}>
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const line = tableLines[virtualRow.index];
-                  if (!line) return null;
-                  return (
-                    <div
-                      key={line.id}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      <SelectedVoiceRow
-                        index={virtualRow.index}
-                        line={line}
-                        expanded={expandedRows.has(line.id)}
-                        isCopied={copiedVoiceId === line.id}
-                        onCopy={() => onCopyLine(line.id)}
-                        onFactorChange={onFactorChange}
-                        onNotesChange={onNotesChange}
-                        onRemove={onRemove}
-                        onSurcharge={onSurcharge}
-                        onToggle={() => handleToggleRow(line.id)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : hasSafetySection ? (
-              <>
-                <RegisterSectionHeader
-                  amount={workLines.reduce((sum, line) => sum + line.totalAmount, 0)}
-                  count={workLines.length}
-                  label="Lavori soggetti a ribasso"
-                  tone="work"
-                />
-                <DragDropReorder
-                  items={workLines}
-                  onReorder={handleReorderWorkLines}
-                  renderItem={(line: SalLineView, index: number) => (
-                    <SelectedVoiceRow
-                      index={index}
-                      key={line.id}
-                      line={line}
-                      expanded={expandedRows.has(line.id)}
-                      isCopied={copiedVoiceId === line.id}
-                      onCopy={() => onCopyLine(line.id)}
-                      onFactorChange={onFactorChange}
-                      onNotesChange={onNotesChange}
-                      onRemove={onRemove}
-                      onSurcharge={onSurcharge}
-                      onToggle={() => handleToggleRow(line.id)}
-                    />
+        <div className="min-w-[1460px]">
+          {/* Header row */}
+          <div className="sticky top-0 z-20 grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/40 bg-[var(--surface-base)] text-10px font-semibold uppercase tracking-wider text-[var(--text-tertiary)] shadow-[0_1px_0_var(--border-subtle)]">
+            {[
+              "N.",
+              "Codice voce",
+              "Voce / categoria",
+              "UM",
+              "Prezzo unit.",
+              "Qtà calc.",
+              "Importo lordo",
+              "Ribasso",
+              "Magg. man.",
+              "Netto SAL",
+              "Azioni",
+            ].map((label) => {
+              const isRight =
+                label === "Prezzo unit." ||
+                label === "Qtà calc." ||
+                label === "Importo lordo" ||
+                label === "Ribasso" ||
+                label === "Magg. man." ||
+                label === "Netto SAL";
+              return (
+                <div
+                  className={cn(
+                    "flex min-h-8 items-center border-r border-[var(--border-subtle)]/40 px-2.5 last:border-r-0",
+                    isRight && "justify-end text-right",
                   )}
-                  uniqueId={(line: SalLineView) => line.id}
-                />
-                <RegisterSectionHeader
-                  amount={safetyLines.reduce((sum, line) => sum + line.totalAmount, 0)}
-                  count={safetyLines.length}
-                  label="Voci OS non soggette a ribasso"
-                  tone="safety"
-                />
-                <DragDropReorder
-                  items={safetyLines}
-                  onReorder={handleReorderSafetyLines}
-                  renderItem={(line: SalLineView, index: number) => (
-                    <SelectedVoiceRow
-                      index={workLines.length + index}
-                      key={line.id}
-                      line={line}
-                      expanded={expandedRows.has(line.id)}
-                      isCopied={copiedVoiceId === line.id}
-                      onCopy={() => onCopyLine(line.id)}
-                      onFactorChange={onFactorChange}
-                      onNotesChange={onNotesChange}
-                      onRemove={onRemove}
-                      onSurcharge={onSurcharge}
-                      onToggle={() => handleToggleRow(line.id)}
-                    />
-                  )}
-                  uniqueId={(line: SalLineView) => line.id}
-                />
-              </>
-            ) : (
-              <DragDropReorder
-                items={tableLines}
-                onReorder={handleReorderVisibleLines}
-                renderItem={(line: SalLineView, index: number) => (
-                  <SelectedVoiceRow
-                    index={index}
-                    key={line.id}
-                    line={line}
-                    expanded={expandedRows.has(line.id)}
-                    isCopied={copiedVoiceId === line.id}
-                    onCopy={() => onCopyLine(line.id)}
-                    onFactorChange={onFactorChange}
-                    onNotesChange={onNotesChange}
-                    onRemove={onRemove}
-                    onSurcharge={onSurcharge}
-                    onToggle={() => handleToggleRow(line.id)}
-                  />
-                )}
-                uniqueId={(line: SalLineView) => line.id}
-              />
-            )}
+                  key={label}
+                >
+                  {label}
+                </div>
+              );
+            })}
           </div>
+
+          {tableLines.length === 0 ? (
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-4 py-12 text-center">
+              <p className="text-14px font-semibold text-[var(--text-primary)]">
+                Aggiungi una voce dal campo di ricerca.
+              </p>
+              <p className="max-w-md text-13px leading-relaxed text-[var(--text-tertiary)]">
+                La griglia si popola come un foglio misure: fattori, maggiorazione, note e totali
+                restano modificabili in riga.
+              </p>
+            </div>
+          ) : hasSafetySection ? (
+            <>
+              <RegisterSectionHeader
+                amount={workLines.reduce((sum, line) => sum + line.totalAmount, 0)}
+                count={workLines.length}
+                label="Lavori soggetti a ribasso"
+                tone="work"
+              />
+              {workLines.map((line, idx) => renderRow(line, idx))}
+              <RegisterSectionHeader
+                amount={safetyLines.reduce((sum, line) => sum + line.totalAmount, 0)}
+                count={safetyLines.length}
+                label="Voci OS non soggette a ribasso"
+                tone="safety"
+              />
+              {safetyLines.map((line, idx) => renderRow(line, workLines.length + idx))}
+            </>
+          ) : (
+            tableLines.map((line, idx) => renderRow(line, idx))
+          )}
         </div>
       </div>
     </div>
@@ -303,27 +253,25 @@ function RegisterSectionHeader({
   return (
     <div
       className={cn(
-        "grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/70 text-11px",
-        tone === "safety"
-          ? "bg-[color-mix(in_srgb,var(--danger-soft)_30%,var(--surface-base)_70%)]"
-          : "bg-[color-mix(in_srgb,var(--accent-primary)_6%,var(--surface-base)_94%)]",
+        "grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/60 text-12px",
+        tone === "safety" ? "bg-[var(--danger-soft)]" : "bg-[var(--accent-primary)]/[0.08]",
       )}
     >
-      <div className="col-span-3 flex min-h-10 items-center gap-2 px-3 font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+      <div className="col-span-3 flex min-h-9 items-center gap-2.5 px-3 font-bold uppercase tracking-wider text-[var(--text-secondary)]">
         <span
           className={cn(
-            "h-2 w-2 rounded-full",
+            "h-2.5 w-2.5 rounded-full",
             tone === "safety" ? "bg-[var(--danger-base)]" : "bg-[var(--accent-primary)]",
           )}
         />
         {label}
       </div>
-      <div className="col-span-5 flex items-center justify-end px-2 text-[var(--text-secondary)]">
+      <div className="col-span-5 flex items-center justify-end px-2 font-medium text-[var(--text-secondary)]">
         {count} voc{count === 1 ? "e" : "i"}
       </div>
       <div
         className={cn(
-          "col-span-2 flex items-center justify-end px-2 font-black tabular-nums",
+          "col-span-2 flex items-center justify-end px-2 text-13px font-black tabular-nums",
           tone === "safety" ? "text-[var(--danger-base)]" : "text-[var(--accent-primary)]",
         )}
       >
@@ -334,15 +282,23 @@ function RegisterSectionHeader({
   );
 }
 
-const MG_SEGMENT = "MG";
+const MEASUREMENT_FACTOR_FIELDS = ["factor1", "factor2", "factor3"] as const;
+
+function isDecimalDraft(value: string): boolean {
+  return /^\d*(?:[,.]\d*)?$/.test(value.trim());
+}
+
+function formatFactorInput(value: number): string {
+  if (!value) return "";
+  return String(value).replace(".", ",");
+}
 
 function isMgRow(voice: SalLineView["voice"]): boolean {
-  return voice.code.split(".")[1]?.toUpperCase() === MG_SEGMENT;
+  return isMgCode(voice.code);
 }
 
 function getMgTariffPrefix(voiceCode: string): string | null {
-  const firstSegment = voiceCode.split(".")[0];
-  return firstSegment && firstSegment.toUpperCase() !== MG_SEGMENT ? firstSegment : null;
+  return extractMgTariffPrefix(voiceCode);
 }
 
 function MgChargesPanel({
@@ -355,17 +311,17 @@ function MgChargesPanel({
   onRemove: (lineId: string) => void;
 }) {
   return (
-    <div className="border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--info-soft)_18%,var(--surface-base)_82%)] px-3 py-3">
+    <div className="border-b border-[var(--border-subtle)]/40 bg-[var(--info-soft)]/15 px-4 py-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--info-base)_12%,var(--surface-base)_88%)] text-[var(--info-base)]">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--info-base)]/10 text-[var(--info-base)]">
             <Percent className="size-3.5" />
           </span>
           <div className="min-w-0">
-            <div className="text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            <div className="text-11px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
               Maggiorazioni MG
             </div>
-            <div className="truncate text-12px text-[var(--text-secondary)]">
+            <div className="truncate text-12px text-[var(--text-tertiary)]">
               Tenute fuori dal registro misure e distribuite sulle voci di riferimento.
             </div>
           </div>
@@ -380,7 +336,7 @@ function MgChargesPanel({
           const charge = mgLine.linkedCharges.find((entry) => entry.code.startsWith("MG."));
           return (
             <div
-              className="rounded-lg bg-[var(--surface-base)] p-3 ring-1 ring-[color-mix(in_srgb,var(--info-base)_16%,var(--border-subtle)_84%)]"
+              className="rounded-lg bg-[var(--surface-base)] p-3 ring-1 ring-[var(--border-subtle)]/50"
               key={mgLine.id}
             >
               <div className="flex items-start justify-between gap-3">
@@ -389,10 +345,10 @@ function MgChargesPanel({
                     <span className="text-12px font-bold text-[var(--info-base)]">
                       {mgLine.voice.code}
                     </span>
-                    <span className="rounded-md bg-[color-mix(in_srgb,var(--info-base)_10%,var(--surface-base)_90%)] px-1.5 py-0.5 text-10px font-bold text-[var(--info-base)]">
+                    <span className="rounded-md bg-[var(--info-base)]/8 px-1.5 py-0.5 text-10px font-bold text-[var(--info-base)]">
                       {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
                     </span>
-                    <span className="text-10px font-semibold uppercase tracking-0_12em text-[var(--text-tertiary)]">
+                    <span className="text-10px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
                       {prefix ? `voci ${prefix}` : "tutte le voci"}
                     </span>
                   </div>
@@ -405,7 +361,7 @@ function MgChargesPanel({
                     <div className="text-13px font-black tabular-nums text-[var(--info-base)]">
                       +<Currency value={charge?.total ?? mgLine.totalAmount} />
                     </div>
-                    <div className="mt-0.5 text-10px text-[var(--text-secondary)]">
+                    <div className="mt-0.5 text-10px text-[var(--text-tertiary)]">
                       base <Currency value={charge?.baseAmount ?? 0} />
                     </div>
                   </div>
@@ -427,7 +383,7 @@ function MgChargesPanel({
                 ) : (
                   affectedLines.slice(0, 8).map((line) => (
                     <span
-                      className="max-w-[220px] truncate rounded-md bg-[var(--bg-muted)] px-2 py-1 text-10px font-semibold text-[var(--text-secondary)]"
+                      className="max-w-[220px] truncate rounded-md bg-[var(--bg-muted)] px-2 py-1 text-10px font-semibold text-[var(--text-tertiary)]"
                       key={`${mgLine.id}-${line.id}`}
                       title={line.voice.description}
                     >
@@ -455,95 +411,131 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   expanded,
   isCopied,
   onCopy,
-  onFactorChange,
+  onAddMeasurementRow,
+  onDuplicateMeasurementRow,
   onNotesChange,
   onRemove,
+  onRemoveMeasurementRow,
   onSurcharge,
   onToggle,
+  onUpdateMeasurementRow,
 }: {
   index: number;
   line: SalLineView;
   expanded: boolean;
   isCopied: boolean;
   onCopy: () => void;
-  onFactorChange: (lineId: string, field: "factor1" | "factor2" | "factor3", value: number) => void;
+  onAddMeasurementRow: (lineId: string) => void;
+  onDuplicateMeasurementRow: (lineId: string, measurementId: string) => void;
   onNotesChange: (lineId: string, notes: string) => void;
   onRemove: (lineId: string) => void;
+  onRemoveMeasurementRow: (lineId: string, measurementId: string) => void;
   onSurcharge: (lineId: string, percent: number) => void;
   onToggle: () => void;
+  onUpdateMeasurementRow: (
+    lineId: string,
+    measurementId: string,
+    updates: Partial<SalMeasurementRowDraft>,
+  ) => void;
 }) {
-  const linkedTotal = line.linkedCharges.reduce((sum, c) => sum + c.total, 0);
   const laborPct = line.voice.laborPercentage ?? 0;
-  const hasDetails = Boolean(line.notes.trim()) || linkedTotal > 0 || laborPct > 0;
+  const isIncomplete = line.status !== "complete";
 
   return (
     <>
+      {/* biome-ignore lint/a11y/useSemanticElements: div[role=button] needed for grid layout, <button> can't be a grid container */}
       <div
         data-line-id={line.id}
+        role="button"
+        tabIndex={0}
         className={cn(
-          "grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/60 text-12px transition-colors hover:bg-[color-mix(in_srgb,var(--info-soft)_20%,var(--surface-base)_80%)]",
-          index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/24",
-          expanded && "bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base)_96%)]",
+          "grid cursor-pointer grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/30 text-12px transition-colors [content-visibility:auto] [contain-intrinsic-size:72px] hover:bg-[var(--bg-muted)]/40",
+          index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/30",
+          expanded &&
+            "bg-[var(--accent-primary)]/[0.05] ring-1 ring-inset ring-[var(--accent-primary)]/15",
+          isIncomplete &&
+            "bg-[var(--warning-soft)]/35 ring-1 ring-inset ring-[var(--warning-base)]/20",
         )}
+        title={
+          isIncomplete ? "Voce incompleta: inserisci una quantità maggiore di zero." : undefined
+        }
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") onToggle();
+        }}
       >
         <GridCell muted>
           <button
-            aria-expanded={expanded}
-            aria-label={`${expanded ? "Comprimi" : "Espandi"} dettagli ${line.voice.code}`}
-            className="flex h-8 w-full items-center justify-center gap-1 rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-            onClick={onToggle}
             type="button"
+            aria-label={`${expanded ? "Comprimi" : "Espandi"} dettagli ${line.voice.code}`}
+            className="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
           >
-            <ChevronDown
-              className={cn("size-3.5 transition-transform", !expanded && "-rotate-90")}
-            />
-            <span className="font-semibold tabular-nums">{index + 1}</span>
+            <ChevronDown className={cn("size-4 transition-transform", !expanded && "-rotate-90")} />
+            <span className="text-11px font-bold tabular-nums text-[var(--text-secondary)]">
+              {index + 1}
+            </span>
           </button>
         </GridCell>
         <GridCell strong title={line.voice.code}>
-          <span className="truncate">{line.voice.code}</span>
+          <span className="truncate text-13px font-bold text-[var(--text-primary)]">
+            {line.voice.code}
+          </span>
         </GridCell>
         <GridCell>
           <div className="flex min-w-0 items-start gap-1.5">
             <span className="min-w-0 flex-1">
-              <div className="whitespace-normal break-words font-medium leading-snug text-[var(--text-primary)]">
+              <div className="whitespace-normal break-words text-13px font-semibold leading-snug text-[var(--text-primary)]">
                 {line.voice.description}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                <span className="truncate text-10px text-[var(--text-secondary)]">
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span className="truncate text-11px font-medium text-[var(--text-secondary)]">
                   {line.voice.category}
                 </span>
                 {laborPct > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base)_90%)] px-1.5 py-0.5 text-10px font-bold text-[var(--accent-primary)]">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-10px font-bold text-[var(--accent-primary)]">
                     <span className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
                     Man. {laborPct}%
                   </span>
                 ) : null}
                 {line.voice.isSafetyCost ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--danger-soft)] px-1.5 py-0.5 text-10px font-bold text-[var(--danger-base)]">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--danger-soft)] px-2 py-0.5 text-10px font-bold text-[var(--danger-base)]">
                     OS
+                  </span>
+                ) : null}
+                {isIncomplete ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-bold text-[var(--warning-base)]">
+                    Da completare
                   </span>
                 ) : null}
               </div>
             </span>
           </div>
         </GridCell>
-        <GridCell muted>{line.voice.unit}</GridCell>
+        <GridCell muted>
+          <span className="text-11px font-semibold text-[var(--text-secondary)]">
+            {line.voice.unit}
+          </span>
+        </GridCell>
         <GridCell align="right">
-          <Currency value={line.voice.unitPrice} />
+          <span className="text-12px font-semibold tabular-nums text-[var(--text-secondary)]">
+            <Currency value={line.voice.unitPrice} />
+          </span>
         </GridCell>
         <GridCell align="right" strong>
-          <NumberValue value={line.quantity} />
+          <span className="text-13px font-bold tabular-nums text-[var(--text-primary)]">
+            <NumberValue value={line.quantity} />
+          </span>
         </GridCell>
         <GridCell align="right" strong>
-          <Currency value={line.grossAmount} />
+          <span className="text-13px font-bold tabular-nums text-[var(--text-primary)]">
+            <Currency value={line.grossAmount} />
+          </span>
         </GridCell>
         <GridCell align="right">
           <span
             className={cn(
-              line.discountAmount > 0
-                ? "font-semibold text-[var(--danger-base)]"
-                : "text-[var(--text-secondary)]",
+              "text-12px font-semibold tabular-nums",
+              line.discountAmount > 0 ? "text-[var(--danger-base)]" : "text-[var(--text-tertiary)]",
             )}
             title={
               line.voice.isSafetyCost && line.discountAmount === 0
@@ -558,7 +550,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
         <GridCell align="right" editable>
           <input
             aria-label={`Maggiorazione % per ${line.voice.code}`}
-            className="h-8 w-full rounded-none border-0 bg-transparent px-1 text-right text-12px font-semibold text-[var(--text-primary)] outline-none transition focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
+            className="h-8 w-full rounded-none border-0 bg-transparent px-1.5 text-right text-12px font-bold text-[var(--text-primary)] outline-none transition focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
             inputMode="decimal"
             onChange={(event) => {
               const raw = event.target.value.replace(",", ".");
@@ -571,13 +563,14 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
                 onSurcharge(line.id, val);
               }
             }}
+            onClick={(e) => e.stopPropagation()}
             placeholder="%"
             type="text"
             value={line.surchargePercent || ""}
           />
         </GridCell>
         <GridCell align="right" strong>
-          <span className="text-[var(--accent-primary)]">
+          <span className="text-14px font-black tabular-nums text-[var(--accent-primary)]">
             <Currency value={line.totalAmount} />
           </span>
         </GridCell>
@@ -591,7 +584,10 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
                   ? "bg-[var(--success-soft)] text-[var(--success-base)]"
                   : "text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
               )}
-              onClick={onCopy}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopy();
+              }}
               type="button"
               title={isCopied ? "Voce copiata - premi Ctrl+V per incollare" : "Copia voce"}
               transition={{ duration: 0.42, ease: SPRING_EASE }}
@@ -601,7 +597,10 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             <m.button
               aria-label={`Rimuovi ${line.voice.code}`}
               className="flex size-7 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
-              onClick={() => onRemove(line.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(line.id);
+              }}
               type="button"
               transition={{ duration: 0.42, ease: SPRING_EASE }}
             >
@@ -613,117 +612,301 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
       {expanded ? (
         <div
           className={cn(
-            "border-b border-[var(--border-subtle)]/70 px-4 py-3",
-            index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/24",
+            "border-b border-[var(--border-subtle)]/30 px-4 py-3",
+            index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/15",
           )}
         >
-          <div className="ml-[58px] grid min-w-0 gap-3 xl:grid-cols-[minmax(520px,0.95fr)_minmax(360px,1fr)]">
-            <div className="min-w-0 rounded-lg bg-[color-mix(in_srgb,var(--bg-muted)_58%,var(--surface-base)_42%)] p-3 ring-1 ring-[var(--border-subtle)]/70">
-              <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
-                <span className="whitespace-nowrap text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
-                  Libretto misura
-                </span>
-                <span className="whitespace-nowrap text-10px text-[var(--text-tertiary)]">
-                  {line.factor1.toLocaleString("it-IT")} × {line.factor2.toLocaleString("it-IT")} ×{" "}
-                  {line.factor3.toLocaleString("it-IT")} ={" "}
-                  {line.quantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
-                </span>
-              </div>
-              <div className="mb-3 overflow-x-auto rounded-md ring-1 ring-[var(--border-subtle)]/70">
-                <div className="grid min-w-[560px] grid-cols-[minmax(180px,1fr)_56px_74px_74px_74px_96px] bg-[var(--surface-base)] text-10px font-bold uppercase tracking-0_12em text-[var(--text-tertiary)]">
-                  {["Descrizione", "UM", "F1", "F2", "F3", "Qtà"].map((label) => (
-                    <div
-                      className="border-r border-[var(--border-subtle)]/60 px-2 py-1.5 last:border-r-0"
-                      key={label}
-                    >
-                      {label}
-                    </div>
-                  ))}
-                </div>
-                <div className="grid min-w-[560px] grid-cols-[minmax(180px,1fr)_56px_74px_74px_74px_96px] border-t border-[var(--border-subtle)]/60 bg-[var(--surface-base)] text-11px">
-                  <div className="border-r border-[var(--border-subtle)]/60 px-2 py-2 text-[var(--text-primary)]">
-                    {line.notes.trim() || "Misura corrente"}
-                  </div>
-                  <div className="border-r border-[var(--border-subtle)]/60 px-2 py-2 text-[var(--text-secondary)]">
-                    {line.voice.unit}
-                  </div>
-                  {[
-                    { key: "factor1", value: line.factor1 },
-                    { key: "factor2", value: line.factor2 },
-                    { key: "factor3", value: line.factor3 },
-                  ].map((factor) => (
-                    <div
-                      className="border-r border-[var(--border-subtle)]/60 px-2 py-2 text-right font-mono tabular-nums text-[var(--text-primary)]"
-                      key={`${line.id}-${factor.key}`}
-                    >
-                      {factor.value.toLocaleString("it-IT")}
-                    </div>
-                  ))}
-                  <div className="px-2 py-2 text-right font-mono font-bold tabular-nums text-[var(--text-primary)]">
-                    {line.quantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
-                  </div>
-                </div>
-                <div className="grid min-w-[560px] grid-cols-[minmax(180px,1fr)_56px_74px_74px_74px_96px] border-t border-[var(--border-subtle)]/60 bg-[color-mix(in_srgb,var(--accent-primary)_5%,var(--surface-base)_95%)] text-11px font-bold">
-                  <div className="col-span-5 px-2 py-2 text-right text-[var(--text-secondary)]">
-                    sommano {line.voice.unit}
-                  </div>
-                  <div className="px-2 py-2 text-right font-mono tabular-nums text-[var(--accent-primary)]">
-                    {line.quantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {(["factor1", "factor2", "factor3"] as const).map((field, fieldIndex) => (
-                  <div className="block" key={field}>
-                    <span className="mb-1 block text-10px font-semibold uppercase tracking-0_12em text-[var(--text-tertiary)]">
-                      F{fieldIndex + 1}
-                    </span>
-                    <InlineEdit
-                      ariaLabel={`Fattore ${fieldIndex + 1} per ${line.voice.code}`}
-                      className="h-9 w-full rounded-md bg-[var(--surface-base)] px-2 text-right text-12px font-semibold ring-1 ring-[var(--border-subtle)]"
-                      onCommit={(value) => onFactorChange(line.id, field, value)}
-                      value={line[field]}
-                    />
-                  </div>
-                ))}
-              </div>
-              {linkedTotal > 0 || hasDetails ? (
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-11px text-[var(--text-secondary)]">
-                  {linkedTotal > 0 ? (
-                    <span className="rounded-md bg-[color-mix(in_srgb,var(--info-base)_10%,var(--surface-base)_90%)] px-2 py-1 font-semibold text-[var(--info-base)]">
-                      Maggiorazioni collegate +<Currency value={linkedTotal} />
-                    </span>
-                  ) : null}
-                  {laborPct > 0 ? (
-                    <span>Manodopera {laborPct.toLocaleString("it-IT")}%</span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            <div className="rounded-lg bg-[color-mix(in_srgb,var(--bg-muted)_58%,var(--surface-base)_42%)] p-3 ring-1 ring-[var(--border-subtle)]/70">
-              <label className="block">
-                <span className="mb-2 block text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
-                  Note riga
-                </span>
-                <textarea
-                  className="min-h-20 w-full resize-y rounded-lg border border-[color-mix(in_srgb,var(--border-subtle)_65%,transparent)] bg-[var(--surface-base)] px-3 py-2 text-12px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                  placeholder={
-                    linkedTotal > 0
-                      ? `Annota criterio maggiorazioni: ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`
-                      : "Aggiungi note di misura, riferimenti o riserve..."
-                  }
-                  rows={3}
-                  value={line.notes}
-                  onChange={(e) => onNotesChange(line.id, e.target.value)}
-                />
-              </label>
-            </div>
+          <div className="min-w-0">
+            <MeasurementRowsTable
+              lineId={line.id}
+              rows={line.measurementRows}
+              unit={line.voice.unit}
+              totalQuantity={line.quantity}
+              linkedCharges={line.linkedCharges}
+              notes={line.notes}
+              onAddRow={onAddMeasurementRow}
+              onRemoveRow={onRemoveMeasurementRow}
+              onDuplicateRow={onDuplicateMeasurementRow}
+              onUpdateRow={onUpdateMeasurementRow}
+              onNotesChange={onNotesChange}
+            />
           </div>
         </div>
       ) : null}
     </>
   );
 });
+
+function MeasurementRowsTable({
+  lineId,
+  rows,
+  unit,
+  totalQuantity,
+  linkedCharges,
+  notes,
+  onAddRow,
+  onRemoveRow,
+  onDuplicateRow,
+  onUpdateRow,
+  onNotesChange,
+}: {
+  lineId: string;
+  rows: SalMeasurementRowDraft[];
+  unit: string;
+  totalQuantity: number;
+  linkedCharges: { code: string; total: number }[];
+  notes: string;
+  onAddRow: (lineId: string) => void;
+  onRemoveRow: (lineId: string, measurementId: string) => void;
+  onDuplicateRow: (lineId: string, measurementId: string) => void;
+  onUpdateRow: (
+    lineId: string,
+    measurementId: string,
+    updates: Partial<SalMeasurementRowDraft>,
+  ) => void;
+  onNotesChange: (lineId: string, notes: string) => void;
+}) {
+  const linkedTotal = linkedCharges.reduce((sum, c) => sum + c.total, 0);
+  const hasMultipleRows = rows.length > 1;
+  const lastRow = rows[rows.length - 1];
+  const [factorDrafts, setFactorDrafts] = useState<Record<string, string>>({});
+  const COLS =
+    "grid-cols-[140px_108px_minmax(190px,1.1fr)_72px_72px_72px_96px_minmax(150px,1fr)_84px]";
+
+  useEffect(() => {
+    setFactorDrafts((current) => {
+      const validKeys = new Set<string>();
+      for (const row of rows) {
+        for (const field of MEASUREMENT_FACTOR_FIELDS) {
+          validKeys.add(`${row.id}:${row.order}:${field}`);
+        }
+      }
+      const next = Object.fromEntries(
+        Object.entries(current).filter(([key]) => validKeys.has(key)),
+      );
+      return Object.keys(next).length === Object.keys(current).length ? current : next;
+    });
+  }, [rows]);
+
+  return (
+    <div className="min-w-0">
+      <div className="overflow-hidden rounded-lg bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)]/40 bg-[var(--bg-muted)]/20 px-3 py-2.5">
+          <div className="min-w-0">
+            <div className="text-11px font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+              Libretto misure
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-11px text-[var(--text-tertiary)]">
+              <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                {rows.length} rig{rows.length === 1 ? "a" : "he"}
+              </span>
+              <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+              <span>
+                Totale {totalQuantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })} {unit}
+              </span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              className="h-8 text-11px"
+              icon={Plus}
+              onClick={() => onAddRow(lineId)}
+              type="button"
+              variant="primary"
+            >
+              Riga
+            </Button>
+            {lastRow ? (
+              <Button
+                className="h-8 text-11px"
+                icon={Copy}
+                onClick={() =>
+                  onDuplicateRow(lineId, buildMeasurementTarget(lastRow.id, rows.length - 1))
+                }
+                type="button"
+                variant="outline"
+              >
+                Ultima
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <div
+            className={`grid min-w-[982px] ${COLS} bg-[var(--bg-muted)]/50 text-11px font-bold uppercase tracking-wider text-[var(--text-secondary)]`}
+          >
+            {["Data", "Stazione", "Descrizione", "F1", "F2", "F3", "Parziale", "Note", ""].map(
+              (label) => (
+                <div
+                  className="border-r border-[var(--border-subtle)]/40 px-2 py-2 last:border-r-0"
+                  key={label || "actions"}
+                >
+                  {label}
+                </div>
+              ),
+            )}
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="grid min-w-[982px] grid-cols-1 border-t border-[var(--border-subtle)]/30 bg-[var(--surface-base)]">
+              <div className="px-3 py-4 text-center text-11px text-[var(--text-tertiary)]">
+                Nessuna riga misura. Aggiungi la prima riga per iniziare.
+              </div>
+            </div>
+          ) : (
+            rows.map((row, rowIndex) => {
+              const rowTarget = buildMeasurementTarget(row.id, rowIndex);
+              return (
+                <div
+                  className={`grid min-w-[982px] ${COLS} border-t border-[var(--border-subtle)]/30 bg-[var(--surface-base)] text-12px font-medium transition-colors hover:bg-[var(--accent-primary)]/[0.03]`}
+                  key={`${row.id}-${row.order}`}
+                >
+                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
+                    <input
+                      aria-label="Data misura"
+                      className="h-9 w-full rounded-md border border-transparent bg-[var(--bg-muted)]/40 px-3 text-12px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      onChange={(e) => onUpdateRow(lineId, rowTarget, { date: e.target.value })}
+                      type="date"
+                      value={row.date}
+                    />
+                  </div>
+                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
+                    <input
+                      aria-label="Stazione"
+                      className="h-9 w-full rounded-md border border-transparent bg-[var(--bg-muted)]/40 px-3 text-12px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      onChange={(e) => onUpdateRow(lineId, rowTarget, { station: e.target.value })}
+                      placeholder="Stazione"
+                      value={row.station ?? ""}
+                    />
+                  </div>
+                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
+                    <input
+                      aria-label="Descrizione misura"
+                      className="h-9 w-full rounded-md border border-transparent bg-[var(--bg-muted)]/40 px-3 text-12px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      onChange={(e) =>
+                        onUpdateRow(lineId, rowTarget, { description: e.target.value })
+                      }
+                      placeholder="Descrizione"
+                      value={row.description}
+                    />
+                  </div>
+                  {MEASUREMENT_FACTOR_FIELDS.map((field) => {
+                    const draftKey = `${row.id}:${row.order}:${field}`;
+                    return (
+                      <div
+                        className="border-r border-[var(--border-subtle)]/40 px-2 py-2"
+                        key={draftKey}
+                      >
+                        <input
+                          aria-label={field}
+                          className="h-9 w-full rounded-md border border-transparent bg-[var(--bg-muted)]/40 px-3 text-right font-mono text-12px font-semibold tabular-nums text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                          inputMode="decimal"
+                          onBlur={() => {
+                            setFactorDrafts((current) => {
+                              const { [draftKey]: _removed, ...next } = current;
+                              return next;
+                            });
+                          }}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (!isDecimalDraft(raw)) return;
+                            setFactorDrafts((current) => ({ ...current, [draftKey]: raw }));
+                            const normalized = raw.replace(",", ".");
+                            const val = normalized === "" ? 0 : Number.parseFloat(normalized);
+                            if (Number.isFinite(val)) {
+                              onUpdateRow(lineId, rowTarget, { [field]: val });
+                            }
+                          }}
+                          value={factorDrafts[draftKey] ?? formatFactorInput(row[field])}
+                        />
+                      </div>
+                    );
+                  })}
+                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2 text-right font-mono font-bold tabular-nums text-[var(--text-primary)]">
+                    <span className="flex h-9 items-center justify-end rounded-md bg-[var(--accent-primary)]/[0.08] px-3 text-12px font-bold text-[var(--accent-primary)]">
+                      {row.partialQuantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
+                    </span>
+                  </div>
+                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
+                    <input
+                      aria-label="Note riga"
+                      className="h-9 w-full rounded-md border border-transparent bg-[var(--bg-muted)]/40 px-3 text-12px font-medium text-[var(--text-secondary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      onChange={(e) => onUpdateRow(lineId, rowTarget, { notes: e.target.value })}
+                      placeholder="Note"
+                      value={row.notes}
+                    />
+                  </div>
+                  <div className="flex items-center justify-center gap-1 px-1.5 py-1.5">
+                    <button
+                      aria-label="Duplica riga"
+                      className="flex size-7 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                      onClick={() => onDuplicateRow(lineId, rowTarget)}
+                      type="button"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                    <button
+                      aria-label="Elimina riga"
+                      className={cn(
+                        "flex size-7 items-center justify-center rounded-md transition-colors",
+                        hasMultipleRows
+                          ? "text-[var(--text-tertiary)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+                          : "cursor-not-allowed text-[var(--text-tertiary)] opacity-35",
+                      )}
+                      disabled={!hasMultipleRows}
+                      onClick={() => onRemoveRow(lineId, rowTarget)}
+                      type="button"
+                      title={
+                        hasMultipleRows
+                          ? "Elimina riga"
+                          : "Il libretto deve mantenere almeno una riga"
+                      }
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          <div
+            className={`grid min-w-[982px] ${COLS} border-t border-[var(--border-subtle)]/30 bg-[var(--accent-primary)]/[0.06] text-12px font-bold`}
+          >
+            <div className="col-span-6 px-2 py-2 text-right text-[var(--text-tertiary)]">
+              sommano {unit}
+            </div>
+            <div className="px-2 py-2 text-right font-mono tabular-nums text-[var(--accent-primary)]">
+              {totalQuantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
+            </div>
+            <div />
+            <div />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-lg bg-[var(--bg-muted)]/30 p-4 ring-1 ring-[var(--border-subtle)]/50">
+        <label className="block">
+          <span className="mb-2 block text-10px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+            Note voce
+          </span>
+          <textarea
+            className="min-h-[88px] w-full resize-y rounded-lg border border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-3 py-2.5 text-12px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            placeholder={
+              linkedTotal > 0
+                ? `Annota criterio maggiorazioni: ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`
+                : "Aggiungi note di misura, riferimenti o riserve..."
+            }
+            rows={3}
+            value={notes}
+            onChange={(e) => onNotesChange(lineId, e.target.value)}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
 
 function GridCell({
   align = "left",
@@ -743,11 +926,11 @@ function GridCell({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center border-r border-[var(--border-subtle)]/60 px-2 py-1 last:border-r-0",
+        "flex min-w-0 items-center border-r border-[var(--border-subtle)]/40 px-2.5 py-1.5 last:border-r-0",
         align === "center" && "justify-center text-center",
         align === "right" && "justify-end text-right tabular-nums",
-        editable && "bg-[color-mix(in_srgb,var(--warning-soft)_18%,transparent)]",
-        muted && "text-[var(--text-secondary)]",
+        editable && "bg-[var(--bg-muted)]/25",
+        muted && "text-[var(--text-tertiary)]",
         strong && "font-semibold text-[var(--text-primary)]",
       )}
       title={title}
@@ -773,16 +956,16 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
 
   if (lines.length === 0) {
     return (
-      <div className="rounded-2xl bg-[var(--bg-muted)]/50">
+      <div className="rounded-2xl bg-[var(--bg-muted)]/30">
         <EmptyTableState message="Il registro SAL apparirà quando avrai selezionato almeno una voce tariffaria." />
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl bg-[var(--bg-muted)]/50">
+    <div className="overflow-x-auto rounded-2xl bg-[var(--bg-muted)]/30">
       <div className="min-w-[1100px]">
-        <div className="grid-col-fade sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_60px_36px] gap-3 bg-[color-mix(in_srgb,var(--surface-base)_95%,var(--bg-muted)_5%)] p-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
+        <div className="sticky top-0 z-10 grid grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_60px_36px] gap-3 bg-[var(--surface-base)] p-3 text-xs font-semibold text-secondary shadow-[0_10px_24px_rgba(0,0,0,0.03)]">
           <span />
           <span>Tariffario</span>
           <span>Codice</span>
@@ -809,7 +992,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
               const expanded = expandedId === line.id;
               return (
                 <div
-                  className="absolute left-0 right-0 border-t border-[var(--border-subtle)]/50"
+                  className="absolute left-0 right-0 border-t border-[var(--border-subtle)]/30"
                   data-index={virtualRow.index}
                   key={line.id}
                   ref={(node) => rowVirtualizer.measureElement(node)}
@@ -819,7 +1002,7 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                 >
                   <m.button
                     aria-expanded={expanded}
-                    className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_60px_36px] items-center p-3 text-left text-13px hover:bg-[var(--bg-muted)]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    className="grid w-full grid-cols-[44px_150px_105px_minmax(240px,1fr)_70px_118px_118px_112px_118px_60px_36px] items-center p-3 text-left text-13px hover:bg-[var(--bg-muted)]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                     onClick={() => setExpandedId(expanded ? null : line.id)}
                     type="button"
                     transition={{ duration: 0.42, ease: SPRING_EASE }}
@@ -849,23 +1032,23 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                     <StatusPill tone={line.status === "complete" ? "success" : "warning"}>
                       {line.status === "complete" ? "Completa" : "Da completare"}
                     </StatusPill>
-                    <MoreHorizontal className="size-5 text-[var(--text-secondary)]" />
+                    <MoreHorizontal className="size-5 text-[var(--text-tertiary)]" />
                   </m.button>
                   {expanded ? (
-                    <div className="grid gap-3 border-t border-[var(--border-subtle)] bg-[var(--bg-muted)]/20 p-3 lg:grid-cols-[1.25fr_1fr]">
+                    <div className="grid gap-3 border-t border-[var(--border-subtle)] bg-[var(--bg-muted)]/15 p-3 lg:grid-cols-[1.25fr_1fr]">
                       <NestedTable
                         columns={["Descrizione", "U.M.", "F1", "F2", "F3", "Qtà", "Note"]}
                         title="Misure"
                       >
                         {line.measurementRows.length === 0 ? (
                           <tr>
-                            <td className="p-3 text-[var(--text-secondary)]" colSpan={7}>
+                            <td className="p-3 text-[var(--text-tertiary)]" colSpan={7}>
                               Nessuna misura inserita.
                             </td>
                           </tr>
                         ) : (
                           line.measurementRows.map((row) => (
-                            <tr className="border-t border-[var(--border-subtle)]/50" key={row.id}>
+                            <tr className="border-t border-[var(--border-subtle)]/30" key={row.id}>
                               <td className="px-3 py-2">{row.description}</td>
                               <td className="px-3 py-2">{row.unit}</td>
                               <td className="px-3 py-2 text-right">
@@ -891,14 +1074,14 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
                       >
                         {line.linkedCharges.length === 0 ? (
                           <tr>
-                            <td className="p-3 text-[var(--text-secondary)]" colSpan={5}>
+                            <td className="p-3 text-[var(--text-tertiary)]" colSpan={5}>
                               Nessuna maggiorazione attiva.
                             </td>
                           </tr>
                         ) : (
                           line.linkedCharges.map((charge) => (
                             <tr
-                              className="border-t border-[var(--border-subtle)]/50"
+                              className="border-t border-[var(--border-subtle)]/30"
                               key={charge.id}
                             >
                               <td className="px-3 py-2">{charge.code}</td>
@@ -961,10 +1144,10 @@ export function DocumentPreview({
   const truncated = lines.length > maxLines;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]">
+    <div className="overflow-hidden rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
       {/* Receipt header */}
-      <div className="border-b border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base)_96%)] px-4 py-2.5">
-        <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+      <div className="border-b border-[var(--border-subtle)]/40 bg-[var(--accent-primary)]/[0.02] px-4 py-2.5">
+        <div className="text-10px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
           Libretto delle misure
         </div>
         <div className="flex items-baseline justify-between gap-2">
@@ -982,7 +1165,7 @@ export function DocumentPreview({
       </div>
 
       {/* Receipt items */}
-      <div className="divide-y divide-[color-mix(in_srgb,var(--accent-primary)_6%,transparent)]">
+      <div className="divide-y divide-[var(--border-subtle)]/20">
         {lines.length === 0 ? (
           <div className="px-4 py-6 text-center text-12px text-[var(--text-tertiary)]">
             Anteprima dopo l'inserimento delle voci.
@@ -999,7 +1182,7 @@ export function DocumentPreview({
                     {line.voice.code}
                   </span>
                   <span className="text-[var(--text-tertiary)]">·</span>
-                  <span className="truncate text-[var(--text-secondary)]">
+                  <span className="truncate text-[var(--text-tertiary)]">
                     {line.voice.description}
                   </span>
                 </div>
@@ -1026,9 +1209,9 @@ export function DocumentPreview({
       </div>
 
       {/* Receipt footer — matches equation layout */}
-      <div className="border-t border-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] bg-[color-mix(in_srgb,var(--accent-primary)_2%,var(--surface-base)_98%)] px-4 py-2.5">
+      <div className="border-t border-[var(--border-subtle)]/40 bg-[var(--accent-primary)]/[0.01] px-4 py-2.5">
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-11px text-[var(--text-secondary)]">
+          <div className="flex items-center justify-between text-11px text-[var(--text-tertiary)]">
             <span>Voci lordo</span>
             <span className="tabular-nums font-semibold text-[var(--text-primary)]">
               {grossTotal.toLocaleString("it-IT", {
@@ -1063,7 +1246,7 @@ export function DocumentPreview({
           )}
         </div>
         {hasMg || hasSurcharges ? (
-          <div className="mt-1 flex items-center justify-between border-t border-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)] pt-1 text-12px font-bold text-[var(--accent-primary)]">
+          <div className="mt-1 flex items-center justify-between border-t border-[var(--border-subtle)]/30 pt-1 text-12px font-bold text-[var(--accent-primary)]">
             <span>= Totale con maggiorazioni</span>
             <span className="tabular-nums">
               {(grossTotal + mgTotal + surchargeTotal).toLocaleString("it-IT", {
@@ -1085,7 +1268,7 @@ export function DocumentPreview({
             </span>
           </div>
         )}
-        <div className="mt-1 flex items-center justify-between border-t border-[color-mix(in_srgb,var(--accent-primary)_15%,transparent)] pt-1.5 text-13px font-black text-[var(--accent-primary)]">
+        <div className="mt-1 flex items-center justify-between border-t border-[var(--border-subtle)]/30 pt-1.5 text-13px font-black text-[var(--accent-primary)]">
           <span>= Totale netto SAL</span>
           <span className="tabular-nums">
             {total.toLocaleString("it-IT", {
@@ -1148,22 +1331,22 @@ export function BreakdownDetails({
   if (!hasMg && !hasDiscount) return null;
 
   return (
-    <div className="rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_96%,var(--bg-muted)_4%)] ring-1 ring-[var(--border-subtle)]/70">
-      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)]/60 px-4 py-3">
-        <span className="text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+    <div className="rounded-xl bg-[var(--surface-base)]/80 ring-1 ring-[var(--border-subtle)]/50">
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)]/40 px-4 py-3">
+        <span className="text-11px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
           Riepilogo economico
         </span>
       </div>
-      <div className="grid gap-px bg-[var(--border-subtle)]/40 md:grid-cols-2">
+      <div className="grid gap-px bg-[var(--border-subtle)]/30 md:grid-cols-2">
         {hasMg
           ? mgEntries.map((entry) => (
               <div
-                className="flex flex-col justify-center bg-[color-mix(in_srgb,var(--surface-base)_90%,var(--info-base)_2%)] px-4 py-3"
+                className="flex flex-col justify-center bg-[var(--surface-base)] px-4 py-3"
                 key={entry.code}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--info-base)_12%,var(--surface-base)_88%)] text-12px font-bold text-[var(--info-base)]">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--info-base)]/10 text-12px font-bold text-[var(--info-base)]">
                       MG
                     </span>
                     <span className="truncate text-12px font-semibold text-[var(--text-primary)]">
@@ -1174,7 +1357,7 @@ export function BreakdownDetails({
                     +<Currency value={entry.total} />
                   </span>
                 </div>
-                <div className="mt-1 flex items-center gap-2 pl-8 text-11px text-[var(--text-secondary)]">
+                <div className="mt-1 flex items-center gap-2 pl-8 text-11px text-[var(--text-tertiary)]">
                   <span>
                     su <Currency value={entry.baseAmount} />
                   </span>
@@ -1185,10 +1368,10 @@ export function BreakdownDetails({
             ))
           : null}
         {hasDiscount ? (
-          <div className="flex flex-col justify-center bg-[color-mix(in_srgb,var(--surface-base)_90%,var(--danger-base)_2%)] px-4 py-3">
+          <div className="flex flex-col justify-center bg-[var(--surface-base)] px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--danger-base)_12%,var(--surface-base)_88%)] text-12px font-bold text-[var(--danger-base)]">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--danger-base)]/10 text-12px font-bold text-[var(--danger-base)]">
                   %
                 </span>
                 <span className="truncate text-12px font-semibold text-[var(--text-primary)]">
@@ -1199,7 +1382,7 @@ export function BreakdownDetails({
                 -<Currency value={discountAmount} />
               </span>
             </div>
-            <div className="mt-1 flex items-center gap-2 pl-8 text-11px text-[var(--text-secondary)]">
+            <div className="mt-1 flex items-center gap-2 pl-8 text-11px text-[var(--text-tertiary)]">
               <span>
                 su <Currency value={discountableAmount} />
               </span>
@@ -1225,18 +1408,18 @@ export function OutputRow({
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3",
-        disabled && "opacity-60",
+        "flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-3.5",
+        disabled && "opacity-50",
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
         {icon}
         <span className="truncate text-sm font-semibold">{label}</span>
       </div>
-      <span className="hidden text-xs font-semibold text-[var(--success-base)] md:inline">
+      <span className="hidden text-xs font-medium text-[var(--success-base)] md:inline">
         {disabled ? "Non disponibile" : "Pronto per export"}
       </span>
-      <Download className="size-4 text-[var(--text-secondary)]" />
+      <Download className="size-4 text-[var(--text-tertiary)]" />
     </div>
   );
 }
@@ -1257,7 +1440,7 @@ function NestedTable({
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse text-left text-12px">
-          <thead className="bg-[var(--bg-muted)]/45 text-[var(--text-secondary)]">
+          <thead className="bg-[var(--bg-muted)]/30 text-[var(--text-tertiary)]">
             <tr>
               {columns.map((col) => (
                 <th className="px-3 py-2 font-semibold" key={col}>
@@ -1275,7 +1458,7 @@ function NestedTable({
 
 function EmptyTableState({ message }: { message: string }) {
   return (
-    <div className="border-t border-[var(--border-subtle)] px-4 py-8 text-center text-13px text-[var(--text-secondary)]">
+    <div className="border-t border-[var(--border-subtle)] px-4 py-8 text-center text-13px text-[var(--text-tertiary)]">
       {message}
     </div>
   );

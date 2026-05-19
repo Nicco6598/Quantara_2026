@@ -28,8 +28,28 @@ export type SalMaterialUsage = {
   quantity: number;
 };
 
+export type SalMeasurementRowPersist = {
+  date: string;
+  day?: string | undefined;
+  description: string;
+  factor1: number;
+  factor2: number;
+  factor3: number;
+  flag?: string | undefined;
+  from?: string | undefined;
+  id: string;
+  notes?: string | undefined;
+  order: number;
+  partialQuantity: number;
+  station?: string | undefined;
+  section?: string | undefined;
+  unit: string;
+  voiceId: string;
+};
+
 export type SalLine = {
   id: string;
+  measurementRows?: SalMeasurementRowPersist[];
   notes?: string;
   quantity: number;
   surcharge: SalSurchargeKind;

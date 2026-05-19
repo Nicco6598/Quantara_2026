@@ -12,15 +12,32 @@ import {
   type SalDocument,
   type SalTariffVoice,
 } from "../../apps/desktop/src/features/sal/domain/sal-workflow";
-import type { SalLineDraft } from "../../apps/desktop/src/features/sal/types";
+import type {
+  SalLineDraft,
+  SalMeasurementRowDraft,
+} from "../../apps/desktop/src/features/sal/types";
+
+function row(overrides?: Partial<SalMeasurementRowDraft>): SalMeasurementRowDraft {
+  return {
+    date: "2026-01-15",
+    description: "Misura",
+    factor1: 1,
+    factor2: 1,
+    factor3: 1,
+    id: "mr-default",
+    notes: "",
+    order: 1,
+    partialQuantity: 1,
+    unit: "m",
+    ...overrides,
+  };
+}
 
 const ordinaryLine: SalLineDraft = {
-  factor1: 2,
-  factor2: 3,
-  factor3: 4,
   id: "line-ordinary",
+  measurementRows: [row({ factor1: 2, factor2: 3, factor3: 4 })],
   notes: "test",
-  quantity: 24,
+  sourceType: "voice",
   surchargePercent: 10,
   voice: {
     category: "Opere",
@@ -35,12 +52,10 @@ const ordinaryLine: SalLineDraft = {
 };
 
 const safetyLine: SalLineDraft = {
-  factor1: 1,
-  factor2: 5,
-  factor3: 2,
   id: "line-safety",
+  measurementRows: [row({ id: "mr-safety-1", factor1: 1, factor2: 5, factor3: 2, unit: "cad" })],
   notes: "",
-  quantity: 10,
+  sourceType: "voice",
   surchargePercent: 0,
   voice: {
     category: "Sicurezza",
@@ -98,7 +113,12 @@ describe("SAL calculations", () => {
 
   it("marks zero or invalid quantities as incomplete without negative totals", () => {
     const views = buildLineViews(
-      [{ ...ordinaryLine, factor1: Number.NaN, factor2: 1, factor3: 1 }],
+      [
+        {
+          ...ordinaryLine,
+          measurementRows: [row({ factor1: Number.NaN, factor2: 1, factor3: 1 })],
+        },
+      ],
       defaultSalEconomicRules,
     );
 
@@ -108,7 +128,7 @@ describe("SAL calculations", () => {
       status: "incomplete",
       totalAmount: 0,
     });
-    expect(views[0]?.measurementRows).toHaveLength(0);
+    expect(views[0]?.measurementRows).toHaveLength(1);
   });
 
   it("reapplies the tender discount to every added line and quantity update", () => {
@@ -116,19 +136,15 @@ describe("SAL calculations", () => {
       ...defaultSalEconomicRules,
       discountPercent: 10,
     };
-    const firstLine = {
+    const firstLine: SalLineDraft = {
       ...ordinaryLine,
-      factor1: 2,
-      factor2: 1,
-      factor3: 1,
+      measurementRows: [row({ factor1: 2, factor2: 1, factor3: 1 })],
       surchargePercent: 0,
       voice: { ...ordinaryLine.voice, id: "voice-a", unitPrice: 100 },
     };
-    const secondLine = {
+    const secondLine: SalLineDraft = {
       ...ordinaryLine,
-      factor1: 3,
-      factor2: 1,
-      factor3: 1,
+      measurementRows: [row({ factor1: 3, factor2: 1, factor3: 1 })],
       id: "line-second",
       surchargePercent: 0,
       voice: { ...ordinaryLine.voice, id: "voice-b", unitPrice: 50 },
@@ -145,7 +161,10 @@ describe("SAL calculations", () => {
     });
 
     const updatedViews = buildLineViews(
-      [firstLine, { ...secondLine, factor1: 4 }],
+      [
+        firstLine,
+        { ...secondLine, measurementRows: [row({ factor1: 4, factor2: 1, factor3: 1 })] },
+      ],
       tenPercentRules,
     );
     const updatedSummary = summarizeSalLines(updatedViews, 1_000, 0);
@@ -184,7 +203,7 @@ describe("SAL calculations", () => {
   it("does not create fake discounts for zero quantity or zero price", () => {
     const views = buildLineViews(
       [
-        { ...ordinaryLine, factor1: 0, factor2: 1, factor3: 1 },
+        { ...ordinaryLine, measurementRows: [row({ factor1: 0, factor2: 1, factor3: 1 })] },
         { ...ordinaryLine, id: "zero-price", voice: { ...ordinaryLine.voice, unitPrice: 0 } },
       ],
       defaultSalEconomicRules,
@@ -197,7 +216,11 @@ describe("SAL calculations", () => {
     const lines = [
       { ...ordinaryLine, surchargePercent: 30 },
       safetyLine,
-      { ...ordinaryLine, id: "zero-qty", factor1: 0, factor2: 1, factor3: 1 },
+      {
+        ...ordinaryLine,
+        id: "zero-qty",
+        measurementRows: [row({ factor1: 0, factor2: 1, factor3: 1 })],
+      },
       { ...ordinaryLine, id: "zero-price", voice: { ...ordinaryLine.voice, unitPrice: 0 } },
     ];
     const views = buildLineViews(lines, {
@@ -319,13 +342,11 @@ describe("SAL edge cases - regression tests", () => {
   });
 
   it("handles very large quantities without overflow", () => {
-    const largeLine = {
+    const largeLine: SalLineDraft = {
       id: "line-large",
-      factor1: 1000000,
-      factor2: 1,
-      factor3: 1,
+      measurementRows: [row({ id: "mr-large", factor1: 1000000, factor2: 1, factor3: 1 })],
       notes: "",
-      quantity: 1000000,
+      sourceType: "voice",
       surchargePercent: 0,
       voice: {
         category: "Opere",
@@ -348,11 +369,9 @@ describe("SAL edge cases - regression tests", () => {
       [
         {
           id: "line-1",
-          factor1: 1,
-          factor2: 1,
-          factor3: 1,
+          measurementRows: [row({ factor1: 1, factor2: 1, factor3: 1 })],
           notes: "",
-          quantity: 1,
+          sourceType: "voice",
           surchargePercent: 0,
           voice: {
             category: "Opere",
@@ -377,11 +396,9 @@ describe("SAL edge cases - regression tests", () => {
       [
         {
           id: "line-1",
-          factor1: 1,
-          factor2: 1,
-          factor3: 1,
+          measurementRows: [row({ factor1: 1, factor2: 1, factor3: 1 })],
           notes: "",
-          quantity: 1,
+          sourceType: "voice",
           surchargePercent: 0,
           voice: {
             category: "Opere",
@@ -402,13 +419,11 @@ describe("SAL edge cases - regression tests", () => {
   });
 
   it("surcharge without labor percentage produces zero linked charge", () => {
-    const line = {
+    const line: SalLineDraft = {
       id: "line-1",
-      factor1: 1,
-      factor2: 1,
-      factor3: 1,
+      measurementRows: [row({ factor1: 1, factor2: 1, factor3: 1 })],
       notes: "",
-      quantity: 1,
+      sourceType: "voice",
       surchargePercent: 10,
       voice: {
         category: "Opere",

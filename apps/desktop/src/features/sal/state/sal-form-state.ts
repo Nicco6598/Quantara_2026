@@ -1,12 +1,12 @@
 import type { DesktopMaterial } from "@/lib/desktopData";
 import type { SalSurchargeKind } from "../domain/sal-workflow";
-import type { SalEconomicRules, SalLineDraft } from "../types";
+import type { SalEconomicRules, SalLineDraft, SalMeasurementRowDraft } from "../types";
 import type { SalWorkflowPhase } from "./workflow";
 
 export const PHASE_ORDER: SalWorkflowPhase[] = [
-  "context",
-  "voices",
-  "review",
+  "project",
+  "measure",
+  "verify",
   "confirm",
   "completed",
 ];
@@ -31,7 +31,21 @@ export type SalFormAction =
   | { type: "SAL_TITLE"; salTitle: string }
   | { type: "PHASE"; phase: SalWorkflowPhase }
   | { type: "MATERIAL_USAGE"; materialUsage: Record<string, number> }
-  | { type: "ALL"; partial: Partial<SalFormState> };
+  | { type: "ALL"; partial: Partial<SalFormState> }
+  | { type: "ADD_MEASUREMENT_ROW"; lineId: string; row: SalMeasurementRowDraft }
+  | { type: "REMOVE_MEASUREMENT_ROW"; lineId: string; measurementId: string }
+  | {
+      type: "DUPLICATE_MEASUREMENT_ROW";
+      lineId: string;
+      measurementId: string;
+      newRow: SalMeasurementRowDraft;
+    }
+  | {
+      type: "UPDATE_MEASUREMENT_ROW";
+      lineId: string;
+      measurementId: string;
+      updates: Partial<SalMeasurementRowDraft>;
+    };
 
 export function salFormReducer(state: SalFormState, action: SalFormAction): SalFormState {
   switch (action.type) {
@@ -47,5 +61,49 @@ export function salFormReducer(state: SalFormState, action: SalFormAction): SalF
       return { ...state, materialUsage: action.materialUsage };
     case "ALL":
       return { ...state, ...action.partial };
+    case "ADD_MEASUREMENT_ROW":
+      return {
+        ...state,
+        lines: state.lines.map((l) =>
+          l.id === action.lineId
+            ? { ...l, measurementRows: [...l.measurementRows, action.row] }
+            : l,
+        ),
+      };
+    case "REMOVE_MEASUREMENT_ROW":
+      return {
+        ...state,
+        lines: state.lines.map((l) =>
+          l.id === action.lineId
+            ? {
+                ...l,
+                measurementRows: l.measurementRows.filter((r) => r.id !== action.measurementId),
+              }
+            : l,
+        ),
+      };
+    case "DUPLICATE_MEASUREMENT_ROW":
+      return {
+        ...state,
+        lines: state.lines.map((l) =>
+          l.id === action.lineId
+            ? { ...l, measurementRows: [...l.measurementRows, action.newRow] }
+            : l,
+        ),
+      };
+    case "UPDATE_MEASUREMENT_ROW":
+      return {
+        ...state,
+        lines: state.lines.map((l) =>
+          l.id === action.lineId
+            ? {
+                ...l,
+                measurementRows: l.measurementRows.map((r) =>
+                  r.id === action.measurementId ? { ...r, ...action.updates } : r,
+                ),
+              }
+            : l,
+        ),
+      };
   }
 }

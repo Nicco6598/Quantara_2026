@@ -47,18 +47,18 @@ export function SaveAsTemplateDialog({
           <h3 className="text-15px font-semibold text-[var(--text-primary)]">
             Salva come template
           </h3>
-          <p className="mt-2 text-13px text-[var(--text-secondary)]">
+          <p className="mt-2 text-13px text-[var(--text-tertiary)]">
             Salva le voci e le regole economiche correnti come template per utilizzarle in futuro.
           </p>
           <div className="mt-4">
             <label
-              className="text-11px font-semibold uppercase tracking-widest text-[var(--text-secondary)]"
+              className="text-11px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]"
               htmlFor="template-name"
             >
               Nome template
             </label>
             <input
-              className="mt-1 h-10 w-full rounded-10px border border-[var(--border-subtle)] bg-[var(--bg-muted)]/50 px-3 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              className="mt-1 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)]/30 px-3 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
               id="template-name"
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
@@ -68,7 +68,7 @@ export function SaveAsTemplateDialog({
               value={name}
             />
           </div>
-          <div className="mt-2 text-12px text-[var(--text-secondary)]">
+          <div className="mt-2 text-12px text-[var(--text-tertiary)]">
             {voiceEntries.length} voci · fattori e maggiorazioni
           </div>
           <DialogActions>

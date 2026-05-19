@@ -2,6 +2,7 @@ import type {
   SalDocument,
   SalLine,
   SalLineDraft,
+  SalMeasurementRowDraft,
   SalSurchargeKind,
   SalTariffVoice,
 } from "../types";
@@ -76,13 +77,47 @@ function buildSalDocumentViewWithVoiceMap(
       const voice = voiceById.get(line.voiceId);
       if (!voice) return [];
 
+      // Build measurement rows from persisted data or synthesize from quantity
+      let measurementRows: SalMeasurementRowDraft[];
+      if (line.measurementRows && line.measurementRows.length > 0) {
+        measurementRows = line.measurementRows.map((r, idx) => ({
+          date: r.date,
+          day: r.day,
+          description: r.description,
+          factor1: r.factor1,
+          factor2: r.factor2,
+          factor3: r.factor3,
+          flag: r.flag,
+          from: r.from,
+          id: r.id,
+          notes: r.notes ?? "",
+          order: r.order ?? idx,
+          partialQuantity: r.partialQuantity,
+          station: r.station,
+          section: r.section,
+          unit: r.unit,
+        }));
+      } else {
+        measurementRows = [
+          {
+            date: document.date,
+            description: "Misura corrente",
+            factor1: line.quantity,
+            factor2: 1,
+            factor3: 1,
+            id: `${line.id}-legacy`,
+            notes: "",
+            order: 0,
+            partialQuantity: line.quantity,
+            unit: voice.unit,
+          },
+        ];
+      }
+
       const draftLine: SalLineDraft = {
         id: line.id,
-        factor1: line.quantity,
-        factor2: 1,
-        factor3: 1,
-        notes: "",
-        quantity: line.quantity,
+        measurementRows,
+        notes: line.notes ?? "",
         sourceType: "voice",
         surchargePercent: line.surchargePercent ?? getSurchargePercent(line.surcharge),
         voice: {

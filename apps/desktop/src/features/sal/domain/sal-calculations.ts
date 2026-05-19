@@ -6,7 +6,7 @@ import type {
   SalLineDraft,
   SalLineView,
   SalLinkedCharge,
-  SalMeasurementRow,
+  SalMeasurementRowDraft,
   SalVerificationCheck,
 } from "../types";
 
@@ -20,11 +20,11 @@ export const defaultSalEconomicRules: SalEconomicRules = {
 /* ── MG (maggiorazione percentuale) helpers ── */
 const MG_SEGMENT = "MG";
 
-function isMgCode(code: string): boolean {
+export function isMgCode(code: string): boolean {
   return code.split(".")[1]?.toUpperCase() === MG_SEGMENT;
 }
 
-function extractMgTariffPrefix(code: string): string | null {
+export function extractMgTariffPrefix(code: string): string | null {
   const first = code.split(".")[0];
   return first && first.toUpperCase() !== MG_SEGMENT ? first : null;
 }
@@ -36,12 +36,11 @@ export function buildLineViews(
   // Phase 1 — build every line; MG lines get zero gross
   const mgIndexes: number[] = [];
   const views: SalLineView[] = lines.map((line, index) => {
-    const rawQty = line.factor1 * line.factor2 * line.factor3;
     const isMg = isMgCode(line.voice.code);
-
     if (isMg) mgIndexes.push(index);
 
-    const quantity = normalizeQuantity(isMg ? 0 : rawQty);
+    const rawQty = isMg ? 0 : computeQuantityFromRows(line.measurementRows);
+    const quantity = normalizeQuantity(rawQty);
     const grossAmount = roundCurrency(isMg ? 0 : quantity * line.voice.unitPrice);
     const linkedCharges = buildLinkedCharges(line, grossAmount);
     const linkedTotal = linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
@@ -59,13 +58,31 @@ export function buildLineViews(
       discountableAmount: discountable,
       grossAmount,
       linkedCharges,
-      measurementRows: buildMeasurementRows(line, quantity, index),
       netAmount,
       quantity,
       status: isMg || quantity > 0 ? "complete" : "incomplete",
       totalAmount,
     };
   });
+  const mgIndexSet = new Set(mgIndexes);
+  const nonMgIndexes: number[] = [];
+  const indexesByPrefix = new Map<string, number[]>();
+  const grossByPrefix = new Map<string, number>();
+  let totalNonMgGross = 0;
+  for (let index = 0; index < views.length; index++) {
+    if (mgIndexSet.has(index)) continue;
+    const view = views[index];
+    if (!view) continue;
+    nonMgIndexes.push(index);
+    totalNonMgGross += view.grossAmount;
+    const prefix = view.voice.code.split(".")[0] ?? "";
+    if (prefix) {
+      const indexes = indexesByPrefix.get(prefix) ?? [];
+      indexes.push(index);
+      indexesByPrefix.set(prefix, indexes);
+      grossByPrefix.set(prefix, (grossByPrefix.get(prefix) ?? 0) + view.grossAmount);
+    }
+  }
 
   // Phase 2 — compute MG surcharges and re-apply discount on (gross + MG)
   for (const idx of mgIndexes) {
@@ -76,20 +93,15 @@ export function buildLineViews(
 
     const tariffPrefix = extractMgTariffPrefix(mgView.voice.code);
     const mgRate = mgPercent / 100;
-    const eligibleGross = views.reduce((sum, v, vi) => {
-      if (mgIndexes.includes(vi)) return sum;
-      if (tariffPrefix && !v.voice.code.startsWith(`${tariffPrefix}.`)) return sum;
-      return sum + v.grossAmount;
-    }, 0);
+    const eligibleIndexes = tariffPrefix ? (indexesByPrefix.get(tariffPrefix) ?? []) : nonMgIndexes;
+    const eligibleGross = tariffPrefix ? (grossByPrefix.get(tariffPrefix) ?? 0) : totalNonMgGross;
     if (eligibleGross <= 0) continue;
     let totalDistributedMg = 0;
 
     // Distribute MG to each eligible voice and re-compute discount on gross + MG
-    for (let vi = 0; vi < views.length; vi++) {
-      if (mgIndexes.includes(vi)) continue;
+    for (const vi of eligibleIndexes) {
       const ev = views[vi];
       if (!ev) continue;
-      if (tariffPrefix && !ev.voice.code.startsWith(`${tariffPrefix}.`)) continue;
       if (ev.grossAmount <= 0) continue;
 
       const mgShare = roundCurrency(ev.grossAmount * mgRate);
@@ -260,6 +272,83 @@ export function buildVerificationChecks(
     tone: completeLines === lineViews.length ? "success" : "warning",
   });
 
+  // ── Measurement row checks ──
+
+  // Rows without date
+  const rowsWithoutDate: string[] = [];
+  for (const line of lineViews) {
+    if (isMgCode(line.voice.code)) continue;
+    const empty = line.measurementRows.filter((r) => !r.date);
+    if (empty.length > 0) rowsWithoutDate.push(line.voice.code);
+  }
+  if (rowsWithoutDate.length > 0) {
+    checks.push({
+      detail: `Le voci ${rowsWithoutDate.join(", ")} contengono righe misura senza data.`,
+      id: "no-date",
+      label: "Righe senza data",
+      result: `${rowsWithoutDate.length} voci`,
+      tone: "warning",
+    });
+  }
+
+  // Rows with zero partial but non-zero factors (likely incomplete)
+  const rowsPartialZero: string[] = [];
+  for (const line of lineViews) {
+    if (isMgCode(line.voice.code)) continue;
+    const suspect = line.measurementRows.filter(
+      (r) => r.partialQuantity <= 0 && (r.factor1 > 0 || r.factor2 > 0 || r.factor3 > 0),
+    );
+    if (suspect.length > 0) rowsPartialZero.push(line.voice.code);
+  }
+  if (rowsPartialZero.length > 0) {
+    checks.push({
+      detail: `Le voci ${rowsPartialZero.join(", ")} hanno righe con parziale zero nonostante i fattori siano compilati.`,
+      id: "zero-partial",
+      label: "Parziali zero sospetti",
+      result: `${rowsPartialZero.length} voci`,
+      tone: "warning",
+    });
+  }
+
+  // Rows with negative factors
+  const rowsNegative: string[] = [];
+  for (const line of lineViews) {
+    if (isMgCode(line.voice.code)) continue;
+    const neg = line.measurementRows.filter((r) => r.factor1 < 0 || r.factor2 < 0 || r.factor3 < 0);
+    if (neg.length > 0) rowsNegative.push(line.voice.code);
+  }
+  if (rowsNegative.length > 0) {
+    checks.push({
+      detail: `Le voci ${rowsNegative.join(", ")} contengono fattori negativi. Verifica le misure.`,
+      id: "negative-factors",
+      label: "Fattori negativi",
+      result: `${rowsNegative.length} voci`,
+      tone: "danger",
+    });
+  }
+
+  // Duplicate suspect rows (same voice + date + station + factors)
+  const duplicateSuspects: string[] = [];
+  for (const line of lineViews) {
+    if (isMgCode(line.voice.code)) continue;
+    const seen = new Map<string, number>();
+    for (const r of line.measurementRows) {
+      const key = `${r.date}|${r.station ?? ""}|${r.factor1}|${r.factor2}|${r.factor3}`;
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    const dupes = [...seen.values()].filter((c) => c > 1);
+    if (dupes.length > 0) duplicateSuspects.push(line.voice.code);
+  }
+  if (duplicateSuspects.length > 0) {
+    checks.push({
+      detail: `Le voci ${duplicateSuspects.join(", ")} hanno righe misura potenzialmente duplicate (stessa data, stazione e fattori).`,
+      id: "duplicate-suspect",
+      label: "Righe duplicate sospette",
+      result: `${duplicateSuspects.length} voci`,
+      tone: "warning",
+    });
+  }
+
   // Zero quantity lines
   if (zeroQtyLines.length > 0) {
     checks.push({
@@ -375,28 +464,14 @@ export function buildVerificationChecks(
   return checks;
 }
 
-function buildMeasurementRows(
-  line: SalLineDraft,
-  quantity: number,
-  index: number,
-): SalMeasurementRow[] {
-  if (quantity <= 0 && isMgCode(line.voice.code)) return [];
-  if (quantity <= 0) {
-    return [];
-  }
-
-  return [
-    {
-      description: "Misura corrente",
-      factor1: line.factor1,
-      factor2: line.factor2,
-      factor3: line.factor3,
-      id: `${line.id}-measurement-current`,
-      notes: line.notes.trim() || `Riga ${index + 1} da tariffario reale`,
-      partialQuantity: quantity,
-      unit: line.voice.unit,
-    },
-  ];
+function computeQuantityFromRows(rows: readonly SalMeasurementRowDraft[] | undefined): number {
+  if (!rows) return 0;
+  return rows.reduce((sum, r) => {
+    const f1 = Number.isFinite(r.factor1) && r.factor1 >= 0 ? r.factor1 : 0;
+    const f2 = Number.isFinite(r.factor2) && r.factor2 >= 0 ? r.factor2 : 0;
+    const f3 = Number.isFinite(r.factor3) && r.factor3 >= 0 ? r.factor3 : 0;
+    return sum + f1 * f2 * f3;
+  }, 0);
 }
 
 function buildLinkedCharges(line: SalLineDraft, grossAmount: number): SalLinkedCharge[] {

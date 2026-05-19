@@ -6,6 +6,7 @@ export type {
   SalEconomicRules,
   SalLine,
   SalMaterialUsage,
+  SalMeasurementRowPersist,
   SalProject,
   SalSurchargeKind,
   SalTariffVoice,
@@ -49,14 +50,29 @@ export type SalVoiceDraft = {
 
 export type SalLineDraft = {
   id: string;
+  measurementRows: SalMeasurementRowDraft[];
+  notes: string;
+  sourceType: "voice" | "material";
+  surchargePercent: number;
+  voice: SalVoiceDraft;
+};
+
+export type SalMeasurementRowDraft = {
+  date: string;
+  day?: string | undefined;
+  description: string;
   factor1: number;
   factor2: number;
   factor3: number;
+  flag?: string | undefined;
+  from?: string | undefined;
+  id: string;
   notes: string;
-  quantity: number;
-  surchargePercent: number;
-  sourceType: "voice" | "material";
-  voice: SalVoiceDraft;
+  order: number;
+  partialQuantity: number;
+  station?: string | undefined;
+  section?: string | undefined;
+  unit: string;
 };
 
 export type SalMaterialDraft = {
@@ -72,13 +88,20 @@ export type SalMaterialDraft = {
 };
 
 export type SalMeasurementRow = {
+  date: string;
+  day?: string | undefined;
   description: string;
   factor1: number;
   factor2: number;
   factor3: number;
+  flag?: string | undefined;
+  from?: string | undefined;
   id: string;
   notes: string;
+  order: number;
   partialQuantity: number;
+  station?: string | undefined;
+  section?: string | undefined;
   unit: string;
 };
 
@@ -96,8 +119,8 @@ export type SalLineView = SalLineDraft & {
   discountableAmount: number;
   grossAmount: number;
   linkedCharges: SalLinkedCharge[];
-  measurementRows: SalMeasurementRow[];
   netAmount: number;
+  quantity: number;
   status: "complete" | "incomplete";
   totalAmount: number;
 };
@@ -125,3 +148,35 @@ export type SalVerificationCheck = {
   result: string;
   tone: "success" | "warning" | "danger";
 };
+
+let _idCounter = 0;
+
+export function createMeasurementId(): string {
+  return `mr_${Date.now()}_${++_idCounter}`;
+}
+
+export function createEmptyMeasurementRow(unit: string, order: number): SalMeasurementRowDraft {
+  return {
+    date: new Date().toISOString().slice(0, 10),
+    description: "",
+    factor1: 0,
+    factor2: 1,
+    factor3: 1,
+    id: createMeasurementId(),
+    notes: "",
+    order,
+    partialQuantity: 0,
+    unit,
+  };
+}
+
+export function computeLineQuantity(rows: SalMeasurementRowDraft[]): number {
+  return rows.reduce((sum, r) => sum + r.partialQuantity, 0);
+}
+
+export function recalcPartialQuantity(row: SalMeasurementRowDraft): number {
+  const f1 = Number.isFinite(row.factor1) && row.factor1 >= 0 ? row.factor1 : 0;
+  const f2 = Number.isFinite(row.factor2) && row.factor2 >= 0 ? row.factor2 : 0;
+  const f3 = Number.isFinite(row.factor3) && row.factor3 >= 0 ? row.factor3 : 0;
+  return f1 * f2 * f3;
+}
