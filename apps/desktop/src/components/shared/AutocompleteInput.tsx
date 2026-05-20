@@ -17,6 +17,7 @@ type AutocompleteInputProps = {
   onSelect: (option: AutocompleteOption) => void;
   placeholder?: string;
   filterOptions?: (options: AutocompleteOption[], query: string) => AutocompleteOption[];
+  onQueryChange?: (query: string) => void;
 };
 
 const RESULTS_MAX_HEIGHT = 520;
@@ -28,6 +29,7 @@ export function AutocompleteInput({
   filterOptions,
   options,
   onSelect,
+  onQueryChange,
   placeholder = "Cerca per codice o descrizione...",
 }: AutocompleteInputProps) {
   const [query, setQuery] = useState("");
@@ -67,6 +69,7 @@ export function AutocompleteInput({
   function handleSelect(option: AutocompleteOption) {
     onSelect(option);
     setQuery("");
+    onQueryChange?.("");
     setIsOpen(false);
     setFloating(null);
     inputRef.current?.focus();
@@ -157,6 +160,7 @@ export function AutocompleteInput({
           onBlur={() => setTimeout(() => setIsOpen(false), 180)}
           onChange={(e) => {
             setQuery(e.target.value);
+            onQueryChange?.(e.target.value);
             setActiveIndex(0);
             setIsOpen(true);
           }}
@@ -173,6 +177,7 @@ export function AutocompleteInput({
             className="mr-2 flex size-7 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"
             onClick={() => {
               setQuery("");
+              onQueryChange?.("");
               setIsOpen(false);
               inputRef.current?.focus();
             }}

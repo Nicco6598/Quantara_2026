@@ -12,11 +12,7 @@ export type PendingReleaseNotes = {
 };
 
 export function storePendingReleaseNotes(notes: PendingReleaseNotes) {
-  try {
-    writeJsonToStorage(window.localStorage, STORAGE_KEY, notes);
-  } catch {
-    /* no-op */
-  }
+  writeJsonToStorage(window.localStorage, STORAGE_KEY, notes);
 }
 
 function clearPendingReleaseNotes() {

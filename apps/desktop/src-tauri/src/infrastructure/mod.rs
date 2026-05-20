@@ -1,8 +1,12 @@
 pub mod contract_repository;
+pub mod encryption;
 pub mod local_storage;
 pub mod material_repository;
+pub mod audit_repository;
 pub mod sal_repository;
+pub mod sal_document_repository_v2;
 pub mod tariff_repository;
+pub mod workspace_repository;
 
 use serde::Serialize;
 

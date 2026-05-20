@@ -1,16 +1,16 @@
 import { CheckCircle2 } from "lucide-react";
 import { AnimatePresence, m } from "framer-motion";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import type { SalDocument } from "@/features/sal/types";
 import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useNavigate } from "@/hooks/useNavigate";
-import { updateDesktopMaterial } from "@/lib/desktopData";
 import {
+  confirmSalTransaction,
   saveSalDocument,
   saveSalProject,
   updateSalDocument as updateBackendSalDocument,
 } from "@/lib/sal-data";
-import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { motionVariants } from "@/motion";
 import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
@@ -204,6 +204,11 @@ export function SalCreationScreen() {
     useAppStore.getState().setSalCurrentStep(stepIndex < 4 ? stepIndex + 1 : 4);
   }, [phase]);
 
+  const selectedTariffBookIds = useMemo(
+    () => data.selectedTariffBooks.map((b) => b.id),
+    [data.selectedTariffBooks],
+  );
+
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [compareLines, setCompareLines] = useState<SalLineView[] | null>(null);
@@ -368,13 +373,22 @@ export function SalCreationScreen() {
       name: data.project.title,
       year: data.selectedTariffBook?.year ?? 2026,
     });
-    saveSalProject({
-      client: data.project.contractor,
-      description: `${data.project.frameworkAgreementCode} - ${data.project.applicationContractCode}`,
-      id: data.project.id,
-      name: data.project.title,
-      year: data.selectedTariffBook?.year ?? 2026,
-    });
+    try {
+      saveSalProject({
+        client: data.project.contractor,
+        description: `${data.project.frameworkAgreementCode} - ${data.project.applicationContractCode}`,
+        id: data.project.id,
+        name: data.project.title,
+        year: data.selectedTariffBook?.year ?? 2026,
+      });
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Salvataggio progetto SAL non riuscito",
+        tone: "danger",
+      });
+      return;
+    }
 
     const materialUsagePayload = Object.entries(materialUsage)
       .filter(([_, qty]) => qty > 0)
@@ -430,34 +444,35 @@ export function SalCreationScreen() {
       })),
     };
 
+    // Atomic transaction: save SAL + deduct materials + audit
+    let salForBackend: SalDocument;
     if (editingDraftSalId.current) {
       updateSalDraft(editingDraftSalId.current, finalSalPayload);
       closeSal(editingDraftSalId.current);
-      const finalized = useSalWorkflowStore
+      salForBackend = useSalWorkflowStore
         .getState()
-        .salDocuments.find((d) => d.id === editingDraftSalId.current);
-      if (finalized) {
-        await updateBackendSalDocument(editingDraftSalId.current, finalized);
-      }
+        .salDocuments.find((d) => d.id === editingDraftSalId.current)!;
     } else {
-      const created = createSal({ ...finalSalPayload, status: "closed" });
-      await saveSalDocument(data.project.id, created);
+      salForBackend = createSal({ ...finalSalPayload, status: "closed" });
     }
 
-    // Deduct materials from inventory on SAL confirmation
-    if (materialUsagePayload.length > 0) {
-      await Promise.all(
-        materialUsagePayload.map(async (mu) => {
-          const mat = materialById.get(mu.materialId);
-          if (mat) {
-            await updateDesktopMaterial(mu.materialId, {
-              ...mat,
-              quantity: Math.max(0, mat.quantity - mu.quantity),
-            });
-          }
-        }),
+    try {
+      await confirmSalTransaction(
+        data.project.id,
+        salForBackend,
+        materialUsagePayload.map((mu) => ({
+          materialId: mu.materialId,
+          quantity: mu.quantity,
+          description: `SAL: ${salTitle.trim() || suggestedSalTitle}`,
+        })),
       );
-      dispatchDataChanged();
+    } catch (err) {
+      notify({
+        message: `Errore durante il salvataggio: ${err instanceof Error ? err.message : String(err)}`,
+        title: "Errore SAL",
+        tone: "danger",
+      });
+      return;
     }
 
     setCreatedSalTitle(salTitle.trim() || suggestedSalTitle);
@@ -509,13 +524,22 @@ export function SalCreationScreen() {
       name: project.title,
       year: data.selectedTariffBook?.year ?? 2026,
     });
-    saveSalProject({
-      client: project.contractor,
-      description: `${project.frameworkAgreementCode} - ${project.applicationContractCode}`,
-      id: pid,
-      name: project.title,
-      year: data.selectedTariffBook?.year ?? 2026,
-    });
+    try {
+      saveSalProject({
+        client: project.contractor,
+        description: `${project.frameworkAgreementCode} - ${project.applicationContractCode}`,
+        id: pid,
+        name: project.title,
+        year: data.selectedTariffBook?.year ?? 2026,
+      });
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Salvataggio progetto SAL non riuscito",
+        tone: "danger",
+      });
+      return;
+    }
     const draftMaterialUsage = Object.entries(materialUsage)
       .filter(([_, qty]) => qty > 0)
       .map(([mid, qty]) => {
@@ -573,10 +597,19 @@ export function SalCreationScreen() {
       ? updateSalDraft(editingDraftSalId.current, draftPayload)
       : createSal(draftPayload);
     if (draftSal) {
-      if (editingDraftSalId.current) {
-        await updateBackendSalDocument(draftSal.id, draftSal);
-      } else {
-        await saveSalDocument(pid, draftSal);
+      try {
+        if (editingDraftSalId.current) {
+          await updateBackendSalDocument(draftSal.id, draftSal);
+        } else {
+          await saveSalDocument(pid, draftSal);
+        }
+      } catch (error) {
+        notify({
+          message: error instanceof Error ? error.message : String(error),
+          title: "Salvataggio bozza SAL non riuscito",
+          tone: "danger",
+        });
+        return;
       }
     }
     const draftSalId = draftSal?.id ?? editingDraftSalId.current;
@@ -693,7 +726,7 @@ export function SalCreationScreen() {
           phase === "measure" ? (
             <SalSearchBar
               voices={data.voices}
-              tariffBookId={data.selectedTariffBook?.id ?? ""}
+              tariffBookIds={selectedTariffBookIds}
               linesCount={lines.length}
               onSelectVoice={(voice) => {
                 const exists = lines.some((l) => l.voice.id === voice.id);

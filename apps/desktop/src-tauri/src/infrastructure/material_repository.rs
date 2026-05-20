@@ -305,6 +305,51 @@ pub fn deduct_materials(
     Ok(updated)
 }
 
+pub fn deduct_materials_tx(
+    conn: &Connection,
+    deductions: &[(String, f64, String)],
+) -> Result<Vec<MaterialRecord>, AppError> {
+    let mut updated = Vec::new();
+
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let base_ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let mut counter: u64 = 0;
+
+    for (material_id, quantity, reference_id) in deductions {
+        let material = get_material(conn, material_id)?.ok_or(AppError::NotFound(format!(
+            "Materiale non trovato: {}",
+            material_id
+        )))?;
+
+        let new_quantity = (material.quantity - quantity).max(0.0);
+        let change = new_quantity - material.quantity;
+
+        conn.execute(
+            "UPDATE materials SET quantity = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            rusqlite::params![new_quantity, material_id],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let tx_id = format!("sal_{}_{}_{}", material_id, base_ts, counter);
+        counter += 1;
+        conn.execute(
+            "INSERT INTO material_transactions (id, material_id, quantity_change, quantity_after, transaction_type, reference_id, description)
+             VALUES (?1, ?2, ?3, ?4, 'sal_deduction', ?5, 'Impegno da SAL')",
+            rusqlite::params![tx_id, material_id, change, new_quantity, reference_id],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        updated.push(get_material(conn, material_id)?.ok_or(AppError::NotFound(
+            "Materiale non trovato dopo deduzione".to_string(),
+        ))?);
+    }
+
+    Ok(updated)
+}
+
 pub fn list_material_transactions(
     connection: &Connection,
     material_id: &str,

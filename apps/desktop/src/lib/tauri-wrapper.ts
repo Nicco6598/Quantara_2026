@@ -12,7 +12,7 @@ function formatDesktopError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export async function invokeWithFallback<T>(
+export async function invokeForRead<T>(
   command: string,
   args: Record<string, unknown>,
   fallback: T,
@@ -36,4 +36,14 @@ export async function invokeWithFallback<T>(
       source: "fallback",
     };
   }
+}
+
+export async function invokeForWrite<T>(
+  command: string,
+  args: Record<string, unknown>,
+): Promise<T> {
+  if (!isTauriRuntime()) {
+    throw new Error("Write operations require Tauri runtime");
+  }
+  return await invoke<T>(command, args);
 }

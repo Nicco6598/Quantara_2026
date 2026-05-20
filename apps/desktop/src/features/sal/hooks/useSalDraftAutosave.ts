@@ -95,7 +95,6 @@ export function useSalDraftAutosave({
 
   const markChanged = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    setStatus("unsaved");
     hasChangesRef.current = true;
     debounceRef.current = setTimeout(persistDraftSilent, 800);
   }, [persistDraftSilent]);

@@ -26,18 +26,14 @@ const SAL_DRAFT_STORAGE_KEY = STORAGE_KEYS.salCreationDraft;
 type StoredSalDraft = Omit<SalCreationDraft, "projectId">;
 
 export function saveSalCreationDraft(projectId: string, data: StoredSalDraft) {
-  try {
-    const existing = readJsonFromStorage<Record<string, StoredSalDraft>>(
-      localStorage,
-      SAL_DRAFT_STORAGE_KEY,
-      {},
-      isDraftRecord,
-    );
-    existing[projectId] = data;
-    writeJsonToStorage(localStorage, SAL_DRAFT_STORAGE_KEY, existing);
-  } catch {
-    /* no-op */
-  }
+  const existing = readJsonFromStorage<Record<string, StoredSalDraft>>(
+    localStorage,
+    SAL_DRAFT_STORAGE_KEY,
+    {},
+    isDraftRecord,
+  );
+  existing[projectId] = data;
+  writeJsonToStorage(localStorage, SAL_DRAFT_STORAGE_KEY, existing);
 }
 
 export function saveSalCreationDraftBySalId(salId: string, data: StoredSalDraft) {
@@ -63,18 +59,14 @@ export function loadSalCreationDraftBySalId(salId: string): StoredSalDraft | nul
 }
 
 export function clearSalCreationDraft(projectId: string) {
-  try {
-    const all = readJsonFromStorage<Record<string, StoredSalDraft>>(
-      localStorage,
-      SAL_DRAFT_STORAGE_KEY,
-      {},
-      isDraftRecord,
-    );
-    delete all[projectId];
-    writeJsonToStorage(localStorage, SAL_DRAFT_STORAGE_KEY, all);
-  } catch {
-    /* no-op */
-  }
+  const all = readJsonFromStorage<Record<string, StoredSalDraft>>(
+    localStorage,
+    SAL_DRAFT_STORAGE_KEY,
+    {},
+    isDraftRecord,
+  );
+  delete all[projectId];
+  writeJsonToStorage(localStorage, SAL_DRAFT_STORAGE_KEY, all);
 }
 
 function isDraftRecord(value: unknown): value is Record<string, StoredSalDraft> {

@@ -175,10 +175,41 @@ export function ProjectDetailScreen() {
     if (!selectedProject) {
       return [];
     }
-    const views: ReturnType<typeof buildSalDocumentView>[] = [];
-    for (const document of salDocuments) {
-      if (document.projectId === selectedProject.id) {
-        views.push(buildSalDocumentView(document, tariffVoices));
+    const views: Array<{
+      id: string;
+      total: number;
+      status: string;
+      title: string;
+      date: string;
+      closedAt: string | undefined;
+      description: string;
+      lineCount: number;
+    }> = [];
+    for (const doc of salDocuments) {
+      if (doc.projectId !== selectedProject.id) continue;
+      if (doc.totalCents != null && doc.lineCount != null) {
+        views.push({
+          id: doc.id,
+          total: doc.totalCents / 100,
+          lineCount: doc.lineCount,
+          status: doc.status,
+          title: doc.title,
+          date: doc.date,
+          closedAt: doc.closedAt,
+          description: doc.description,
+        });
+      } else {
+        const view = buildSalDocumentView(doc, tariffVoices);
+        views.push({
+          id: doc.id,
+          total: view.total,
+          lineCount: view.lines.length,
+          status: doc.status,
+          title: doc.title,
+          date: doc.date,
+          closedAt: doc.closedAt,
+          description: doc.description,
+        });
       }
     }
     views.sort((left, right) => {
@@ -240,7 +271,7 @@ export function ProjectDetailScreen() {
         isApproved: row.status === "approved",
         isDraft: row.status === "draft",
         isReview: row.status === "in-review",
-        lineCount: row.lines.length,
+        lineCount: row.lineCount,
         period: row.description || row.title,
         progressiveNumber,
         sal: row.title,
@@ -355,7 +386,16 @@ export function ProjectDetailScreen() {
         await restoreMaterialsFromSalUsage(sal.materialUsage);
       }
       deleteSal(salId);
-      deleteSalDocument(salId);
+      try {
+        await deleteSalDocument(salId);
+      } catch (error) {
+        notify({
+          message: error instanceof Error ? error.message : String(error),
+          title: "Eliminazione SAL non riuscita",
+          tone: "danger",
+        });
+        return;
+      }
       dispatchDataChanged();
       setDeleteTargetId(null);
       notify({
@@ -711,7 +751,7 @@ export function ProjectDetailScreen() {
                   </button>
                   <button
                     className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3.5 text-12px font-bold text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
-                    onClick={() => {
+                    onClick={async () => {
                       const ids = [...salMultiSelect.selectedIds];
                       const count = ids.length;
                       const deletedSals = ids
@@ -724,14 +764,27 @@ export function ProjectDetailScreen() {
                           void restoreMaterialsFromSalUsage(sal.materialUsage);
                         }
                         if (sal) deleteSal(sal.id);
-                        deleteSalDocument(id);
+                        try {
+                          await deleteSalDocument(id);
+                        } catch (error) {
+                          notify({
+                            message: error instanceof Error ? error.message : String(error),
+                            title: "Eliminazione SAL non riuscita",
+                            tone: "danger",
+                          });
+                          return;
+                        }
                       }
                       dispatchDataChanged();
 
-                      const execute = () => {
+                      const execute = async () => {
                         for (const sal of deletedSals) {
                           deleteSal(sal.id);
-                          deleteSalDocument(sal.id);
+                          try {
+                            await deleteSalDocument(sal.id);
+                          } catch {
+                            /* best-effort in undo execution */
+                          }
                         }
                         dispatchDataChanged();
                       };
@@ -751,7 +804,16 @@ export function ProjectDetailScreen() {
                             ...(typeof sal.total === "number" ? { total: sal.total } : {}),
                           };
                           useSalWorkflowStore.getState().createSal(salInput);
-                          await saveSalDocument(sal.projectId, sal);
+                          try {
+                            await saveSalDocument(sal.projectId, sal);
+                          } catch (error) {
+                            notify({
+                              message: error instanceof Error ? error.message : String(error),
+                              title: "Ripristino SAL non riuscito",
+                              tone: "danger",
+                            });
+                            return;
+                          }
                           if (sal.materialUsage) {
                             await restoreMaterialsFromSalUsage(sal.materialUsage);
                           }

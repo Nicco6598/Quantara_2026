@@ -2,7 +2,7 @@
 
 All notable changes to Quantara follow SemVer.
 
-## 0.3.40 — 2026-05-19
+## 0.4.0 — 2026-05-20
 
 ### SAL — creazione più veloce e controllabile
 
@@ -24,6 +24,11 @@ All notable changes to Quantara follow SemVer.
 - **Lookup materiali più rapidi** — durante salvataggio e conferma SAL i materiali vengono cercati tramite indice, non con ricerche ripetute nella lista.
 - **Autosave più stabile** — il salvataggio automatico della bozza è stato isolato e non marca più la SAL come modificata a ogni render inutile.
 - **Codice SAL più manutenibile** — la schermata di creazione è stata alleggerita spostando azioni sulle righe, dati derivati, autosave e helper misura in moduli dedicati.
+
+### Più sicuro
+
+- **Backup protetti da passphrase** — in Impostazioni puoi attivare una passphrase prima di creare un backup. I dati vengono cifrati con AES-256-GCM. Durante il ripristino, se il file è crittografato, Quantara ti chiede automaticamente la passphrase — con feedback se è sbagliata.
+- **Bug e Stability Fix** — risolti bug e problemi di stabilità/prestazioni dell'app.
 
 ## 0.3.32 — 2026-05-18
 

@@ -5,8 +5,11 @@ import {
   CheckCircle,
   Clock,
   DesktopTower,
+  Eye,
+  EyeSlash,
   FloppyDisk,
   GitBranch,
+  LockSimple,
   MagicWand,
   Palette,
   ShieldCheck,
@@ -17,12 +20,20 @@ import {
 import { m } from "framer-motion";
 import { useCallback, useEffect, useReducer, useState } from "react";
 import { Button } from "@/components/shared/Button";
+import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
-import { backupDatabase, type DatabaseInfo, getDatabaseInfo, restoreDatabase } from "@/lib/backup";
+import {
+  backupDatabase,
+  type DatabaseInfo,
+  getDatabaseInfo,
+  isRestoreNeedsPassphrase,
+  restoreDatabase,
+  restoreDatabaseWithPassphrase,
+} from "@/lib/backup";
 import { loadThemeCSS } from "@/lib/theme-loader";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { cn } from "@/lib/utils";
@@ -439,12 +450,24 @@ function BackupRestoreCard({
   backupResult,
   onBackup,
   onRestore,
+  passphrase,
+  onPassphraseChange,
+  showPassphrase,
+  onTogglePassphrase,
+  showPassphraseText,
+  onTogglePassphraseText,
 }: {
   dbInfo: DatabaseInfo | null;
   isBackupRunning: boolean;
   backupResult: string | null;
   onBackup: () => void;
   onRestore: () => void;
+  passphrase: string;
+  onPassphraseChange: (value: string) => void;
+  showPassphrase: boolean;
+  onTogglePassphrase: () => void;
+  showPassphraseText: boolean;
+  onTogglePassphraseText: () => void;
 }) {
   return (
     <BezelSurface innerClassName="p-5">
@@ -481,6 +504,45 @@ function BackupRestoreCard({
             {dbInfo ? "Locale" : "\u2014"}
           </div>
         </div>
+      </div>
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={onTogglePassphrase}
+          className="flex items-center gap-1.5 text-11px font-medium text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          <LockSimple className="size-3.5" weight="bold" />
+          {showPassphrase ? "Rimuovi passphrase" : "Proteggi con passphrase"}
+        </button>
+        {showPassphrase ? (
+          <div className="mt-2">
+            <div className="relative">
+              <input
+                type={showPassphraseText ? "text" : "password"}
+                value={passphrase}
+                onChange={(e) => onPassphraseChange(e.target.value)}
+                placeholder="Inserisci una passphrase"
+                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] pr-9 pl-3 py-2 text-13px text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-base)] focus:ring-1 focus:ring-[var(--accent-base)]/30 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={onTogglePassphraseText}
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex size-6 items-center justify-center rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                tabIndex={-1}
+              >
+                {showPassphraseText ? (
+                  <EyeSlash className="size-4" weight="bold" />
+                ) : (
+                  <Eye className="size-4" weight="bold" />
+                )}
+              </button>
+            </div>
+            <p className="mt-1 text-10px text-[var(--text-tertiary)]">
+              Se imposti una passphrase, il backup sarà crittografato. Durante il ripristino ti
+              verrà chiesta automaticamente.
+            </p>
+          </div>
+        ) : null}
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button disabled={isBackupRunning} onClick={onBackup} variant="primary">
@@ -768,6 +830,13 @@ export function SettingsScreen() {
     dispatch,
   ] = useReducer(asyncOpReducer, initialAsyncState);
   const [dbInfo, setDbInfo] = useState<DatabaseInfo | null>(null);
+  const [backupPassphrase, setBackupPassphrase] = useState("");
+  const [showBackupPassphrase, setShowBackupPassphrase] = useState(false);
+  const [restorePassphrasePath, setRestorePassphrasePath] = useState<string | null>(null);
+  const [restorePassphrase, setRestorePassphrase] = useState("");
+  const [restorePassphraseError, setRestorePassphraseError] = useState<string | null>(null);
+  const [showBackupPassphraseText, setShowBackupPassphraseText] = useState(false);
+  const [showRestorePassphraseText, setShowRestorePassphraseText] = useState(false);
 
   useEffect(() => {
     getDatabaseInfo()
@@ -783,24 +852,53 @@ export function SettingsScreen() {
 
   const handleBackup = useCallback(async () => {
     dispatch({ type: "BACKUP_START" });
-    const result = await backupDatabase();
+    const passphrase = backupPassphrase.trim() || undefined;
+    const result = await backupDatabase(passphrase);
     dispatch({ type: "BACKUP_DONE", result });
     if (result !== "annullato") {
       getDatabaseInfo()
         .then(setDbInfo)
         .catch(() => {});
     }
-  }, []);
+  }, [backupPassphrase]);
 
   const handleRestore = useCallback(async () => {
     const result = await restoreDatabase();
-    if (result !== "annullato") {
-      dispatch({ type: "RESTORE_DONE", result });
-      getDatabaseInfo()
-        .then(setDbInfo)
-        .catch(() => {});
+    if (result === "annullato") return;
+    const encryptedPath = isRestoreNeedsPassphrase(result);
+    if (encryptedPath) {
+      setRestorePassphrasePath(encryptedPath);
+      setRestorePassphrase("");
+      return;
     }
+    dispatch({ type: "RESTORE_DONE", result });
+    getDatabaseInfo()
+      .then(setDbInfo)
+      .catch(() => {});
   }, []);
+
+  const handleRestoreWithPassphrase = useCallback(async () => {
+    if (!restorePassphrasePath || !restorePassphrase.trim()) return;
+    setRestorePassphraseError(null);
+    try {
+      const result = await restoreDatabaseWithPassphrase(
+        restorePassphrasePath,
+        restorePassphrase.trim(),
+      );
+      setRestorePassphrasePath(null);
+      setRestorePassphrase("");
+      if (result !== "annullato") {
+        dispatch({ type: "RESTORE_DONE", result });
+        getDatabaseInfo()
+          .then(setDbInfo)
+          .catch(() => {});
+      }
+    } catch (err) {
+      setRestorePassphraseError(
+        typeof err === "string" ? err : "Passphrase errata o file non valido",
+      );
+    }
+  }, [restorePassphrasePath, restorePassphrase]);
 
   const handleIntegrityCheck = useCallback(async () => {
     dispatch({ type: "INTEGRITY_START" });
@@ -872,6 +970,12 @@ export function SettingsScreen() {
           backupResult={backupResult}
           onBackup={handleBackup}
           onRestore={handleRestore}
+          passphrase={backupPassphrase}
+          onPassphraseChange={setBackupPassphrase}
+          showPassphrase={showBackupPassphrase}
+          onTogglePassphrase={() => setShowBackupPassphrase((v) => !v)}
+          showPassphraseText={showBackupPassphraseText}
+          onTogglePassphraseText={() => setShowBackupPassphraseText((v) => !v)}
         />
         <IntegrityCheckCard
           dbInfo={dbInfo}
@@ -886,6 +990,71 @@ export function SettingsScreen() {
         <ReleaseRulesCard />
         <AuditLogCard />
       </div>
+
+      <Dialog
+        isOpen={!!restorePassphrasePath}
+        onClose={() => {
+          setRestorePassphrasePath(null);
+          setRestorePassphraseError(null);
+        }}
+        title="Backup crittografato"
+      >
+        <p className="mt-3 text-13px leading-5 text-[var(--text-secondary)]">
+          Il file di backup selezionato è protetto da passphrase. Inseriscila per ripristinare i
+          dati.
+        </p>
+        <div className="relative mt-4">
+          <input
+            type={showRestorePassphraseText ? "text" : "password"}
+            value={restorePassphrase}
+            onChange={(e) => {
+              setRestorePassphrase(e.target.value);
+              setRestorePassphraseError(null);
+            }}
+            placeholder="Passphrase"
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)] pr-9 pl-3 py-2 text-13px text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-base)] focus:ring-1 focus:ring-[var(--accent-base)]/30 transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && restorePassphrase.trim()) handleRestoreWithPassphrase();
+            }}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={() => setShowRestorePassphraseText((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 flex size-6 items-center justify-center rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+            tabIndex={-1}
+          >
+            {showRestorePassphraseText ? (
+              <EyeSlash className="size-4" weight="bold" />
+            ) : (
+              <Eye className="size-4" weight="bold" />
+            )}
+          </button>
+        </div>
+        {restorePassphraseError ? (
+          <p className="mt-2 text-12px font-medium text-[var(--danger-base)]">
+            {restorePassphraseError}
+          </p>
+        ) : null}
+        <DialogActions>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setRestorePassphrasePath(null);
+              setRestorePassphraseError(null);
+            }}
+          >
+            Annulla
+          </Button>
+          <Button
+            variant="primary"
+            disabled={!restorePassphrase.trim()}
+            onClick={handleRestoreWithPassphrase}
+          >
+            Ripristina
+          </Button>
+        </DialogActions>
+      </Dialog>
     </ScreenLayout>
   );
 }

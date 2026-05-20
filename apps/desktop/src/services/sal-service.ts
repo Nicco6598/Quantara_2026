@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type {
   SalDocument,
   SalDocumentStatus,
@@ -52,60 +52,39 @@ type UseSalWorkflowServiceReturn = {
   ) => void;
   setActiveProject: (projectId: string) => void;
   setActiveSal: (salId: string) => void;
+  initializeFromBackend: (
+    docs: SalDocument[],
+    projs: SalProject[],
+    voices: SalTariffVoice[],
+  ) => void;
 };
 
 export function useSalWorkflowService(): UseSalWorkflowServiceReturn {
-  const store = useSalWorkflowStore();
+  const activeProjectId = useSalWorkflowStore((s) => s.activeProjectId);
+  const activeSalId = useSalWorkflowStore((s) => s.activeSalId);
+  const projects = useSalWorkflowStore(useShallow((s) => s.projects));
+  const salDocuments = useSalWorkflowStore(useShallow((s) => s.salDocuments));
+  const tariffVoices = useSalWorkflowStore(useShallow((s) => s.tariffVoices));
 
-  const activeProjectId = store.activeProjectId;
-  const activeSalId = store.activeSalId;
-  const salDocuments = store.salDocuments;
-  const projects = store.projects;
-  const tariffVoices = store.tariffVoices;
-
-  const createProject = useCallback(
-    (input: Omit<SalProject, "id"> & { id?: string }) => store.createProject(input),
-    [store],
-  );
-
-  const createSal = useCallback((input: CreateSalInput) => store.createSal(input), [store]);
-
-  const updateSalDraft = useCallback(
-    (id: string, input: Partial<CreateSalInput>) => store.updateSalDraft(id, input),
-    [store],
-  );
-
-  const closeSal = useCallback((salId: string) => store.closeSal(salId), [store]);
-  const setSalStatus = useCallback(
-    (salId: string, status: SalDocumentStatus) => store.setSalStatus(salId, status),
-    [store],
-  );
-  const deleteSal = useCallback((salId: string) => store.deleteSal(salId), [store]);
-  const addLineToSal = useCallback(
-    (salId: string, voiceId: string) => store.addLineToSal(salId, voiceId),
-    [store],
-  );
-  const deleteLineFromSal = useCallback(
-    (salId: string, lineId: string) => store.deleteLineFromSal(salId, lineId),
-    [store],
-  );
-  const updateLine = useCallback(
-    (salId: string, lineId: string, data: Partial<Pick<SalLine, "quantity" | "surcharge">>) =>
-      store.updateLine(salId, lineId, data),
-    [store],
-  );
-  const setActiveProject = useCallback(
-    (projectId: string) => store.setActiveProject(projectId),
-    [store],
-  );
-  const setActiveSal = useCallback((salId: string) => store.setActiveSal(salId), [store]);
+  const createProject = useSalWorkflowStore((s) => s.createProject);
+  const createSal = useSalWorkflowStore((s) => s.createSal);
+  const updateSalDraft = useSalWorkflowStore((s) => s.updateSalDraft);
+  const closeSal = useSalWorkflowStore((s) => s.closeSal);
+  const setSalStatus = useSalWorkflowStore((s) => s.setSalStatus);
+  const deleteSal = useSalWorkflowStore((s) => s.deleteSal);
+  const addLineToSal = useSalWorkflowStore((s) => s.addLineToSal);
+  const deleteLineFromSal = useSalWorkflowStore((s) => s.deleteLineFromSal);
+  const updateLine = useSalWorkflowStore((s) => s.updateLine);
+  const setActiveProject = useSalWorkflowStore((s) => s.setActiveProject);
+  const setActiveSal = useSalWorkflowStore((s) => s.setActiveSal);
+  const initializeFromBackend = useSalWorkflowStore((s) => s.initializeFromBackend);
 
   return {
-    salDocuments,
-    projects,
-    tariffVoices,
     activeProjectId,
     activeSalId,
+    projects,
+    salDocuments,
+    tariffVoices,
     createProject,
     createSal,
     updateSalDraft,
@@ -117,5 +96,6 @@ export function useSalWorkflowService(): UseSalWorkflowServiceReturn {
     updateLine,
     setActiveProject,
     setActiveSal,
+    initializeFromBackend,
   };
 }

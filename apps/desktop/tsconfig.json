@@ -9,7 +9,7 @@
       "@quantara/shared-types": ["../../packages/shared-types/src/index.ts"],
       "@quantara/validation": ["../../packages/validation/src/index.ts"]
     },
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"]
   },
   "include": [
     "src",

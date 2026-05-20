@@ -1,10 +1,11 @@
+use crate::infrastructure::audit_repository;
 use tauri::{AppHandle, State};
 
 use crate::infrastructure::{
     local_storage::{DbConnection, with_db, with_db_mut},
     tariff_repository::{
         CreateTariffBookRequest, TariffBookRecord, TariffPdfImportPreview, TariffVoiceCountRecord,
-        TariffVoiceRecord, UpdateTariffBookRequest,
+        TariffVoiceRecord, TariffVoiceSearchResult, UpdateTariffBookRequest,
     },
 };
 
@@ -21,7 +22,9 @@ pub fn create_tariff_book(
     request: CreateTariffBookRequest,
 ) -> Result<TariffBookRecord, String> {
     with_db_mut(&state, |conn| {
-        crate::infrastructure::tariff_repository::create_tariff_book(conn, request)
+        let book = crate::infrastructure::tariff_repository::create_tariff_book(conn, request)?;
+        audit_repository::append_event(conn, "tariff_book", &book.id, "create", None, None)?;
+        Ok(book)
     })
 }
 
@@ -32,7 +35,9 @@ pub fn update_tariff_book(
     request: UpdateTariffBookRequest,
 ) -> Result<TariffBookRecord, String> {
     with_db_mut(&state, |conn| {
-        crate::infrastructure::tariff_repository::update_tariff_book(conn, &tariff_book_id, request)
+        let book = crate::infrastructure::tariff_repository::update_tariff_book(conn, &tariff_book_id, request)?;
+        audit_repository::append_event(conn, "tariff_book", &tariff_book_id, "update", None, None)?;
+        Ok(book)
     })
 }
 
@@ -42,7 +47,9 @@ pub fn delete_tariff_book(
     tariff_book_id: String,
 ) -> Result<(), String> {
     with_db_mut(&state, |conn| {
-        crate::infrastructure::tariff_repository::delete_tariff_book(conn, &tariff_book_id)
+        crate::infrastructure::tariff_repository::delete_tariff_book(conn, &tariff_book_id)?;
+        audit_repository::append_event(conn, "tariff_book", &tariff_book_id, "delete", None, None)?;
+        Ok(())
     })
 }
 
@@ -107,6 +114,23 @@ pub async fn import_tariff_pdf_preview_batch(
     })
     .await
     .map_err(|error| format!("Import batch interrotto: {error}"))?
+}
+
+#[tauri::command]
+pub fn search_tariff_voices(
+    state: State<'_, DbConnection>,
+    tariff_book_ids: Vec<String>,
+    query: String,
+    limit: Option<i64>,
+) -> Result<Vec<TariffVoiceSearchResult>, String> {
+    with_db(&state, |conn| {
+        crate::infrastructure::tariff_repository::search_tariff_voices(
+            conn,
+            &tariff_book_ids,
+            &query,
+            limit.unwrap_or(50),
+        )
+    })
 }
 
 fn to_command_error(error: crate::models::app_error::AppError) -> String {

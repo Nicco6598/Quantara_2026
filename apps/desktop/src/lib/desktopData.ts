@@ -10,7 +10,7 @@ import type {
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
-import { invokeWithFallback, isTauriRuntime } from "./tauri-wrapper";
+import { invokeForRead, isTauriRuntime } from "./tauri-wrapper";
 import { dispatchDataChanged } from "@/lib/sync-events";
 
 export type DesktopContract = DesktopContractRecord;
@@ -69,7 +69,7 @@ export async function listDesktopContracts(
 
   return cachedFetch("contracts", () =>
     withInflightCache("contracts", () =>
-      invokeWithFallback("list_contracts", {}, fallback, "dati dimostrativi"),
+      invokeForRead("list_contracts", {}, fallback, "dati dimostrativi"),
     ),
   );
 }
@@ -195,7 +195,7 @@ export async function listDesktopTariffBooks(
 ): Promise<DesktopDataResult<DesktopTariffBook[]>> {
   return cachedFetch(`tariff-books:${fallback.length}`, () =>
     withInflightCache(`tariff-books:${fallback.length}`, () =>
-      invokeWithFallback("list_tariff_books", {}, fallback, "dati dimostrativi"),
+      invokeForRead("list_tariff_books", {}, fallback, "dati dimostrativi"),
     ),
   );
 }
@@ -256,9 +256,36 @@ export async function listDesktopTariffVoices(
 
   return cachedFetch(`tariff-voices:${tariffBookId}`, () =>
     withInflightCache(`tariff-voices:${tariffBookId}:${fallback.length}`, () =>
-      invokeWithFallback("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative"),
+      invokeForRead("list_tariff_voices", { tariffBookId }, fallback, "voci dimostrative"),
     ),
   );
+}
+
+export type TariffVoiceSearchResult = {
+  id: string;
+  tariffBookId: string;
+  officialCode: string;
+  description: string;
+  category: string;
+  unitOfMeasure: string;
+  unitPriceCents: number;
+  laborPercentage: number | null;
+  searchRank: number;
+};
+
+export async function searchTariffVoices(
+  tariffBookIds: string[],
+  query: string,
+  limit?: number,
+): Promise<TariffVoiceSearchResult[]> {
+  if (!query.trim()) return [];
+  if (!isTauriRuntime()) return [];
+
+  return invoke<TariffVoiceSearchResult[]>("search_tariff_voices", {
+    tariffBookIds,
+    query: query.trim(),
+    limit: limit ?? 50,
+  });
 }
 
 export async function listDesktopTariffVoiceCounts(
@@ -274,7 +301,7 @@ export async function listDesktopTariffVoiceCounts(
 
   return withInflightCache(
     `tariff-voice-counts:${fallbackBooks.length}:${fallbackVoices.length}`,
-    () => invokeWithFallback("list_tariff_voice_counts", {}, counts, "conteggi dimostrativi"),
+    () => invokeForRead("list_tariff_voice_counts", {}, counts, "conteggi dimostrativi"),
   );
 }
 
@@ -480,7 +507,7 @@ export async function listDesktopMaterials(
   }
   return cachedFetch("materials", () =>
     withInflightCache("materials", () =>
-      invokeWithFallback("list_materials", {}, fallback, "materiali dimostrativi"),
+      invokeForRead("list_materials", {}, fallback, "materiali dimostrativi"),
     ),
   );
 }

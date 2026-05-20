@@ -1,3 +1,4 @@
+use crate::infrastructure::audit_repository;
 use tauri::State;
 
 use crate::infrastructure::{
@@ -28,7 +29,9 @@ pub fn create_contract(
     request: CreateContractRequest,
 ) -> Result<ContractRecord, String> {
     with_db_mut(&state, |conn| {
-        crate::infrastructure::contract_repository::create_contract(conn, request)
+        let record = crate::infrastructure::contract_repository::create_contract(conn, request)?;
+        audit_repository::append_event(conn, "contract", &record.id, "create", None, None)?;
+        Ok(record)
     })
 }
 
@@ -39,13 +42,17 @@ pub fn update_contract(
     request: UpdateContractRequest,
 ) -> Result<ContractRecord, String> {
     with_db_mut(&state, |conn| {
-        crate::infrastructure::contract_repository::update_contract(conn, &contract_id, request)
+        let record = crate::infrastructure::contract_repository::update_contract(conn, &contract_id, request)?;
+        audit_repository::append_event(conn, "contract", &contract_id, "update", None, None)?;
+        Ok(record)
     })
 }
 
 #[tauri::command]
 pub fn delete_contract(state: State<'_, DbConnection>, contract_id: String) -> Result<(), String> {
     with_db_mut(&state, |conn| {
-        crate::infrastructure::contract_repository::delete_contract(conn, &contract_id)
+        crate::infrastructure::contract_repository::delete_contract(conn, &contract_id)?;
+        audit_repository::append_event(conn, "contract", &contract_id, "delete", None, None)?;
+        Ok(())
     })
 }

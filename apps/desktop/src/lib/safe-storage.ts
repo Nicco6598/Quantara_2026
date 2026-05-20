@@ -1,17 +1,27 @@
-function handleQuotaExceeded(key: string, value: string, storage: Storage): void {
-  console.warn(`[storage] Quota exceeded for key "${key}", clearing stale entries`);
-  const keys = Object.keys(storage).filter((k) => k.startsWith("quantara") && k !== key);
-  for (const k of keys.slice(0, Math.min(3, keys.length))) {
-    storage.removeItem(k);
+export type StorageUsage = {
+  usedBytes: number;
+  itemCount: number;
+};
+
+function estimateStorageUsage(storage: Storage): StorageUsage {
+  let usedBytes = 0;
+  let itemCount = 0;
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (key !== null) {
+      const value = storage.getItem(key);
+      usedBytes += key.length * 2 + (value?.length ?? 0) * 2;
+      itemCount++;
+    }
   }
-  try {
-    storage.setItem(key, value);
-  } catch {
-    console.error(`[storage] Failed to write "${key}" even after cleanup`);
-  }
+  return { usedBytes, itemCount };
 }
 
-export function createSafeLocalStorage(): Storage {
+export type SafeStorage = Storage & {
+  getStorageUsage: () => StorageUsage;
+};
+
+export function createSafeLocalStorage(): SafeStorage {
   return {
     clear: () => localStorage.clear(),
     getItem: (key: string) => localStorage.getItem(key),
@@ -21,13 +31,8 @@ export function createSafeLocalStorage(): Storage {
     },
     removeItem: (key: string) => localStorage.removeItem(key),
     setItem: (key: string, value: string) => {
-      try {
-        localStorage.setItem(key, value);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "QuotaExceededError") {
-          handleQuotaExceeded(key, value, localStorage);
-        }
-      }
+      localStorage.setItem(key, value);
     },
+    getStorageUsage: () => estimateStorageUsage(localStorage),
   };
 }

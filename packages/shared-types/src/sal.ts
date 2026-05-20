@@ -79,4 +79,11 @@ export type SalDocument = {
   status: SalDocumentStatus;
   title: string;
   total?: number;
+
+  /** Persisted derived fields from backend (P1.9) */
+  totalCents?: number;
+  grossAmountCents?: number;
+  discountAmountCents?: number;
+  lineCount?: number;
+  measurementRowCount?: number;
 };

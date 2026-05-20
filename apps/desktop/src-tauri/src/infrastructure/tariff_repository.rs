@@ -285,6 +285,98 @@ pub fn list_tariff_voices(
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TariffVoiceSearchResult {
+    pub id: String,
+    pub tariff_book_id: String,
+    pub official_code: String,
+    pub description: String,
+    pub category: String,
+    pub unit_of_measure: String,
+    pub unit_price_cents: i64,
+    pub labor_percentage: Option<f64>,
+    pub search_rank: f64,
+}
+
+pub fn search_tariff_voices(
+    conn: &Connection,
+    tariff_book_ids: &[String],
+    query: &str,
+    limit: i64,
+) -> Result<Vec<TariffVoiceSearchResult>, AppError> {
+    if query.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let fts_query = query
+        .split_whitespace()
+        .filter(|t| !t.is_empty())
+        .map(|term| format!("\"{}\"*", term.replace('\"', "")))
+        .collect::<Vec<_>>()
+        .join(" AND ");
+
+    if fts_query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let num_books = tariff_book_ids.len();
+    let limit_param = 2 + num_books;
+
+    let mut sql = String::from(
+        "SELECT v.id, v.tariff_book_id, v.official_code, v.description, \
+                v.category, v.unit_of_measure, v.unit_price_cents, \
+                v.labor_percentage, \
+                rank
+         FROM tariff_voices_fts f
+         JOIN tariff_voices v ON v.rowid = f.rowid
+         WHERE tariff_voices_fts MATCH ?1"
+    );
+
+    if !tariff_book_ids.is_empty() {
+        sql.push_str(" AND v.tariff_book_id IN (");
+        for i in 0..num_books {
+            if i > 0 { sql.push_str(", "); }
+            sql.push_str(&format!("?{}", i + 2));
+        }
+        sql.push(')');
+    }
+
+    sql.push_str(&format!(" ORDER BY rank LIMIT ?{limit_param}"));
+
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    params.push(Box::new(fts_query));
+    for id in tariff_book_ids {
+        params.push(Box::new(id.clone()));
+    }
+    params.push(Box::new(limit));
+
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+    let mut stmt = conn.prepare(&sql).map_err(to_database_error)?;
+    let rows = stmt
+        .query_map(param_refs.as_slice(), |row| {
+            Ok(TariffVoiceSearchResult {
+                id: row.get(0)?,
+                tariff_book_id: row.get(1)?,
+                official_code: row.get(2)?,
+                description: row.get(3)?,
+                category: row.get(4)?,
+                unit_of_measure: row.get(5)?,
+                unit_price_cents: row.get(6)?,
+                labor_percentage: row.get(7)?,
+                search_rank: row.get(8)?,
+            })
+        })
+        .map_err(to_database_error)?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row.map_err(to_database_error)?);
+    }
+    Ok(results)
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TariffVoiceCountRecord {
     pub tariff_book_id: String,
     pub count: i64,

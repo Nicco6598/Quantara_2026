@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useDeferredValue, useMemo } from "react";
 import {
   buildLineViews,
   buildVerificationChecks,
@@ -35,14 +35,21 @@ export function useSalDerivedViews({
 
   const previousProgressiveAmount = useMemo(
     () =>
-      closedProjectSals.reduce(
-        (sum, sal) => sum + buildSalDocumentView(sal, tariffVoices).total,
-        0,
-      ),
+      closedProjectSals.reduce((sum, sal) => {
+        if (sal.totalCents != null) {
+          return sum + sal.totalCents / 100;
+        }
+        return sum + buildSalDocumentView(sal, tariffVoices).total;
+      }, 0),
     [closedProjectSals, tariffVoices],
   );
 
-  const lineViews = useMemo(() => buildLineViews(lines, economicRules), [lines, economicRules]);
+  // Defer expensive calculations when user is typing in measurement rows
+  const deferredLines = useDeferredValue(lines);
+  const lineViews = useMemo(
+    () => buildLineViews(deferredLines, economicRules),
+    [deferredLines, economicRules],
+  );
 
   const summary = useMemo(
     () => summarizeSalLines(lineViews, project?.contractAmount ?? 0, previousProgressiveAmount),

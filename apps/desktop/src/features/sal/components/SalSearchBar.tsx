@@ -1,10 +1,12 @@
 import { BookOpen } from "lucide-react";
 import { m } from "framer-motion";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
 import { TemplatePicker } from "./TemplatePicker";
 import type { SalVoiceDraft } from "../types";
 import type { SalTemplate } from "@/store/template-store";
+import { useTariffSearch } from "../hooks/useTariffSearch";
+import { tariffTokenMatchesQuery } from "../utils/search-utils";
 
 type SalAutocompleteOption = {
   id?: string;
@@ -32,12 +34,6 @@ function buildTariffSearchTokens(voice: SalVoiceDraft) {
     .map((word) => word[0])
     .join("");
   return new Set([normalizedName, normalizedId, acronym, ...words].filter(Boolean));
-}
-
-function tariffTokenMatchesQuery(token: string, queryPart: string) {
-  if (!token || !queryPart) return false;
-  if (queryPart.length <= 2) return token === queryPart;
-  return token === queryPart || token.startsWith(queryPart);
 }
 
 function defaultSalVoiceOptionMatches(option: SalAutocompleteOption, normalizedQuery: string) {
@@ -85,30 +81,39 @@ function filterSalVoiceOptionsByTariffIntent({
 
 export function SalSearchBar({
   voices,
-  tariffBookId,
+  tariffBookIds,
   linesCount,
   onSelectVoice,
   onApplyTemplate,
   onOpenTemplateDialog,
 }: {
   voices: SalVoiceDraft[];
-  tariffBookId: string;
+  tariffBookIds: string[];
   linesCount: number;
   onSelectVoice: (v: SalVoiceDraft) => void;
   onApplyTemplate: (t: SalTemplate) => void;
   onOpenTemplateDialog: () => void;
 }) {
-  const autocompleteOptions = useMemo(
-    () =>
-      voices.map((v) => ({
-        id: v.id,
-        label: v.description,
-        metadata: `${v.tariffBookName} · ${v.category} · ${v.unit} · ${v.unitPrice.toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
-        value: v.code,
-        keywords: `${v.code} ${v.description} ${v.category} ${v.tariffBookName} ${v.tariffBookId}`,
-      })),
-    [voices],
-  );
+  const { setQuery: setSearchQuery, results: searchResults } = useTariffSearch(tariffBookIds);
+
+  const autocompleteOptions = useMemo(() => {
+    if (searchResults.length > 0) {
+      return searchResults.map((r) => ({
+        id: r.id,
+        label: r.description,
+        value: r.officialCode,
+        keywords: `${r.officialCode} ${r.description} ${r.category}`,
+        metadata: `${r.tariffBookId} · ${r.category} · ${r.unitOfMeasure} · ${(r.unitPriceCents / 100).toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
+      }));
+    }
+    return voices.map((v) => ({
+      id: v.id,
+      label: v.description,
+      metadata: `${v.tariffBookName} · ${v.category} · ${v.unit} · ${v.unitPrice.toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
+      value: v.code,
+      keywords: `${v.code} ${v.description} ${v.category} ${v.tariffBookName} ${v.tariffBookId}`,
+    }));
+  }, [searchResults, voices]);
 
   const voiceByOptionId = useMemo(() => new Map(voices.map((v) => [v.id, v])), [voices]);
   const tariffTokensByBookId = useMemo(() => {
@@ -121,11 +126,29 @@ export function SalSearchBar({
     return result;
   }, [voices]);
 
+  const hasSearchResults = searchResults.length > 0;
+
+  const filterOptions = useCallback(
+    (options: SalAutocompleteOption[], query: string) => {
+      if (hasSearchResults) {
+        return query.trim() ? options : [];
+      }
+      return filterSalVoiceOptionsByTariffIntent({
+        options,
+        query,
+        tariffTokensByBookId,
+        voiceByOptionId,
+      });
+    },
+    [hasSearchResults, tariffTokensByBookId, voiceByOptionId],
+  );
+
   return (
     <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/30 bg-[var(--surface-base)] px-4 py-1.5 lg:flex-row lg:items-center lg:px-6">
       <div className="min-w-0 flex-1">
         <AutocompleteInput
           options={autocompleteOptions}
+          onQueryChange={setSearchQuery}
           onSelect={(o) => {
             const v =
               (o.id ? voiceByOptionId.get(o.id) : undefined) ??
@@ -133,18 +156,11 @@ export function SalSearchBar({
             if (v) onSelectVoice(v);
           }}
           placeholder={`Cerca codice, descrizione o categoria (${voices.length} voci)...`}
-          filterOptions={(options, query) =>
-            filterSalVoiceOptionsByTariffIntent({
-              options,
-              query,
-              tariffTokensByBookId,
-              voiceByOptionId,
-            })
-          }
+          filterOptions={filterOptions}
         />
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <TemplatePicker onApply={onApplyTemplate} tariffBookId={tariffBookId} />
+        <TemplatePicker onApply={onApplyTemplate} tariffBookId={tariffBookIds[0] ?? ""} />
         {linesCount > 0 && (
           <m.button
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--bg-muted)] px-3 text-11px font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)] hover:text-[var(--text-primary)]"

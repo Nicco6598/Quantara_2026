@@ -403,7 +403,7 @@ export function AccountingScreen() {
                       </button>
                       <button
                         className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3.5 text-12px font-bold text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
-                        onClick={() => {
+                        onClick={async () => {
                           const ids = [...multiSelect.selectedIds];
                           const count = ids.length;
                           const deletedSals = ids
@@ -445,7 +445,16 @@ export function AccountingScreen() {
                                 ...(typeof doc.total === "number" ? { total: doc.total } : {}),
                               };
                               useSalWorkflowStore.getState().createSal(salInput);
-                              await saveSalDocument(doc.projectId, doc);
+                              try {
+                                await saveSalDocument(doc.projectId, doc);
+                              } catch (error) {
+                                notify({
+                                  message: error instanceof Error ? error.message : String(error),
+                                  title: "Ripristino SAL non riuscito",
+                                  tone: "danger",
+                                });
+                                return;
+                              }
                               if (doc.materialUsage) {
                                 await restoreMaterialsFromSalUsage(doc.materialUsage);
                               }

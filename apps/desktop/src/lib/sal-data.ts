@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { invokeWithFallback, isTauriRuntime } from "./tauri-wrapper";
+import { invokeForRead, invokeForWrite, isTauriRuntime } from "./tauri-wrapper";
 import type { DesktopDataResult } from "./tauri-wrapper";
 import type { SalDocument, SalProject } from "@/features/sal/types";
 
@@ -22,14 +22,6 @@ function readSalDataStore(): SalDataStore | null {
   }
 }
 
-function writeSalDataStore(data: SalDataStore): void {
-  try {
-    window.localStorage.setItem(SAL_DATA_KEY, JSON.stringify(data));
-  } catch {
-    /* no-op */
-  }
-}
-
 export async function listDesktopSalDocuments(
   projectId: string | null,
 ): Promise<DesktopDataResult<SalDocument[]>> {
@@ -40,71 +32,55 @@ export async function listDesktopSalDocuments(
     return { data: filtered, message: "Runtime browser: SAL localStorage.", source: "fallback" };
   }
 
-  return invokeWithFallback<SalDocument[]>(
-    "list_sal_documents",
-    { projectId },
-    [],
-    "SAL dimostrative",
-  );
+  return invokeForRead<SalDocument[]>("list_sal_documents", { projectId }, [], "SAL dimostrative");
 }
 
 export async function saveSalDocument(projectId: string, doc: SalDocument): Promise<void> {
   if (!isTauriRuntime()) {
-    const stored = readSalDataStore();
-    const existing = stored?.salDocuments ?? [];
-    const docIndex = existing.findIndex((d) => d.id === doc.id);
-    const updated =
-      docIndex >= 0 ? existing.map((d, i) => (i === docIndex ? doc : d)) : [doc, ...existing];
-    writeSalDataStore({
-      projects: stored?.projects ?? [],
-      salDocuments: updated,
-    });
-    return;
+    throw new Error("SAL save requires Tauri desktop runtime");
   }
 
-  try {
-    await invoke("save_sal_document", { projectId, data: doc as never });
-  } catch {
-    /* no-op */
+  const payload = { ...doc } as Record<string, unknown>;
+  if (doc.lines) {
+    payload.lineCount = doc.lines.length;
+    payload.measurementRowCount = doc.lines.reduce(
+      (sum, line) => sum + (line.measurementRows?.length ?? 0),
+      0,
+    );
   }
+  if (doc.total != null) {
+    payload.totalCents = Math.round(doc.total * 100);
+  }
+
+  await invokeForWrite("save_sal_document", { projectId, data: payload as never });
 }
 
 export async function updateSalDocument(id: string, doc: SalDocument): Promise<void> {
   if (!isTauriRuntime()) {
-    const stored = readSalDataStore();
-    const existing = stored?.salDocuments ?? [];
-    const updated = existing.map((d) => (d.id === id ? doc : d));
-    writeSalDataStore({
-      projects: stored?.projects ?? [],
-      salDocuments: updated,
-    });
-    return;
+    throw new Error("SAL update requires Tauri desktop runtime");
   }
 
-  try {
-    await invoke("update_sal_document", { id, data: doc as never });
-  } catch {
-    /* no-op */
+  const payload = { ...doc } as Record<string, unknown>;
+  if (doc.lines) {
+    payload.lineCount = doc.lines.length;
+    payload.measurementRowCount = doc.lines.reduce(
+      (sum, line) => sum + (line.measurementRows?.length ?? 0),
+      0,
+    );
   }
+  if (doc.total != null) {
+    payload.totalCents = Math.round(doc.total * 100);
+  }
+
+  await invokeForWrite("update_sal_document", { id, data: payload as never });
 }
 
 export async function deleteSalDocument(id: string): Promise<void> {
   if (!isTauriRuntime()) {
-    const stored = readSalDataStore();
-    const existing = stored?.salDocuments ?? [];
-    const updated = existing.filter((d) => d.id !== id);
-    writeSalDataStore({
-      projects: stored?.projects ?? [],
-      salDocuments: updated,
-    });
-    return;
+    throw new Error("SAL delete requires Tauri desktop runtime");
   }
 
-  try {
-    await invoke("delete_sal_document", { id });
-  } catch {
-    /* no-op */
-  }
+  await invokeForWrite("delete_sal_document", { id });
 }
 
 export async function listDesktopSalProjects(): Promise<DesktopDataResult<SalProject[]>> {
@@ -117,30 +93,67 @@ export async function listDesktopSalProjects(): Promise<DesktopDataResult<SalPro
     };
   }
 
-  return invokeWithFallback<SalProject[]>("list_sal_projects", {}, [], "progetti SAL dimostrativi");
+  return invokeForRead<SalProject[]>("list_sal_projects", {}, [], "progetti SAL dimostrativi");
 }
 
 export async function saveSalProject(project: SalProject): Promise<void> {
   if (!isTauriRuntime()) {
-    const stored = readSalDataStore();
-    const existing = stored?.projects ?? [];
-    const projIndex = existing.findIndex((p) => p.id === project.id);
-    const updated =
-      projIndex >= 0
-        ? existing.map((p, i) => (i === projIndex ? project : p))
-        : [project, ...existing];
-    writeSalDataStore({
-      projects: updated,
-      salDocuments: stored?.salDocuments ?? [],
-    });
-    return;
+    throw new Error("SAL project save requires Tauri desktop runtime");
   }
 
-  try {
-    await invoke("save_sal_project", { project: project as never });
-  } catch {
-    /* no-op */
+  await invokeForWrite("save_sal_project", { project: project as never });
+}
+
+export type MaterialDeductionInput = {
+  materialId: string;
+  quantity: number;
+  description?: string;
+};
+
+export async function confirmSalTransaction(
+  projectId: string,
+  salData: SalDocument,
+  materialDeductions: MaterialDeductionInput[],
+): Promise<SalDocument> {
+  if (!isTauriRuntime()) {
+    await saveSalDocument(projectId, salData);
+    const { updateDesktopMaterial, listDesktopMaterials } = await import("./desktopData");
+    const { data: all } = await listDesktopMaterials([]);
+    for (const d of materialDeductions) {
+      const mat = all.find((m: { id: string }) => m.id === d.materialId);
+      if (mat) {
+        await updateDesktopMaterial(d.materialId, {
+          id: mat.id,
+          code: mat.code,
+          description: mat.description,
+          category: mat.category,
+          unit: mat.unit,
+          minQuantity: mat.minQuantity,
+          notes: mat.notes,
+          quantity: Math.max(0, mat.quantity - d.quantity),
+        });
+      }
+    }
+    return salData;
   }
+
+  const payload = { ...salData } as Record<string, unknown>;
+  if (salData.lines) {
+    payload.lineCount = salData.lines.length;
+    payload.measurementRowCount = salData.lines.reduce(
+      (sum, line) => sum + (line.measurementRows?.length ?? 0),
+      0,
+    );
+  }
+  if (salData.total != null) {
+    payload.totalCents = Math.round(salData.total * 100);
+  }
+
+  return invoke<SalDocument>("confirm_sal_transaction", {
+    projectId,
+    salData: payload as never,
+    materialDeductions,
+  });
 }
 
 // Migrazione one-time: sposta i SAL dal vecchio zustand persist key (quantara-sal-workflow)
@@ -151,44 +164,32 @@ const OLD_ZUSTAND_KEY = "quantara-sal-workflow";
 export async function migrateSalLocalStorageToBackend(): Promise<void> {
   if (!isTauriRuntime()) return;
 
-  try {
-    const alreadyDone = window.localStorage.getItem(MIGRATION_FLAG_KEY);
-    if (alreadyDone) return;
+  const alreadyDone = window.localStorage.getItem(MIGRATION_FLAG_KEY);
+  if (alreadyDone) return;
 
-    const raw = window.localStorage.getItem(OLD_ZUSTAND_KEY);
-    if (!raw) {
-      window.localStorage.setItem(MIGRATION_FLAG_KEY, "1");
-      return;
-    }
-
-    const parsed = JSON.parse(raw);
-    const state = parsed?.state ?? parsed;
-    const docs: SalDocument[] = Array.isArray(state?.salDocuments) ? state.salDocuments : [];
-    const projects: SalProject[] = Array.isArray(state?.projects) ? state.projects : [];
-
-    if (docs.length === 0 && projects.length === 0) {
-      window.localStorage.setItem(MIGRATION_FLAG_KEY, "1");
-      return;
-    }
-
-    for (const doc of docs) {
-      try {
-        await invoke("save_sal_document", { projectId: doc.projectId, data: doc as never });
-      } catch {
-        /* best-effort */
-      }
-    }
-
-    for (const proj of projects) {
-      try {
-        await invoke("save_sal_project", { project: proj as never });
-      } catch {
-        /* best-effort */
-      }
-    }
-
+  const raw = window.localStorage.getItem(OLD_ZUSTAND_KEY);
+  if (!raw) {
     window.localStorage.setItem(MIGRATION_FLAG_KEY, "1");
-  } catch {
-    /* no-op */
+    return;
   }
+
+  const parsed = JSON.parse(raw);
+  const state = parsed?.state ?? parsed;
+  const docs: SalDocument[] = Array.isArray(state?.salDocuments) ? state.salDocuments : [];
+  const projects: SalProject[] = Array.isArray(state?.projects) ? state.projects : [];
+
+  if (docs.length === 0 && projects.length === 0) {
+    window.localStorage.setItem(MIGRATION_FLAG_KEY, "1");
+    return;
+  }
+
+  for (const doc of docs) {
+    await invokeForWrite("save_sal_document", { projectId: doc.projectId, data: doc as never });
+  }
+
+  for (const proj of projects) {
+    await invokeForWrite("save_sal_project", { project: proj as never });
+  }
+
+  window.localStorage.setItem(MIGRATION_FLAG_KEY, "1");
 }

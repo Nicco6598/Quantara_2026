@@ -65,3 +65,22 @@ pub fn get_database_path(app: &AppHandle) -> Result<PathBuf, AppError> {
     let dir = get_app_data_dir(app)?;
     Ok(dir.join(default_database_name()))
 }
+
+pub fn reopen_connection(app: &AppHandle, conn: &mut Connection) -> Result<(), AppError> {
+    let database_path = get_database_path(app)?;
+    let new_conn =
+        Connection::open(&database_path).map_err(|e| AppError::Database(e.to_string()))?;
+
+    new_conn
+        .execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA cache_size = -2000;
+             PRAGMA temp_store = MEMORY;",
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    migrations::apply_migrations(&new_conn)?;
+    *conn = new_conn;
+    Ok(())
+}
