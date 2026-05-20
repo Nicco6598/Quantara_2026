@@ -8,10 +8,18 @@ import type { SalEconomicRules, SalEconomicSummary, SalLineView } from "../types
 export function ConfirmStep({
   economicRules,
   lineViews,
+  onExportExcel,
+  onExportMeasurementBookPdf,
+  onExportSalPdf,
+  onPrintAccounting,
   summary,
 }: {
   economicRules: SalEconomicRules;
   lineViews: SalLineView[];
+  onExportExcel: () => void;
+  onExportMeasurementBookPdf: () => void;
+  onExportSalPdf: () => void;
+  onPrintAccounting: () => void;
   summary: SalEconomicSummary;
 }) {
   return (
@@ -34,21 +42,21 @@ export function ConfirmStep({
 
           <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[520px]">
             <ExportButton
-              disabled
               icon={<FileText className="size-4" />}
               label="PDF SAL"
+              onClick={onExportSalPdf}
               tone="danger"
             />
             <ExportButton
-              disabled
               icon={<FileText className="size-4" />}
               label="PDF libretto"
+              onClick={onExportMeasurementBookPdf}
               tone="info"
             />
             <ExportButton
-              disabled
               icon={<FileSpreadsheet className="size-4" />}
               label="Excel dettaglio"
+              onClick={onExportExcel}
               tone="success"
             />
           </div>
@@ -79,21 +87,26 @@ export function ConfirmStep({
         title="Documento finale SAL"
       />
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <ExportCard
-          disabled
+          icon={<FileSpreadsheet className="size-4 text-[var(--success-base)]" />}
+          label="Excel dettaglio"
+          onClick={onExportExcel}
+        />
+        <ExportCard
           icon={<FileText className="size-4 text-[var(--danger-base)]" />}
           label="PDF SAL"
+          onClick={onExportSalPdf}
         />
         <ExportCard
-          disabled
           icon={<FileText className="size-4 text-[var(--info-base)]" />}
           label="PDF libretto"
+          onClick={onExportMeasurementBookPdf}
         />
         <ExportCard
-          disabled
           icon={<Printer className="size-4 text-[var(--text-tertiary)]" />}
           label="Stampa contabilità"
+          onClick={onPrintAccounting}
         />
       </div>
     </div>
@@ -104,11 +117,13 @@ function ExportButton({
   disabled,
   icon,
   label,
+  onClick,
   tone,
 }: {
   disabled?: boolean;
   icon: ReactNode;
   label: string;
+  onClick: () => void;
   tone: "danger" | "info" | "success";
 }) {
   return (
@@ -124,6 +139,7 @@ function ExportButton({
         disabled && "cursor-not-allowed opacity-55",
       )}
       disabled={disabled}
+      onClick={onClick}
       title={disabled ? "Export non ancora collegato" : undefined}
       type="button"
     >
@@ -138,26 +154,31 @@ function ExportCard({
   disabled,
   icon,
   label,
+  onClick,
 }: {
   disabled?: boolean;
   icon: ReactNode;
   label: string;
+  onClick: () => void;
 }) {
   return (
-    <div
+    <button
       className={cn(
-        "flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-3.5",
+        "flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-3.5 text-left transition-colors hover:bg-[var(--bg-muted)]",
         disabled && "opacity-45",
       )}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
     >
       <div className="flex min-w-0 items-center gap-3">
         {icon}
         <span className="truncate text-sm font-semibold text-[var(--text-primary)]">{label}</span>
       </div>
       <span className="hidden text-xs font-medium text-[var(--text-tertiary)] md:inline">
-        {disabled ? "Da collegare" : "Pronto"}
+        {disabled ? "Da collegare" : "Genera"}
       </span>
-    </div>
+    </button>
   );
 }
 

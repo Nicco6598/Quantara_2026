@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import type { SalDocument } from "@/features/sal/types";
 import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
+import { saveWorkbookAs, waitForUiPaint } from "@/features/projects/utils/projects-helpers";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   confirmSalTransaction,
@@ -449,9 +450,18 @@ export function SalCreationScreen() {
     if (editingDraftSalId.current) {
       updateSalDraft(editingDraftSalId.current, finalSalPayload);
       closeSal(editingDraftSalId.current);
-      salForBackend = useSalWorkflowStore
+      const updatedDraft = useSalWorkflowStore
         .getState()
-        .salDocuments.find((d) => d.id === editingDraftSalId.current)!;
+        .salDocuments.find((d) => d.id === editingDraftSalId.current);
+      if (!updatedDraft) {
+        notify({
+          message: "La bozza aggiornata non e stata trovata nel registro locale.",
+          title: "Errore SAL",
+          tone: "danger",
+        });
+        return;
+      }
+      salForBackend = updatedDraft;
     } else {
       salForBackend = createSal({ ...finalSalPayload, status: "closed" });
     }
@@ -661,6 +671,114 @@ export function SalCreationScreen() {
     summary.total,
   ]);
 
+  const handleExportSalExcel = useCallback(async () => {
+    const project = data.project;
+    if (!project) {
+      notify({
+        message: "Seleziona un progetto prima di esportare la SAL.",
+        title: "Export SAL",
+        tone: "warning",
+      });
+      return;
+    }
+
+    try {
+      const { serializeSalDetailReportWorkbook } = await import("@quantara/excel-import");
+      const fileName = `quantara-sal-${slugify(salTitle.trim() || suggestedSalTitle)}-${salDate}.xlsx`;
+      await waitForUiPaint();
+      const savedPath = await saveWorkbookAs(
+        await serializeSalDetailReportWorkbook({
+          date: salDate,
+          economicRules,
+          lines: lineViews.map((line) => ({
+            discountAmount: line.discountAmount,
+            discountableAmount: line.discountableAmount,
+            grossAmount: line.grossAmount,
+            id: line.id,
+            linkedCharges: line.linkedCharges,
+            measurementRows: line.measurementRows.map((row) => ({
+              date: row.date,
+              description: row.description,
+              factor1: row.factor1,
+              factor2: row.factor2,
+              factor3: row.factor3,
+              notes: row.notes,
+              partialQuantity: row.partialQuantity,
+              ...(row.station ? { station: row.station } : {}),
+              unit: row.unit,
+            })),
+            netAmount: line.netAmount,
+            quantity: line.quantity,
+            surchargePercent: line.surchargePercent,
+            totalAmount: line.totalAmount,
+            voice: {
+              category: line.voice.category,
+              code: line.voice.code,
+              description: line.voice.description,
+              isSafetyCost: line.voice.isSafetyCost,
+              unit: line.voice.unit,
+              unitPrice: line.voice.unitPrice,
+            },
+          })),
+          project: {
+            applicationContractCode: project.applicationContractCode,
+            contractor: project.contractor,
+            contractAmount: project.contractAmount,
+            frameworkAgreementCode: project.frameworkAgreementCode,
+            title: project.title,
+          },
+          summary,
+          title: salTitle.trim() || suggestedSalTitle,
+        }),
+        fileName,
+      );
+      if (!savedPath) {
+        notify({
+          message: "Export annullato.",
+          title: "Export SAL",
+          tone: "info",
+        });
+        return;
+      }
+      notify({
+        message: `${lineViews.length} righe incluse nel file Excel.`,
+        title: "Excel SAL completato",
+        tone: "success",
+      });
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Export Excel non riuscito",
+        tone: "danger",
+      });
+    }
+  }, [
+    data.project,
+    economicRules,
+    lineViews,
+    notify,
+    salDate,
+    salTitle,
+    suggestedSalTitle,
+    summary,
+  ]);
+
+  const handlePdfPending = useCallback(
+    (kind: "libretto" | "sal" | "stampa") => {
+      notify({
+        message:
+          kind === "libretto"
+            ? "Il renderer PDF del libretto misure sarà collegato al prossimo blocco export."
+            : kind === "stampa"
+              ? "La stampa contabile userà il report contabilità condiviso nel prossimo blocco."
+              : "Il renderer PDF SAL sarà collegato al prossimo blocco export.",
+        title: "PDF non ancora generato",
+        tone: "info",
+      });
+    },
+    [notify],
+  );
+
   const toolbarConfig = useMemo(
     () => ({
       autoSaveLastSaved: salAutoSaveLastSaved,
@@ -838,6 +956,10 @@ export function SalCreationScreen() {
                   <ConfirmStep
                     economicRules={economicRules}
                     lineViews={lineViews}
+                    onExportExcel={handleExportSalExcel}
+                    onExportMeasurementBookPdf={() => handlePdfPending("libretto")}
+                    onExportSalPdf={() => handlePdfPending("sal")}
+                    onPrintAccounting={() => handlePdfPending("stampa")}
                     summary={summary}
                   />
                 )}
@@ -996,5 +1118,17 @@ function Currency({ value }: { value: number }) {
         minimumFractionDigits: 2,
       })}
     </span>
+  );
+}
+
+function slugify(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 48) || "sal"
   );
 }

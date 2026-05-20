@@ -4,6 +4,13 @@ All notable changes to Quantara follow SemVer.
 
 ## 0.4.0 — 2026-05-20
 
+### Export Excel — report più controllabili
+
+- **Export progetti con scelta esplicita** — il comando Export non scarica più tutto automaticamente: apre una finestra dove puoi scegliere quali progetti includere nel file.
+- **Report Excel progetti più leggibile** — il nuovo workbook contiene un foglio Indice e un foglio per ogni progetto selezionato, con budget, SAL, residui e dettaglio righe.
+- **Export SAL in Excel** — nello step Conferma SAL è disponibile l'export Excel dettaglio, con riepilogo del documento e foglio Libretto per le righe misura.
+- **Salvataggio dove vuoi tu** — in app desktop gli export Excel aprono il selettore percorso, così puoi decidere cartella e nome file prima di salvare.
+
 ### SAL — creazione più veloce e controllabile
 
 - **Cockpit misure più operativo** — durante l'inserimento voci ora hai totale corrente, residuo budget, voci incomplete e controlli rapidi sempre visibili accanto al registro. Non devi più arrivare allo step di verifica per capire se qualcosa non torna.

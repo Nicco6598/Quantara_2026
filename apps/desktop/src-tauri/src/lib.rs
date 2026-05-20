@@ -111,6 +111,7 @@ pub fn run() {
             commands::backup::restore_database_encrypted,
             commands::backup::get_backup_encryption_status,
             commands::backup::get_database_info,
+            commands::export::write_export_file,
             commands::release_notes::write_pending_release_notes,
             commands::release_notes::read_pending_release_notes,
             commands::release_notes::clear_pending_release_notes,

@@ -1,4 +1,4 @@
-import { Trash2, X } from "lucide-react";
+import { FileSpreadsheet, Trash2, X } from "lucide-react";
 import {
   type ChangeEvent,
   lazy,
@@ -42,6 +42,7 @@ import {
   updateDesktopContract,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { cn } from "@/lib/utils";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import {
   type PendingWorkflowAction,
@@ -105,12 +106,9 @@ export function ProjectsScreen() {
   const [, setMigrationAction] = useState<MigrationAction>("idle");
   const [query, setQuery] = useState("");
   const [isSalModalOpen, setIsSalModalOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportSelectionIds, setExportSelectionIds] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
-  const { exportMigrationWorkbook, importMigrationFile } = useProjectMigration({
-    contracts: contractsState.data,
-    notify,
-    setMigrationAction,
-  });
   const { deleteProject, selectProject } = useProjectMutations({
     contracts: contractsState.data,
     notify,
@@ -137,6 +135,14 @@ export function ProjectsScreen() {
         : [],
     [contractsState.data, contractsState.source, projectContractors, salDocuments, tariffVoices],
   );
+  const { exportProjectsReportWorkbook, importMigrationFile } = useProjectMigration({
+    contracts: contractsState.data,
+    notify,
+    projects: activeProjects,
+    salDocuments,
+    setMigrationAction,
+    tariffVoices,
+  });
   const treeData = useMemo(
     () =>
       buildContractorTree(
@@ -409,6 +415,40 @@ export function ProjectsScreen() {
 
   const { averageProgress, criticalCount, salExposure, salWindowCount, totalBudget } =
     portfolioMetrics;
+  const exportSelectedProjects = useMemo(
+    () => visibleProjects.filter((project) => exportSelectionIds.has(project.id)),
+    [exportSelectionIds, visibleProjects],
+  );
+
+  function openExportDialog() {
+    setExportSelectionIds(new Set(visibleProjects.map((project) => project.id)));
+    setIsExportDialogOpen(true);
+  }
+
+  function toggleExportProject(projectId: string) {
+    setExportSelectionIds((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  }
+
+  function confirmProjectExport() {
+    if (exportSelectedProjects.length === 0) {
+      notify({
+        message: "Seleziona almeno un progetto da esportare.",
+        title: "Export",
+        tone: "warning",
+      });
+      return;
+    }
+    setIsExportDialogOpen(false);
+    void exportProjectsReportWorkbook(exportSelectedProjects);
+  }
 
   return (
     <ScreenLayout gradient="accent" gradientHeight={460}>
@@ -425,7 +465,7 @@ export function ProjectsScreen() {
             managerLoadCount={managerLoad.length}
             onBack={handleBackFromContractor}
             onCreateProject={handleOpenCreateProject}
-            onExport={exportMigrationWorkbook}
+            onExport={openExportDialog}
             onFocusChange={(nextFocus) => startTransition(() => setFocus(nextFocus))}
             onImport={() => fileInputRef.current?.click()}
             onOpenProject={handleOpenProject}
@@ -528,6 +568,16 @@ export function ProjectsScreen() {
             onConfirm={handleConfirmDeleteContractor}
           />
         ) : null}
+        <ProjectExportDialog
+          isOpen={isExportDialogOpen}
+          onClose={() => setIsExportDialogOpen(false)}
+          onConfirm={confirmProjectExport}
+          onSelectAll={() => setExportSelectionIds(new Set(visibleProjects.map((p) => p.id)))}
+          onSelectNone={() => setExportSelectionIds(new Set())}
+          onToggleProject={toggleExportProject}
+          projects={visibleProjects}
+          selectedIds={exportSelectionIds}
+        />
         <ConfirmDialog
           isOpen={projectDeleteTarget !== null}
           onCancel={() => setProjectDeleteTarget(null)}
@@ -542,6 +592,128 @@ export function ProjectsScreen() {
         </ConfirmDialog>
       </Suspense>
     </ScreenLayout>
+  );
+}
+
+function ProjectExportDialog({
+  isOpen,
+  onClose,
+  onConfirm,
+  onSelectAll,
+  onSelectNone,
+  onToggleProject,
+  projects,
+  selectedIds,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  onSelectAll: () => void;
+  onSelectNone: () => void;
+  onToggleProject: (projectId: string) => void;
+  projects: PortfolioProject[];
+  selectedIds: Set<string>;
+}) {
+  return (
+    <Dialog
+      className="max-w-3xl"
+      contentClassName="overflow-hidden p-0"
+      isOpen={isOpen}
+      onClose={onClose}
+      zIndex={90}
+    >
+      <div className="border-b border-[var(--border-subtle)] px-5 py-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--success-soft)] text-[var(--success-base)]">
+              <FileSpreadsheet className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-16px font-bold text-[var(--text-primary)]">Esporta progetti</h3>
+              <p className="mt-1 text-12px font-medium text-[var(--text-secondary)]">
+                {selectedIds.size} di {projects.length} progetti selezionati
+              </p>
+            </div>
+          </div>
+          <button
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="mt-4 inline-flex rounded-full bg-[var(--bg-muted)] p-1">
+          <button
+            className="rounded-full px-3 py-1.5 text-12px font-bold text-[var(--accent-primary)] transition-colors hover:bg-[var(--surface-base)]"
+            onClick={onSelectAll}
+            type="button"
+          >
+            Tutti
+          </button>
+          <button
+            className="rounded-full px-3 py-1.5 text-12px font-bold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-base)] hover:text-[var(--text-primary)]"
+            onClick={onSelectNone}
+            type="button"
+          >
+            Nessuno
+          </button>
+        </div>
+      </div>
+
+      <div className="max-h-[52vh] space-y-2 overflow-y-auto bg-[var(--bg-muted)]/35 px-5 py-4">
+        {projects.length > 0 ? (
+          projects.map((project) => {
+            const selected = selectedIds.has(project.id);
+            return (
+              <button
+                className={cn(
+                  "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-xl border px-4 py-3 text-left transition-colors",
+                  selected
+                    ? "border-[var(--accent-primary)] bg-[var(--surface-base)] shadow-[0_12px_30px_color-mix(in_srgb,var(--accent-primary)_10%,transparent)]"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--bg-muted)]",
+                )}
+                key={project.id}
+                onClick={() => onToggleProject(project.id)}
+                type="button"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-14px font-bold text-[var(--text-primary)]">
+                    {project.title}
+                  </div>
+                  <div className="mt-1 truncate text-12px font-medium text-[var(--text-secondary)]">
+                    {project.contractor} · {project.lot}
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    "flex size-6 shrink-0 items-center justify-center rounded-lg border-2",
+                    selected
+                      ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]"
+                      : "border-[var(--border-subtle)]",
+                  )}
+                >
+                  {selected ? <span className="size-2 rounded-sm bg-white" /> : null}
+                </span>
+              </button>
+            );
+          })
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-8 text-center text-13px text-[var(--text-secondary)]">
+            Nessun progetto nel filtro corrente.
+          </div>
+        )}
+      </div>
+
+      <DialogActions className="mt-0 border-t border-[var(--border-subtle)] px-5 py-4">
+        <Button onClick={onClose} variant="ghost">
+          Annulla
+        </Button>
+        <Button disabled={selectedIds.size === 0} icon={FileSpreadsheet} onClick={onConfirm}>
+          Genera Excel
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

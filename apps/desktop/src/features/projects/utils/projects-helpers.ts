@@ -1,5 +1,6 @@
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { LaneTone, PortfolioProject } from "@/features/projects/types";
+import { isTauriRuntime } from "@/lib/tauri-wrapper";
 
 export type TonePalette = {
   accent: string;
@@ -214,4 +215,29 @@ export function downloadWorkbook(bytes: Uint8Array, fileName: string): void {
   link.download = fileName;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+export async function saveWorkbookAs(bytes: Uint8Array, fileName: string): Promise<string | null> {
+  if (!isTauriRuntime()) {
+    downloadWorkbook(bytes, fileName);
+    return fileName;
+  }
+
+  const [{ invoke }, { save }] = await Promise.all([
+    import("@tauri-apps/api/core"),
+    import("@tauri-apps/plugin-dialog"),
+  ]);
+  const path = await save({
+    defaultPath: fileName,
+    filters: [{ name: "Excel", extensions: ["xlsx"] }],
+  });
+
+  if (!path) {
+    return null;
+  }
+
+  return invoke<string>("write_export_file", {
+    bytes: Array.from(bytes),
+    path,
+  });
 }
