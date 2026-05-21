@@ -150,7 +150,7 @@ export function calculateProjectPerformanceForecast(
   const recentTypicalSalAmount = calculateTypicalAmount(
     recentRows.length > 0 ? recentRows : baselineRows,
   );
-  const latestSalAmount = sortedRows.at(-1)?.amount ?? recentTypicalSalAmount;
+  const latestSalAmount = sortedRows[sortedRows.length - 1]?.amount ?? recentTypicalSalAmount;
   const activeSalAmount =
     latestSalAmount > 0 && recentTypicalSalAmount > 0
       ? latestSalAmount * 0.7 + recentTypicalSalAmount * 0.3

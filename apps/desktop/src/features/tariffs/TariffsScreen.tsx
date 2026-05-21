@@ -657,10 +657,12 @@ export function TariffsScreen() {
       if (lastSavedResult?.voices.length) {
         setVoicesState({ data: lastSavedResult.voices, source: "desktop" });
       }
-      setSelectedTariffBookId(lastSavedResult?.tariffBookId ?? savedBooks.at(-1)?.id ?? "");
+      setSelectedTariffBookId(
+        lastSavedResult?.tariffBookId ?? savedBooks[savedBooks.length - 1]?.id ?? "",
+      );
       setTariffBooksState((current) => ({
         data: [
-          ...savedBooks.toReversed(),
+          ...[...savedBooks].reverse(),
           ...current.data.filter(
             (item) => !savedBookIds.has(item.id) && !duplicateBookIds.has(item.id),
           ),

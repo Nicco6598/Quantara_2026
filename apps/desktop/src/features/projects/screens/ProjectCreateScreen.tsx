@@ -137,7 +137,7 @@ export function ProjectCreateScreen() {
   const { draft, step, error, tariffSearchQuery } = ui;
 
   const availableTariffYears = useMemo(
-    () => [...new Set(tariffBooks.map((book) => book.year))].toSorted((a, b) => b - a),
+    () => [...new Set(tariffBooks.map((book) => book.year))].sort((a, b) => b - a),
     [tariffBooks],
   );
 
@@ -738,7 +738,7 @@ export function ProjectCreateScreen() {
                                       setTariffYearFilters((current) =>
                                         selected
                                           ? current.filter((item) => item !== year)
-                                          : [...current, year].toSorted((a, b) => b - a),
+                                          : [...current, year].sort((a, b) => b - a),
                                       );
                                     }}
                                     type="button"
@@ -1407,7 +1407,7 @@ function mergeContractorOptions(values: string[]) {
     options.set(contractor.toLocaleLowerCase("it-IT"), contractor);
   }
 
-  return [...options.values()].toSorted((left, right) => left.localeCompare(right));
+  return [...options.values()].sort((left, right) => left.localeCompare(right));
 }
 
 function sanitizeMoneyInput(value: string) {

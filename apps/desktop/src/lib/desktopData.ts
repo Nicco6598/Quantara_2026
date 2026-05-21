@@ -10,6 +10,7 @@ import type {
   UpdateDesktopTariffBookRecordRequest,
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invokeForRead, isTauriRuntime } from "./tauri-wrapper";
 import { dispatchDataChanged } from "@/lib/sync-events";
 
@@ -312,8 +313,7 @@ export async function selectMultipleTariffPdfMetadatas(
     return [];
   }
 
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  const selectedPaths = await open({
+  const selectedPaths = await openDialog({
     filters: [{ extensions: ["pdf", "json"], name: "Tariffario PDF o JSON parser" }],
     multiple: true,
   });

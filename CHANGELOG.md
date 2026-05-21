@@ -2,6 +2,12 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.4.21 — 2026-05-21
+
+### Stability Fix
+
+- **Fix di import tariffari** — l'app poteva restituire errori vari nell'importare i tariffari.
+
 ## 0.4.2 — 2026-05-21
 
 ### Tariffari — import, parser e preview

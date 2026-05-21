@@ -601,16 +601,16 @@ export const EditableTariffVoicesGrid = memo(
           grpMap.get(grp)?.push(group);
         }
         return [...catMap.entries()]
-          .toSorted(([a], [b]) => a.localeCompare(b, "it", { numeric: true }))
+          .sort(([a], [b]) => a.localeCompare(b, "it", { numeric: true }))
           .map(([cat, grpMap]) => ({
             id: createCategoryId(cat),
             categoria: cat,
             groups: [...grpMap.entries()]
-              .toSorted(([a], [b]) => a.localeCompare(b, "it", { numeric: true }))
+              .sort(([a], [b]) => a.localeCompare(b, "it", { numeric: true }))
               .map(([grp, voci]) => ({
                 gruppo: grp,
                 gruppoDesc: voci[0]?.gruppoDesc ?? "",
-                voci: voci.toSorted((a, b) => Number(a.voce || "0") - Number(b.voce || "0")),
+                voci: [...voci].sort((a, b) => Number(a.voce || "0") - Number(b.voce || "0")),
               })),
           }));
       }, [groups]);

@@ -26,7 +26,7 @@ export function buildTariffMetrics(tariffBooks: readonly DesktopTariffBook[]): T
     activeCount,
     sourceCount: sourceNames.size,
     tariffCount: tariffBooks.length,
-    years: [...years].toSorted((a, b) => b - a),
+    years: [...years].sort((a, b) => b - a),
   };
 }
 

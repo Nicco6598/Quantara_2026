@@ -30,8 +30,8 @@ export function parseChangelogTree(markdown: string): TreeNode[] {
         key: `h3-${h3[1]}`,
         text: h3[1],
       };
-      while (stack.length > 0 && (stack.at(-1)?.depth ?? 0) >= 1) stack.pop();
-      const parent = stack.at(-1);
+      while (stack.length > 0 && (stack[stack.length - 1]?.depth ?? 0) >= 1) stack.pop();
+      const parent = stack[stack.length - 1];
       if (parent) parent.node.children.push(node);
       else root.push(node);
       stack.push({ node, depth: 1 });
@@ -47,8 +47,8 @@ export function parseChangelogTree(markdown: string): TreeNode[] {
         key: `li-${clean}`,
         text: clean,
       };
-      while (stack.length > 0 && (stack.at(-1)?.depth ?? 0) >= 2) stack.pop();
-      const parent = stack.at(-1);
+      while (stack.length > 0 && (stack[stack.length - 1]?.depth ?? 0) >= 2) stack.pop();
+      const parent = stack[stack.length - 1];
       if (parent) parent.node.children.push(node);
       else root.push(node);
     }
