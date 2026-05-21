@@ -453,65 +453,46 @@ export function ProjectsScreen() {
   return (
     <ScreenLayout gradient="accent" gradientHeight={460}>
       <ErrorBoundary resetKey={`projects-workspace:${selectedContractorId ?? "root"}`}>
-        {selectedContractor ? (
-          <ContractorDetailView
-            averageProgress={averageProgress}
-            contractor={selectedContractor}
-            criticalCount={criticalCount}
-            focus={focus}
-            focusCounts={focusCounts}
-            focusOptions={focusOptions}
-            isPending={isPending}
-            managerLoadCount={managerLoad.length}
-            onBack={handleBackFromContractor}
-            onCreateProject={handleOpenCreateProject}
-            onExport={openExportDialog}
-            onFocusChange={(nextFocus) => startTransition(() => setFocus(nextFocus))}
-            onImport={() => fileInputRef.current?.click()}
-            onOpenProject={handleOpenProject}
-            onEditProject={(project) => selectProject(project.id)}
-            onDeleteProject={(projectId) => setProjectDeleteTarget(projectId)}
-            projects={visibleProjects}
-            query={query}
-            salExposure={salExposure}
-            salWindowCount={salWindowCount}
-            selectedProjectId={selectedContractId}
-            setQuery={setQuery}
-            totalBudget={totalBudget}
-            visibleActivities={visibleActivities}
-            visibleApprovals={visibleApprovals}
-            visibleQueue={visibleQueue}
-          />
-        ) : isTreeView ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-15px font-semibold text-[var(--text-primary)]">
-                  Albero appaltatori
-                </h2>
-                <p className="mt-0.5 text-12px text-[var(--text-secondary)]">
-                  {treeData.length} appaltatori · {activeProjects.length} progetti
-                </p>
-              </div>
-              <Button onClick={() => setIsTreeView(false)} size="sm" variant="outline">
-                Vista griglia
-              </Button>
-            </div>
+        <div className="flex min-h-0 flex-1 flex-col">
+          {selectedContractor ? (
+            <ContractorDetailView
+              averageProgress={averageProgress}
+              contractor={selectedContractor}
+              criticalCount={criticalCount}
+              focus={focus}
+              focusCounts={focusCounts}
+              focusOptions={focusOptions}
+              isPending={isPending}
+              managerLoadCount={managerLoad.length}
+              onBack={handleBackFromContractor}
+              onCreateProject={handleOpenCreateProject}
+              onExport={openExportDialog}
+              onFocusChange={(nextFocus) => startTransition(() => setFocus(nextFocus))}
+              onImport={() => fileInputRef.current?.click()}
+              onOpenProject={handleOpenProject}
+              onEditProject={(project) => selectProject(project.id)}
+              onDeleteProject={(projectId) => setProjectDeleteTarget(projectId)}
+              projects={visibleProjects}
+              query={query}
+              salExposure={salExposure}
+              salWindowCount={salWindowCount}
+              selectedProjectId={selectedContractId}
+              setQuery={setQuery}
+              totalBudget={totalBudget}
+              visibleActivities={visibleActivities}
+              visibleApprovals={visibleApprovals}
+              visibleQueue={visibleQueue}
+            />
+          ) : isTreeView ? (
             <ContractorTreeView
               contractors={treeData}
               onOpenProject={(id) => {
                 const p = activeProjects.find((proj) => proj.id === id);
                 if (p) handleOpenProject(p);
               }}
+              onSwitchView={() => setIsTreeView(false)}
             />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-end">
-              <Button onClick={() => setIsTreeView(true)} size="sm" variant="outline">
-                Vista albero
-              </Button>
-            </div>
+          ) : (
             <ContractorsWorkspace
               activeProjectsCount={activeProjects.length}
               folders={contractorFolders}
@@ -520,11 +501,12 @@ export function ProjectsScreen() {
               onOpenCreateContractor={() => setIsContractorModalOpen(true)}
               onOpenFolder={handleOpenFolder}
               onOpenNotifications={() => setIsSalModalOpen(true)}
+              onSwitchToTreeView={() => setIsTreeView(true)}
               recentSalsCount={recentSals.length}
               totalPortfolioValue={totalPortfolioValue}
             />
-          </div>
-        )}
+          )}
+        </div>
       </ErrorBoundary>
 
       <input

@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 const PROJECT_AUTO_DRAFT_KEY = STORAGE_KEYS.projectAutoDraft;
 const PROJECT_STEPPER_SPRING = { type: "spring", ...motionSpring.panel } as const;
 const PROJECT_STEPPER_REVEAL = {
-  duration: motionDuration.deliberate,
+  duration: motionDuration.reveal,
   ease: motionEase.emphasized,
 } as const;
 
@@ -700,11 +700,11 @@ export function ProjectCreateScreen() {
                           <>
                             <button
                               aria-label="Chiudi filtro anno"
-                              className="fixed inset-0 z-40 cursor-default"
+                              className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
                               onClick={() => setTariffYearFilterOpen(false)}
                               type="button"
                             />
-                            <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[190px] overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
+                            <div className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-1 w-full min-w-[190px] overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
                               <button
                                 className={cn(
                                   "flex w-full items-center justify-between rounded-10px px-3 py-2 text-left text-13px font-medium transition-colors",
@@ -1343,7 +1343,7 @@ function ContractorSelect({
           />
         </div>
         {isOpen ? (
-          <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-48 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg">
+          <div className="absolute left-0 right-0 top-full z-[var(--z-dropdown-menu)] mt-2 max-h-48 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg">
             {filtered.length === 0 ? (
               <div className="px-3 py-2 text-sm text-[var(--text-secondary)]">Nessun risultato</div>
             ) : (

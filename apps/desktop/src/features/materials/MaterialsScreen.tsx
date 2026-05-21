@@ -508,7 +508,7 @@ function MaterialCard({
   return (
     <m.article
       className={cn(
-        "group relative min-h-[116px] rounded-14px border p-4 text-left transition-colors duration-200",
+        "group relative min-h-[116px] rounded-14px border p-4 text-left transition-colors duration-[var(--duration-fast)]",
         checked
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
           : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
@@ -600,7 +600,7 @@ function MaterialCard({
                     <div className="flex h-2 overflow-hidden rounded-full bg-[var(--border-subtle)]">
                       <div
                         className={cn(
-                          "h-full rounded-full transition-all duration-500",
+                          "h-full rounded-full transition-all duration-[var(--duration-reveal)]",
                           tone === "danger" && "bg-[var(--danger-base)]",
                           tone === "warning" && "bg-[var(--warning-base)]",
                           tone === "success" && "bg-[var(--success-base)]",

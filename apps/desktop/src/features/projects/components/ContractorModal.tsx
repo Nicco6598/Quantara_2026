@@ -24,7 +24,7 @@ export function ContractorModal({
   }
 
   return (
-    <Dialog isOpen onClose={onClose} zIndex={75}>
+    <Dialog isOpen onClose={onClose} zIndex={"var(--z-dialog)"}>
       <div className="space-y-4">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">

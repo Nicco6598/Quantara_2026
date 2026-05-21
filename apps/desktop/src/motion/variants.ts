@@ -32,7 +32,7 @@ export const motionVariants = {
   },
   progress: {
     initial: { scaleX: 0 },
-    transition: { duration: motionDuration.slow, ease: motionEase.emphasized },
+    transition: { duration: motionDuration.reveal, ease: motionEase.emphasized },
     viewport: { once: true },
   },
   route: {

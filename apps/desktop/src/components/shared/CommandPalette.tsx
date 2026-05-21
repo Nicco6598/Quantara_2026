@@ -563,7 +563,10 @@ export function CommandPalette({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] pointer-events-none" ref={paletteRef}>
+    <div
+      className="fixed inset-0 z-[var(--z-command-palette)] pointer-events-none"
+      ref={paletteRef}
+    >
       <section
         aria-label="Command palette"
         className="pointer-events-auto"

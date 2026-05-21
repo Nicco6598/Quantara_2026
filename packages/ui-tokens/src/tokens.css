@@ -123,9 +123,14 @@
   --space-80: 20rem;
   --space-96: 24rem;
 
+  /* ── Easing ── */
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
   /* ── Transition durations (allineate a easings.ts MOTION_DURATION) ── */
-  --duration-fast: 180ms;
-  --duration-base: 280ms;
+  --duration-fast: 200ms;
+  --duration-base: 340ms;
   --duration-slow: 420ms;
   --duration-reveal: 580ms;
 
@@ -565,6 +570,8 @@
   --duration-slow: var(--duration-slow);
   --duration-reveal: var(--duration-reveal);
   --ease-standard: var(--ease-standard);
+  --ease-entrance: var(--ease-entrance);
+  --ease-exit: var(--ease-exit);
   --z-dropdown-menu: var(--z-dropdown-menu);
   --z-sticky: var(--z-sticky);
   --z-topbar: var(--z-topbar);

@@ -51,7 +51,7 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
 
   return (
     <header
-      className="top-toolbar-shell relative z-30 shrink-0 px-3 py-2 md:px-4"
+      className="top-toolbar-shell relative z-[var(--z-topbar)] shrink-0 px-3 py-2 md:px-4"
       data-tauri-drag-region
     >
       <div

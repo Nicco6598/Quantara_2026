@@ -1,7 +1,6 @@
 import { m } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import uPlot from "uplot";
-import "uplot/dist/uPlot.min.css";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { cn } from "@/lib/utils";
 import { useChartColors } from "./useChartColors";
@@ -325,7 +324,7 @@ export function UplotChart({
 
     const tooltip = document.createElement("div");
     tooltip.className =
-      "pointer-events-none absolute z-50 rounded-14px border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/94 px-3 py-2 text-11px font-medium text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl opacity-0 transition-opacity duration-200";
+      "pointer-events-none absolute z-[var(--z-dropdown-menu)] rounded-14px border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/94 px-3 py-2 text-11px font-medium text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl opacity-0 transition-opacity duration-[var(--duration-fast)]";
 
     containerRef.current.appendChild(tooltip);
 

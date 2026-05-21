@@ -163,7 +163,7 @@ export function SpendingTrend({ views, contractualAmount }: SpendingTrendProps) 
           <>
             <button
               type="button"
-              className="fixed inset-0 z-30"
+              className="fixed inset-0 z-[var(--z-topbar)]"
               onClick={() => setOpen(false)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") setOpen(false);
@@ -171,7 +171,7 @@ export function SpendingTrend({ views, contractualAmount }: SpendingTrendProps) 
               tabIndex={-1}
               aria-label="Close"
             />
-            <div className="absolute right-0 top-full z-40 mt-1 w-max min-w-[130px] overflow-hidden rounded-11px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]">
+            <div className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-1 w-max min-w-[130px] overflow-hidden rounded-11px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]">
               {TF_OPTS.map((opt) => (
                 <button
                   className={cn(

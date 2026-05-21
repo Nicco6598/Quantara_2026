@@ -102,6 +102,95 @@ export function InfoBlock({ label, note, value }: { label: string; note?: string
   );
 }
 
+export function PerformanceIndexBar({
+  label,
+  note,
+  value,
+}: {
+  label: string;
+  note?: string;
+  value: number | null;
+}) {
+  const formatted =
+    value == null || !Number.isFinite(value)
+      ? "N/D"
+      : value.toLocaleString("it-IT", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        });
+  const numericValue = value != null && Number.isFinite(value) ? Math.max(0, value) : null;
+  const maxScale = Math.max(2, Math.ceil(Math.max(numericValue ?? 1, 1) * 2) / 2);
+  const markerPosition =
+    numericValue == null
+      ? 50
+      : numericValue <= 1
+        ? Math.max(0, numericValue * 50)
+        : Math.min(100, 50 + ((numericValue - 1) / (maxScale - 1)) * 50);
+  const leftWidth = numericValue == null || numericValue >= 1 ? 0 : 50 - markerPosition;
+  const rightWidth = numericValue == null || numericValue <= 1 ? 0 : markerPosition - 50;
+  const isLow = value != null && value < 0.95;
+  const isHigh = value != null && value > 1.05;
+  const stateLabel = isLow ? "Sotto soglia" : isHigh ? "Extra margine" : "Bilanciato";
+  const accentClass = isLow
+    ? "text-[var(--danger-base)]"
+    : isHigh
+      ? "text-[var(--success-base)]"
+      : "text-[var(--text-primary)]";
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-tertiary)]">
+            {label}
+          </div>
+          <div className={cn("mt-0.5 text-11px font-semibold", accentClass)}>{stateLabel}</div>
+        </div>
+        <div className="shrink-0 rounded-lg bg-[var(--surface-base)] px-2.5 py-1 text-right ring-1 ring-[var(--border-subtle)]/60">
+          <div className={cn("text-16px font-semibold tabular-nums leading-none", accentClass)}>
+            {formatted}
+          </div>
+        </div>
+      </div>
+
+      <div className="relative mt-3">
+        <div className="grid h-7 grid-cols-[1fr_1px_1fr] items-center overflow-hidden rounded-full bg-[linear-gradient(90deg,color-mix(in_srgb,var(--danger-base)_34%,var(--bg-muted)_66%)_0%,color-mix(in_srgb,var(--warning-base)_22%,var(--bg-muted)_78%)_38%,color-mix(in_srgb,var(--surface-base)_72%,var(--bg-muted)_28%)_50%,color-mix(in_srgb,var(--success-base)_18%,var(--bg-muted)_82%)_62%,color-mix(in_srgb,var(--success-base)_36%,var(--bg-muted)_64%)_100%)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_58%,transparent)]">
+          <div className="relative h-full overflow-hidden rounded-l-full">
+            <div
+              className="absolute bottom-0 top-0 rounded-l-full bg-[linear-gradient(90deg,var(--danger-base),color-mix(in_srgb,var(--warning-base)_70%,var(--danger-base)_30%))] shadow-[0_0_16px_color-mix(in_srgb,var(--danger-base)_34%,transparent)] transition-[width] duration-[var(--duration-reveal)]"
+              style={{ right: 0, width: `${leftWidth * 2}%` }}
+            />
+          </div>
+          <div className="h-full w-px bg-[var(--text-primary)]/45" />
+          <div className="relative h-full overflow-hidden rounded-r-full">
+            <div
+              className="absolute bottom-0 top-0 rounded-r-full bg-[linear-gradient(90deg,color-mix(in_srgb,var(--success-base)_78%,var(--accent-primary)_22%),var(--success-base))] shadow-[0_0_16px_color-mix(in_srgb,var(--success-base)_34%,transparent)] transition-[width] duration-[var(--duration-reveal)]"
+              style={{ left: 0, width: `${rightWidth * 2}%` }}
+            />
+          </div>
+        </div>
+        <div className="pointer-events-none absolute inset-x-1 top-1/2 grid -translate-y-1/2 grid-cols-8">
+          {Array.from({ length: 8 }, (_, i) => i).map((i) => (
+            <span
+              className="h-4 border-l border-[var(--surface-base)]/40 first:border-l-0"
+              key={i}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-3 text-9px font-semibold tabular-nums text-[var(--text-tertiary)]">
+        <span>0</span>
+        <span className="text-center text-[var(--text-secondary)]">1,00</span>
+        <span className="text-right">+{maxScale.toLocaleString("it-IT")}</span>
+      </div>
+
+      {note ? (
+        <div className={cn("mt-2 text-11px font-semibold leading-4", accentClass)}>{note}</div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SalCard({
   cardStatus,
   date,
@@ -428,7 +517,7 @@ export function TariffPanelDialog({
       className="max-w-lg sm:max-w-xl lg:max-w-2xl"
       isOpen={isOpen}
       onClose={onClose}
-      zIndex={75}
+      zIndex={"var(--z-dialog)"}
     >
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--info-base)]">
@@ -655,7 +744,7 @@ export function DeleteConfirmDialog({
   onConfirm: (salId: string) => void;
 }) {
   return (
-    <Dialog isOpen={deleteTargetId !== null} onClose={onClose} zIndex={75}>
+    <Dialog isOpen={deleteTargetId !== null} onClose={onClose} zIndex={"var(--z-dialog)"}>
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
           <Trash2 className="size-5" />

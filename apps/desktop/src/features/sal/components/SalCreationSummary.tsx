@@ -61,7 +61,7 @@ function LiveMetric({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.32, ease: [0.25, 0.1, 0.25, 1] }}
         className={cn(
-          "mt-0.5 inline-block text-15px font-black tabular-nums transition-colors duration-500",
+          "mt-0.5 inline-block text-15px font-black tabular-nums transition-colors duration-[var(--duration-reveal)]",
           danger
             ? "text-[var(--danger-base)]"
             : isActive

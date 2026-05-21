@@ -86,14 +86,14 @@ export function SavedViewSelector({
         <>
           <button
             aria-label="Chiudi"
-            className="fixed inset-0 z-40 cursor-default"
+            className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
             onClick={() => {
               setIsOpen(false);
               setIsSaving(false);
             }}
             type="button"
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
+          <div className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
             <div className="flex items-center justify-between px-3 py-2">
               <span className="text-12px font-semibold text-[var(--text-primary)]">
                 Viste salvate

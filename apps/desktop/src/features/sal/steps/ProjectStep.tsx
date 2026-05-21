@@ -101,12 +101,12 @@ export function ProjectStep({
               {contractOpen && (
                 <>
                   <button
-                    className="fixed inset-0 z-40 cursor-default"
+                    className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
                     onClick={() => setContractOpen(false)}
                     type="button"
                     aria-label="Chiudi"
                   />
-                  <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
+                  <div className="absolute left-0 top-full z-[var(--z-dropdown-menu)] mt-2 w-full overflow-hidden rounded-xl bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]">
                     {contracts.map((c) => {
                       const isActive = c.id === project.id;
                       return (
@@ -192,7 +192,7 @@ export function ProjectStep({
                 Data SAL
               </label>
               <input
-                className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)]/30 px-3.5 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)]/30 px-3.5 pr-2 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)] [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:opacity-70"
                 id="sal-date-input"
                 onChange={(e) => setSalDate(e.target.value)}
                 type="date"

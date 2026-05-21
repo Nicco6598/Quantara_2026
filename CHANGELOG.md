@@ -2,6 +2,45 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.4.1 — 2026-05-21
+
+### Temi scuri finalmente corretti
+
+- **I temi scuri Ambra, Foresta e Midnight ora funzionano davvero** — focus ring, accenti e colori chart ereditavano sempre il blu del tema base ignorando la palette scelta. Ora ogni tema scuro ha la sua palette completa e coerente.
+- **Bottoni, ombre e date picker corretti in tutti i temi scuri** — prima usavano gradienti e ombre del tema chiaro.
+- **Transizioni fluide in tutta l'app** — 67 hover e cambi stato usavano la curva lineare di default del browser. Ora seguono la fluidità prevista dal design.
+- **Ombre che si adattano al tema** — niente più ombre fisse pensate per lo sfondo chiaro su fondo scuro.
+- **Token duplicati eliminati** — rimosse 72 varianti inutili nei temi e costanti motion ridondanti tra CSS e JavaScript.
+
+### Dettaglio progetto — forecast più affidabile
+
+- **CPI e SPI ricalcolati con logica condivisa** — il dettaglio progetto e la Dashboard ora usano la stessa funzione di forecast, basata su SAL impegnate, importo tipico e ritmo storico.
+- **CPI non resta più bloccato a 1** — una bozza pesante o SAL più leggere della baseline ora influenzano l'indice. Test dedicati coprono scenari neutro, critico e favorevole.
+- **Indicatori CPI/SPI ridisegnati** — una barra bidirezionale centrata su 1,00: sinistra rossa per sotto-performance, destra verde per margine positivo, con valore numerico grande e stato sintetico.
+
+### Gantt e timeline più corretti
+
+- **Gantt allineato alla fine prevista** — le barre usano la stessa data stimata del dettaglio progetto, niente più differenze tra previsione testuale e durata visualizzata.
+- **Date SAL con la data periodo, non di chiusura** — una SAL chiusa oggi ma riferita a marzo non accorcia più artificialmente la timeline.
+- **Timeline Dashboard pronte subito** — le SAL si caricano all'avvio, senza dover aprire e salvare una bozza per far comparire il progetto.
+
+### SAL — step misure più leggibile
+
+- **Registro misure a larghezza piena** — la tabella occupa tutto lo spazio disponibile senza essere compressa dal cockpit laterale.
+- **Righe più distinguibili e libretto più coerente** — separazione maggiore tra le voci, stato espanso più evidente, intestazioni più chiare, comandi copia/elimina più visibili.
+- **Maggiorazioni MG più compatte** — non occupano più un grande pannello sopra il registro: sono segnalate nella testata con chip compatti, totale dedicato e collegamento alla voce applicata.
+- **Cockpit SAL meno invasivo** — non si apre più come pannello pesante nello step Misure. Lo stato resta compatto accanto al totale, senza coprire ricerca voci e template.
+- **Virtualizzazione del registro migliorata** — libretti lunghi scorrono più fluidi grazie a un render migliore delle righe espanse.
+- **Contrasti e leggibilità migliorati** — testi secondari, bordi e stati soft sono più leggibili in tutti i temi, il calendario è più visibile nei temi chiari.
+
+### Appaltatori — schede, albero e conteggi
+
+- **Scheda appaltatore ridisegnata** — rimossi gradienti decorativi, avatar col caschetto e footer "Apri" ridondante. Mostra nome, progetti, budget e metriche con icone di contesto. Passandoci sopra la card si solleva con un'ombra più marcata.
+- **Mini cronologia dell'ultimo SAL** — in fondo a ogni scheda compare l'ultimo documento registrato: titolo, stato (Approvato / Bozza / Revisione), nome del progetto a cui appartiene e data relativa ("Oggi", "Ieri", "3 giorni fa").
+- **Vista albero riscritta** — linee di connessione tra i livelli (appaltatore → progetto → SAL), raggi diversi per ogni livello, e il pulsante espandi non apre più la pagina dell'appaltatore.
+- **Conteggio SAL finalmente corretto** — le schede non mostrano più "0 SAL su 2 workflow" quando i progetti hanno SAL registrate. Il conteggio ora usa la stessa assegnazione appaltatore dei progetti.
+- **Tre puntini che funzionano** — il menu a tre puntini sulle card progetto è posizionato indipendentemente. Cliccare "Elimina" o "Modifica" non apre più il progetto per sbaglio.
+
 ## 0.4.0 — 2026-05-20
 
 ### Export Excel — report più controllabili

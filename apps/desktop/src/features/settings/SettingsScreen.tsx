@@ -1078,7 +1078,7 @@ function ThemeOption({
     <m.button
       aria-pressed={active}
       className={cn(
-        "group flex min-h-14 items-center gap-3 rounded-xl p-2.5 text-left outline-none ring-1 transition-all duration-200",
+        "group flex min-h-14 items-center gap-3 rounded-xl p-2.5 text-left outline-none ring-1 transition-all duration-[var(--duration-fast)]",
         active
           ? "bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--surface-base))] ring-[color-mix(in_srgb,var(--accent-primary)_34%,transparent)]"
           : "bg-[var(--bg-muted)] ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]",
@@ -1088,7 +1088,7 @@ function ThemeOption({
     >
       <span
         className={cn(
-          "flex size-10 items-center justify-center rounded-full transition-all duration-200",
+          "flex size-10 items-center justify-center rounded-full transition-all duration-[var(--duration-fast)]",
           active
             ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
             : "bg-[var(--surface-base)] text-[var(--text-secondary)]",
@@ -1129,7 +1129,7 @@ function ToggleRow({
       <m.button
         aria-checked={checked}
         className={cn(
-          "relative mt-0.5 flex h-7 w-12 shrink-0 items-center rounded-full p-1 outline-none ring-1 transition-colors duration-200",
+          "relative mt-0.5 flex h-7 w-12 shrink-0 items-center rounded-full p-1 outline-none ring-1 transition-colors duration-[var(--duration-fast)]",
           checked
             ? "bg-[var(--accent-primary)] ring-[var(--accent-primary)]"
             : "bg-[var(--surface-base)] ring-[var(--border-subtle)]",

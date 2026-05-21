@@ -13,7 +13,7 @@ type DialogProps = {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
-  zIndex?: number;
+  zIndex?: number | string;
 };
 
 export function Dialog({
@@ -24,7 +24,7 @@ export function Dialog({
   isOpen,
   onClose,
   title,
-  zIndex = 80,
+  zIndex = "var(--z-dialog)",
 }: DialogProps) {
   const titleId = useId();
 

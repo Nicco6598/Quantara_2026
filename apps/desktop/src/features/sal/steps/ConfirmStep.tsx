@@ -24,11 +24,11 @@ export function ConfirmStep({
 }) {
   return (
     <div className="space-y-4">
-      <div className="sticky top-0 z-20 -mx-4 border-b border-[var(--border-subtle)]/45 bg-[var(--surface-base)]/94 px-4 py-3 shadow-[0_14px_34px_rgba(15,23,42,0.06)] backdrop-blur-xl lg:-mx-6 lg:px-6">
+      <div className="sticky top-0 z-20 -mx-4 border-b border-[var(--border-subtle)]/45 bg-[var(--surface-base)]/94 px-4 py-3 shadow-[0_14px_34px_color-mix(in_srgb,var(--text-primary)_6%,transparent)] backdrop-blur-xl lg:-mx-6 lg:px-6">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex h-6 items-center rounded-md bg-[var(--success-soft)] px-2 text-9px font-black uppercase tracking-[0.14em] text-[var(--success-base)]">
+              <span className="inline-flex h-6 items-center rounded-md bg-[var(--success-soft)] px-2 text-9px font-black uppercase tracking-0_14em text-[var(--success-base)]">
                 Pronta per conferma
               </span>
               <span className="text-11px font-semibold text-[var(--text-tertiary)]">

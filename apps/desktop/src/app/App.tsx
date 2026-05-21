@@ -267,7 +267,7 @@ function WindowTitleBar({
             <>
               <button
                 aria-label="Chiudi cambio sezione"
-                className="fixed inset-0 z-40 cursor-default"
+                className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
                 onClick={() => setIsRouteMenuOpen(false)}
                 onMouseDown={(event) => event.stopPropagation()}
                 type="button"

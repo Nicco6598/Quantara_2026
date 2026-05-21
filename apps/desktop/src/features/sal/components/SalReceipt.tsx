@@ -123,7 +123,7 @@ function ReceiptHeader({
     <header className="border-b border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/32 px-5 py-4 sm:px-6">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-11px font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+          <div className="flex items-center gap-2 text-11px font-bold uppercase tracking-widest text-[var(--text-secondary)]">
             <ReceiptText className="size-3.5" />
             {title ?? "Riepilogo SAL"}
           </div>
@@ -420,7 +420,7 @@ function MgSection({
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-10px font-bold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+                <div className="text-10px font-bold uppercase tracking-0_06em text-[var(--text-secondary)]">
                   Totale MG
                 </div>
                 <div className="mt-1 text-13px font-black tabular-nums text-[var(--info-base)]">
@@ -452,7 +452,7 @@ function ReceiptRail({
   return (
     <aside className="border-t border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/30 px-5 py-5 sm:px-6 lg:border-l lg:border-t-0">
       <div className="lg:sticky lg:top-[172px]">
-        <div className="text-11px font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+        <div className="text-11px font-bold uppercase tracking-widest text-[var(--text-secondary)]">
           Formula economica
         </div>
         <div className="mt-3 space-y-2">
@@ -485,7 +485,7 @@ function ReceiptRail({
         </div>
 
         <div className="mt-5 rounded-xl bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/40">
-          <div className="text-11px font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+          <div className="text-11px font-bold uppercase tracking-widest text-[var(--text-secondary)]">
             Budget
           </div>
           <div className="mt-3 grid gap-2">
@@ -573,7 +573,7 @@ function HeaderMetric({
 }) {
   return (
     <div className="rounded-lg bg-[var(--surface-base)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]/35">
-      <div className="flex items-center gap-2 text-11px font-bold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+      <div className="flex items-center gap-2 text-11px font-bold uppercase tracking-0_06em text-[var(--text-secondary)]">
         {icon}
         {label}
       </div>
@@ -604,7 +604,7 @@ function AmountColumn({
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-10px font-bold uppercase tracking-[0.04em] text-[var(--text-secondary)]">
+      <div className="text-10px font-bold uppercase tracking-0_04em text-[var(--text-secondary)]">
         {label}
       </div>
       <div
@@ -700,7 +700,7 @@ function SmallBadge({
   return (
     <span
       className={cn(
-        "rounded-md px-1.5 py-0.5 text-10px font-black uppercase tracking-[0.03em]",
+        "rounded-md px-1.5 py-0.5 text-10px font-black uppercase tracking-wider",
         tone === "danger" && "bg-[var(--danger-base)]/8 text-[var(--danger-base)]",
         tone === "info" && "bg-[var(--info-base)]/8 text-[var(--info-base)]",
         tone === "success" && "bg-[var(--success-base)]/8 text-[var(--success-base)]",

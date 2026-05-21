@@ -57,6 +57,7 @@ import {
   MilestoneItem,
   Panel,
   PanelTitle,
+  PerformanceIndexBar,
   SalCard,
   SummaryRow,
   TariffPanelDialog,
@@ -689,7 +690,8 @@ export function ProjectDetailScreen() {
                     Forecast
                   </div>
                   <InfoBlock label="Fine prevista" value={detail.endDate} />
-                  <InfoBlock label="CPI" value={detail.cpi} note={detail.cpiNote} />
+                  <PerformanceIndexBar label="CPI" value={detail.cpiValue} note={detail.cpiNote} />
+                  <PerformanceIndexBar label="SPI" value={detail.spiValue} note={detail.spiNote} />
                 </div>
                 <div className="pt-4 md:pl-4 md:pt-0">
                   <div className="flex items-center justify-between text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">

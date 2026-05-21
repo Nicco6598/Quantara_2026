@@ -20,7 +20,10 @@ export function SeverityBar({ percentage, tone = "neutral", className }: Severit
   return (
     <div className={cn("h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]", className)}>
       <div
-        className={cn("h-full rounded-full transition-all duration-500", severityColors[tone])}
+        className={cn(
+          "h-full rounded-full transition-all duration-[var(--duration-reveal)]",
+          severityColors[tone],
+        )}
         style={{ width: `${clamped}%` }}
       />
     </div>

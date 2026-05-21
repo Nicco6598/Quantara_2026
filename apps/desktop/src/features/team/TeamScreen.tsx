@@ -389,12 +389,12 @@ function TeamMembersPanel({
             {roleOpen && (
               <>
                 <button
-                  className="fixed inset-0 z-40 cursor-default"
+                  className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
                   onClick={() => setRoleOpen(false)}
                   type="button"
                   aria-label="Chiudi"
                 />
-                <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[180px] overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]">
+                <div className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-1 w-full min-w-[180px] overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]">
                   <button
                     className={cn(
                       "flex w-full items-center rounded-10px px-3 py-2 text-left text-13px font-medium transition-colors",

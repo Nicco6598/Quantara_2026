@@ -4,6 +4,7 @@ import { ArrowRight, Check, Circle, FileText, Save, WalletCards } from "lucide-r
 import { Button } from "@/components/shared/Button";
 import { cn } from "@/lib/utils";
 import { Currency } from "./SalCreationTables";
+import type { SalVerificationCheck } from "../types";
 import type { SalWorkflowPhase } from "../state/workflow";
 import { getPhaseIndex } from "../state/workflow";
 
@@ -31,6 +32,7 @@ export function SalHeader({
   suggestedSalTitle,
   projectTitle,
   total,
+  cockpit,
   canContinue,
   primaryDisabledReason,
   searchBar,
@@ -43,6 +45,12 @@ export function SalHeader({
   suggestedSalTitle: string;
   projectTitle: string | null;
   total: number;
+  cockpit?: {
+    budgetResidual: number;
+    checks: SalVerificationCheck[];
+    incompleteCount: number;
+    voiceCount: number;
+  };
   canContinue: boolean;
   primaryDisabledReason: string | null;
   searchBar?: ReactNode;
@@ -56,13 +64,17 @@ export function SalHeader({
   const activeStep = STEPS[visibleIndex];
   const progress = phase === "completed" ? 100 : ((visibleIndex + 1) / STEPS.length) * 100;
   const canUsePrimary = phase !== "completed" && canContinue;
+  const dangerChecks = cockpit?.checks.filter((check) => check.tone === "danger") ?? [];
+  const warningChecks = cockpit?.checks.filter((check) => check.tone === "warning") ?? [];
+  const cockpitTone =
+    dangerChecks.length > 0 ? "danger" : warningChecks.length > 0 ? "warning" : "success";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/94 shadow-[0_10px_28px_rgba(15,23,42,0.05)] backdrop-blur-xl">
+    <header className="sticky top-0 z-[var(--z-topbar)] border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/94 shadow-[0_10px_28px_color-mix(in_srgb,var(--text-primary)_5%,transparent)] backdrop-blur-xl">
       <div className="px-4 py-2.5 lg:px-6">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)_auto] xl:items-center">
           <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2 text-10px font-bold uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
+            <div className="flex min-w-0 items-center gap-2 text-10px font-bold uppercase tracking-caption text-[var(--text-tertiary)]">
               <span className="rounded-md border border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/35 px-2 py-1">
                 SAL
               </span>
@@ -138,7 +150,7 @@ export function SalHeader({
             <div className="flex h-9 items-center gap-2 rounded-lg border border-[var(--accent-primary)]/18 bg-[var(--accent-primary)]/[0.045] px-3">
               <WalletCards className="size-4 text-[var(--accent-primary)]" />
               <div className="text-right">
-                <div className="text-8px font-bold uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
+                <div className="text-8px font-bold uppercase tracking-widest text-[var(--text-tertiary)]">
                   Totale
                 </div>
                 <div className="text-12px font-black tabular-nums text-[var(--accent-primary)]">
@@ -146,6 +158,27 @@ export function SalHeader({
                 </div>
               </div>
             </div>
+            {cockpit ? (
+              <div className="hidden h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)]/55 bg-[var(--bg-muted)]/25 px-2.5 text-10px font-bold text-[var(--text-secondary)] md:flex">
+                <span
+                  className={cn(
+                    "size-2 rounded-full",
+                    cockpitTone === "danger" && "bg-[var(--danger-base)]",
+                    cockpitTone === "warning" && "bg-[var(--warning-base)]",
+                    cockpitTone === "success" && "bg-[var(--success-base)]",
+                  )}
+                />
+                <span>
+                  {cockpit.incompleteCount > 0
+                    ? `${cockpit.incompleteCount} da completare`
+                    : cockpitTone === "warning"
+                      ? `${warningChecks.length} warning`
+                      : cockpitTone === "danger"
+                        ? `${dangerChecks.length} blocchi`
+                        : "Misure OK"}
+                </span>
+              </div>
+            ) : null}
 
             <Button
               aria-label="Salva bozza"

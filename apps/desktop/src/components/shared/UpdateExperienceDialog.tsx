@@ -28,7 +28,7 @@ export function UpdateExperienceDialog({
       contentClassName="flex max-h-[80dvh] min-h-0 flex-col overflow-hidden rounded-[18px] p-0"
       isOpen
       onClose={onClose}
-      zIndex={210}
+      zIndex={"var(--z-command-palette)"}
     >
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
         <div className="min-w-0">

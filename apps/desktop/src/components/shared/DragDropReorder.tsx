@@ -31,7 +31,7 @@ function DraggableItem<T>({ item, index, renderItem, uniqueId }: DraggableItemPr
               "group flex items-stretch rounded-lg",
               snapshot.isDragging && "shadow-soft,0_0_0_1px_var(--border-subtle)]",
               snapshot.dropAnimation &&
-                "transition-transform duration-[0.25s] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                "transition-transform duration-[var(--duration-base)] ease-standard",
             )}
           >
             <div

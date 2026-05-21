@@ -33,6 +33,7 @@ export type ContractorFolder = {
   criticalCount: number;
   id: string;
   projectCount: number;
+  recentSal: { date: string; projectName: string; status: string; title: string } | null;
   salCount: number;
   salExposure: number;
   salWindowCount: number;

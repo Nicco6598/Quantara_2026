@@ -110,6 +110,7 @@
 .quantara-button-primary,
 .projects-control-button-primary {
   border: 1px solid var(--button-primary-border);
+  color: var(--text-inverse);
   background:
     radial-gradient(
       ellipse at 50% -28%,
@@ -127,6 +128,11 @@
     0 3px 10px var(--button-primary-glow),
     inset 0 1px 0 color-mix(in srgb, white 30%, transparent),
     inset 0 -10px 22px var(--button-primary-shadow-inner);
+}
+
+.quantara-button-primary svg,
+.projects-control-button-primary svg {
+  color: currentColor;
 }
 
 .quantara-button-primary:hover,
@@ -199,8 +205,8 @@
     inset 0 1px 0 color-mix(in srgb, white 28%, transparent);
 }
 
-[data-theme="dark"] .quantara-button-primary,
-[data-theme="dark"] .projects-control-button-primary {
+[data-theme^="dark"] .quantara-button-primary,
+[data-theme^="dark"] .projects-control-button-primary {
   border-color: var(--button-primary-dark-border);
   background:
     radial-gradient(
@@ -221,10 +227,10 @@
     inset 0 -12px 26px var(--button-primary-dark-shadow-inner);
 }
 
-[data-theme="dark"] .quantara-button-neutral,
-[data-theme="dark"] .quantara-button-ghost,
-[data-theme="dark"] .projects-control-button-neutral,
-[data-theme="dark"] .projects-control-button-ghost {
+[data-theme^="dark"] .quantara-button-neutral,
+[data-theme^="dark"] .quantara-button-ghost,
+[data-theme^="dark"] .projects-control-button-neutral,
+[data-theme^="dark"] .projects-control-button-ghost {
   border-color: var(--button-neutral-dark-border);
   background:
     radial-gradient(ellipse at 50% -34%, color-mix(in srgb, white 9%, transparent), transparent 52%),
@@ -235,8 +241,8 @@
     inset 0 1px 0 color-mix(in srgb, white 10%, transparent);
 }
 
-[data-theme="dark"] .quantara-button-soft,
-[data-theme="dark"] .projects-control-button-soft {
+[data-theme^="dark"] .quantara-button-soft,
+[data-theme^="dark"] .projects-control-button-soft {
   border-color: var(--button-soft-dark-border);
   background:
     radial-gradient(
@@ -293,7 +299,7 @@
     color-mix(in srgb, color-mix(in srgb, var(--danger-base) 55%, #000 45%) 16%, transparent);
 }
 
-[data-theme="dark"] .quantara-button-destructive {
+[data-theme^="dark"] .quantara-button-destructive {
   border-color: color-mix(in srgb, var(--button-destructive-start) 38%, var(--danger-base) 62%);
   background:
     radial-gradient(
@@ -336,6 +342,20 @@ main {
 input[type="date"]::-webkit-datetime-edit {
   color: inherit;
   font: inherit;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  margin-inline-start: 2px;
+  padding: 0;
+}
+
+.sal-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: brightness(0) saturate(100%) opacity(0.62);
+}
+
+[data-theme^="dark"] .sal-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.74);
 }
 
 /* ── Responsive container patterns ── */
@@ -382,7 +402,7 @@ body,
 
 .sal-panel {
   border: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
-  border-radius: 24px;
+  border-radius: var(--radius-3xl);
   background:
     radial-gradient(
       circle at 90% 0%,
@@ -405,14 +425,14 @@ body,
   height: 72px;
   align-items: center;
   justify-content: center;
-  border-radius: 22px;
+  border-radius: var(--radius-22px);
   background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
   color: var(--accent-primary);
 }
 
 .sal-topbar {
   border: 1px solid color-mix(in srgb, var(--border-subtle) 46%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--surface-base) 86%, transparent);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 20%, transparent),
@@ -426,7 +446,7 @@ body,
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 0 18px;
   font-size: var(--text-13px);
   font-weight: var(--font-weight-bold);
@@ -484,7 +504,7 @@ body,
   align-items: center;
   justify-content: center;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 50%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--surface-base) 74%, transparent);
   color: var(--text-secondary);
   transition:
@@ -612,13 +632,13 @@ body {
   color: var(--text-primary);
   font-size: var(--text-11px);
   font-weight: var(--font-weight-560);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-wide);
 }
 
 .window-titlebar-mark {
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--accent-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 11%, transparent);
 }
@@ -691,7 +711,7 @@ body {
   align-items: center;
   gap: 6px;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 50%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--surface-base) 58%, var(--bg-muted) 6%);
   color: var(--text-primary);
   padding: 0 8px;
@@ -737,7 +757,7 @@ body {
   width: 210px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: linear-gradient(
     145deg,
     color-mix(in srgb, var(--surface-base) 96%, var(--bg-muted) 4%),
@@ -757,7 +777,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-radius: 11px;
+  border-radius: var(--radius-11px);
   padding: 7px 8px;
   text-align: left;
   transition: background-color var(--duration-fast) var(--ease-standard);
@@ -790,7 +810,7 @@ body {
   align-items: center;
   gap: 5px;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 50%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--surface-base) 56%, transparent);
   color: var(--text-secondary);
   padding: 0 6px 0 8px;
@@ -821,12 +841,12 @@ body {
 
 .window-titlebar-command kbd {
   border: 1px solid color-mix(in srgb, var(--border-subtle) 62%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--surface-base) 78%, transparent);
   color: color-mix(in srgb, var(--text-secondary) 74%, transparent);
   font-size: var(--text-8px);
   font-weight: var(--font-weight-bold);
-  line-height: 1;
+  line-height: var(--leading-none);
   padding: 2px 3px;
   letter-spacing: 0.02em;
 }
@@ -852,7 +872,7 @@ body {
   width: 42px;
   place-items: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   transition:
@@ -880,7 +900,7 @@ body {
   width: 12px;
   height: 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   color: color-mix(in srgb, #4a2824 64%, transparent);
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, black 18%, transparent),
@@ -1094,12 +1114,12 @@ body {
   align-items: center;
   width: max-content;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--surface-base) 76%, transparent);
   color: var(--text-secondary);
   font-size: var(--text-10px);
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.24em;
+  letter-spacing: var(--tracking-uppercase-wide);
   padding: var(--space-1) var(--space-3);
   text-transform: uppercase;
 }
@@ -1110,8 +1130,8 @@ body {
   color: var(--text-primary);
   font-size: clamp(2.25rem, 5vw, 3.5rem);
   font-weight: var(--font-weight-650);
-  letter-spacing: 0;
-  line-height: 0.98;
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
   text-wrap: balance;
 }
 
@@ -1121,11 +1141,11 @@ body {
   color: var(--text-secondary);
   font-size: var(--text-15px);
   font-weight: var(--font-weight-medium);
-  line-height: 1.7;
+  line-height: var(--leading-relaxed);
 }
 
 .premium-bezel {
-  border-radius: 30px;
+  border-radius: var(--radius-5xl);
   background: color-mix(in srgb, var(--bg-muted-strong) 66%, transparent);
   padding: var(--space-1_5);
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
@@ -1134,7 +1154,7 @@ body {
 .premium-bezel-core {
   height: 100%;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 62%, transparent);
-  border-radius: 24px;
+  border-radius: var(--radius-3xl);
   background:
     radial-gradient(
       circle at 86% 0%,
@@ -1159,7 +1179,7 @@ body {
   color: var(--text-primary);
   font-size: 2rem;
   font-weight: var(--font-weight-650);
-  line-height: 1;
+  line-height: var(--leading-none);
   tab-size: 4;
 }
 
@@ -1252,7 +1272,7 @@ body {
 
 .dashboard-bezel {
   position: relative;
-  border-radius: 28px;
+  border-radius: var(--radius-4xl);
 }
 
 .dashboard-bezel-core {
@@ -1260,7 +1280,7 @@ body {
   isolation: isolate;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
-  border-radius: 28px;
+  border-radius: var(--radius-4xl);
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--surface-base) 94%, white 6%),
@@ -1318,7 +1338,7 @@ body {
   bottom: var(--space-7);
   width: 190px;
   height: 1px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: linear-gradient(
     90deg,
     transparent,
@@ -1330,13 +1350,13 @@ body {
   color: var(--accent-primary);
   font-size: var(--text-10px);
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.22em;
+  letter-spacing: var(--tracking-uppercase);
   text-transform: uppercase;
 }
 
 .dashboard-signal-pill {
   border: 1px solid color-mix(in srgb, var(--success-base) 16%, var(--border-subtle));
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--success-soft) 54%, transparent);
   color: var(--success-base);
   font-size: var(--text-11px);
@@ -1346,7 +1366,7 @@ body {
 
 .dashboard-chip {
   border: 1px solid color-mix(in srgb, var(--border-subtle) 50%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--surface-base) 64%, transparent);
   padding: var(--space-2) var(--space-3);
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
@@ -1355,7 +1375,7 @@ body {
 .dashboard-hero-instrument {
   position: relative;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 48%, transparent);
-  border-radius: 24px;
+  border-radius: var(--radius-3xl);
   background:
     radial-gradient(
       circle at 30% 0%,
@@ -1375,7 +1395,7 @@ body {
   color: var(--text-secondary);
   font-size: var(--text-11px);
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.12em;
+  letter-spacing: var(--tracking-caption);
   text-transform: uppercase;
 }
 
@@ -1385,13 +1405,13 @@ body {
   color: var(--text-primary);
   font-size: var(--text-54px);
   font-weight: var(--font-weight-650);
-  letter-spacing: -0.07em;
+  letter-spacing: var(--tracking-tighter);
   line-height: 0.88;
 }
 
 .dashboard-instrument-copy {
   margin-top: var(--space-3);
-  letter-spacing: 0.03em;
+  letter-spacing: var(--tracking-wider);
   text-transform: none;
 }
 
@@ -1408,7 +1428,7 @@ body {
   bottom: var(--space-4);
   left: var(--space-4);
   height: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--accent-primary) 56%, transparent),
@@ -1430,7 +1450,7 @@ body {
   height: 48px;
   flex-shrink: 0;
   place-items: center;
-  border-radius: 17px;
+  border-radius: var(--radius-17px);
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 22%, transparent);
 }
 
@@ -1438,7 +1458,7 @@ body {
   width: 18px;
   height: 18px;
   border: 1.5px solid currentColor;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   box-shadow: 9px 9px 0 -5px currentColor;
 }
 
@@ -1485,7 +1505,7 @@ body {
 .dashboard-priority-glyph {
   font-size: var(--text-18px);
   font-weight: var(--font-weight-bold);
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 .dashboard-search-chip {
@@ -1534,7 +1554,7 @@ body {
 .dashboard-rail-index {
   font-size: var(--text-11px);
   font-weight: var(--font-weight-800);
-  letter-spacing: -0.04em;
+  letter-spacing: var(--tracking-tight);
 }
 
 .dashboard-track-mark span {
@@ -1547,7 +1567,7 @@ body {
 .dashboard-more-dot {
   width: 4px;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--text-secondary);
   box-shadow:
     0 -7px 0 var(--text-secondary),
@@ -1612,7 +1632,7 @@ body {
   width: 22px;
   height: 22px;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, currentColor 10%, transparent);
   font-size: var(--text-11px);
   transition:
@@ -1626,7 +1646,7 @@ body {
 
 .dashboard-nested-link:focus-visible,
 .dashboard-inline-link:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   outline: 2px solid var(--ring-focus);
   outline-offset: 3px;
 }
@@ -1649,11 +1669,11 @@ body {
 .top-toolbar-shell h1,
 .window-titlebar-brand {
   font-family: var(--font-heading);
-  letter-spacing: 0;
+  letter-spacing: var(--tracking-normal);
 }
 
 .top-toolbar-bezel {
-  border-radius: 22px;
+  border-radius: var(--radius-22px);
   background: color-mix(in srgb, var(--bg-muted-strong) 42%, transparent);
   padding: 0;
 }
@@ -1662,7 +1682,7 @@ body {
   position: relative;
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 52%, transparent);
-  border-radius: 22px;
+  border-radius: var(--radius-22px);
   background:
     radial-gradient(
       circle at 82% 0%,
@@ -1699,8 +1719,8 @@ body {
   color: var(--accent-primary);
   font-size: var(--text-9px);
   font-weight: var(--font-weight-800);
-  letter-spacing: 0.24em;
-  line-height: 1;
+  letter-spacing: var(--tracking-uppercase-wide);
+  line-height: var(--leading-none);
   margin-bottom: var(--space-2);
   text-transform: uppercase;
 }
@@ -1708,7 +1728,7 @@ body {
 .top-toolbar-status-dot {
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--success-base);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--success-base) 13%, transparent);
 }
@@ -1762,7 +1782,7 @@ body {
   justify-content: center;
   gap: var(--space-px);
   border: 1px solid color-mix(in srgb, var(--border-subtle) 56%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface-base) 78%, transparent);
   color: var(--text-secondary);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 4%, transparent);
@@ -1857,7 +1877,7 @@ body {
   align-items: center;
   gap: var(--space-1);
   border: 1px solid color-mix(in srgb, var(--border-subtle) 44%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--surface-base) 54%, transparent);
   padding: var(--space-1) var(--space-2);
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
@@ -1957,7 +1977,7 @@ body {
   transition-duration: 60ms;
 }
 
-[data-theme="dark"] .top-toolbar-action-primary {
+[data-theme^="dark"] .top-toolbar-action-primary {
   border-color: var(--button-primary-dark-border);
   background:
     radial-gradient(
@@ -1988,7 +2008,7 @@ body {
 .top-toolbar-menu-mark {
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, currentColor 11%, transparent);
 }
 
@@ -2116,10 +2136,6 @@ body {
   backdrop-filter: blur(18px) saturate(1.08);
 }
 
-* {
-  box-sizing: border-box;
-}
-
 /* Scrollbar slim personalizzata */
 ::-webkit-scrollbar {
   width: 6px;
@@ -2132,7 +2148,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--accent-primary) 40%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {

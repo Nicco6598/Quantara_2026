@@ -226,7 +226,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed bottom-5 right-5 z-[90] flex w-[360px] max-w-[calc(100vw-2rem)] flex-col-reverse gap-2"
+        className="pointer-events-none fixed bottom-5 right-5 z-[var(--z-toast)] flex w-[360px] max-w-[calc(100vw-2rem)] flex-col-reverse gap-2"
       >
         <AnimatePresence initial={false}>
           {toasts.map((toast) => {

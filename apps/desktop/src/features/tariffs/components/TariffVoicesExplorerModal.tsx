@@ -82,7 +82,7 @@ export function TariffVoicesExplorerModal({
       contentClassName="flex max-h-[92vh] min-h-0 flex-col overflow-hidden bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-0"
       isOpen
       onClose={onClose}
-      zIndex={80}
+      zIndex={"var(--z-dialog)"}
     >
       <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
         <div className="min-w-0">

@@ -80,7 +80,7 @@ export function SalModal({
       contentClassName="max-h-[90vh] overflow-hidden bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] p-0"
       isOpen={isOpen}
       onClose={onClose}
-      zIndex={50}
+      zIndex={"var(--z-dropdown-menu)"}
     >
       <div className="flex h-full max-h-[90vh] flex-col">
         <div className="flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">

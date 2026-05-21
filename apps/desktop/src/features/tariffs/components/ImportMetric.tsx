@@ -31,7 +31,7 @@ export function ImportMetric({
           : "bg-[var(--bg-muted)] text-[var(--accent-primary)]";
 
   return (
-    <div className="flex min-h-[112px] items-center gap-4 rounded-18px bg-[var(--surface-base)] p-4 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_22%,transparent)]">
+    <div className="flex min-h-[112px] items-center gap-4 rounded-18px bg-[var(--surface-base)] p-4 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]">
       {Icon ? (
         <div
           className={`flex size-12 shrink-0 items-center justify-center rounded-14px ${iconTone}`}

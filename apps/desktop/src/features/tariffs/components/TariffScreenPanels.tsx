@@ -69,7 +69,7 @@ export function TariffBookPreviewCard({
   return (
     <m.article
       className={cn(
-        "relative min-h-[168px] rounded-14px border p-4 text-left transition-colors duration-200",
+        "relative min-h-[168px] rounded-14px border p-4 text-left transition-colors duration-[var(--duration-fast)]",
         isSelected
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
           : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",

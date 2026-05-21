@@ -308,7 +308,7 @@ export function SalHistoryBars({ views }: SalHistoryBarsProps) {
 
           {tooltip ? (
             <div
-              className="pointer-events-none absolute z-50 min-w-[180px] rounded-14px border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/95 px-3 py-2 text-11px font-medium text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl"
+              className="pointer-events-none absolute z-[var(--z-dropdown-menu)] min-w-[180px] rounded-14px border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/95 px-3 py-2 text-11px font-medium text-[var(--text-secondary)] shadow-[0_20px_58px_color-mix(in_srgb,var(--text-primary)_16%,transparent)] backdrop-blur-xl"
               style={{
                 left: tooltip.x,
                 top: tooltip.y,

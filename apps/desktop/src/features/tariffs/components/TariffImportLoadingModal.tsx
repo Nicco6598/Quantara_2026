@@ -10,7 +10,7 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
   const completedCount = doneCount + errorCount;
 
   return createPortal(
-    <div className="fixed inset-0 z-[82] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
       <div className="relative w-full max-w-lg rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
         <div className="rounded-22px bg-[var(--surface-base)] p-6 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
           <div className="flex items-start gap-4">
@@ -84,7 +84,7 @@ export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[
                   <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
                     {file.pagesTotal && file.pagesParsed ? (
                       <div
-                        className="h-full rounded-full bg-[var(--accent-primary)] transition-all duration-300"
+                        className="h-full rounded-full bg-[var(--accent-primary)] transition-all duration-[var(--duration-base)]"
                         style={{
                           width: `${Math.min(100, (file.pagesParsed / file.pagesTotal) * 100)}%`,
                         }}

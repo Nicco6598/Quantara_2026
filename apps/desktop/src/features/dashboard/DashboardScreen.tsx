@@ -21,6 +21,11 @@ import type { SalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
 import { useNavigate } from "@/hooks/useNavigate";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
+import {
+  listDesktopSalDocuments,
+  listDesktopSalProjects,
+  migrateSalLocalStorageToBackend,
+} from "@/lib/sal-data";
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
@@ -61,13 +66,39 @@ function buildOperationalTotals(projects: PortfolioProject[], views: SalDocument
     };
     const committedAmount = current.committedAmount + view.total;
     const approvedAmount =
-      view.status === "closed" ? current.approvedAmount + view.total : current.approvedAmount;
+      view.status === "closed" || view.status === "approved"
+        ? current.approvedAmount + view.total
+        : current.approvedAmount;
     const budget = budgetById.get(view.projectId) ?? 0;
     const progressPercent = budget > 0 ? Math.min(100, (committedAmount / budget) * 100) : 0;
     totals.set(view.projectId, { approvedAmount, committedAmount, progressPercent });
   }
 
   return totals;
+}
+
+function buildDashboardSalViews(
+  salDocuments: ReturnType<typeof useSalWorkflowStore.getState>["salDocuments"],
+  tariffVoices: ReturnType<typeof useSalWorkflowStore.getState>["tariffVoices"],
+): SalDocumentView[] {
+  return salDocuments.map((doc) => {
+    const cachedTotal =
+      typeof doc.total === "number"
+        ? doc.total
+        : typeof (doc as { totalCents?: unknown }).totalCents === "number"
+          ? (doc as { totalCents: number }).totalCents / 100
+          : null;
+
+    if (cachedTotal != null) {
+      return {
+        ...doc,
+        lines: [],
+        total: cachedTotal,
+      } as SalDocumentView;
+    }
+
+    return buildSalDocumentViews([doc], tariffVoices)[0] as SalDocumentView;
+  });
 }
 
 export function DashboardScreen() {
@@ -96,8 +127,13 @@ export function DashboardScreen() {
   useEffect(() => {
     const abort = new AbortController();
 
-    listDesktopContracts([])
-      .then((contracts) => {
+    Promise.all([
+      listDesktopContracts([]),
+      migrateSalLocalStorageToBackend().then(() =>
+        Promise.all([listDesktopSalDocuments(null), listDesktopSalProjects()]),
+      ),
+    ])
+      .then(([contracts, [salDocs, salProjects]]) => {
         if (abort.signal.aborted) return;
         const contractors = readStringRecord(STORAGE_KEYS.projectContractors);
         setProjects(
@@ -105,6 +141,13 @@ export function DashboardScreen() {
             mapContractToProject(contract, contractors[contract.id]),
           ),
         );
+        useSalWorkflowStore
+          .getState()
+          .initializeFromBackend(
+            salDocs.data,
+            salProjects.data,
+            useSalWorkflowStore.getState().tariffVoices,
+          );
       })
       .catch(() => {
         if (abort.signal.aborted) return;
@@ -119,7 +162,7 @@ export function DashboardScreen() {
   }, [notify]);
 
   const views = useMemo(
-    () => buildSalDocumentViews(salDocuments, tariffVoices),
+    () => buildDashboardSalViews(salDocuments, tariffVoices),
     [salDocuments, tariffVoices],
   );
 

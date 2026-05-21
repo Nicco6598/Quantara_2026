@@ -22,7 +22,7 @@ import type { SalTemplate } from "@/store/template-store";
 import { SalHeader } from "./components/SalHeader";
 import { SalSearchBar } from "./components/SalSearchBar";
 import { SaveAsTemplateDialog } from "./components/SaveAsTemplateDialog";
-import { defaultSalEconomicRules } from "./domain/sal-calculations";
+import { defaultSalEconomicRules, isMgCode } from "./domain/sal-calculations";
 import {
   clearSalCreationDraft,
   clearSalCreationDraftBySalId,
@@ -807,6 +807,18 @@ export function SalCreationScreen() {
     useAppStore.getState().setSalToolbar(toolbarConfig);
   }, [toolbarConfig]);
 
+  const headerCockpit = useMemo(
+    () => ({
+      budgetResidual: summary.budgetResidual,
+      checks,
+      incompleteCount: lineViews.filter(
+        (line) => !isMgCode(line.voice.code) && line.status !== "complete",
+      ).length,
+      voiceCount: lineViews.filter((line) => !isMgCode(line.voice.code)).length,
+    }),
+    [checks, lineViews, summary.budgetResidual],
+  );
+
   const actionHandlersRef = useRef({ goPrimary, handleSaveDraft, phase });
   actionHandlersRef.current = { goPrimary, handleSaveDraft, phase };
 
@@ -835,6 +847,7 @@ export function SalCreationScreen() {
         suggestedSalTitle={suggestedSalTitle}
         projectTitle={data.project?.title ?? null}
         total={summary.total}
+        cockpit={headerCockpit}
         canContinue={canContinue}
         primaryDisabledReason={currentDisabledReason}
         onPrimary={goPrimary}
@@ -858,11 +871,16 @@ export function SalCreationScreen() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+      <div
+        className={cn(
+          "flex-1 min-h-0",
+          phase === "measure" ? "overflow-hidden px-0 py-4 lg:py-6" : "overflow-y-auto p-4 lg:p-6",
+        )}
+      >
         <AnimatePresence initial={false} mode="wait">
           <m.div
             animate={motionVariants.route.animate}
-            className="min-h-full"
+            className={cn("min-h-full", phase === "measure" && "h-full min-h-0")}
             exit={{ opacity: 0, scale: 0.996, y: -8 }}
             initial={{ opacity: 0, scale: 0.992, y: 16 }}
             key={phase}
@@ -917,7 +935,6 @@ export function SalCreationScreen() {
 
                 {phase === "measure" && (
                   <MeasureStep
-                    checks={checks}
                     lineViews={lineViews}
                     onAddMeasurementRow={addMeasurementRow}
                     onDuplicateMeasurementRow={duplicateMeasurementRow}
@@ -927,7 +944,6 @@ export function SalCreationScreen() {
                     onNotesChange={setNotes}
                     onSurcharge={setSurcharge}
                     onPasteLine={handlePasteLine}
-                    summary={summary}
                   />
                 )}
 

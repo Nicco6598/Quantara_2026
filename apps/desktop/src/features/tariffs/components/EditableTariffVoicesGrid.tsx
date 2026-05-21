@@ -18,7 +18,7 @@ import type { VoiceGroup } from "../utils/tariff-grouping";
 import { formatEditablePercent } from "../utils/tariffs-validation";
 
 const CELL_BASE =
-  "h-8 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-12px font-semibold text-[var(--text-primary)] outline-none transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
+  "h-8 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-12px font-semibold text-[var(--text-primary)] outline-none transition duration-[var(--duration-fast)] ease-standard focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
 const CELL_EDIT = "border-transparent hover:border-[var(--border-subtle)]";
 const GRID_COLS = "grid grid-cols-[160px_minmax(360px,1fr)_80px_100px_110px_36px] gap-3 px-5 py-2";
 
@@ -92,7 +92,7 @@ function WarningTooltip({
   return createPortal(
     <div
       ref={tooltipRef}
-      className="fixed z-[100] w-72 rounded-14px bg-[var(--surface-base)] p-3 shadow-soft ring-1 ring-[var(--border-subtle)]"
+      className="fixed z-[var(--z-dropdown-portal)] w-72 rounded-14px bg-[var(--surface-base)] p-3 shadow-soft ring-1 ring-[var(--border-subtle)]"
       style={{
         left: position.left,
         top: position.top,
@@ -254,7 +254,7 @@ function DescriptionCell({
 
   return (
     <textarea
-      className={`min-h-[34px] w-full resize-none rounded-md border border-transparent bg-transparent px-2.5 py-2 text-12px font-semibold leading-1_45 text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[var(--border-subtle)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
+      className={`min-h-[34px] w-full resize-none rounded-md border border-transparent bg-transparent px-2.5 py-2 text-12px font-semibold leading-1_45 text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-standard hover:border-[var(--border-subtle)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
         highlighted
           ? "border-[var(--warning-base)] bg-[color-mix(in_srgb,var(--warning-base)_10%,var(--surface-base)_90%)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--warning-base)_18%,transparent)]"
           : ""
@@ -774,7 +774,7 @@ export const EditableTariffVoicesGrid = memo(
               Nessuna voce da importare.
             </div>
           ) : (
-            <div className="rounded-18px border border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[var(--surface-base)] shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_18%,transparent)]">
+            <div className="rounded-18px border border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[var(--surface-base)] shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]">
               <div
                 data-tariff-virtual-scroll="true"
                 className="max-h-[72vh] min-h-[520px] overflow-auto px-4 py-4"

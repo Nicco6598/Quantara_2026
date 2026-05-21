@@ -373,7 +373,7 @@ function StockBar({ coverage, tone }: { coverage: number; tone: string }) {
       <div className="flex h-1.5 w-16 overflow-hidden rounded-full bg-[var(--border-subtle)] sm:w-20">
         <div
           className={cn(
-            "h-full rounded-full transition-all duration-500",
+            "h-full rounded-full transition-all duration-[var(--duration-reveal)]",
             tone === "danger" && "bg-[var(--danger-base)]",
             tone === "warning" && "bg-[var(--warning-base)]",
             tone === "success" && "bg-[var(--success-base)]",

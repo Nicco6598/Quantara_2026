@@ -5,11 +5,10 @@ import {
   AlertTriangle,
   Building2,
   CheckCircle2,
-  ChevronRight,
   ClipboardList,
-  FolderOpen,
   HardHat,
   Layers3,
+  ListTree,
   MoreVertical,
   Plus,
   Search,
@@ -37,6 +36,7 @@ type ContractorsWorkspaceProps = {
   onOpenCreateContractor: () => void;
   onOpenFolder: (folderId: string) => void;
   onOpenNotifications: () => void;
+  onSwitchToTreeView?: () => void;
   recentSalsCount: number;
   totalPortfolioValue: number;
 };
@@ -55,6 +55,7 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
   onOpenCreateContractor,
   onOpenFolder,
   onOpenNotifications,
+  onSwitchToTreeView,
   recentSalsCount,
   totalPortfolioValue,
 }: ContractorsWorkspaceProps) {
@@ -69,10 +70,22 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
     <div className="space-y-8">
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
         <div className="min-w-0">
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)]">
-            Appaltatori
-          </span>
-          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight tracking-[-0.03em] text-[var(--text-primary)] md:text-56px">
+          <div className="flex items-center justify-between gap-4">
+            <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)]">
+              Appaltatori
+            </span>
+            {onSwitchToTreeView && (
+              <button
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_80%,var(--bg-muted)_20%)] px-4 py-1.5 text-11px font-semibold text-[var(--text-primary)] transition-all duration-[var(--duration-fast)] ease-standard"
+                onClick={onSwitchToTreeView}
+                type="button"
+              >
+                <ListTree className="size-3.5" />
+                Vista albero
+              </button>
+            )}
+          </div>
+          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight tracking-neg-0_03em text-[var(--text-primary)] md:text-56px">
             Cockpit appaltatori
           </h2>
           <p className="mt-4 max-w-2xl text-15px leading-6 text-[var(--text-secondary)]">
@@ -369,7 +382,7 @@ function ContractorFoldersPanel({
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
-              className="h-10 w-full rounded-18px border border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+              className="h-10 w-full rounded-18px border border-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] pl-10 pr-3 text-13px font-medium text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Cerca appaltatore..."
               type="search"
@@ -414,7 +427,7 @@ function ContractorFoldersPanel({
           <span className="text-12px font-medium text-[var(--text-secondary)]">
             {folders.length} cartelle operative ·{" "}
             <button
-              className="font-semibold text-[var(--accent-primary)] hover:underline"
+              className="font-semibold text-[var(--accent-primary)]"
               onClick={onOpenCreateContractor}
               type="button"
             >
@@ -425,6 +438,31 @@ function ContractorFoldersPanel({
       ) : null}
     </BezelSurface>
   );
+}
+
+const SAL_STATUS_LABELS: Record<string, string> = {
+  approved: "Approvato",
+  closed: "Chiuso",
+  draft: "Bozza",
+  "in-review": "Revisione",
+};
+
+const SAL_STATUS_TONES: Record<string, string> = {
+  approved: "text-[var(--success-base)]",
+  closed: "text-[var(--success-base)]",
+  draft: "text-[var(--text-tertiary)]",
+  "in-review": "text-[var(--info-base)]",
+};
+
+function formatRecentDate(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
+  if (diffDays === 0) return "Oggi";
+  if (diffDays === 1) return "Ieri";
+  if (diffDays < 7) return `${diffDays} giorni fa`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} sett. fa`;
+  return date.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 }
 
 function ContractorCard({
@@ -438,114 +476,121 @@ function ContractorCard({
 }) {
   const health = getFolderHealth(folder);
   const initials = getContractorInitials(folder.contractor);
-  const salRatio =
-    folder.projectCount > 0
-      ? Math.min(100, Math.round((folder.salCount / folder.projectCount) * 100))
-      : 0;
   const exposureLabel = formatMoney({ amount: folder.salExposure, currency: "EUR" });
+  const budgetLabel = formatMoney({ amount: folder.budget, currency: "EUR" });
 
   return (
-    <m.article
-      layout
-      animate={MOTION_VARIANTS.card.whileInView}
-      className="group relative min-h-[244px] overflow-hidden rounded-26px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[0_16px_42px_color-mix(in_srgb,var(--text-primary)_7%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_58%,transparent)]"
-      exit={{ opacity: 0, scale: 0.994, y: 10 }}
-      initial={MOTION_VARIANTS.card.initial}
-      transition={MOTION_VARIANTS.card.transition}
-      whileHover={{ y: -2 }}
-    >
-      <div className="absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-highlight)_82%,transparent),transparent)]" />
-      <div className="absolute right-4 top-4 z-20">
-        <ContractorMenu folder={folder} onDeleteContractor={onDeleteContractor} />
-      </div>
-
-      <button
-        aria-label={`Apri ${folder.contractor}`}
-        className="relative z-10 flex h-full w-full flex-col p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-        onClick={() => onOpenFolder(folder.id)}
-        type="button"
+    <div className="group relative rounded-[30px] bg-[color-mix(in_srgb,var(--border-subtle)_52%,transparent)] p-[2px] shadow-[0_16px_42px_color-mix(in_srgb,var(--text-primary)_5%,transparent)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_24px_56px_color-mix(in_srgb,var(--text-primary)_12%,transparent)] motion-safe:active:scale-[0.99]">
+      <m.article
+        layout
+        animate={MOTION_VARIANTS.card.whileInView}
+        className="relative overflow-hidden rounded-[28px] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]"
+        exit={{ opacity: 0, scale: 0.994, y: 10 }}
+        initial={MOTION_VARIANTS.card.initial}
+        transition={MOTION_VARIANTS.card.transition}
       >
-        <div className="flex min-w-0 items-start gap-4 pr-9">
-          <ContractorAvatar initials={initials} tone={health.tone} />
-
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-18px px-2 py-1 text-10px font-semibold",
-                  toneSurface(health.tone),
-                )}
-              >
-                {health.tone === "warning" ? (
-                  <AlertTriangle className="size-3" />
-                ) : (
-                  <CheckCircle2 className="size-3" />
-                )}
-                {health.label}
-              </span>
-            </div>
-            <h3 className="mt-3 line-clamp-2 text-22px font-semibold leading-[1.05] tracking-[-0.02em] text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
-              {folder.contractor}
-            </h3>
-            <p className="mt-2 text-12px font-medium text-[var(--text-secondary)]">
-              {folder.projectCount} progetti · {folder.salCount} SAL · esposizione {exposureLabel}
-            </p>
-          </div>
+        <div className="absolute right-3 top-3 z-20">
+          <ContractorMenu folder={folder} onDeleteContractor={onDeleteContractor} />
         </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <CockpitMetric
-            label="Budget"
-            value={formatMoney({ amount: folder.budget, currency: "EUR" })}
-          />
-          <CockpitMetric label="Progetti" value={`${folder.projectCount}`} />
-          <CockpitMetric
-            label="Alert"
-            tone={folder.criticalCount > 0 ? "warning" : "neutral"}
-            value={`${folder.criticalCount}`}
-          />
-        </div>
-
-        <div className="mt-4 rounded-22px bg-[color-mix(in_srgb,var(--bg-muted)_62%,transparent)] p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-                Copertura SAL
-              </div>
-              <div className="mt-1 text-13px font-semibold text-[var(--text-primary)]">
-                {folder.salCount} su {Math.max(folder.projectCount, 1)} workflow
+        <button
+          aria-label={`Apri ${folder.contractor}`}
+          className="relative z-10 flex w-full flex-col p-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+          onClick={() => onOpenFolder(folder.id)}
+          type="button"
+        >
+          <div className="flex min-w-0 items-start justify-between gap-3 pr-12">
+            <div className="flex min-w-0 items-start gap-3.5">
+              <ContractorAvatar initials={initials} tone={health.tone} />
+              <div className="min-w-0 flex-1 pt-1">
+                <h3 className="text-20px font-semibold leading-[1.1] tracking-[-0.015em] text-[var(--text-primary)] line-clamp-1">
+                  {folder.contractor}
+                </h3>
+                <div className="mt-1.5 flex items-center gap-2 text-12px font-medium text-[var(--text-secondary)]">
+                  <span className="tabular-nums">{folder.projectCount} progetti</span>
+                  <span className="size-1 rounded-full bg-[var(--text-tertiary)]/30" />
+                  <span className="tabular-nums">{folder.salCount} SAL</span>
+                  <span className="size-1 rounded-full bg-[var(--text-tertiary)]/30" />
+                  <span className="tabular-nums">{budgetLabel}</span>
+                </div>
               </div>
             </div>
-            <div className="text-18px font-semibold tabular-nums text-[var(--text-primary)]">
-              {salRatio}%
-            </div>
+            <span
+              className={cn(
+                "mt-1 shrink-0 rounded-full px-2.5 py-0.5 text-10px font-semibold tracking-[-0.01em]",
+                toneSurface(health.tone),
+              )}
+            >
+              {health.label}
+            </span>
           </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-18px bg-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-            <m.div
-              className="h-full rounded-18px bg-[var(--accent-primary)]"
-              initial={MOTION_VARIANTS.progress.initial}
-              style={{ originX: 0 }}
-              transition={{
-                ...MOTION_VARIANTS.progress.transition,
-                delay: 0.08,
-              }}
-              viewport={MOTION_VARIANTS.progress.viewport}
-              whileInView={{ scaleX: salRatio / 100 }}
+
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <CockpitMetric icon={TrendingUp} label="Budget" value={budgetLabel} />
+            <CockpitMetric icon={Layers3} label="Progetti" value={`${folder.projectCount}`} />
+            <CockpitMetric
+              icon={folder.criticalCount > 0 ? AlertTriangle : ShieldCheck}
+              label="Criticità"
+              tone={folder.criticalCount > 0 ? "warning" : "neutral"}
+              value={`${folder.criticalCount}`}
             />
           </div>
-        </div>
 
-        <div className="mt-auto flex items-center justify-between pt-4">
-          <div className="flex items-center gap-2 text-12px font-semibold text-[var(--text-secondary)]">
-            <FolderOpen className="size-4" />
-            Cartella appaltatore
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="min-w-0 rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] p-3.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)]">
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                  Esposizione SAL
+                </dt>
+                <span className="text-14px font-semibold tabular-nums text-[var(--accent-primary)]">
+                  {exposureLabel}
+                </span>
+              </div>
+            </div>
+            <div className="min-w-0 rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] p-3.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)]">
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+                  Finestre SAL
+                </dt>
+                <span className="text-14px font-semibold tabular-nums text-[var(--text-primary)]">
+                  {folder.salWindowCount}
+                </span>
+              </div>
+            </div>
           </div>
-          <span className="inline-flex items-center gap-1 text-12px font-semibold text-[var(--accent-primary)] opacity-0 transition-[opacity,transform] duration-200 ease-out will-change-transform -translate-x-1 group-hover:translate-x-0 group-hover:opacity-100">
-            Apri <ChevronRight className="size-3.5" />
-          </span>
-        </div>
-      </button>
-    </m.article>
+
+          {folder.recentSal && (
+            <div className="mt-3 rounded-[20px] bg-[color-mix(in_srgb,var(--bg-muted)_50%,transparent)] px-3.5 py-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)]/12">
+                  <div className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-11px leading-tight">
+                    <span className="font-medium text-[var(--text-primary)] truncate">
+                      {folder.recentSal.title}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 font-medium",
+                        SAL_STATUS_TONES[folder.recentSal.status] || "text-[var(--text-tertiary)]",
+                      )}
+                    >
+                      {SAL_STATUS_LABELS[folder.recentSal.status] || folder.recentSal.status}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-10px font-medium text-[var(--text-tertiary)]">
+                    <span className="truncate">{folder.recentSal.projectName}</span>
+                    <span className="size-0.5 rounded-full bg-[var(--text-tertiary)]/40" />
+                    <span className="shrink-0">{formatRecentDate(folder.recentSal.date)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </button>
+      </m.article>
+    </div>
   );
 }
 
@@ -553,14 +598,11 @@ function ContractorAvatar({ initials, tone }: { initials: string; tone: StatusTo
   return (
     <span
       className={cn(
-        "relative flex size-20 shrink-0 items-center justify-center rounded-26px text-24px font-semibold tracking-[-0.03em] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]",
+        "flex size-12 shrink-0 items-center justify-center rounded-[14px] text-16px font-semibold tracking-neg-0_03em shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]",
         toneSurface(tone),
       )}
     >
       {initials}
-      <span className="absolute -right-1 -top-1 flex size-7 items-center justify-center rounded-18px bg-[var(--surface-base)] shadow-[0_6px_16px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]">
-        <HardHat className="size-3.5 text-[var(--accent-primary)]" />
-      </span>
     </span>
   );
 }
@@ -583,6 +625,7 @@ function ContractorMenu({
           event.stopPropagation();
           setIsOpen((v) => !v);
         }}
+        style={{ borderRadius: "26px" }}
         variant="icon"
       >
         <MoreVertical className="size-4" />
@@ -603,22 +646,33 @@ function ContractorMenu({
 }
 
 function CockpitMetric({
+  icon: Icon,
   label,
   tone = "neutral",
   value,
 }: {
+  icon?: LucideIcon;
   label: string;
   tone?: StatusTone;
   value: string;
 }) {
   return (
-    <div className="min-w-0 rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)]">
+    <div className="min-w-0 rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:group-hover:bg-[color-mix(in_srgb,var(--surface-base)_58%,var(--bg-muted)_42%)]">
+      {Icon && (
+        <Icon
+          className={cn(
+            "mb-1.5 size-3.5",
+            tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--accent-primary)]",
+          )}
+          strokeWidth={1.8}
+        />
+      )}
       <dt className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
         {label}
       </dt>
       <dd
         className={cn(
-          "mt-1 truncate text-15px font-semibold tabular-nums",
+          "mt-0.5 truncate text-16px font-semibold tabular-nums tracking-[-0.01em]",
           tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--text-primary)]",
         )}
       >
@@ -632,7 +686,7 @@ function EmptyContractorsState({ onOpenCreateContractor }: { onOpenCreateContrac
   return (
     <div className="px-4 py-8 xl:px-5">
       <button
-        className="w-full rounded-26px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_70%,transparent)] px-6 py-12 text-center transition-colors hover:bg-[var(--surface-base)]"
+        className="w-full rounded-26px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_70%,transparent)] px-6 py-12 text-center"
         onClick={onOpenCreateContractor}
         type="button"
       >

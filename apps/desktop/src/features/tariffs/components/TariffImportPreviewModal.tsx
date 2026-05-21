@@ -328,7 +328,7 @@ function FileTabs({
           return (
             <m.button
               className={cn(
-                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-12px font-semibold transition-all duration-200",
+                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-12px font-semibold transition-all duration-[var(--duration-fast)]",
                 i === localActiveIndex
                   ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
                   : draftedFiles.has(i)
@@ -1231,7 +1231,7 @@ export function TariffImportPreviewModal({
       {deleteDialog}
     </>
   ) : (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
       <m.button
         aria-label="Chiudi"
         className="absolute inset-0 cursor-default"
@@ -1398,7 +1398,7 @@ function InspectorContent({
   sections: TariffGridSectionSummary[];
 }) {
   return (
-    <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_16%,transparent)]">
+    <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]">
       <div className="rounded-18px bg-[var(--surface-base)] p-3">
         <InspectorHeader
           completionPercent={globalReviewSummary.completionPercent}
@@ -1560,8 +1560,7 @@ function CategoryJumpPanel({
     <div
       className={cn(
         "rounded-18px bg-[var(--surface-base)] p-3 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
-        !compact &&
-          "shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_16%,transparent)]",
+        !compact && "shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]",
       )}
     >
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
@@ -1620,8 +1619,7 @@ function InterventionPanel({
     <div
       className={cn(
         "rounded-18px p-4 text-12px font-medium leading-5 ring-1",
-        !compact &&
-          "shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_12%,transparent)]",
+        !compact && "shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]",
         hasBlockingIssues
           ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[var(--warning-base)]/15"
           : "bg-[var(--success-soft)] text-[var(--success-base)] ring-[var(--success-base)]/15",
@@ -1735,8 +1733,7 @@ function ControlPanel({
     <div
       className={cn(
         "overflow-hidden rounded-18px bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
-        !compact &&
-          "shadow-[0_16px_36px_color-mix(in_srgb,var(--shadow-color,rgba(15,23,42,0.10))_16%,transparent)]",
+        !compact && "shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]",
       )}
     >
       <div
@@ -1771,7 +1768,7 @@ function ControlPanel({
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
           <div
             className={cn(
-              "h-full rounded-full transition-[width] duration-300",
+              "h-full rounded-full transition-[width] duration-[var(--duration-base)]",
               globalReviewSummary.isReviewReady
                 ? "bg-[var(--success-base)]"
                 : "bg-[var(--warning-base)]",

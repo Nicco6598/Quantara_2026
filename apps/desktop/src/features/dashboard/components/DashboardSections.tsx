@@ -19,6 +19,11 @@ import { MOTION_VARIANTS } from "@/motion";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { PortfolioProject } from "@/features/projects/types";
+import {
+  calculateProjectPerformanceForecast,
+  type ProjectFinancials,
+  type SalProgressRow,
+} from "@/features/project-detail/domain/project-detail-model";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { AuditEntry } from "@/store/audit-log-store";
@@ -43,7 +48,7 @@ export function PriorityActions({ items }: { items: PortfolioProject[] }) {
       <div className="space-y-3">
         {items.slice(0, 4).map((project, index) => (
           <m.div
-            className="flex items-start gap-3 rounded-18px p-3 transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--bg-muted)]"
+            className="flex items-start gap-3 rounded-18px p-3 transition-colors duration-[var(--duration-base)] ease-standard hover:bg-[var(--bg-muted)]"
             initial={MOTION_VARIANTS.listItem.initial}
             key={project.id}
             transition={{
@@ -306,7 +311,7 @@ export function TimelineGantt({
                 >
                   {/* Timeline bar */}
                   <div
-                    className="absolute top-1/2 h-5 -translate-y-1/2 rounded-full transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                    className="absolute top-1/2 h-5 -translate-y-1/2 rounded-full transition-all duration-[var(--duration-reveal)] ease-standard"
                     style={{
                       left: bs.left,
                       width: bs.width,
@@ -534,7 +539,7 @@ function ProjectRow({
 
   return (
     <m.article
-      className="group cursor-pointer rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_56%,transparent)] bg-[var(--surface-base)] p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[color-mix(in_srgb,var(--surface-base)_90%,var(--bg-muted)_10%)] hover:shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_8%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_14%,transparent)]"
+      className="group cursor-pointer rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_56%,transparent)] bg-[var(--surface-base)] p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-[var(--duration-base)] ease-standard hover:bg-[color-mix(in_srgb,var(--surface-base)_90%,var(--bg-muted)_10%)] hover:shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_8%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_14%,transparent)]"
       initial={MOTION_VARIANTS.row.initial}
       transition={MOTION_VARIANTS.row.transition}
       viewport={MOTION_VARIANTS.row.viewport}
@@ -716,7 +721,7 @@ export function RightRail({
 function ActionButton({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
     <button
-      className="flex w-full items-center gap-3 rounded-18px bg-[var(--bg-muted)]/70 px-4 py-3 text-left text-13px font-semibold text-[var(--text-primary)] transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--bg-muted)]"
+      className="flex w-full items-center gap-3 rounded-18px bg-[var(--bg-muted)]/70 px-4 py-3 text-left text-13px font-semibold text-[var(--text-primary)] transition-colors duration-[var(--duration-base)] ease-standard hover:bg-[var(--bg-muted)]"
       type="button"
     >
       <span className="flex size-8 shrink-0 items-center justify-center rounded-10px bg-[var(--info-soft)] text-[var(--info-base)]">
@@ -829,23 +834,31 @@ export function buildSalTimeline(
 ): Map<string, { firstSalDate: Date; lastSalDate: Date; totalSalAmount: number }> {
   const timeline = new Map<
     string,
-    { firstSalDate: Date; lastSalDate: Date; totalSalAmount: number }
+    { firstSalDate: Date; lastSalDate: Date; totalSalAmount: number; rows: SalProgressRow[] }
   >();
 
   for (const view of views) {
     const existing = timeline.get(view.projectId);
-    const salDate = new Date(view.closedAt ?? view.date);
+    const salDate = new Date(view.date);
+    const row = {
+      amount: view.total,
+      date: view.date,
+      isApproved: view.status === "approved",
+      isClosed: view.status === "closed",
+    };
 
     if (!existing) {
       timeline.set(view.projectId, {
         firstSalDate: salDate,
         lastSalDate: salDate,
+        rows: [row],
         totalSalAmount: view.total,
       });
     } else {
       timeline.set(view.projectId, {
         firstSalDate: salDate < existing.firstSalDate ? salDate : existing.firstSalDate,
         lastSalDate: salDate > existing.lastSalDate ? salDate : existing.lastSalDate,
+        rows: [...existing.rows, row],
         totalSalAmount: existing.totalSalAmount + view.total,
       });
     }
@@ -858,34 +871,50 @@ export function buildSalTimeline(
       timeline.set(project.id, {
         firstSalDate: new Date(),
         lastSalDate: new Date(),
+        rows: [],
         totalSalAmount: 0,
       });
       continue;
     }
 
-    // Estimate end date based on progress (same logic as Quadro economico)
-    const budget = project.budget.amount;
-    const remaining = Math.max(0, budget - entry.totalSalAmount);
+    const financials: ProjectFinancials = {
+      approvedAmount: entry.rows.reduce(
+        (sum, row) => (row.isApproved || row.isClosed ? sum + row.amount : sum),
+        0,
+      ),
+      committed: entry.totalSalAmount,
+      contractual: project.budget.amount,
+      currentSalAmount: entry.rows[entry.rows.length - 1]?.amount ?? 0,
+      draftAmount: entry.rows.reduce(
+        (sum, row) => (!row.isApproved && !row.isClosed ? sum + row.amount : sum),
+        0,
+      ),
+      progress:
+        project.budget.amount > 0
+          ? Math.min(100, (entry.totalSalAmount / project.budget.amount) * 100)
+          : 0,
+      residual: project.budget.amount - entry.totalSalAmount,
+    };
+    const forecast = calculateProjectPerformanceForecast(entry.rows, financials, project.salDays);
 
-    if (remaining > 0 && entry.totalSalAmount > 0) {
-      const elapsedMs = entry.lastSalDate.getTime() - entry.firstSalDate.getTime();
-      const elapsedDays = elapsedMs / 86400000;
-
-      if (elapsedDays > 0) {
-        const progress = entry.totalSalAmount / Math.max(budget, 1);
-        const totalDays = Math.round(elapsedDays / Math.min(Math.max(progress, 0.05), 0.95));
-        const remainingDays = Math.max(0, totalDays - elapsedDays);
-        const estimatedEnd = new Date(entry.lastSalDate.getTime() + remainingDays * 86400000);
-
-        timeline.set(project.id, {
-          ...entry,
-          lastSalDate: estimatedEnd,
-        });
-      }
+    if (forecast.estimatedEndDate) {
+      timeline.set(project.id, {
+        ...entry,
+        lastSalDate: forecast.estimatedEndDate,
+      });
     }
   }
 
-  return timeline;
+  return new Map(
+    [...timeline.entries()].map(([projectId, entry]) => [
+      projectId,
+      {
+        firstSalDate: entry.firstSalDate,
+        lastSalDate: entry.lastSalDate,
+        totalSalAmount: entry.totalSalAmount,
+      },
+    ]),
+  );
 }
 
 const statusColorMap: Record<string, string> = {

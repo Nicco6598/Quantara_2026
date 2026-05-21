@@ -219,14 +219,14 @@ export function PortfolioBurn({ projects, viewsByProjectId, totalBudget }: Portf
         </div>
         <div className="relative" ref={ref}>
           <button
-            className="flex items-center gap-1 rounded-full bg-[var(--bg-muted)]/70 px-2.5 py-1 text-10px font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/50 backdrop-blur-sm transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[var(--bg-muted-strong)]/70 active:scale-[0.96]"
+            className="flex items-center gap-1 rounded-full bg-[var(--bg-muted)]/70 px-2.5 py-1 text-10px font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/50 backdrop-blur-sm transition-all duration-[var(--duration-fast)] ease-standard hover:bg-[var(--bg-muted-strong)]/70 active:scale-[0.96]"
             onClick={() => setOpen((v) => !v)}
             type="button"
           >
             {TF_LABEL[timeframe]}
             <ChevronDown
               className={cn(
-                "size-3 opacity-60 transition-transform duration-200",
+                "size-3 opacity-60 transition-transform duration-[var(--duration-fast)]",
                 open && "rotate-180",
               )}
             />
@@ -235,7 +235,7 @@ export function PortfolioBurn({ projects, viewsByProjectId, totalBudget }: Portf
             <>
               <button
                 type="button"
-                className="fixed inset-0 z-30"
+                className="fixed inset-0 z-[var(--z-topbar)]"
                 onClick={() => setOpen(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") setOpen(false);
@@ -245,7 +245,7 @@ export function PortfolioBurn({ projects, viewsByProjectId, totalBudget }: Portf
               />
               <m.div
                 animate={{ opacity: 1, y: 0 }}
-                className="absolute right-0 top-full z-40 mt-1.5 w-max min-w-[130px] origin-top-right overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]"
+                className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-1.5 w-max min-w-[130px] origin-top-right overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]"
                 initial={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
               >

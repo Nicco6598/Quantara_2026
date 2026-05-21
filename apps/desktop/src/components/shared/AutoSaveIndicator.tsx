@@ -22,7 +22,7 @@ export function AutoSaveIndicator({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-11px font-medium transition-all duration-200",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-11px font-medium transition-all duration-[var(--duration-fast)]",
         status === "unsaved" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
         status === "saving" && "bg-[var(--info-soft)] text-[var(--info-base)]",
         status === "saved" && "bg-[var(--success-soft)] text-[var(--success-base)]",

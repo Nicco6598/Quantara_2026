@@ -44,13 +44,13 @@ export function TemplatePicker({ onApply, tariffBookId }: TemplatePickerProps) {
         <>
           <button
             aria-label="Chiudi"
-            className="fixed inset-0 z-40 cursor-default"
+            className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
             onClick={() => setIsOpen(false)}
             type="button"
           />
           <m.div
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]"
+            className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]"
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             initial={{ opacity: 0, y: -8, scale: 0.96 }}
             transition={{ duration: 0.18, ease: SPRING_EASE }}

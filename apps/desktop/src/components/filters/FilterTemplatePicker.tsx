@@ -140,7 +140,7 @@ export function FilterTemplatePicker({
         <>
           <button
             aria-label="Chiudi"
-            className="fixed inset-0 z-40 cursor-default"
+            className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
             onClick={() => {
               setIsOpen(false);
               setIsSaving(false);
@@ -149,7 +149,7 @@ export function FilterTemplatePicker({
             type="button"
           />
           <m.div
-            className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]"
+            className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-2 w-72 overflow-hidden rounded-18px bg-[var(--surface-base)] p-1.5 shadow-soft ring-1 ring-[var(--border-subtle)]"
             initial={MOTION_VARIANTS.popover.initial}
             animate={MOTION_VARIANTS.popover.animate}
             exit={MOTION_VARIANTS.popover.exit}

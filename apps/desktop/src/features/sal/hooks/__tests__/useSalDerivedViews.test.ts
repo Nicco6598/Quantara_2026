@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildLineViews, summarizeSalLines } from "../../domain/sal-calculations";
-import type { SalEconomicRules, SalLineDraft, SalVoiceDraft } from "../../types";
+import type { SalEconomicRules, SalLineDraft, SalLineView, SalVoiceDraft } from "../../types";
 
 const defaultRules: SalEconomicRules = {
   applyDiscountToSafetyCosts: false,
@@ -78,7 +78,7 @@ describe("buildLineViews", () => {
 
     const views = buildLineViews(lines, defaultRules);
     expect(views.length).toBe(1);
-    const v0 = views[0]!;
+    const v0 = views[0] as SalLineView;
     expect(v0.quantity).toBe(10);
     expect(v0.grossAmount).toBe(1000);
     expect(v0.measurementRows.length).toBe(2);
@@ -98,7 +98,7 @@ describe("buildLineViews", () => {
     ];
 
     const views = buildLineViews(lines, defaultRules);
-    const v0 = views[0]!;
+    const v0 = views[0] as SalLineView;
     // gross = 10 * 100 = 1000, no surcharge, discountable = 1000, discount = 1000 * 0.1825 = 182.5
     expect(v0.grossAmount).toBe(1000);
     expect(v0.discountableAmount).toBe(1000);
@@ -116,7 +116,7 @@ describe("buildLineViews", () => {
     ];
 
     const views = buildLineViews(lines, defaultRules);
-    const v0 = views[0]!;
+    const v0 = views[0] as SalLineView;
     // gross = 1000, but safety cost so discountable = 0 (applyDiscountToSafetyCosts = false)
     expect(v0.grossAmount).toBe(1000);
     expect(v0.discountableAmount).toBe(0);

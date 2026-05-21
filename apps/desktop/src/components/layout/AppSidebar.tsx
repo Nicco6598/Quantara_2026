@@ -232,7 +232,7 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   return (
     <m.aside
       animate={{ width: sidebarWidth }}
-      className="relative z-40 flex h-full shrink-0 select-none overflow-hidden bg-transparent [font-family:var(--font-sans)] text-[var(--text-primary)]"
+      className="relative z-[var(--z-dropdown-menu)] flex h-full shrink-0 select-none overflow-hidden bg-transparent [font-family:var(--font-sans)] text-[var(--text-primary)]"
       transition={{ type: "tween", duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
       <m.div
@@ -281,7 +281,7 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
   return (
     <div
       className={cn(
-        "flex min-h-12 items-center rounded-18px transition-all duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "flex min-h-12 items-center rounded-18px transition-all duration-[260ms] ease-standard",
         collapsed
           ? "justify-center px-1.5"
           : "justify-between bg-[color-mix(in_srgb,var(--surface-base)_56%,transparent)] px-2.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_46%,transparent)]",
@@ -297,7 +297,12 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
           style={isDark ? { filter: "brightness(0) invert(1)" } : undefined}
           width={40}
         />
-        <div className={cn("min-w-0 transition-opacity duration-200", collapsed && "sr-only")}>
+        <div
+          className={cn(
+            "min-w-0 transition-opacity duration-[var(--duration-fast)]",
+            collapsed && "sr-only",
+          )}
+        >
           <div className="truncate text-13px font-650 leading-4 text-[var(--text-primary)]">
             Quantara
           </div>
@@ -449,7 +454,7 @@ function SidebarNavItem({
     <button
       aria-label={item.label}
       className={cn(
-        "group relative flex w-full select-none items-center overflow-hidden rounded-14px text-left outline-none transition-all duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "group relative flex w-full select-none items-center overflow-hidden rounded-14px text-left outline-none transition-all duration-[260ms] ease-standard",
         collapsed
           ? "min-h-[48px] justify-center px-1.5 py-2"
           : "min-h-[50px] gap-2.5 px-2.5 py-2.5",
@@ -474,7 +479,7 @@ function SidebarNavItem({
           transition={SIDEBAR_ACTIVE_TRANSITION}
         />
       ) : (
-        <span className="absolute inset-0 rounded-14px bg-[color-mix(in_srgb,var(--surface-base)_58%,transparent)] opacity-0 transition-opacity duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:opacity-100" />
+        <span className="absolute inset-0 rounded-14px bg-[color-mix(in_srgb,var(--surface-base)_58%,transparent)] opacity-0 transition-opacity duration-[260ms] ease-standard group-hover:opacity-100" />
       )}
 
       {active ? (
@@ -492,7 +497,7 @@ function SidebarNavItem({
 
       <span
         className={cn(
-          "relative z-10 flex size-8 shrink-0 items-center justify-center rounded-10px transition-all duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "relative z-10 flex size-8 shrink-0 items-center justify-center rounded-10px transition-all duration-[260ms] ease-standard",
           active
             ? "bg-[color-mix(in_srgb,var(--accent-primary)_13%,var(--surface-base))] text-[var(--accent-primary)] shadow-none"
             : "bg-[color-mix(in_srgb,var(--bg-muted-strong)_76%,transparent)] text-[var(--text-secondary)] group-hover:bg-[var(--surface-base)] group-hover:text-[var(--accent-primary)]",
@@ -559,7 +564,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
     <footer className="select-none">
       <div
         className={cn(
-          "group flex items-center gap-2.5 rounded-18px text-left transition-colors duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "group flex items-center gap-2.5 rounded-18px text-left transition-colors duration-[260ms] ease-standard",
           "bg-[color-mix(in_srgb,var(--surface-base)_58%,transparent)] p-2 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_46%,transparent)] hover:bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)]",
           collapsed && "justify-center",
         )}

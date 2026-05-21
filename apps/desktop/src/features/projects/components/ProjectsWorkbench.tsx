@@ -166,35 +166,70 @@ function WorkbenchRow({
       : 0;
 
   return (
-    <m.article
-      animate={MOTION_VARIANTS.card.whileInView}
-      className={cn(
-        "group relative cursor-pointer overflow-hidden rounded-26px p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)] transition-[box-shadow,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-        isSelected
-          ? "bg-[color-mix(in_srgb,var(--info-soft)_28%,var(--surface-base)_72%)]"
-          : "bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] hover:shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_8%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_14%,transparent)]",
-      )}
-      exit={{ opacity: 0, scale: 0.994, y: 10 }}
-      initial={MOTION_VARIANTS.card.initial}
-      layout
-      onClick={() => onOpenProject(project)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpenProject(project);
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      transition={MOTION_VARIANTS.card.transition}
-      whileHover={{ y: -2 }}
-    >
-      <div className="hidden grid-cols-[1.45fr_0.78fr_0.72fr_1fr_0.78fr_64px] items-center gap-3 xl:grid">
-        <ProjectIdentity project={project} toneClass={toneClass} />
-        <ProjectStatus project={project} toneClass={toneClass} />
-        <ProjectManager project={project} />
-        <SalCockpit project={project} salProgress={salProgress} />
-        <ProjectProgress progress={project.progress} progressColor={progressColor} />
+    <div className="relative">
+      <m.article
+        animate={MOTION_VARIANTS.card.whileInView}
+        className={cn(
+          "cursor-pointer overflow-hidden rounded-26px p-4 shadow-[0_12px_32px_color-mix(in_srgb,var(--text-primary)_5%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_52%,transparent)]",
+          isSelected
+            ? "bg-[color-mix(in_srgb,var(--info-soft)_28%,var(--surface-base)_72%)]"
+            : "bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)]",
+        )}
+        exit={{ opacity: 0, scale: 0.994, y: 10 }}
+        initial={MOTION_VARIANTS.card.initial}
+        layout
+        onClick={() => onOpenProject(project)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpenProject(project);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        transition={MOTION_VARIANTS.card.transition}
+      >
+        <div className="hidden grid-cols-[1.45fr_0.78fr_0.72fr_1fr_0.78fr_64px] items-center gap-3 xl:grid">
+          <ProjectIdentity project={project} toneClass={toneClass} />
+          <ProjectStatus project={project} toneClass={toneClass} />
+          <ProjectManager project={project} />
+          <SalCockpit project={project} salProgress={salProgress} />
+          <ProjectProgress progress={project.progress} progressColor={progressColor} />
+          <div />
+        </div>
+
+        <div className="flex flex-col gap-4 xl:hidden">
+          <div className="flex min-w-0 items-start gap-3">
+            <ProjectIcon toneClass={toneClass} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="min-w-0 truncate text-15px font-semibold leading-tight text-[var(--text-primary)]">
+                  {project.title}
+                </h3>
+                <ProjectStatusPill project={project} toneClass={toneClass} />
+              </div>
+              <ProjectMeta project={project} />
+            </div>
+          </div>
+
+          <SalCockpit project={project} salProgress={salProgress} />
+
+          <div className="grid grid-cols-2 gap-2">
+            <InlineMetric
+              detail={project.variance}
+              label="Budget"
+              value={formatMoney(project.budget)}
+            />
+            <InlineMetric
+              detail={project.phase}
+              label="Progresso"
+              value={formatPercent(project.progress)}
+            />
+          </div>
+        </div>
+      </m.article>
+
+      <div className="absolute right-2 top-1/2 -translate-y-1/2">
         <ProjectActionsDropdown
           onDeleteProject={onDeleteProject}
           onEditProject={onEditProject}
@@ -202,43 +237,7 @@ function WorkbenchRow({
           project={project}
         />
       </div>
-
-      <div className="flex flex-col gap-4 xl:hidden">
-        <div className="flex min-w-0 items-start gap-3">
-          <ProjectIcon toneClass={toneClass} />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="min-w-0 truncate text-15px font-semibold leading-tight text-[var(--text-primary)]">
-                {project.title}
-              </h3>
-              <ProjectStatusPill project={project} toneClass={toneClass} />
-            </div>
-            <ProjectMeta project={project} />
-          </div>
-          <ProjectActionsDropdown
-            onDeleteProject={onDeleteProject}
-            onEditProject={onEditProject}
-            onOpenProject={onOpenProject}
-            project={project}
-          />
-        </div>
-
-        <SalCockpit project={project} salProgress={salProgress} />
-
-        <div className="grid grid-cols-2 gap-2">
-          <InlineMetric
-            detail={project.variance}
-            label="Budget"
-            value={formatMoney(project.budget)}
-          />
-          <InlineMetric
-            detail={project.phase}
-            label="Progresso"
-            value={formatPercent(project.progress)}
-          />
-        </div>
-      </div>
-    </m.article>
+    </div>
   );
 }
 
@@ -247,7 +246,7 @@ function ProjectIdentity({ project, toneClass }: { project: PortfolioProject; to
     <div className="flex min-w-0 items-center gap-3">
       <ProjectIcon toneClass={toneClass} />
       <div className="min-w-0">
-        <div className="truncate text-15px font-semibold leading-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+        <div className="truncate text-15px font-semibold leading-tight text-[var(--text-primary)]">
           {project.title}
         </div>
         <ProjectMeta project={project} />
@@ -421,6 +420,7 @@ function ProjectActionsDropdown({
     <div className="flex justify-end" ref={menuRef}>
       <Button
         aria-label={`Azioni per ${project.title}`}
+        style={{ borderRadius: "26px" }}
         icon={MoreVertical}
         onClick={(event: React.MouseEvent) => {
           event.stopPropagation();

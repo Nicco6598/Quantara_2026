@@ -13,7 +13,7 @@ export function SortIndicator({ active, className, direction, onClick }: SortInd
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center rounded transition-all duration-200 hover:bg-[var(--bg-muted)]",
+        "inline-flex items-center justify-center rounded transition-all duration-[var(--duration-fast)] hover:bg-[var(--bg-muted)]",
         active ? "text-[var(--accent-primary)]" : "text-[var(--text-tertiary)]",
         className,
       )}

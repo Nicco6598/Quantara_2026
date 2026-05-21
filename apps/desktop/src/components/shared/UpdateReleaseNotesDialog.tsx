@@ -24,7 +24,7 @@ export function UpdateReleaseNotesDialog({ notes, onClose }: UpdateReleaseNotesD
       contentClassName="flex max-h-[70dvh] min-h-0 flex-col overflow-hidden rounded-[18px] p-0"
       isOpen
       onClose={onClose}
-      zIndex={210}
+      zIndex={"var(--z-command-palette)"}
     >
       <div className="flex shrink-0 items-start gap-4 p-5 pb-0">
         <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--success-soft)] text-[var(--success-base)]">

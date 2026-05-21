@@ -210,6 +210,7 @@ export function buildVerificationChecks(
   let safetyLines = 0;
   let linkedLines = 0;
   const hasBudgetOverflow = summary.budgetResidual < 0;
+  const measurableLines = lineViews.filter((line) => !isMgCode(line.voice.code));
   const zeroQtyLines: SalLineView[] = [];
   const zeroPriceLines: SalLineView[] = [];
   const highSurchargeLines: SalLineView[] = [];
@@ -218,7 +219,7 @@ export function buildVerificationChecks(
     economicRules.discountEnabled && economicRules.discountPercent > 0;
   const discountableWithoutDiscount: SalLineView[] = [];
 
-  for (const line of lineViews) {
+  for (const line of measurableLines) {
     if (line.status === "complete") completeLines += 1;
     if (line.voice.isSafetyCost) safetyLines += 1;
     if (line.linkedCharges.length > 0) linkedLines += 1;
@@ -263,13 +264,13 @@ export function buildVerificationChecks(
   // Complete measurements
   checks.push({
     detail:
-      completeLines === lineViews.length
+      completeLines === measurableLines.length
         ? "Tutte le voci hanno una quantità valida maggiore di zero."
-        : `${lineViews.length - completeLines} voci hanno quantità zero. Assegna una misura per completarle.`,
+        : `${measurableLines.length - completeLines} voci hanno quantità zero. Assegna una misura per completarle.`,
     id: "measurements",
     label: "Voci con quantità valida",
-    result: `${completeLines}/${lineViews.length} ok`,
-    tone: completeLines === lineViews.length ? "success" : "warning",
+    result: `${completeLines}/${measurableLines.length} ok`,
+    tone: completeLines === measurableLines.length ? "success" : "warning",
   });
 
   // ── Measurement row checks ──

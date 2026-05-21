@@ -199,7 +199,7 @@ export function AutocompleteInput({
               top: floating.top,
               width: floating.width,
               maxHeight: RESULTS_MAX_HEIGHT,
-              zIndex: 50,
+              zIndex: "var(--z-dropdown-menu)",
             }}
           >
             <div
@@ -221,7 +221,7 @@ export function AutocompleteInput({
                     <button
                       ref={rowVirtualizer.measureElement}
                       className={cn(
-                        "flex min-h-[84px] w-full items-start gap-3 border-b border-[var(--border-subtle)]/55 px-3 py-3 text-left text-13px transition-colors duration-[180ms] first:rounded-t-18px last:rounded-b-18px last:border-b-0",
+                        "flex min-h-[84px] w-full items-start gap-3 border-b border-[var(--border-subtle)]/55 px-3 py-3 text-left text-13px transition-colors duration-[var(--duration-fast)] first:rounded-t-18px last:rounded-b-18px last:border-b-0",
                         virtualRow.index === activeIndex
                           ? "bg-[var(--bg-muted)]"
                           : "hover:bg-[var(--bg-muted)]",

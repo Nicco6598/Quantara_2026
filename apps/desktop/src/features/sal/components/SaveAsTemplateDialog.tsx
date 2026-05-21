@@ -34,7 +34,7 @@ export function SaveAsTemplateDialog({
   }
 
   return (
-    <Dialog isOpen onClose={onClose} zIndex={75}>
+    <Dialog isOpen onClose={onClose} zIndex={"var(--z-dialog)"}>
       {saved ? (
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <span className="flex size-12 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success-base)]">
