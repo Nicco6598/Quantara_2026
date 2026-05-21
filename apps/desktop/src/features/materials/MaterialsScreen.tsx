@@ -5,7 +5,6 @@ import {
   Download,
   MoreVertical,
   Package,
-  PackagePlus,
   Pencil,
   Plus,
   ShoppingCart,
@@ -13,22 +12,27 @@ import {
   Warehouse,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { ClearFiltersButton, FilterSearch, FilterTemplatePicker } from "@/components/filters";
+import {
+  ClearFiltersButton,
+  FilterSearch,
+  FilterSelect,
+  FilterTemplatePicker,
+} from "@/components/filters";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { MOTION_VARIANTS } from "@/motion";
-import { FilterChip } from "@/components/shared/FilterChip";
 import { MetricCard } from "@/components/shared/MetricCard";
-import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
+import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
+import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { QuickAction } from "@/components/shared/QuickAction";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import { SeverityBar } from "@/components/shared/SeverityBar";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
-import { useMultiSelect } from "@/hooks/use-multi-select";
+import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
@@ -39,6 +43,7 @@ import {
   listDesktopMaterials,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { reportUserActionError } from "@/lib/user-action-error";
 import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
@@ -93,19 +98,6 @@ export function MaterialsScreen() {
     () => materials.find((m) => m.id === state.selectedMaterialId) ?? null,
     [materials, state.selectedMaterialId],
   );
-
-  const categories = useMemo(() => {
-    const categoryCounts = new Map<string, number>();
-
-    for (const material of materials) {
-      categoryCounts.set(material.category, (categoryCounts.get(material.category) ?? 0) + 1);
-    }
-
-    return {
-      counts: categoryCounts,
-      names: ["Tutti", ...categoryCounts.keys()],
-    };
-  }, [materials]);
 
   const filteredMaterials = useMemo(() => {
     const q = state.searchQuery.toLowerCase().trim();
@@ -168,10 +160,12 @@ export function MaterialsScreen() {
           tone: "success",
         });
       } catch (error) {
-        notify({
-          message: error instanceof Error ? error.message : String(error),
+        reportUserActionError(error, {
+          action: "delete",
+          area: "materials",
+          notify,
           title: "Eliminazione non riuscita",
-          tone: "danger",
+          userMessage: "Non sono riuscito a eliminare il materiale.",
         });
       } finally {
         dispatch({ type: "SET_DELETE_CONFIRM_ID", payload: null });
@@ -180,7 +174,110 @@ export function MaterialsScreen() {
     [materials, notify, state.selectedMaterialId],
   );
 
-  const multiSelect = useMultiSelect(filteredMaterials);
+  const multiSelect = useMultiSelectDelete(filteredMaterials);
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = [...multiSelect.selectedIds];
+    const deletedMaterials = filteredMaterials.filter((material) => ids.includes(material.id));
+    if (deletedMaterials.length === 0) return;
+
+    const results = await Promise.allSettled(
+      deletedMaterials.map((material) => deleteDesktopMaterial(material.id)),
+    );
+    const successfullyDeleted = deletedMaterials.filter(
+      (_material, index) => results[index]?.status === "fulfilled",
+    );
+    const failedResults = results.filter((result) => result.status === "rejected");
+
+    dispatchDataChanged();
+    loadMaterials();
+
+    const firstFailure = failedResults[0];
+    if (firstFailure) {
+      reportUserActionError(firstFailure.reason, {
+        action: "bulk-delete",
+        area: "materials",
+        notify,
+        title: "Eliminazione parziale",
+        userMessage:
+          failedResults.length === deletedMaterials.length
+            ? "Non sono riuscito a eliminare i materiali selezionati."
+            : `${failedResults.length} materiali non sono stati eliminati.`,
+      });
+    }
+
+    if (successfullyDeleted.length === 0) return;
+
+    const execute = async () => {
+      const redoResults = await Promise.allSettled(
+        successfullyDeleted.map((material) => deleteDesktopMaterial(material.id)),
+      );
+      dispatchDataChanged();
+      loadMaterials();
+      const failedRedo = redoResults.find((result) => result.status === "rejected");
+      if (failedRedo?.status === "rejected") {
+        reportUserActionError(failedRedo.reason, {
+          action: "bulk-delete-redo",
+          area: "materials",
+          notify,
+          title: "Ripetizione non riuscita",
+          userMessage: "Non sono riuscito a ripetere l'eliminazione dei materiali.",
+        });
+      }
+    };
+    const undo = async () => {
+      const restoreResults = await Promise.allSettled(
+        successfullyDeleted.map((material) =>
+          createDesktopMaterial({
+            id: material.id,
+            code: material.code,
+            description: material.description,
+            category: material.category,
+            unit: material.unit,
+            quantity: material.quantity,
+            minQuantity: material.minQuantity,
+            notes: material.notes,
+          }),
+        ),
+      );
+      dispatchDataChanged();
+      loadMaterials();
+      const failedRestore = restoreResults.find((result) => result.status === "rejected");
+      if (failedRestore?.status === "rejected") {
+        reportUserActionError(failedRestore.reason, {
+          action: "bulk-delete-undo",
+          area: "materials",
+          notify,
+          title: "Annullamento incompleto",
+          userMessage: "Non sono riuscito a ripristinare tutti i materiali eliminati.",
+        });
+      }
+    };
+
+    useUndoStore.getState().push({
+      label: `${successfullyDeleted.length} materiali eliminati`,
+      execute,
+      undo,
+    });
+    notify({
+      actionLabel: "Annulla",
+      message:
+        failedResults.length > 0
+          ? `${successfullyDeleted.length} materiali eliminati, ${failedResults.length} non eliminati.`
+          : `${successfullyDeleted.length} materiali eliminati.`,
+      onAction: async () => {
+        await undo();
+        notify({
+          message: "Azione annullata",
+          title: "Annullato",
+          tone: "info",
+        });
+      },
+      title: "Eliminati",
+      tone: failedResults.length > 0 ? "warning" : "success",
+    });
+    multiSelect.onDeleted();
+  }, [filteredMaterials, loadMaterials, multiSelect, notify]);
 
   const handleCardClick = useCallback(
     (id: string) => {
@@ -200,12 +297,37 @@ export function MaterialsScreen() {
         title="Materiali e coperture"
         description={`${materials.length} materiali registrati. Gestisci stock, impegni e soglie minime.`}
         sidePanel={
-          <SidebarCategories
-            categories={categories}
-            materialsCount={materials.length}
-            selectedCategory={state.selectedCategory}
-            onSelectCategory={(cat) => dispatch({ type: "SET_SELECTED_CATEGORY", payload: cat })}
-          />
+          <div>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
+                  Stock totale
+                </div>
+                <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
+                  {metrics.totalStock.toLocaleString("it-IT")}
+                </div>
+              </div>
+              <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+                <Package className="size-6" />
+              </span>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
+                <AlertTriangle className="size-5" />
+              </span>
+              <div className="text-12px font-semibold text-[var(--text-primary)]">
+                {metrics.critical} sotto soglia
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
+                <Package className="size-5" />
+              </span>
+              <div className="text-12px font-semibold text-[var(--text-primary)]">
+                {metrics.zero} esauriti
+              </div>
+            </div>
+          </div>
         }
       >
         <MetricsGrid metrics={metrics} />
@@ -218,13 +340,6 @@ export function MaterialsScreen() {
               Azioni rapide
             </span>
             <div className="mt-4 space-y-3">
-              <QuickAction
-                detail="Aggiungi un nuovo materiale al catalogo"
-                icon={PackagePlus}
-                label="Carica materiale"
-                onClick={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
-                tone="info"
-              />
               <QuickAction
                 detail="Crea un ordine per i materiali selezionati"
                 icon={ShoppingCart}
@@ -263,43 +378,79 @@ export function MaterialsScreen() {
         </aside>
 
         <Panel className="min-w-0 overflow-visible p-0">
-          <CategoryFilterBar
-            categoryNames={CATEGORIES}
-            categoryCounts={categories.counts}
-            materialsCount={materials.length}
-            selectedCategory={state.selectedCategory}
-            searchQuery={state.searchQuery}
-            onSelectCategory={(cat) => dispatch({ type: "SET_SELECTED_CATEGORY", payload: cat })}
-            onSearchChange={(q) => dispatch({ type: "SET_SEARCH_QUERY", payload: q })}
-            onCreateMaterial={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
-          />
-
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2 lg:px-4">
-            <FilterTemplatePicker
-              scope="materials"
-              currentFilters={{
-                selectedCategory: state.selectedCategory,
-                searchQuery: state.searchQuery,
-              }}
-              onApplyFilters={applyTemplateFilters}
-            />
-            <MultiSelectToggle
-              isEnabled={multiSelect.isEnabled}
-              onToggle={multiSelect.toggleEnable}
-              count={multiSelect.count}
-            />
+          <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <FilterSelect
+                label="Categoria"
+                onChange={(cat) =>
+                  dispatch({
+                    type: "SET_SELECTED_CATEGORY",
+                    payload: cat === "all" ? null : cat,
+                  })
+                }
+                options={["all", ...CATEGORIES]}
+                value={state.selectedCategory ?? "all"}
+                displayMap={
+                  new Map([
+                    ["all", "Tutte le categorie"],
+                    ...CATEGORIES.map((c) => [c, c] as const),
+                  ])
+                }
+              />
+              <FilterSearch
+                onChange={(q) => dispatch({ type: "SET_SEARCH_QUERY", payload: q })}
+                placeholder="Cerca materiale..."
+                value={state.searchQuery}
+              />
+              {state.searchQuery || state.selectedCategory ? (
+                <ClearFiltersButton
+                  onClick={() => {
+                    dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
+                    dispatch({ type: "SET_SELECTED_CATEGORY", payload: null });
+                  }}
+                />
+              ) : null}
+            </div>
+            <div className="flex items-center gap-3">
+              <FilterTemplatePicker
+                scope="materials"
+                currentFilters={{
+                  selectedCategory: state.selectedCategory,
+                  searchQuery: state.searchQuery,
+                }}
+                onApplyFilters={applyTemplateFilters}
+              />
+              <Button
+                icon={Plus}
+                onClick={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
+                variant="primary"
+              >
+                Nuovo materiale
+              </Button>
+              <MultiSelectToggle
+                isEnabled={multiSelect.isEnabled}
+                onToggle={multiSelect.toggleEnable}
+                count={multiSelect.count}
+              />
+            </div>
           </div>
 
           {multiSelect.count > 0 && (
             <div className="px-3 pt-3 lg:px-4">
-              <MultiSelectBulkBar
+              <MultiSelectBulkDeleteBar
+                allSelected={multiSelect.allSelected}
                 count={multiSelect.count}
                 entityLabel="materiali"
-                allSelected={multiSelect.allSelected}
-                someSelected={multiSelect.someSelected}
-                onSelectAll={() => multiSelect.selectAll(filteredMaterials.map((m) => m.id))}
+                entityLabelSingular="materiale"
+                isDeleteConfirmOpen={multiSelect.isConfirmOpen}
                 onClear={multiSelect.clear}
                 onClose={multiSelect.disable}
+                onDeleteConfirm={handleBulkDelete}
+                onDeleteConfirmDismiss={multiSelect.dismissDelete}
+                onDeleteRequest={multiSelect.requestDelete}
+                onSelectAll={() => multiSelect.selectAll(filteredMaterials.map((m) => m.id))}
+                selectedItemNames={multiSelect.selectedItems.map((m) => m.description)}
+                someSelected={multiSelect.someSelected}
               >
                 <button
                   className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3.5 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
@@ -315,69 +466,7 @@ export function MaterialsScreen() {
                   <Download className="size-4" />
                   Esporta
                 </button>
-                <button
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3.5 text-12px font-bold text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
-                  onClick={() => {
-                    const ids = [...multiSelect.selectedIds];
-                    const deletedMaterials = filteredMaterials.filter((m) => ids.includes(m.id));
-                    for (const id of ids) {
-                      void deleteDesktopMaterial(id).catch(() => {});
-                    }
-                    dispatchDataChanged();
-
-                    const execute = () => {
-                      for (const mat of deletedMaterials) {
-                        void deleteDesktopMaterial(mat.id).catch(() => {});
-                      }
-                      dispatchDataChanged();
-                    };
-                    const undo = async () => {
-                      for (const mat of deletedMaterials) {
-                        try {
-                          await createDesktopMaterial({
-                            id: mat.id,
-                            code: mat.code,
-                            description: mat.description,
-                            category: mat.category,
-                            unit: mat.unit,
-                            quantity: mat.quantity,
-                            minQuantity: mat.minQuantity,
-                            notes: mat.notes,
-                          });
-                        } catch {
-                          // skip failed restores
-                        }
-                      }
-                      dispatchDataChanged();
-                    };
-
-                    useUndoStore.getState().push({
-                      label: `${ids.length} materiali eliminati`,
-                      execute,
-                      undo,
-                    });
-                    notify({
-                      actionLabel: "Annulla",
-                      message: `${ids.length} materiali eliminati.`,
-                      onAction: async () => {
-                        await undo();
-                        notify({
-                          message: "Azione annullata",
-                          title: "Annullato",
-                          tone: "info",
-                        });
-                      },
-                      title: "Eliminati",
-                      tone: "success",
-                    });
-                    multiSelect.disable();
-                  }}
-                  type="button"
-                >
-                  <Trash2 className="size-4" />
-                  Elimina
-                </button>
-              </MultiSelectBulkBar>
+              </MultiSelectBulkDeleteBar>
             </div>
           )}
 
@@ -508,7 +597,7 @@ function MaterialCard({
   return (
     <m.article
       className={cn(
-        "group relative min-h-[116px] rounded-14px border p-4 text-left transition-colors duration-[var(--duration-fast)]",
+        "relative rounded-14px border p-3 text-left transition-colors duration-[var(--duration-fast)]",
         checked
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
           : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
@@ -519,8 +608,8 @@ function MaterialCard({
       whileInView={MOTION_VARIANTS.row.whileInView}
     >
       <div className="flex h-full flex-col">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-start gap-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             {showCheckbox && (
               <span className="mt-0.5">
                 <SelectionCheckbox
@@ -531,173 +620,123 @@ function MaterialCard({
               </span>
             )}
             <button
-              className="min-w-0 flex-1 rounded-lg pt-0.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+              className="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
               onClick={(e) => {
                 e.stopPropagation();
                 onCardClick(material.id);
               }}
               type="button"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  variant={
-                    effTone === "danger" ? "danger" : effTone === "warning" ? "warning" : "success"
-                  }
-                >
-                  {effTone === "danger" ? "Critico" : effTone === "warning" ? "Attenzione" : "OK"}
-                </Badge>
-                <span className="rounded-sm bg-[var(--bg-muted)] px-1.5 py-0.5 text-10px font-bold text-[var(--text-secondary)]">
-                  {material.category}
-                </span>
+              <div className="relative flex h-[76px] w-[58px] shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-tertiary)] shadow-[0_12px_22px_-18px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]">
+                <Package className="size-6" />
+                <span
+                  className={cn(
+                    "absolute -right-1.5 -top-1.5 size-4 rounded-full border-2 border-[var(--surface-base)]",
+                    effTone === "danger"
+                      ? "bg-[var(--danger-base)]"
+                      : effTone === "warning"
+                        ? "bg-[var(--warning-base)]"
+                        : "bg-[var(--success-base)]",
+                  )}
+                />
               </div>
-              <h3 className="mt-3 truncate text-16px font-semibold leading-tight text-[var(--text-primary)]">
-                {material.code}
-              </h3>
-              <p className="mt-2 truncate text-13px font-medium text-[var(--text-secondary)]">
-                {material.description}
-              </p>
-              {/* Stock overview row */}
-              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-                <div className="inline-flex items-center gap-1.5 text-12px font-medium text-[var(--text-secondary)]">
-                  <span className="text-10px uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Stock
-                  </span>
-                  <span
-                    className={cn(
-                      "font-bold",
+              <div className="min-w-0 flex-1 pt-0.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={
                       effTone === "danger"
-                        ? "text-[var(--danger-base)]"
+                        ? "danger"
                         : effTone === "warning"
-                          ? "text-[var(--warning-base)]"
-                          : "text-[var(--text-primary)]",
-                    )}
+                          ? "warning"
+                          : "success"
+                    }
                   >
-                    {formatQuantity(material.quantity, material.unit)}
+                    {effTone === "danger" ? "Critico" : effTone === "warning" ? "Attenzione" : "OK"}
+                  </Badge>
+                  <span className="rounded-sm bg-[var(--bg-muted)] px-1.5 py-0.5 text-10px font-bold text-[var(--text-secondary)]">
+                    {material.category}
                   </span>
                 </div>
-                {material.minQuantity > 0 && (
-                  <div className="inline-flex items-center gap-1.5 text-12px font-medium text-[var(--text-secondary)]">
-                    <span className="text-10px uppercase tracking-wider text-[var(--text-tertiary)]">
-                      Soglia
+                <h3 className="mt-2 truncate text-14px font-semibold leading-tight text-[var(--text-primary)]">
+                  {material.code}
+                </h3>
+                <p className="mt-1 truncate text-12px font-medium text-[var(--text-secondary)]">
+                  {material.description}
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 text-11px font-medium text-[var(--text-secondary)]">
+                  <span>
+                    Stock:{" "}
+                    <span
+                      className={cn(
+                        "font-semibold",
+                        effTone === "danger"
+                          ? "text-[var(--danger-base)]"
+                          : effTone === "warning"
+                            ? "text-[var(--warning-base)]"
+                            : "text-[var(--text-primary)]",
+                      )}
+                    >
+                      {formatQuantity(material.quantity, material.unit)}
                     </span>
-                    <span className="font-bold text-[var(--text-primary)]">
-                      {formatQuantity(material.minQuantity, material.unit)}
+                  </span>
+                  {material.minQuantity > 0 && (
+                    <span>
+                      Soglia:{" "}
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        {formatQuantity(material.minQuantity, material.unit)}
+                      </span>
                     </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Coverage bar */}
-              {(() => {
-                const effective = Math.max(0, material.quantity - committed);
-                const barCoverage =
-                  material.quantity > 0
-                    ? Math.min(100, Math.round((effective / material.quantity) * 100))
-                    : 0;
-                const tone = toneForQuantity(effective, material.minQuantity);
-                return (
-                  <div className="mt-3">
-                    <div className="flex h-2 overflow-hidden rounded-full bg-[var(--border-subtle)]">
-                      <div
-                        className={cn(
-                          "h-full rounded-full transition-all duration-[var(--duration-reveal)]",
-                          tone === "danger" && "bg-[var(--danger-base)]",
-                          tone === "warning" && "bg-[var(--warning-base)]",
-                          tone === "success" && "bg-[var(--success-base)]",
-                        )}
-                        style={{ width: `${barCoverage}%` }}
-                      />
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-10px">
-                      <span className="text-[var(--text-tertiary)]">
-                        {barCoverage}%{" "}
-                        {committed > 0
-                          ? `· -${committed.toLocaleString("it-IT")} in SAL`
-                          : "disponibile"}
+                  )}
+                  {committed > 0 && (
+                    <span>
+                      Impegnato:{" "}
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        {committed.toLocaleString("it-IT")}
                       </span>
-                      <span
-                        className={cn(
-                          "font-semibold tabular-nums",
-                          tone === "danger" && "text-[var(--danger-base)]",
-                          tone === "warning" && "text-[var(--warning-base)]",
-                          tone === "success" && "text-[var(--text-primary)]",
-                        )}
-                      >
-                        {formatQuantity(effective, material.unit)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Committed SAL details inline */}
-              {usageInfo.usedCount > 0 && (
-                <div className="mt-2 divide-y divide-[var(--border-subtle)]/40 rounded-lg bg-[var(--bg-muted)]/30 px-2.5 py-1 text-11px">
-                  {usageInfo.entries.map((e) => (
-                    <div className="flex items-center justify-between gap-2 py-1.5" key={e.salId}>
-                      <div className="min-w-0 flex-1">
-                        <span className="font-medium text-[var(--text-primary)]">{e.salTitle}</span>
-                        <span className="ml-1.5 text-[var(--text-tertiary)]">
-                          {e.projectName} · {e.contractor}
-                        </span>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        <span className="font-bold tabular-nums text-[var(--text-primary)]">
-                          {e.quantity.toLocaleString("it-IT")}
-                        </span>
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 font-semibold",
-                            e.status === "Bozza"
-                              ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-                              : "bg-[var(--info-soft)] text-[var(--info-base)]",
-                          )}
-                        >
-                          {e.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
             </button>
           </div>
 
-          <div ref={menuRef}>
-            <Button
-              aria-label="Azioni materiale"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMenuOpen((v) => !v);
-              }}
-              variant="icon"
-            >
-              <MoreVertical className="size-4" />
-            </Button>
-            <DropdownMenu
-              isOpen={isMenuOpen}
-              onClose={() => setIsMenuOpen(false)}
-              triggerRef={menuRef}
-            >
-              <DropdownItem
-                icon={Pencil}
-                label="Modifica"
-                onClick={() => {
-                  onEdit();
-                  setIsMenuOpen(false);
+          <div className="flex shrink-0 items-center gap-1">
+            <div ref={menuRef}>
+              <Button
+                aria-label="Azioni materiale"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMenuOpen((v) => !v);
                 }}
-              />
-              <DropdownDivider />
-              <DropdownItem
-                icon={Trash2}
-                label="Elimina materiale"
-                onClick={() => {
-                  onDelete();
-                  setIsMenuOpen(false);
-                }}
-                tone="danger"
-              />
-            </DropdownMenu>
+                variant="icon"
+              >
+                <MoreVertical className="size-4" />
+              </Button>
+              <DropdownMenu
+                isOpen={isMenuOpen}
+                onClose={() => setIsMenuOpen(false)}
+                triggerRef={menuRef}
+              >
+                <DropdownItem
+                  icon={Pencil}
+                  label="Modifica"
+                  onClick={() => {
+                    onEdit();
+                    setIsMenuOpen(false);
+                  }}
+                />
+                <DropdownDivider />
+                <DropdownItem
+                  icon={Trash2}
+                  label="Elimina materiale"
+                  onClick={() => {
+                    onDelete();
+                    setIsMenuOpen(false);
+                  }}
+                  tone="danger"
+                />
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>
@@ -869,50 +908,6 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
 
 /* ── Shared sub-components ── */
 
-function SidebarCategories({
-  categories,
-  materialsCount,
-  selectedCategory,
-  onSelectCategory,
-}: {
-  categories: { counts: Map<string, number>; names: string[] };
-  materialsCount: number;
-  selectedCategory: string | null;
-  onSelectCategory: (cat: string | null) => void;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between">
-        <span className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-          Categorie
-        </span>
-      </div>
-      <div className="mt-3 space-y-1.5">
-        {categories.names.map((cat) => {
-          const count = cat === "Tutti" ? materialsCount : (categories.counts.get(cat) ?? 0);
-          return (
-            <m.button
-              className={cn(
-                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-13px font-semibold transition-colors",
-                selectedCategory === cat || (!selectedCategory && cat === "Tutti")
-                  ? "bg-[var(--info-soft)] text-[var(--info-base)]"
-                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-              )}
-              key={cat}
-              onClick={() => onSelectCategory(cat === "Tutti" ? null : cat)}
-              type="button"
-              whileTap={{ scale: 0.98 }}
-            >
-              <span>{cat}</span>
-              <span className="text-11px font-medium text-[var(--text-secondary)]">{count}</span>
-            </m.button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function MetricsGrid({
   metrics,
 }: {
@@ -958,73 +953,6 @@ function MetricsGrid({
   );
 }
 
-function CategoryFilterBar({
-  categoryNames,
-  categoryCounts,
-  materialsCount,
-  selectedCategory,
-  searchQuery,
-  onSelectCategory,
-  onSearchChange,
-  onCreateMaterial,
-}: {
-  categoryNames: string[];
-  categoryCounts: Map<string, number>;
-  materialsCount: number;
-  selectedCategory: string | null;
-  searchQuery: string;
-  onSelectCategory: (cat: string | null) => void;
-  onSearchChange: (q: string) => void;
-  onCreateMaterial: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterChip
-          active={!selectedCategory}
-          count={materialsCount}
-          onClick={() => onSelectCategory(null)}
-        >
-          Tutti i materiali
-        </FilterChip>
-        {categoryNames.map((cat) => {
-          const count = categoryCounts.get(cat) ?? 0;
-          if (count === 0) return null;
-          return (
-            <FilterChip
-              key={cat}
-              active={selectedCategory === cat}
-              count={count}
-              onClick={() => onSelectCategory(cat)}
-            >
-              {cat}
-            </FilterChip>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterSearch
-          onChange={onSearchChange}
-          placeholder="Cerca materiale..."
-          value={searchQuery}
-        />
-        {searchQuery || selectedCategory ? (
-          <ClearFiltersButton
-            onClick={() => {
-              onSearchChange("");
-              onSelectCategory(null);
-            }}
-          />
-        ) : null}
-        <Button icon={Plus} onClick={onCreateMaterial} variant="primary">
-          Nuovo materiale
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function MaterialListSection({
   filteredMaterials,
   totalMaterials,
@@ -1049,17 +977,6 @@ function MaterialListSection({
 
   return (
     <>
-      {!isMultiSelectEnabled && (
-        <div className="flex items-center justify-start border-b border-[var(--border-subtle)] px-3 py-2 lg:px-4">
-          <button
-            className="text-12px font-semibold text-[var(--accent-primary)] hover:underline"
-            onClick={onCreateMaterial}
-            type="button"
-          >
-            + Nuovo materiale
-          </button>
-        </div>
-      )}
       <div className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-3">
         {filteredMaterials.length > 0 ? (
           filteredMaterials.map((mat) => (

@@ -124,6 +124,7 @@ export type SalDetailReportLine = {
   grossAmount: number;
   id: string;
   linkedCharges?: { code: string; description: string; percent: number; total: number }[];
+  notes?: string;
   measurementRows?: {
     date: string;
     description: string;
@@ -342,7 +343,7 @@ export function buildSalDetailReportWorkbook(input: SalDetailReportWorkbookInput
           textCell(line.voice.category),
           numberCell(line.quantity),
           textCell(line.voice.unit),
-          textCell(line.voice.description),
+          textCell(line.notes || line.voice.description),
           moneyCell(line.voice.unitPrice),
           percentCell(line.surchargePercent / 100),
           moneyCell(line.grossAmount),

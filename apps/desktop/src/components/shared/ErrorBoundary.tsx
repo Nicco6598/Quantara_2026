@@ -8,17 +8,18 @@ type ErrorBoundaryProps = {
 };
 
 type ErrorBoundaryState = {
+  copied: boolean;
   error: Error | null;
 };
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { error: null };
+    this.state = { copied: false, error: null };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { error };
+    return { copied: false, error };
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -28,9 +29,15 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override componentDidUpdate(prevProps: ErrorBoundaryProps) {
     if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
-      this.setState({ error: null });
+      this.setState({ copied: false, error: null });
     }
   }
+
+  private copyErrorDetails = async () => {
+    if (!this.state.error || !navigator.clipboard?.writeText) return;
+    await navigator.clipboard.writeText(this.state.error.stack ?? this.state.error.message);
+    this.setState({ copied: true });
+  };
 
   override render() {
     if (this.state.error) {
@@ -52,13 +59,29 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 {this.state.error.message}
               </pre>
             ) : null}
-            <button
-              className="mt-6 rounded-full bg-[var(--accent-primary)] px-6 py-2 text-sm font-semibold text-[var(--text-inverse)]"
-              onClick={() => this.setState({ error: null })}
-              type="button"
-            >
-              Riprova
-            </button>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <button
+                className="rounded-full bg-[var(--accent-primary)] px-6 py-2 text-sm font-semibold text-[var(--text-inverse)]"
+                onClick={() => this.setState({ copied: false, error: null })}
+                type="button"
+              >
+                Riprova
+              </button>
+              <button
+                className="rounded-full bg-[var(--bg-muted)] px-6 py-2 text-sm font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]"
+                onClick={() => window.location.reload()}
+                type="button"
+              >
+                Ricarica app
+              </button>
+              <button
+                className="rounded-full bg-[var(--bg-muted)] px-6 py-2 text-sm font-semibold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]"
+                onClick={this.copyErrorDetails}
+                type="button"
+              >
+                {this.state.copied ? "Dettagli copiati" : "Copia dettagli"}
+              </button>
+            </div>
           </div>
         </main>
       );

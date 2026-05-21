@@ -16,6 +16,7 @@ import {
   Sparkle,
   Trash,
   WaveSine,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { m } from "framer-motion";
 import { useCallback, useEffect, useReducer, useState } from "react";
@@ -23,6 +24,7 @@ import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { useToast } from "@/components/shared/ToastProvider";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
@@ -36,6 +38,7 @@ import {
 } from "@/lib/backup";
 import { loadThemeCSS } from "@/lib/theme-loader";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
+import { getErrorMessage, reportUserActionError } from "@/lib/user-action-error";
 import { cn } from "@/lib/utils";
 import { usePreferenceState, useThemeState } from "@/store/app-store";
 import { useAuditLogStore } from "@/store/audit-log-store";
@@ -446,6 +449,7 @@ function UpdateCheckCard({
 
 function BackupRestoreCard({
   dbInfo,
+  dbInfoError,
   isBackupRunning,
   backupResult,
   onBackup,
@@ -458,6 +462,7 @@ function BackupRestoreCard({
   onTogglePassphraseText,
 }: {
   dbInfo: DatabaseInfo | null;
+  dbInfoError: string | null;
   isBackupRunning: boolean;
   backupResult: string | null;
   onBackup: () => void;
@@ -487,6 +492,7 @@ function BackupRestoreCard({
       <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
         Crea un backup completo del database o ripristina da un file .qbk esistente.
       </p>
+      {dbInfoError ? <DatabaseInfoWarning message={dbInfoError} /> : null}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
           <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
@@ -588,11 +594,13 @@ function BackupRestoreCard({
 
 function IntegrityCheckCard({
   dbInfo,
+  dbInfoError,
   isIntegrityRunning,
   integrityResult,
   onIntegrityCheck,
 }: {
   dbInfo: DatabaseInfo | null;
+  dbInfoError: string | null;
   isIntegrityRunning: boolean;
   integrityResult: string | null;
   onIntegrityCheck: () => void;
@@ -615,6 +623,7 @@ function IntegrityCheckCard({
       <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
         Controlla lo stato del database locale, dimensione e accessibilita dei dati.
       </p>
+      {dbInfoError ? <DatabaseInfoWarning message={dbInfoError} /> : null}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
           <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
@@ -667,6 +676,15 @@ function IntegrityCheckCard({
         </div>
       ) : null}
     </BezelSurface>
+  );
+}
+
+function DatabaseInfoWarning({ message }: { message: string }) {
+  return (
+    <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--warning-soft)] px-3 py-2 text-12px font-medium text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20">
+      <WarningCircle className="mt-0.5 size-3.5 shrink-0" weight="bold" />
+      <span>Info database non disponibile: {message}</span>
+    </div>
   );
 }
 
@@ -817,6 +835,7 @@ function AuditLogCard() {
 // ── Main component ───────────────────────────────────────
 
 export function SettingsScreen() {
+  const { notify } = useToast();
   const { showReleaseNotesAfterUpdate } = usePreferenceState();
   const [
     {
@@ -830,6 +849,7 @@ export function SettingsScreen() {
     dispatch,
   ] = useReducer(asyncOpReducer, initialAsyncState);
   const [dbInfo, setDbInfo] = useState<DatabaseInfo | null>(null);
+  const [dbInfoError, setDbInfoError] = useState<string | null>(null);
   const [backupPassphrase, setBackupPassphrase] = useState("");
   const [showBackupPassphrase, setShowBackupPassphrase] = useState(false);
   const [restorePassphrasePath, setRestorePassphrasePath] = useState<string | null>(null);
@@ -838,11 +858,32 @@ export function SettingsScreen() {
   const [showBackupPassphraseText, setShowBackupPassphraseText] = useState(false);
   const [showRestorePassphraseText, setShowRestorePassphraseText] = useState(false);
 
+  const refreshDatabaseInfo = useCallback(
+    async (action: string) => {
+      try {
+        const info = await getDatabaseInfo();
+        setDbInfo(info);
+        setDbInfoError(null);
+        return info;
+      } catch (error) {
+        setDbInfo(null);
+        setDbInfoError(getErrorMessage(error));
+        reportUserActionError(error, {
+          action,
+          area: "settings",
+          notify,
+          title: "Info database non disponibile",
+          userMessage: "Non sono riuscito a leggere le informazioni del database.",
+        });
+        return null;
+      }
+    },
+    [notify],
+  );
+
   useEffect(() => {
-    getDatabaseInfo()
-      .then(setDbInfo)
-      .catch(() => {});
-  }, []);
+    void refreshDatabaseInfo("load-database-info");
+  }, [refreshDatabaseInfo]);
 
   const handleCheckForUpdates = useCallback(async () => {
     dispatch({ type: "CHECK_UPDATE_START" });
@@ -852,30 +893,47 @@ export function SettingsScreen() {
 
   const handleBackup = useCallback(async () => {
     dispatch({ type: "BACKUP_START" });
-    const passphrase = backupPassphrase.trim() || undefined;
-    const result = await backupDatabase(passphrase);
-    dispatch({ type: "BACKUP_DONE", result });
-    if (result !== "annullato") {
-      getDatabaseInfo()
-        .then(setDbInfo)
-        .catch(() => {});
+    try {
+      const passphrase = backupPassphrase.trim() || undefined;
+      const result = await backupDatabase(passphrase);
+      dispatch({ type: "BACKUP_DONE", result });
+      if (result !== "annullato") {
+        await refreshDatabaseInfo("refresh-after-backup");
+      }
+    } catch (error) {
+      dispatch({ type: "BACKUP_DONE", result: null });
+      reportUserActionError(error, {
+        action: "backup",
+        area: "settings",
+        notify,
+        title: "Backup non riuscito",
+        userMessage: "Non sono riuscito a creare il backup.",
+      });
     }
-  }, [backupPassphrase]);
+  }, [backupPassphrase, notify, refreshDatabaseInfo]);
 
   const handleRestore = useCallback(async () => {
-    const result = await restoreDatabase();
-    if (result === "annullato") return;
-    const encryptedPath = isRestoreNeedsPassphrase(result);
-    if (encryptedPath) {
-      setRestorePassphrasePath(encryptedPath);
-      setRestorePassphrase("");
-      return;
+    try {
+      const result = await restoreDatabase();
+      if (result === "annullato") return;
+      const encryptedPath = isRestoreNeedsPassphrase(result);
+      if (encryptedPath) {
+        setRestorePassphrasePath(encryptedPath);
+        setRestorePassphrase("");
+        return;
+      }
+      dispatch({ type: "RESTORE_DONE", result });
+      await refreshDatabaseInfo("refresh-after-restore");
+    } catch (error) {
+      reportUserActionError(error, {
+        action: "restore",
+        area: "settings",
+        notify,
+        title: "Ripristino non riuscito",
+        userMessage: "Non sono riuscito a ripristinare il database.",
+      });
     }
-    dispatch({ type: "RESTORE_DONE", result });
-    getDatabaseInfo()
-      .then(setDbInfo)
-      .catch(() => {});
-  }, []);
+  }, [notify, refreshDatabaseInfo]);
 
   const handleRestoreWithPassphrase = useCallback(async () => {
     if (!restorePassphrasePath || !restorePassphrase.trim()) return;
@@ -889,22 +947,31 @@ export function SettingsScreen() {
       setRestorePassphrase("");
       if (result !== "annullato") {
         dispatch({ type: "RESTORE_DONE", result });
-        getDatabaseInfo()
-          .then(setDbInfo)
-          .catch(() => {});
+        await refreshDatabaseInfo("refresh-after-encrypted-restore");
       }
     } catch (err) {
       setRestorePassphraseError(
         typeof err === "string" ? err : "Passphrase errata o file non valido",
       );
+      reportUserActionError(err, {
+        action: "encrypted-restore",
+        area: "settings",
+        notify,
+        title: "Ripristino non riuscito",
+        userMessage: "Non sono riuscito a ripristinare il backup crittografato.",
+      });
     }
-  }, [restorePassphrasePath, restorePassphrase]);
+  }, [notify, refreshDatabaseInfo, restorePassphrasePath, restorePassphrase]);
 
   const handleIntegrityCheck = useCallback(async () => {
     dispatch({ type: "INTEGRITY_START" });
     await new Promise((r) => setTimeout(r, 400));
     try {
-      const info = await getDatabaseInfo();
+      const info = await refreshDatabaseInfo("integrity-database-info");
+      if (!info) {
+        dispatch({ type: "INTEGRITY_DONE", result: "Info database non disponibile" });
+        return;
+      }
       const checks: string[] = [];
       if (info.exists) {
         checks.push(info.sizeBytes > 0 ? "Database integro" : "Database vuoto");
@@ -913,10 +980,17 @@ export function SettingsScreen() {
       } else {
         dispatch({ type: "INTEGRITY_DONE", result: "Nessun database locale trovato" });
       }
-    } catch {
+    } catch (error) {
+      reportUserActionError(error, {
+        action: "integrity-check",
+        area: "settings",
+        notify,
+        title: "Verifica non riuscita",
+        userMessage: "Non sono riuscito a verificare il database.",
+      });
       dispatch({ type: "INTEGRITY_DONE", result: "Verifica non riuscita" });
     }
-  }, []);
+  }, [notify, refreshDatabaseInfo]);
 
   return (
     <ScreenLayout gradient="success-info">
@@ -966,6 +1040,7 @@ export function SettingsScreen() {
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <BackupRestoreCard
           dbInfo={dbInfo}
+          dbInfoError={dbInfoError}
           isBackupRunning={isBackupRunning}
           backupResult={backupResult}
           onBackup={handleBackup}
@@ -979,6 +1054,7 @@ export function SettingsScreen() {
         />
         <IntegrityCheckCard
           dbInfo={dbInfo}
+          dbInfoError={dbInfoError}
           isIntegrityRunning={isIntegrityRunning}
           integrityResult={integrityResult}
           onIntegrityCheck={handleIntegrityCheck}

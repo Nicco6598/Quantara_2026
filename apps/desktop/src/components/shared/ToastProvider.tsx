@@ -13,9 +13,9 @@ import {
 import { cn } from "@/lib/utils";
 import { motionVariants } from "@/motion";
 
-type ToastTone = "info" | "success" | "warning" | "danger";
+export type ToastTone = "info" | "success" | "warning" | "danger";
 
-type ToastInput = {
+export type ToastInput = {
   actionLabel?: string;
   message: string;
   onAction?: () => void;

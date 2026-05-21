@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function FilterSelect({
-  label,
+  label: _label,
   value,
   options,
   onChange,
@@ -33,16 +33,16 @@ export function FilterSelect({
   return (
     <div className="relative" ref={ref}>
       <button
-        className="flex items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-12px font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+        className="inline-flex h-10 min-w-[160px] items-center justify-between rounded-14px border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3.5 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
-        <span className="whitespace-nowrap">{label}:</span>
-        <span className="max-w-[140px] truncate text-12px font-semibold text-[var(--text-primary)]">
-          {displayValue}
-        </span>
+        <span className="max-w-[160px] truncate">{displayValue}</span>
         <ChevronDown
-          className={cn("size-3 shrink-0 opacity-60 transition-transform", isOpen && "rotate-180")}
+          className={cn(
+            "ml-1.5 size-4 shrink-0 text-[var(--text-secondary)] transition-transform",
+            isOpen && "rotate-180",
+          )}
         />
       </button>
 

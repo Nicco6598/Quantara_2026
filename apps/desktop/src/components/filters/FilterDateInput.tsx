@@ -25,15 +25,15 @@ export function FilterDateInput({
 
   return (
     <label
-      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3 py-1.5 text-12px font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
+      className="flex h-10 cursor-pointer items-center gap-2 rounded-14px border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3.5 text-13px font-medium text-[var(--text-primary)] outline-none transition focus-within:border-[var(--accent-primary)] focus-within:ring-2 focus-within:ring-[var(--ring-focus)] hover:bg-[var(--bg-muted-strong)]"
       onClick={handleDatePickerClick}
       onKeyDown={handleKeyDown}
     >
-      <Calendar className="size-3.5 shrink-0" />
-      <span className="whitespace-nowrap">{label}</span>
+      <Calendar className="size-4 shrink-0 text-[var(--text-secondary)]" />
+      <span className="whitespace-nowrap text-[var(--text-secondary)]">{label}</span>
       <input
         ref={inputRef}
-        className="date-input-native w-[110px] cursor-pointer bg-transparent text-12px text-[var(--text-primary)] outline-none"
+        className="date-input-native w-[110px] cursor-pointer bg-transparent text-13px font-medium text-[var(--text-primary)] outline-none"
         onChange={(e) => onChange(e.target.value)}
         type="date"
         value={value}

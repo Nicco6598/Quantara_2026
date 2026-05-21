@@ -14,6 +14,7 @@ import { useRef, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import { BezelSurface } from "@/components/shared/ui-primitives";
 import { MOTION_VARIANTS } from "@/motion";
 import type { DesktopTariffBook, TariffPdfMetadata } from "@/lib/desktopData";
@@ -38,9 +39,10 @@ export function TariffBookPreviewCard({
   onEditFormChange,
   onOpenVoices,
   onSaveEdit,
-  onSelect,
   onShowDetails,
   onToggleFavorite,
+  onToggleSelect,
+  showCheckbox,
   showDetails,
   voiceCount,
 }: {
@@ -48,7 +50,7 @@ export function TariffBookPreviewCard({
   editForm: EditTariffBookForm;
   editing: boolean;
   isFavorite: boolean;
-  isSelected: boolean;
+  isSelected?: boolean;
   linkedProjectCount: number;
   onCancelEdit: () => void;
   onDelete: () => void;
@@ -56,9 +58,10 @@ export function TariffBookPreviewCard({
   onEditFormChange: Dispatch<SetStateAction<EditTariffBookForm>>;
   onOpenVoices: () => void;
   onSaveEdit: () => void;
-  onSelect: () => void;
   onShowDetails: () => void;
   onToggleFavorite: () => void;
+  onToggleSelect?: (id: string) => void;
+  showCheckbox?: boolean;
   showDetails: boolean;
   voiceCount: number | undefined;
 }) {
@@ -69,7 +72,7 @@ export function TariffBookPreviewCard({
   return (
     <m.article
       className={cn(
-        "relative min-h-[168px] rounded-14px border p-4 text-left transition-colors duration-[var(--duration-fast)]",
+        "relative rounded-14px border p-3 text-left transition-colors duration-[var(--duration-fast)]",
         isSelected
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
           : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
@@ -80,18 +83,22 @@ export function TariffBookPreviewCard({
       whileInView={MOTION_VARIANTS.row.whileInView}
     >
       <div className="flex h-full flex-col">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-2">
+          {showCheckbox ? (
+            <span className="mt-0.5 shrink-0">
+              <SelectionCheckbox
+                checked={isSelected ?? false}
+                id={book.id}
+                onToggle={onToggleSelect ?? (() => {})}
+              />
+            </span>
+          ) : null}
           <button
-            className="flex min-w-0 flex-1 items-start gap-4 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-            onClick={onSelect}
+            className="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+            onClick={showCheckbox ? () => onToggleSelect?.(book.id) : onShowDetails}
             type="button"
           >
-            <div
-              className={cn(
-                "relative flex h-[96px] w-[72px] shrink-0 items-center justify-center rounded-md border bg-[var(--surface-raised)] text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]",
-                isSelected ? "border-[var(--accent-primary)]" : "border-[var(--border-subtle)]",
-              )}
-            >
+            <div className="relative flex h-[76px] w-[58px] shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]">
               <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-[var(--text-inverse)]">
                 PDF
               </span>
@@ -124,15 +131,14 @@ export function TariffBookPreviewCard({
                   Anno {book.year}
                 </span>
               </div>
-              <h3 className="mt-3 truncate text-16px font-semibold leading-tight text-[var(--text-primary)]">
+              <h3 className="mt-2 truncate text-14px font-semibold leading-tight text-[var(--text-primary)]">
                 {book.name}
               </h3>
-              <p className="mt-2 truncate text-13px text-[var(--text-secondary)]">
+              <p className="mt-1 truncate text-12px text-[var(--text-secondary)]">
                 {book.sourceName}
               </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-12px font-medium text-[var(--text-secondary)]">
+              <div className="mt-1.5 flex flex-wrap gap-x-2 text-11px font-medium text-[var(--text-secondary)]">
                 <span>{displayVoiceCount} voci</span>
-                <span>·</span>
                 <span>{linkedProjectCount} progetti</span>
               </div>
             </div>
@@ -142,7 +148,7 @@ export function TariffBookPreviewCard({
             <button
               aria-label={isFavorite ? "Rimuovi dai preferiti" : "Segna come preferito"}
               className={cn(
-                "flex size-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[var(--warning-soft)] hover:text-[var(--warning-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
+                "flex size-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[var(--warning-soft)] hover:text-[var(--warning-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
                 isFavorite && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
               )}
               onClick={onToggleFavorite}
@@ -270,11 +276,6 @@ export function TariffBookPreviewCard({
           </m.div>
         ) : null}
       </div>
-      {isSelected ? (
-        <span className="absolute bottom-4 right-4 flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--accent-primary)] text-[var(--text-inverse)]">
-          <CheckCircle2 className="size-4" strokeWidth={3} />
-        </span>
-      ) : null}
     </m.article>
   );
 }

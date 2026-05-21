@@ -105,10 +105,36 @@ pub fn apply_migrations(connection: &rusqlite::Connection) -> rusqlite::Result<(
     }
 
     ensure_tariff_voice_labor_percentage(connection)?;
+    ensure_tariff_voice_sal_rule_fields(connection)?;
     ensure_contract_migration(connection)?;
     ensure_contractors_migration(connection)?;
     ensure_fts_triggers(connection)?;
     migrate_sal_json_to_v2(connection)?;
+
+    Ok(())
+}
+
+fn ensure_tariff_voice_sal_rule_fields(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
+    let columns = {
+        let mut statement = connection.prepare("PRAGMA table_info(tariff_voices)")?;
+        statement
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+    };
+
+    if !columns.iter().any(|column| column == "linked_maggiorazioni") {
+        connection.execute(
+            "ALTER TABLE tariff_voices ADD COLUMN linked_maggiorazioni TEXT",
+            [],
+        )?;
+    }
+
+    if !columns.iter().any(|column| column == "applicability_rules") {
+        connection.execute(
+            "ALTER TABLE tariff_voices ADD COLUMN applicability_rules TEXT",
+            [],
+        )?;
+    }
 
     Ok(())
 }

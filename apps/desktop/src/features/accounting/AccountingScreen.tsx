@@ -7,7 +7,6 @@ import {
   FileBadge,
   ReceiptText,
   ShieldCheck,
-  Trash2,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,7 +18,8 @@ import {
   FilterTemplatePicker,
 } from "@/components/filters";
 import { Button } from "@/components/shared/Button";
-import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
+import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
+import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { SavedViewSelector } from "@/components/shared/SavedViewSelector";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
@@ -31,7 +31,7 @@ import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
-import { useMultiSelect } from "@/hooks/use-multi-select";
+import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { listDesktopContracts, restoreMaterialsFromSalUsage } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
@@ -193,13 +193,90 @@ export function AccountingScreen() {
 
   const { sortedItems: sortedRows, sortKey, sortDirection, onSort } = useTableSort(sortableRows);
 
-  const multiSelect = useMultiSelect(sortedRows);
+  const multiSelect = useMultiSelectDelete(sortedRows);
 
   const selection = useMemo(() => {
     const ids = multiSelect.selectedIds;
     if (ids.size === 0) return sortedRows.map((r) => ({ doc: r.doc, view: r.view }));
     return sortedRows.filter((r) => ids.has(r.doc.id)).map((r) => ({ doc: r.doc, view: r.view }));
   }, [sortedRows, multiSelect.selectedIds]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = [...multiSelect.selectedIds];
+    const count = ids.length;
+    const deletedSals = ids
+      .map((id) => useSalWorkflowStore.getState().salDocuments.find((d) => d.id === id))
+      .filter((d): d is NonNullable<typeof d> => d !== undefined);
+
+    for (const id of ids) {
+      const doc = useSalWorkflowStore.getState().salDocuments.find((d) => d.id === id);
+      if (doc?.materialUsage) {
+        void restoreMaterialsFromSalUsage(doc.materialUsage);
+      }
+      useSalWorkflowStore.getState().deleteSal(id);
+    }
+    dispatchDataChanged();
+
+    const execute = () => {
+      for (const doc of deletedSals) {
+        useSalWorkflowStore.getState().deleteSal(doc.id);
+      }
+      dispatchDataChanged();
+    };
+    const undo = async () => {
+      for (const doc of deletedSals) {
+        const salInput = {
+          projectId: doc.projectId,
+          date: doc.date,
+          description: doc.description,
+          notes: doc.notes,
+          title: doc.title,
+          lines: doc.lines,
+          voices: [] as never[],
+          status: doc.status,
+          ...(doc.economicRules ? { economicRules: doc.economicRules } : {}),
+          ...(doc.materialUsage ? { materialUsage: doc.materialUsage } : {}),
+          ...(typeof doc.total === "number" ? { total: doc.total } : {}),
+        };
+        useSalWorkflowStore.getState().createSal(salInput);
+        try {
+          await saveSalDocument(doc.projectId, doc);
+        } catch (error) {
+          notify({
+            message: error instanceof Error ? error.message : String(error),
+            title: "Ripristino SAL non riuscito",
+            tone: "danger",
+          });
+          return;
+        }
+        if (doc.materialUsage) {
+          await restoreMaterialsFromSalUsage(doc.materialUsage);
+        }
+      }
+      dispatchDataChanged();
+    };
+
+    useUndoStore.getState().push({
+      label: `${count} SAL eliminat${count === 1 ? "a" : "e"}`,
+      execute,
+      undo,
+    });
+    notify({
+      actionLabel: "Annulla",
+      message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
+      onAction: async () => {
+        await undo();
+        notify({
+          message: "Azione annullata",
+          title: "Annullato",
+          tone: "info",
+        });
+      },
+      title: "Eliminate",
+      tone: "success",
+    });
+    multiSelect.onDeleted();
+  }, [multiSelect, notify]);
 
   const metrics = useMemo(() => {
     const total = selection.reduce((s, { view }) => s + (view?.total ?? 0), 0);
@@ -271,22 +348,13 @@ export function AccountingScreen() {
           <div className="flex flex-wrap items-center gap-2">
             <FilterSelect
               label="Appaltatore"
-              onChange={(v) => {
-                setFilterContractor(v);
-                setFilterProject("all");
-              }}
+              onChange={setFilterContractor}
               options={[...contractorOptions]}
               value={filterContractor}
             />
             <FilterSelect
               label="Progetto"
-              onChange={(v) => {
-                setFilterProject(v);
-                if (v !== "all") {
-                  const c = contracts.find((cc) => cc.id === v);
-                  if (c) setFilterContractor(c.contractor);
-                }
-              }}
+              onChange={setFilterProject}
               options={projectOptions.map((o) => o.id)}
               displayMap={new Map(projectOptions.map((o) => [o.id, o.title]))}
               value={filterProject}
@@ -378,14 +446,20 @@ export function AccountingScreen() {
 
                 {multiSelect.count > 0 && (
                   <div className="px-2 pt-3">
-                    <MultiSelectBulkBar
+                    <MultiSelectBulkDeleteBar
+                      allSelected={multiSelect.allSelected}
                       count={multiSelect.count}
                       entityLabel="SAL"
-                      allSelected={multiSelect.allSelected}
-                      someSelected={multiSelect.someSelected}
-                      onSelectAll={() => multiSelect.selectAll(sortedRows.map((r) => r.doc.id))}
+                      entityLabelSingular="SAL"
+                      isDeleteConfirmOpen={multiSelect.isConfirmOpen}
                       onClear={multiSelect.clear}
                       onClose={multiSelect.disable}
+                      onDeleteConfirm={handleBulkDelete}
+                      onDeleteConfirmDismiss={multiSelect.dismissDelete}
+                      onDeleteRequest={multiSelect.requestDelete}
+                      onSelectAll={() => multiSelect.selectAll(sortedRows.map((r) => r.doc.id))}
+                      selectedItemNames={multiSelect.selectedItems.map((r) => `SAL ${r.doc.title}`)}
+                      someSelected={multiSelect.someSelected}
                     >
                       <button
                         className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3.5 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
@@ -401,94 +475,7 @@ export function AccountingScreen() {
                         <Download className="size-4" />
                         Esporta
                       </button>
-                      <button
-                        className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3.5 text-12px font-bold text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
-                        onClick={async () => {
-                          const ids = [...multiSelect.selectedIds];
-                          const count = ids.length;
-                          const deletedSals = ids
-                            .map((id) =>
-                              useSalWorkflowStore.getState().salDocuments.find((d) => d.id === id),
-                            )
-                            .filter((d): d is NonNullable<typeof d> => d !== undefined);
-
-                          for (const id of ids) {
-                            const doc = useSalWorkflowStore
-                              .getState()
-                              .salDocuments.find((d) => d.id === id);
-                            if (doc?.materialUsage) {
-                              void restoreMaterialsFromSalUsage(doc.materialUsage);
-                            }
-                            useSalWorkflowStore.getState().deleteSal(id);
-                          }
-                          dispatchDataChanged();
-
-                          const execute = () => {
-                            for (const doc of deletedSals) {
-                              useSalWorkflowStore.getState().deleteSal(doc.id);
-                            }
-                            dispatchDataChanged();
-                          };
-                          const undo = async () => {
-                            for (const doc of deletedSals) {
-                              const salInput = {
-                                projectId: doc.projectId,
-                                date: doc.date,
-                                description: doc.description,
-                                notes: doc.notes,
-                                title: doc.title,
-                                lines: doc.lines,
-                                voices: [] as never[],
-                                status: doc.status,
-                                ...(doc.economicRules ? { economicRules: doc.economicRules } : {}),
-                                ...(doc.materialUsage ? { materialUsage: doc.materialUsage } : {}),
-                                ...(typeof doc.total === "number" ? { total: doc.total } : {}),
-                              };
-                              useSalWorkflowStore.getState().createSal(salInput);
-                              try {
-                                await saveSalDocument(doc.projectId, doc);
-                              } catch (error) {
-                                notify({
-                                  message: error instanceof Error ? error.message : String(error),
-                                  title: "Ripristino SAL non riuscito",
-                                  tone: "danger",
-                                });
-                                return;
-                              }
-                              if (doc.materialUsage) {
-                                await restoreMaterialsFromSalUsage(doc.materialUsage);
-                              }
-                            }
-                            dispatchDataChanged();
-                          };
-
-                          useUndoStore.getState().push({
-                            label: `${count} SAL eliminat${count === 1 ? "a" : "e"}`,
-                            execute,
-                            undo,
-                          });
-                          notify({
-                            actionLabel: "Annulla",
-                            message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
-                            onAction: async () => {
-                              await undo();
-                              notify({
-                                message: "Azione annullata",
-                                title: "Annullato",
-                                tone: "info",
-                              });
-                            },
-                            title: "Eliminate",
-                            tone: "success",
-                          });
-                          multiSelect.disable();
-                        }}
-                        type="button"
-                      >
-                        <Trash2 className="size-4" />
-                        Elimina
-                      </button>
-                    </MultiSelectBulkBar>
+                    </MultiSelectBulkDeleteBar>
                   </div>
                 )}
 

@@ -12,6 +12,27 @@ type SalDataStore = {
   salDocuments: SalDocument[];
 };
 
+export type SerializableSalDocument = SalDocument & {
+  lineCount?: number;
+  measurementRowCount?: number;
+  totalCents?: number;
+};
+
+export function toSalDocumentPayload(doc: SalDocument): SerializableSalDocument {
+  const payload: SerializableSalDocument = { ...doc };
+  if (doc.lines) {
+    payload.lineCount = doc.lines.length;
+    payload.measurementRowCount = doc.lines.reduce(
+      (sum, line) => sum + (line.measurementRows?.length ?? 0),
+      0,
+    );
+  }
+  if (doc.total != null) {
+    payload.totalCents = Math.round(doc.total * 100);
+  }
+  return payload;
+}
+
 function readSalDataStore(): SalDataStore | null {
   try {
     const raw = window.localStorage.getItem(SAL_DATA_KEY);
@@ -40,19 +61,7 @@ export async function saveSalDocument(projectId: string, doc: SalDocument): Prom
     throw new Error("SAL save requires Tauri desktop runtime");
   }
 
-  const payload = { ...doc } as Record<string, unknown>;
-  if (doc.lines) {
-    payload.lineCount = doc.lines.length;
-    payload.measurementRowCount = doc.lines.reduce(
-      (sum, line) => sum + (line.measurementRows?.length ?? 0),
-      0,
-    );
-  }
-  if (doc.total != null) {
-    payload.totalCents = Math.round(doc.total * 100);
-  }
-
-  await invokeForWrite("save_sal_document", { projectId, data: payload as never });
+  await invokeForWrite("save_sal_document", { projectId, data: toSalDocumentPayload(doc) });
 }
 
 export async function updateSalDocument(id: string, doc: SalDocument): Promise<void> {
@@ -60,19 +69,7 @@ export async function updateSalDocument(id: string, doc: SalDocument): Promise<v
     throw new Error("SAL update requires Tauri desktop runtime");
   }
 
-  const payload = { ...doc } as Record<string, unknown>;
-  if (doc.lines) {
-    payload.lineCount = doc.lines.length;
-    payload.measurementRowCount = doc.lines.reduce(
-      (sum, line) => sum + (line.measurementRows?.length ?? 0),
-      0,
-    );
-  }
-  if (doc.total != null) {
-    payload.totalCents = Math.round(doc.total * 100);
-  }
-
-  await invokeForWrite("update_sal_document", { id, data: payload as never });
+  await invokeForWrite("update_sal_document", { id, data: toSalDocumentPayload(doc) });
 }
 
 export async function deleteSalDocument(id: string): Promise<void> {
@@ -101,7 +98,7 @@ export async function saveSalProject(project: SalProject): Promise<void> {
     throw new Error("SAL project save requires Tauri desktop runtime");
   }
 
-  await invokeForWrite("save_sal_project", { project: project as never });
+  await invokeForWrite("save_sal_project", { project });
 }
 
 export type MaterialDeductionInput = {
@@ -137,21 +134,11 @@ export async function confirmSalTransaction(
     return salData;
   }
 
-  const payload = { ...salData } as Record<string, unknown>;
-  if (salData.lines) {
-    payload.lineCount = salData.lines.length;
-    payload.measurementRowCount = salData.lines.reduce(
-      (sum, line) => sum + (line.measurementRows?.length ?? 0),
-      0,
-    );
-  }
-  if (salData.total != null) {
-    payload.totalCents = Math.round(salData.total * 100);
-  }
+  const payload = toSalDocumentPayload(salData);
 
   return invoke<SalDocument>("confirm_sal_transaction", {
     projectId,
-    salData: payload as never,
+    salData: payload,
     materialDeductions,
   });
 }
@@ -184,11 +171,14 @@ export async function migrateSalLocalStorageToBackend(): Promise<void> {
   }
 
   for (const doc of docs) {
-    await invokeForWrite("save_sal_document", { projectId: doc.projectId, data: doc as never });
+    await invokeForWrite("save_sal_document", {
+      projectId: doc.projectId,
+      data: toSalDocumentPayload(doc),
+    });
   }
 
   for (const proj of projects) {
-    await invokeForWrite("save_sal_project", { project: proj as never });
+    await invokeForWrite("save_sal_project", { project: proj });
   }
 
   window.localStorage.setItem(MIGRATION_FLAG_KEY, "1");

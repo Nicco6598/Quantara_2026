@@ -1,20 +1,27 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { m } from "framer-motion";
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
   ChevronsDown,
   ChevronsUp,
   Copy,
   Download,
+  ListChecks,
   MoreHorizontal,
   Percent,
   Plus,
+  Route,
   Trash2,
+  X,
 } from "lucide-react";
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Currency } from "@/components/shared/Currency";
 import { StatusPill } from "@/components/shared/StatusPill";
+import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
+import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { SPRING_EASE } from "@/motion";
 
 export { Currency };
@@ -38,8 +45,10 @@ export function NumberValue({ value }: { value: number }) {
 }
 
 export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
+  economicRules,
   lines,
   copiedVoiceId,
+  onAllocateMg,
   onCopyLine,
   onAddMeasurementRow,
   onDuplicateMeasurementRow,
@@ -49,8 +58,10 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onSurcharge,
   onUpdateMeasurementRow,
 }: {
+  economicRules: SalEconomicRules;
   lines: SalLineView[];
   copiedVoiceId: string | null;
+  onAllocateMg: (mgLineId: string, targetLineIds: string[]) => void;
   onCopyLine: (lineId: string) => void;
   onAddMeasurementRow: (lineId: string) => void;
   onDuplicateMeasurementRow: (lineId: string, measurementId: string) => void;
@@ -64,6 +75,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     updates: Partial<SalMeasurementRowDraft>,
   ) => void;
 }) {
+  const [allocPanelMgId, setAllocPanelMgId] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(
     () => new Set(lines.map((l) => l.id)),
   );
@@ -77,6 +89,14 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     [tableLines],
   );
   const mgLines = useMemo(() => lines.filter((line) => isMgRow(line.voice)), [lines]);
+  const tariffMgSignals = useMemo(
+    () => tableLines.filter((line) => hasTariffMaggiorazioneSignal(line)),
+    [tableLines],
+  );
+  const manualSurchargeLines = useMemo(
+    () => tableLines.filter((line) => line.surchargePercent > 0),
+    [tableLines],
+  );
   const allExpanded = expandedRows.size === tableLines.length;
   const hasSafetySection = safetyLines.length > 0;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -182,6 +202,10 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     return () => window.removeEventListener("keydown", handler);
   }, [handleToggleAll]);
 
+  const allocPanelMgLine = allocPanelMgId
+    ? lines.find((line) => line.id === allocPanelMgId)
+    : undefined;
+
   const renderRow = (line: SalLineView, index: number) => (
     <SelectedVoiceRow
       key={line.id}
@@ -205,10 +229,10 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)]/40 px-4 py-2">
         <div className="min-w-0">
-          <div className="text-11px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+          <div className="text-12px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
             Registro misure
           </div>
-          <div className="mt-0.5 text-12px text-[var(--text-tertiary)]">
+          <div className="mt-0.5 text-13px text-[var(--text-tertiary)]">
             {lines.length === 0
               ? "Nessuna voce inserita"
               : `${tableLines.length} voc${tableLines.length === 1 ? "e" : "i"} misurabil${tableLines.length === 1 ? "e" : "i"}${
@@ -219,9 +243,6 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 text-11px text-[var(--text-tertiary)]">
-          {mgLines.length > 0 ? (
-            <MgInlineSummary lines={tableLines} mgLines={mgLines} onRemove={onRemove} />
-          ) : null}
           <button
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.08] px-3 font-black text-[var(--accent-primary)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/[0.12] hover:text-[var(--accent-primary)]"
             onClick={handleToggleAll}
@@ -237,10 +258,22 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
         </div>
       </div>
 
+      {mgLines.length > 0 || tariffMgSignals.length > 0 || manualSurchargeLines.length > 0 ? (
+        <MaggiorazioniStepPanel
+          economicRules={economicRules}
+          lines={tableLines}
+          manualSurchargeLines={manualSurchargeLines}
+          mgLines={mgLines}
+          tariffMgSignals={tariffMgSignals}
+          onAllocate={setAllocPanelMgId}
+          onRemove={onRemove}
+        />
+      ) : null}
+
       <div className="min-h-0 flex-1 overflow-auto" ref={scrollRef}>
         <div className="min-w-[1460px]">
           {/* Header row */}
-          <div className="sticky top-0 z-20 grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/40 bg-[var(--surface-base)] text-10px font-semibold uppercase tracking-wider text-[var(--text-tertiary)] shadow-[0_1px_0_var(--border-subtle)]">
+          <div className="sticky top-0 z-20 grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/40 bg-[var(--surface-base)] text-12px font-semibold uppercase tracking-wider text-[var(--text-tertiary)] shadow-[0_1px_0_var(--border-subtle)]">
             {[
               "N.",
               "Codice voce",
@@ -322,6 +355,16 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
           )}
         </div>
       </div>
+
+      {allocPanelMgLine ? (
+        <MgAllocationPanel
+          economicRules={economicRules}
+          lineViews={lines}
+          mgLine={allocPanelMgLine}
+          onClose={() => setAllocPanelMgId(null)}
+          onSave={onAllocateMg}
+        />
+      ) : null}
     </div>
   );
 });
@@ -340,7 +383,7 @@ function RegisterSectionHeader({
   return (
     <div
       className={cn(
-        "grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/60 text-12px",
+        "grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/60 text-13px",
         tone === "safety" ? "bg-[var(--danger-soft)]" : "bg-[var(--accent-primary)]/[0.08]",
       )}
     >
@@ -388,58 +431,433 @@ function getMgTariffPrefix(voiceCode: string): string | null {
   return extractMgTariffPrefix(voiceCode);
 }
 
-function MgInlineSummary({
+function hasTariffMaggiorazioneSignal(line: SalLineView): boolean {
+  return (
+    (line.voice.linkedMaggiorazioni?.length ?? 0) > 0 ||
+    line.voice.applicabilityRules?.mentionsMaggiorazione === true
+  );
+}
+
+function getManualSurchargeTotal(line: SalLineView): number {
+  return line.linkedCharges
+    .filter((charge) => !charge.code.startsWith("MG."))
+    .reduce((sum, charge) => sum + charge.total, 0);
+}
+
+function getMgLinkedTotal(line: SalLineView): number {
+  return line.linkedCharges
+    .filter((charge) => charge.code.startsWith("MG."))
+    .reduce((sum, charge) => sum + charge.total, 0);
+}
+
+function MaggiorazioniStepPanel({
+  economicRules,
   lines,
+  manualSurchargeLines,
   mgLines,
+  tariffMgSignals,
+  onAllocate,
   onRemove,
 }: {
+  economicRules: SalEconomicRules;
   lines: SalLineView[];
+  manualSurchargeLines: SalLineView[];
   mgLines: SalLineView[];
-  onRemove: (lineId: string) => void;
+  tariffMgSignals: SalLineView[];
+  onAllocate: (mgLineId: string) => void;
+  onRemove: (mgLineId: string) => void;
 }) {
-  const totalMg = mgLines.reduce((sum, line) => {
-    const charge = line.linkedCharges.find((entry) => entry.code.startsWith("MG."));
-    return sum + (charge?.total ?? line.totalAmount);
+  const totalMg = lines.reduce((sum, line) => sum + getMgLinkedTotal(line), 0);
+  const manualTotal = manualSurchargeLines.reduce(
+    (sum, line) => sum + getManualSurchargeTotal(line),
+    0,
+  );
+  const pendingSignals = tariffMgSignals.filter(
+    (line) => getMgLinkedTotal(line) <= 0 && line.surchargePercent <= 0,
+  );
+  const configuredMgLines = mgLines.reduce((sum, line) => {
+    const manualAlloc = economicRules.mgManualAllocations?.[line.id];
+    if (manualAlloc == null) return sum + 1;
+    return manualAlloc.length > 0 ? sum + 1 : sum;
   }, 0);
 
+  const [collapsed, setCollapsed] = useState(mgLines.length > 4);
+  const visibleMg = collapsed ? mgLines.slice(0, 4) : mgLines;
+  const visibleSignals = tariffMgSignals.slice(0, 4);
+  const hasMore = mgLines.length > 4;
+
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-[var(--info-base)]/35 bg-[var(--info-soft)] px-2 py-1.5 shadow-sm">
-      <span
-        className="inline-flex h-6 items-center gap-1.5 rounded-md text-10px font-black uppercase tracking-wider text-[var(--info-base)]"
-        title={`Totale maggiorazioni MG: ${totalMg.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`}
-      >
-        <span className="flex size-5 items-center justify-center rounded bg-[var(--info-base)] text-[var(--text-inverse)]">
-          <Percent className="size-3" />
-        </span>
-        Maggiorazioni +<Currency value={totalMg} />
-      </span>
-      <div className="flex max-w-[340px] items-center gap-1 overflow-hidden">
-        {mgLines.slice(0, 3).map((mgLine) => {
-          const prefix = getMgTariffPrefix(mgLine.voice.code);
-          const affectedCount = prefix
-            ? lines.filter((line) => line.voice.code.startsWith(`${prefix}.`)).length
-            : lines.length;
-          return (
-            <button
-              aria-label={`Rimuovi maggiorazione ${mgLine.voice.code}`}
-              className="inline-flex h-6 max-w-[136px] items-center gap-1 rounded-md bg-[var(--surface-base)] px-2 text-10px font-black text-[var(--info-base)] shadow-sm ring-1 ring-[var(--info-base)]/25 transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
-              key={mgLine.id}
-              onClick={() => onRemove(mgLine.id)}
-              title={`${mgLine.voice.code} su ${prefix ? `voci ${prefix}.*` : "tutte le voci"} (${affectedCount} voci). Click per rimuovere.`}
-              type="button"
-            >
-              <span className="truncate">{mgLine.voice.code}</span>
-              <span className="shrink-0">{mgLine.voice.unitPrice.toLocaleString("it-IT")}%</span>
-            </button>
-          );
-        })}
-        {mgLines.length > 3 ? (
-          <span className="inline-flex h-7 items-center rounded-md bg-[var(--bg-muted)] px-2 text-10px font-semibold text-[var(--text-tertiary)]">
-            +{mgLines.length - 3}
-          </span>
-        ) : null}
+    <div className="shrink-0 border-b border-[var(--border-subtle)]/45 bg-[var(--bg-muted)]/18 px-4 py-3">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex h-7 items-center gap-1.5 rounded-md bg-[var(--info-soft)] px-2 text-11px font-black uppercase tracking-wider text-[var(--info-base)]">
+              <Percent className="size-3.5" />
+              Maggiorazioni
+            </span>
+            <MgMetric label="MG tariffario" value={configuredMgLines} />
+            <MgMetric label="Regole parser" value={tariffMgSignals.length} />
+            <MgMetric label="Manuali" value={manualSurchargeLines.length} />
+            {pendingSignals.length > 0 ? (
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-md bg-[var(--warning-soft)] px-2 text-11px font-bold text-[var(--warning-base)]">
+                <AlertTriangle className="size-3.5" />
+                {pendingSignals.length} da valutare
+              </span>
+            ) : null}
+          </div>
+
+          {mgLines.length > 0 ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {visibleMg.map((mgLine) => (
+                <MgRuleCard
+                  economicRules={economicRules}
+                  key={mgLine.id}
+                  lines={lines}
+                  mgLine={mgLine}
+                  onAllocate={onAllocate}
+                  onRemove={onRemove}
+                />
+              ))}
+              {hasMore ? (
+                <button
+                  className="flex min-w-[96px] items-center justify-center rounded-lg border border-dashed border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/70 px-3 text-12px font-bold text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)]/40 hover:text-[var(--accent-primary)]"
+                  onClick={() => setCollapsed(!collapsed)}
+                  type="button"
+                >
+                  {collapsed ? `+${mgLines.length - 4} MG` : "Mostra meno"}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/55 px-3 py-2 text-12px text-[var(--text-tertiary)]">
+              Nessuna voce MG inserita nel SAL. Le regole estratte dal tariffario restano visibili
+              come promemoria sulle righe.
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 rounded-lg border border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/70 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-11px font-black uppercase tracking-wider text-[var(--text-tertiary)]">
+                Impatto nello step
+              </div>
+              <div className="mt-0.5 text-12px text-[var(--text-secondary)]">
+                Le MG tariffarie sono distribuite sulle righe destinatarie; la colonna “Magg. man.”
+                resta solo per percentuali manuali.
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <div className="font-mono text-13px font-black tabular-nums text-[var(--info-base)]">
+                +<Currency value={totalMg + manualTotal} />
+              </div>
+              <div className="text-10px font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+                totale magg.
+              </div>
+            </div>
+          </div>
+
+          {visibleSignals.length > 0 ? (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {visibleSignals.map((line) => (
+                <TariffSignalRow key={line.id} line={line} />
+              ))}
+              {tariffMgSignals.length > visibleSignals.length ? (
+                <div className="text-11px font-semibold text-[var(--text-tertiary)]">
+                  +{tariffMgSignals.length - visibleSignals.length} altre voci con regole MG
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
+  );
+}
+
+function MgMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--border-subtle)]/50 bg-[var(--surface-base)]/80 px-2 text-11px font-bold text-[var(--text-secondary)]">
+      <span className="font-mono text-[var(--text-primary)]">{value}</span>
+      {label}
+    </span>
+  );
+}
+
+function MgRuleCard({
+  economicRules,
+  lines,
+  mgLine,
+  onAllocate,
+  onRemove,
+}: {
+  economicRules: SalEconomicRules;
+  lines: SalLineView[];
+  mgLine: SalLineView;
+  onAllocate: (mgLineId: string) => void;
+  onRemove: (mgLineId: string) => void;
+}) {
+  const prefix = getMgTariffPrefix(mgLine.voice.code);
+  const manualAlloc = economicRules.mgManualAllocations?.[mgLine.id];
+  const hasManual = manualAlloc != null;
+  const autoTargets = prefix
+    ? lines.filter((line) => line.voice.code.startsWith(`${prefix}.`))
+    : lines;
+  const targetCount = hasManual ? manualAlloc.length : autoTargets.length;
+  const total = mgLine.linkedCharges.find((entry) => entry.code.startsWith("MG."))?.total ?? 0;
+  const isDisabled = hasManual && manualAlloc.length === 0;
+
+  return (
+    <div
+      className={cn(
+        "grid min-w-[260px] grid-cols-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border bg-[var(--surface-base)]/82 shadow-sm",
+        isDisabled
+          ? "border-[var(--danger-base)]/25"
+          : hasManual
+            ? "border-[var(--accent-primary)]/35"
+            : "border-[var(--border-subtle)]/55",
+      )}
+    >
+      <button
+        className="min-w-0 p-3 text-left transition-colors hover:bg-[var(--accent-primary)]/[0.045]"
+        onClick={() => onAllocate(mgLine.id)}
+        type="button"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-mono text-12px font-black text-[var(--text-primary)]">
+            {mgLine.voice.code}
+          </span>
+          <span className="rounded-sm bg-[var(--info-soft)] px-1.5 py-0.5 text-10px font-black text-[var(--info-base)]">
+            {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
+          </span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 text-11px text-[var(--text-tertiary)]">
+          <Route className="size-3.5" />
+          {isDisabled
+            ? "disattivata"
+            : hasManual
+              ? `${targetCount} destinatar${targetCount === 1 ? "ia" : "ie"} manuali`
+              : prefix
+                ? `auto su prefisso ${prefix}`
+                : "auto su tutte le voci"}
+        </div>
+      </button>
+      <div className="flex min-w-[88px] flex-col border-l border-[var(--border-subtle)]/35">
+        <div className="flex flex-1 items-center justify-end px-2 text-12px font-black tabular-nums text-[var(--accent-primary)]">
+          <Currency value={total} />
+        </div>
+        <button
+          aria-label={`Rimuovi ${mgLine.voice.code}`}
+          className="flex h-8 items-center justify-center border-t border-[var(--border-subtle)]/30 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+          onClick={() => onRemove(mgLine.id)}
+          title="Rimuovi maggiorazione"
+          type="button"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TariffSignalRow({ line }: { line: SalLineView }) {
+  const refs = line.voice.linkedMaggiorazioni ?? [];
+  const conditions = line.voice.applicabilityRules?.conditions ?? [];
+  const mgTotal = getMgLinkedTotal(line);
+  const manualTotal = getManualSurchargeTotal(line);
+  const isActive = mgTotal > 0 || manualTotal > 0;
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md bg-[var(--bg-muted)]/25 px-2.5 py-2 text-11px">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-mono font-black text-[var(--text-primary)]">
+            {line.voice.code}
+          </span>
+          <span
+            className={cn(
+              "shrink-0 rounded px-1.5 py-0.5 font-bold",
+              isActive
+                ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+                : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+            )}
+          >
+            {isActive ? "applicata" : "da valutare"}
+          </span>
+        </div>
+        <div className="mt-1 truncate text-[var(--text-tertiary)]">
+          {refs.length > 0 ? refs.join(", ") : "regola maggiorazione dal tariffario"}
+          {conditions.length > 0 ? ` · ${conditions[0]}` : ""}
+        </div>
+      </div>
+      <div className="self-center font-mono font-bold tabular-nums text-[var(--text-secondary)]">
+        {isActive ? <Currency value={mgTotal + manualTotal} /> : "0,00"}
+      </div>
+    </div>
+  );
+}
+
+function MgAllocationPanel({
+  economicRules,
+  lineViews,
+  mgLine,
+  onClose,
+  onSave,
+}: {
+  economicRules: SalEconomicRules;
+  lineViews: SalLineView[];
+  mgLine: SalLineView;
+  onClose: () => void;
+  onSave: (mgLineId: string, targetLineIds: string[]) => void;
+}) {
+  const prefix = getMgTariffPrefix(mgLine.voice.code);
+  const eligible = useMemo(
+    () =>
+      lineViews.filter((line) => {
+        if (isMgCode(line.voice.code)) return false;
+        if (line.grossAmount <= 0) return false;
+        if (prefix) return line.voice.code.startsWith(`${prefix}.`);
+        return true;
+      }),
+    [lineViews, prefix],
+  );
+  const currentAlloc = economicRules.mgManualAllocations?.[mgLine.id];
+  const eligibleIds = useMemo(() => new Set(eligible.map((l) => l.id)), [eligible]);
+  const validAlloc = useMemo(
+    () => currentAlloc?.filter((id) => eligibleIds.has(id)),
+    [currentAlloc, eligibleIds],
+  );
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(validAlloc && validAlloc.length > 0 ? validAlloc : eligible.map((l) => l.id)),
+  );
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+
+  const allSelected = selected.size === eligible.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const handleToggleAll = useCallback(() => {
+    setSelected((prev) => {
+      if (prev.size === eligible.length) return new Set();
+      return new Set(eligible.map((l) => l.id));
+    });
+  }, [eligible]);
+
+  const handleToggle = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleSave = useCallback(() => {
+    onSave(mgLine.id, [...selectedRef.current]);
+    onClose();
+  }, [onSave, mgLine.id, onClose]);
+
+  const handleRemove = useCallback(() => {
+    onSave(mgLine.id, []);
+    onClose();
+  }, [onSave, mgLine.id, onClose]);
+
+  return (
+    <Dialog className="max-w-xl" contentClassName="p-0" isOpen onClose={onClose} title="">
+      <div className="border-b border-[var(--border-subtle)]/40 px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)]/[0.1]">
+            <ListChecks className="size-5 text-[var(--accent-primary)]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-14px font-bold text-[var(--text-primary)]">
+              {mgLine.voice.code}
+              <span className="ml-2 font-mono text-[var(--accent-primary)]">
+                {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
+              </span>
+            </h3>
+            <p className="mt-0.5 text-12px text-[var(--text-tertiary)]">
+              {prefix
+                ? `Assegnazione su voci con prefisso ${prefix}`
+                : "Assegnazione su tutte le voci"}
+              <span className="ml-1.5 inline-flex items-center gap-1">
+                <Badge variant="info">{eligible.length} disponibili</Badge>
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {eligible.length === 0 ? (
+        <div className="px-5 py-8 text-center text-13px text-[var(--text-tertiary)]">
+          Nessuna voce {prefix ? `con prefisso ${prefix}` : ""} con importo positivo disponibile.
+        </div>
+      ) : (
+        <>
+          <div className="px-5 py-3">
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg bg-[var(--bg-muted)]/25 px-3 py-2.5 text-12px font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)]/40">
+              <input
+                checked={allSelected}
+                className="size-4 rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--ring-focus)]"
+                onChange={handleToggleAll}
+                ref={(el) => {
+                  if (el) el.indeterminate = someSelected;
+                }}
+                type="checkbox"
+              />
+              <span>{allSelected ? "Deseleziona tutto" : "Seleziona tutto"}</span>
+              <span className="ml-auto font-mono text-11px tabular-nums text-[var(--text-tertiary)]">
+                {selected.size}/{eligible.length}
+              </span>
+            </label>
+          </div>
+
+          <div className="max-h-[300px] overflow-y-auto border-t border-[var(--border-subtle)]/30">
+            {eligible.map((line, idx) => (
+              <label
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 border-b border-[var(--border-subtle)]/20 px-5 py-2.5 text-12px transition-colors hover:bg-[var(--accent-primary)]/[0.03]",
+                  idx % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/15",
+                )}
+                key={line.id}
+              >
+                <input
+                  checked={selected.has(line.id)}
+                  className="size-4 rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--ring-focus)]"
+                  onChange={() => handleToggle(line.id)}
+                  type="checkbox"
+                />
+                <span className="min-w-0 flex-1 truncate font-semibold text-[var(--text-primary)]">
+                  {line.voice.code}
+                </span>
+                <span className="hidden min-w-0 max-w-[260px] truncate text-[var(--text-tertiary)] sm:block">
+                  {line.voice.description}
+                </span>
+                <span className="shrink-0 font-mono text-11px font-bold tabular-nums text-[var(--text-secondary)]">
+                  <Currency value={line.grossAmount} />
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <DialogActions className="items-center justify-between px-5 py-3">
+            <Button onClick={handleRemove} size="sm" variant="ghost">
+              <Trash2 className="size-3.5" />
+              Rimuovi MG
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={onClose} size="sm" variant="secondary">
+                Annulla
+              </Button>
+              <Button onClick={handleSave} size="sm" variant="primary">
+                <Check className="size-3.5" />
+                Applica a {selected.size} voc{selected.size === 1 ? "e" : "i"}
+              </Button>
+            </div>
+          </DialogActions>
+        </>
+      )}
+    </Dialog>
   );
 }
 
@@ -478,6 +896,11 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
 }) {
   const laborPct = line.voice.laborPercentage ?? 0;
   const isIncomplete = line.status !== "complete";
+  const hasTariffMgSignal = hasTariffMaggiorazioneSignal(line);
+  const mgLinkedTotal = getMgLinkedTotal(line);
+  const manualLinkedTotal = getManualSurchargeTotal(line);
+  const hasMissingMgDecision =
+    hasTariffMgSignal && mgLinkedTotal <= 0 && line.surchargePercent <= 0;
 
   return (
     <>
@@ -530,18 +953,35 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
                   {line.voice.category}
                 </span>
                 {laborPct > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-10px font-bold text-[var(--accent-primary)]">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-11px font-bold text-[var(--accent-primary)]">
                     <span className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
                     Man. {laborPct}%
                   </span>
                 ) : null}
                 {line.voice.isSafetyCost ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--danger-soft)] px-2 py-0.5 text-10px font-bold text-[var(--danger-base)]">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--danger-soft)] px-2 py-0.5 text-11px font-bold text-[var(--danger-base)]">
                     OS
                   </span>
                 ) : null}
+                {mgLinkedTotal > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--info-soft)] px-2 py-0.5 text-11px font-bold text-[var(--info-base)]">
+                    <Percent className="size-3" />
+                    MG <Currency value={mgLinkedTotal} />
+                  </span>
+                ) : null}
+                {manualLinkedTotal > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-11px font-bold text-[var(--accent-primary)]">
+                    Man. +<Currency value={manualLinkedTotal} />
+                  </span>
+                ) : null}
+                {hasMissingMgDecision ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--warning-soft)] px-2 py-0.5 text-11px font-bold text-[var(--warning-base)]">
+                    <AlertTriangle className="size-3" />
+                    MG da valutare
+                  </span>
+                ) : null}
                 {isIncomplete ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-bold text-[var(--warning-base)]">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--warning-soft)] px-2 py-0.5 text-11px font-bold text-[var(--warning-base)]">
                     Da completare
                   </span>
                 ) : null}
@@ -550,12 +990,12 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
           </div>
         </GridCell>
         <GridCell muted>
-          <span className="text-11px font-semibold text-[var(--text-secondary)]">
+          <span className="text-12px font-semibold text-[var(--text-secondary)]">
             {line.voice.unit}
           </span>
         </GridCell>
         <GridCell align="right">
-          <span className="text-12px font-semibold tabular-nums text-[var(--text-secondary)]">
+          <span className="text-13px font-semibold tabular-nums text-[var(--text-secondary)]">
             <Currency value={line.voice.unitPrice} />
           </span>
         </GridCell>
@@ -572,7 +1012,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
         <GridCell align="right">
           <span
             className={cn(
-              "text-12px font-semibold tabular-nums",
+              "text-13px font-semibold tabular-nums",
               line.discountAmount > 0 ? "text-[var(--danger-base)]" : "text-[var(--text-tertiary)]",
             )}
             title={
@@ -588,7 +1028,10 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
         <GridCell align="right" editable>
           <input
             aria-label={`Maggiorazione % per ${line.voice.code}`}
-            className="h-8 w-full rounded-none border-0 bg-transparent px-1.5 text-right text-12px font-bold text-[var(--text-primary)] outline-none transition focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
+            className={cn(
+              "h-8 w-full rounded-none border-0 bg-transparent px-1.5 text-right text-13px font-bold text-[var(--text-primary)] outline-none transition focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]",
+              hasMissingMgDecision && "bg-[var(--warning-soft)]/45 text-[var(--warning-base)]",
+            )}
             inputMode="decimal"
             onChange={(event) => {
               const raw = event.target.value.replace(",", ".");
@@ -737,13 +1180,13 @@ function MeasurementRowsTable({
         <div className="grid gap-3 border-b border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/18 px-3 py-1.5 md:grid-cols-[minmax(0,1fr)_auto]">
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="text-10px font-black uppercase tracking-wider text-[var(--text-tertiary)]">
+              <span className="text-11px font-black uppercase tracking-wider text-[var(--text-tertiary)]">
                 Libretto misure
               </span>
               <span className="rounded-sm bg-[var(--bg-muted)] px-1.5 py-0.5 font-mono text-11px font-bold text-[var(--text-secondary)]">
                 {voiceCode}
               </span>
-              <span className="min-w-0 truncate text-12px font-semibold text-[var(--text-primary)]">
+              <span className="min-w-0 truncate text-13px font-semibold text-[var(--text-primary)]">
                 {voiceDescription}
               </span>
             </div>
@@ -775,7 +1218,7 @@ function MeasurementRowsTable({
 
         <div className="overflow-x-auto">
           <div
-            className={`grid min-w-[1010px] ${COLS} bg-[var(--bg-muted)]/35 text-10px font-black uppercase tracking-wider text-[var(--text-secondary)]`}
+            className={`grid min-w-[1010px] ${COLS} bg-[var(--bg-muted)]/35 text-11px font-black uppercase tracking-wider text-[var(--text-secondary)]`}
           >
             {["Data", "Stazione", "Descrizione", "F1", "F2", "F3", "Parziale", "Note", ""].map(
               (label) => (
@@ -791,7 +1234,7 @@ function MeasurementRowsTable({
 
           {rows.length === 0 ? (
             <div className="grid min-w-[1010px] grid-cols-1 border-t border-[var(--border-subtle)]/30 bg-[var(--surface-base)]">
-              <div className="px-3 py-4 text-center text-11px text-[var(--text-tertiary)]">
+              <div className="px-3 py-4 text-center text-12px text-[var(--text-tertiary)]">
                 Nessuna riga misura. Aggiungi la prima riga per iniziare.
               </div>
             </div>
@@ -806,7 +1249,7 @@ function MeasurementRowsTable({
                   <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
                     <input
                       aria-label="Data misura"
-                      className="sal-date-input h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2 text-12px font-medium text-[var(--text-primary)] outline-none transition [color-scheme:light] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)] dark:[color-scheme:dark]"
+                      className="sal-date-input h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2 text-13px font-medium text-[var(--text-primary)] outline-none transition [color-scheme:light] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)] dark:[color-scheme:dark]"
                       onChange={(e) => onUpdateRow(lineId, rowTarget, { date: e.target.value })}
                       type="date"
                       value={row.date}
@@ -815,7 +1258,7 @@ function MeasurementRowsTable({
                   <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
                     <input
                       aria-label="Stazione"
-                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-12px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-13px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                       onChange={(e) => onUpdateRow(lineId, rowTarget, { station: e.target.value })}
                       placeholder="Stazione"
                       value={row.station ?? ""}
@@ -824,7 +1267,7 @@ function MeasurementRowsTable({
                   <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
                     <input
                       aria-label="Descrizione misura"
-                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-12px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-13px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                       onChange={(e) =>
                         onUpdateRow(lineId, rowTarget, { description: e.target.value })
                       }
@@ -841,7 +1284,7 @@ function MeasurementRowsTable({
                       >
                         <input
                           aria-label={field}
-                          className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2 text-right font-mono text-12px font-semibold tabular-nums text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                          className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2 text-right font-mono text-13px font-semibold tabular-nums text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                           inputMode="decimal"
                           onBlur={() => {
                             setFactorDrafts((current) => {
@@ -865,14 +1308,14 @@ function MeasurementRowsTable({
                     );
                   })}
                   <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2 text-right font-mono font-bold tabular-nums text-[var(--text-primary)]">
-                    <span className="flex h-9 items-center justify-end rounded-md bg-[var(--accent-primary)]/[0.08] px-2.5 text-12px font-bold text-[var(--accent-primary)]">
+                    <span className="flex h-9 items-center justify-end rounded-md bg-[var(--accent-primary)]/[0.08] px-2.5 text-13px font-bold text-[var(--accent-primary)]">
                       {row.partialQuantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
                     </span>
                   </div>
                   <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
                     <input
                       aria-label="Note riga"
-                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-12px font-medium text-[var(--text-secondary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-13px font-medium text-[var(--text-secondary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
                       onChange={(e) => onUpdateRow(lineId, rowTarget, { notes: e.target.value })}
                       placeholder="Note"
                       value={row.notes}
@@ -925,7 +1368,7 @@ function MeasurementRowsTable({
           </button>
 
           <div
-            className={`grid min-w-[1010px] ${COLS} border-t border-[var(--border-subtle)]/30 bg-[var(--accent-primary)]/[0.06] text-11px font-bold`}
+            className={`grid min-w-[1010px] ${COLS} border-t border-[var(--border-subtle)]/30 bg-[var(--accent-primary)]/[0.06] text-12px font-bold`}
           >
             <div className="col-span-6 px-2 py-2 text-right text-[var(--text-tertiary)]">
               sommano {unit}
@@ -958,11 +1401,11 @@ function VoiceNotes({
   return (
     <div className="mt-2 rounded-lg bg-[var(--surface-base)] p-2.5 ring-1 ring-[var(--border-subtle)]/50">
       <label className="block">
-        <span className="mb-2 block text-10px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+        <span className="mb-2 block text-11px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
           Note della voce principale
         </span>
         <textarea
-          className="min-h-[52px] w-full resize-y rounded-lg border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/25 px-3 py-2 text-12px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+          className="min-h-[52px] w-full resize-y rounded-lg border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/25 px-3 py-2 text-13px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
           placeholder={
             linkedTotal > 0
               ? `Annota criterio maggiorazioni: ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`
@@ -1194,21 +1637,28 @@ export function DocumentPreview({
   const grossTotal = summary?.grossAmount ?? lines.reduce((sum, line) => sum + line.grossAmount, 0);
   const discountTotal =
     summary?.discountAmount ?? lines.reduce((sum, line) => sum + line.discountAmount, 0);
-  const mgTotal = lines.reduce(
-    (sum, line) =>
+  const mgTotal = lines.reduce((sum, line) => {
+    if (isMgCode(line.voice.code)) return sum;
+    return (
       sum +
-      line.linkedCharges.filter((c) => c.code.startsWith("MG.")).reduce((s, c) => s + c.total, 0),
-    0,
-  );
+      line.linkedCharges.filter((c) => c.code.startsWith("MG.")).reduce((s, c) => s + c.total, 0)
+    );
+  }, 0);
   const surchargeTotal = lines.reduce(
     (sum, line) =>
       sum +
-      line.linkedCharges.filter((c) => !c.code.startsWith("MG.")).reduce((s, c) => s + c.total, 0),
+      (isMgCode(line.voice.code)
+        ? 0
+        : line.linkedCharges
+            .filter((c) => !c.code.startsWith("MG."))
+            .reduce((s, c) => s + c.total, 0)),
     0,
   );
   const hasMg = mgTotal > 0;
   const hasSurcharges = surchargeTotal > 0;
-  const total = summary?.total ?? lines.reduce((sum, line) => sum + line.totalAmount, 0);
+  const total =
+    summary?.total ??
+    lines.reduce((sum, line) => (isMgCode(line.voice.code) ? sum : sum + line.totalAmount), 0);
   const maxLines = compact ? 4 : 7;
   const truncated = lines.length > maxLines;
 
@@ -1216,14 +1666,14 @@ export function DocumentPreview({
     <div className="overflow-hidden rounded-xl bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
       {/* Receipt header */}
       <div className="border-b border-[var(--border-subtle)]/40 bg-[var(--accent-primary)]/[0.02] px-4 py-2.5">
-        <div className="text-10px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+        <div className="text-11px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
           Libretto delle misure
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-12px font-bold text-[var(--text-primary)]">
             Stato Avanzamento Lavori
           </span>
-          <span className="text-10px text-[var(--text-tertiary)]">
+          <span className="text-12px text-[var(--text-tertiary)]">
             {lines.length} voci ·{" "}
             {total.toLocaleString("it-IT", {
               maximumFractionDigits: 2,
@@ -1242,7 +1692,7 @@ export function DocumentPreview({
         ) : (
           <>
             {lines.slice(0, maxLines).map((line, idx) => (
-              <div key={line.id} className="flex items-center gap-3 px-4 py-1.5 text-11px">
+              <div key={line.id} className="flex items-center gap-3 px-4 py-1.5 text-12px">
                 <span className="w-5 shrink-0 text-right text-[var(--text-tertiary)]">
                   {idx + 1}
                 </span>
@@ -1269,7 +1719,7 @@ export function DocumentPreview({
               </div>
             ))}
             {truncated && (
-              <div className="px-4 py-1.5 text-center text-10px text-[var(--text-tertiary)]">
+              <div className="px-4 py-1.5 text-center text-11px text-[var(--text-tertiary)]">
                 + altre {lines.length - maxLines} voci
               </div>
             )}
@@ -1280,7 +1730,7 @@ export function DocumentPreview({
       {/* Receipt footer — matches equation layout */}
       <div className="border-t border-[var(--border-subtle)]/40 bg-[var(--accent-primary)]/[0.01] px-4 py-2.5">
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-11px text-[var(--text-tertiary)]">
+          <div className="flex items-center justify-between text-12px text-[var(--text-tertiary)]">
             <span>Voci lordo</span>
             <span className="tabular-nums font-semibold text-[var(--text-primary)]">
               {grossTotal.toLocaleString("it-IT", {
@@ -1290,7 +1740,7 @@ export function DocumentPreview({
             </span>
           </div>
           {hasMg && (
-            <div className="flex items-center justify-between text-11px text-[var(--info-base)]">
+            <div className="flex items-center justify-between text-12px text-[var(--info-base)]">
               <span>+ Maggiorazioni MG</span>
               <span className="tabular-nums font-semibold">
                 +
@@ -1302,7 +1752,7 @@ export function DocumentPreview({
             </div>
           )}
           {hasSurcharges && (
-            <div className="flex items-center justify-between text-11px text-[var(--info-base)]">
+            <div className="flex items-center justify-between text-12px text-[var(--info-base)]">
               <span>+ Maggiorazioni su manodopera</span>
               <span className="tabular-nums font-semibold">
                 +
@@ -1326,7 +1776,7 @@ export function DocumentPreview({
           </div>
         ) : null}
         {discountTotal > 0 && (
-          <div className="mt-1 flex items-center justify-between text-11px text-[var(--danger-base)]">
+          <div className="mt-1 flex items-center justify-between text-12px text-[var(--danger-base)]">
             <span>- Ribasso gara</span>
             <span className="tabular-nums font-semibold">
               -
@@ -1402,7 +1852,7 @@ export function BreakdownDetails({
   return (
     <div className="rounded-xl bg-[var(--surface-base)]/80 ring-1 ring-[var(--border-subtle)]/50">
       <div className="flex items-center gap-2 border-b border-[var(--border-subtle)]/40 px-4 py-3">
-        <span className="text-11px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+        <span className="text-12px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
           Riepilogo economico
         </span>
       </div>
@@ -1426,7 +1876,7 @@ export function BreakdownDetails({
                     +<Currency value={entry.total} />
                   </span>
                 </div>
-                <div className="mt-1 flex items-center gap-2 pl-8 text-11px text-[var(--text-tertiary)]">
+                <div className="mt-1 flex items-center gap-2 pl-8 text-12px text-[var(--text-tertiary)]">
                   <span>
                     su <Currency value={entry.baseAmount} />
                   </span>

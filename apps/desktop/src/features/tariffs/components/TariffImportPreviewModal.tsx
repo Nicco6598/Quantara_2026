@@ -5,10 +5,14 @@ import {
   Archive,
   CheckCircle2,
   ChevronRight,
-  Files,
+  FileWarning,
+  Gauge,
+  Link2,
   List,
   ListChecks,
+  MapPinned,
   Save,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import {
@@ -44,10 +48,9 @@ import {
   type TariffGridScrollTarget,
   type TariffGridSectionSummary,
 } from "./EditableTariffVoicesGrid";
-import { ImportMetric } from "./ImportMetric";
 import { ValidationLine } from "./ValidationLine";
 
-type InspectorTab = "checks" | "categories" | "issues";
+type InspectorTab = "checks" | "categories" | "issues" | "warnings";
 
 type ImportReviewSummary = {
   blockingIssueCount: number;
@@ -56,10 +59,23 @@ type ImportReviewSummary = {
   hasVoices: boolean;
   issueCount: number;
   isReviewReady: boolean;
+  maggiorazioniCount: number;
   sourceIssues: number;
   validation: ImportValidation;
   warningRows: number;
   yearIssues: number;
+};
+
+type ExtractionSummary = {
+  averageConfidence: number | null;
+  issueRows: number;
+  linkedRows: number;
+  lowConfidenceRows: number;
+  maggiorazioneRules: number;
+  pagesLabel: string;
+  parserIssues: number;
+  sourceMappedRows: number;
+  warningLibraryRows: number;
 };
 
 const emptyImportValidation: ImportValidation = {
@@ -73,6 +89,71 @@ const emptyImportValidation: ImportValidation = {
   warningCount: 0,
 };
 
+function readRecordValue(value: unknown, key: string): unknown {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  return record[key] ?? record[key.replace(/[A-Z]/g, (match) => `_${match.toLowerCase()}`)];
+}
+
+function readNumberMap(value: unknown, key: string): Record<string, number> {
+  const map = readRecordValue(value, key);
+  if (!map || typeof map !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(map as Record<string, unknown>).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number",
+    ),
+  );
+}
+
+function getArrayLength(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function buildExtractionSummary(
+  metadata: TariffPdfMetadata | undefined,
+  voices: readonly DesktopTariffVoice[],
+): ExtractionSummary {
+  const report = metadata?.validationReport as unknown;
+  const counts = readNumberMap(report, "counts");
+  const confidence = readNumberMap(report, "confidence");
+  const issueRows = voices.filter((voice) => (voice.issues?.length ?? 0) > 0).length;
+  const lowConfidenceRows = voices.filter((voice) => (voice.confidence ?? 1) < 0.85).length;
+  const sourceMappedRows = voices.filter((voice) => voice.source?.page != null).length;
+  const linkedRows = voices.filter((voice) => (voice.linkedMaggiorazioni?.length ?? 0) > 0).length;
+  const parserIssues =
+    Object.values(readNumberMap(report, "issuesByType")).reduce((sum, count) => sum + count, 0) +
+    Object.values(readNumberMap(report, "warningIssuesByType")).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+  const pageCount = metadata?.pagesParsed ?? metadata?.pagesTotal ?? counts.pages_total ?? 0;
+  const totalPages = metadata?.pagesTotal ?? pageCount;
+
+  return {
+    averageConfidence:
+      confidence.average_record_confidence ??
+      (voices.length > 0
+        ? Math.round(
+            (voices.reduce((sum, voice) => sum + (voice.confidence ?? 1), 0) / voices.length) *
+              1000,
+          ) / 1000
+        : null),
+    issueRows,
+    linkedRows,
+    lowConfidenceRows: counts.low_confidence_records ?? lowConfidenceRows,
+    maggiorazioneRules:
+      counts.maggiorazione_rules ?? getArrayLength(metadata?.maggiorazioneRules as unknown),
+    pagesLabel: pageCount > 0 ? `${pageCount}/${totalPages || pageCount}` : "-",
+    parserIssues,
+    sourceMappedRows: counts.source_index_codes ?? sourceMappedRows,
+    warningLibraryRows: counts.warnings ?? getArrayLength(metadata?.warnings as unknown),
+  };
+}
+
+function isMaggiorazioneVoice(voice: DesktopTariffVoice): boolean {
+  return voice.isMaggiorazione === true || voice.officialCode?.includes(".MG.");
+}
+
 function buildImportReviewSummary(
   metadatas: readonly TariffPdfMetadata[],
   editableVoicesList: readonly DesktopTariffVoice[][],
@@ -82,6 +163,7 @@ function buildImportReviewSummary(
   let duplicateCount = 0;
   let filesWithoutVoices = 0;
   let invalidCount = 0;
+  let maggiorazioniCount = 0;
   let sourceIssues = 0;
   let totalVoices = 0;
   let validCount = 0;
@@ -93,6 +175,7 @@ function buildImportReviewSummary(
     const validation = validations[index] ?? emptyImportValidation;
 
     totalVoices += voices.length;
+    maggiorazioniCount += voices.filter((voice) => isMaggiorazioneVoice(voice)).length;
     warningRows += voices.filter((voice) => (voice.warnings?.length ?? 0) > 0).length;
     validCount += validation.validCount;
     invalidCount += validation.invalidCount;
@@ -117,6 +200,7 @@ function buildImportReviewSummary(
     hasVoices: filesWithoutVoices === 0,
     issueCount,
     isReviewReady: metadatas.length > 0 && issueCount === 0,
+    maggiorazioniCount,
     sourceIssues,
     validation: {
       ...emptyImportValidation,
@@ -185,7 +269,8 @@ function ImportShortcutLegend({ compact = false }: { compact?: boolean }) {
     <div
       className={cn(
         "flex flex-wrap items-center gap-x-5 gap-y-2 text-11px font-semibold text-[var(--text-secondary)]",
-        compact && "rounded-14px bg-[var(--bg-muted)]/45 px-3 py-2",
+        compact &&
+          "rounded-14px border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/70 px-3 py-2",
       )}
     >
       {groups.map((group) => (
@@ -202,43 +287,139 @@ function ImportShortcutLegend({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function MetricsBar({
-  totalVoices,
-  validation,
+function ExtractionAuditStrip({ summary }: { summary: ExtractionSummary }) {
+  const confidencePercent =
+    summary.averageConfidence == null ? null : Math.round(summary.averageConfidence * 100);
+  const cells = [
+    {
+      icon: Gauge,
+      label: "Confidenza",
+      tone:
+        confidencePercent == null
+          ? "neutral"
+          : confidencePercent >= 90
+            ? "success"
+            : confidencePercent >= 80
+              ? "warning"
+              : "danger",
+      value: confidencePercent == null ? "-" : `${confidencePercent}%`,
+    },
+    {
+      icon: MapPinned,
+      label: "Source map",
+      tone: summary.sourceMappedRows > 0 ? "success" : "neutral",
+      value: summary.sourceMappedRows.toLocaleString("it-IT"),
+    },
+    {
+      icon: FileWarning,
+      label: "Avvertenze",
+      tone: summary.warningLibraryRows > 0 ? "warning" : "neutral",
+      value: summary.warningLibraryRows.toLocaleString("it-IT"),
+    },
+    {
+      icon: Link2,
+      label: "Regole MG",
+      tone: summary.maggiorazioneRules > 0 ? "warning" : "neutral",
+      value: summary.maggiorazioneRules.toLocaleString("it-IT"),
+    },
+    {
+      icon: ShieldCheck,
+      label: "Audit",
+      tone: summary.parserIssues > 0 || summary.lowConfidenceRows > 0 ? "warning" : "success",
+      value: (summary.parserIssues + summary.lowConfidenceRows).toLocaleString("it-IT"),
+    },
+  ] as const;
+
+  return (
+    <div className="grid gap-2 border-y border-[var(--border-subtle)]/70 py-2 sm:grid-cols-2 lg:grid-cols-5">
+      {cells.map(({ icon: Icon, label, tone, value }) => (
+        <div
+          className="flex min-w-0 items-center gap-2 rounded-12px bg-[var(--surface-base)]/42 px-3 py-2 ring-1 ring-[var(--border-subtle)]/44"
+          key={label}
+        >
+          <span
+            className={cn(
+              "flex size-7 shrink-0 items-center justify-center rounded-lg",
+              tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
+              tone === "warning" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+              tone === "danger" && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+              tone === "neutral" && "bg-[var(--surface-base)] text-[var(--text-secondary)]",
+            )}
+          >
+            <Icon className="size-3.5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-10px font-bold uppercase tracking-caption text-[var(--text-tertiary)]">
+              {label}
+            </span>
+            <span className="block text-13px font-bold tabular-nums text-[var(--text-primary)]">
+              {value}
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ImportWorkspaceHeader({
+  metadata,
+  regularCount,
+  maggiorazioniCount,
+  summary,
 }: {
-  totalVoices: number;
-  validation: ImportValidation;
+  metadata: TariffPdfMetadata | undefined;
+  regularCount: number;
+  maggiorazioniCount: number;
+  summary: ExtractionSummary;
 }) {
   return (
-    <div className="grid grid-flow-dense gap-3 md:grid-cols-4">
-      <ImportMetric
-        caption="Totali rilevate"
-        icon={Files}
-        label="Righe rilevate"
-        tone="info"
-        value={totalVoices.toLocaleString("it-IT")}
-      />
-      <ImportMetric
-        caption="Pronte all'uso"
-        icon={CheckCircle2}
-        label="Valide"
-        tone={validation.validCount > 0 ? "success" : "warning"}
-        value={validation.validCount.toLocaleString("it-IT")}
-      />
-      <ImportMetric
-        caption="Da verificare"
-        icon={AlertTriangle}
-        label="Warning"
-        tone={validation.warningCount > 0 ? "warning" : "neutral"}
-        value={validation.warningCount.toLocaleString("it-IT")}
-      />
-      <ImportMetric
-        caption="Possibili duplicati"
-        icon={Archive}
-        label="Duplicati"
-        tone={validation.duplicateCount > 0 ? "warning" : "info"}
-        value={validation.duplicateCount.toLocaleString("it-IT")}
-      />
+    <div className="border-b border-[var(--border-subtle)]/70 pb-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-10px font-bold uppercase tracking-0_14em text-[var(--text-tertiary)]">
+            <span>{metadata?.sourceName ?? "Sorgente"}</span>
+            <span className="h-1 w-1 rounded-full bg-[var(--text-tertiary)]/60" />
+            <span>{metadata?.year ?? "-"}</span>
+            <span className="h-1 w-1 rounded-full bg-[var(--text-tertiary)]/60" />
+            <span>pagine {summary.pagesLabel}</span>
+          </div>
+          <h3 className="mt-2 truncate text-24px font-semibold leading-tight tracking-neg-0_035em text-[var(--text-primary)]">
+            {metadata?.name ?? "Preview importazione"}
+          </h3>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
+          <HeaderStat label="Voci" value={regularCount} />
+          <HeaderStat label="Maggioraz." value={maggiorazioniCount} tone="warning" />
+          <HeaderStat label="Audit" value={summary.issueRows + summary.lowConfidenceRows} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeaderStat({
+  label,
+  tone = "neutral",
+  value,
+}: {
+  label: string;
+  tone?: "neutral" | "warning";
+  value: number;
+}) {
+  return (
+    <div className="rounded-xl bg-[var(--surface-base)]/44 px-3 py-2 ring-1 ring-[var(--border-subtle)]/50">
+      <div className="text-9px font-bold uppercase tracking-caption text-[var(--text-tertiary)]">
+        {label}
+      </div>
+      <div
+        className={cn(
+          "mt-1 text-18px font-bold leading-none tabular-nums",
+          tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--text-primary)]",
+        )}
+      >
+        {value.toLocaleString("it-IT")}
+      </div>
     </div>
   );
 }
@@ -721,6 +902,7 @@ export function TariffImportPreviewModal({
   }));
   const { editableVoicesList, excludedFiles, draftedFiles, modalReviewedFiles, modalActiveIndex } =
     importState;
+  const [warningDetailVoice, setWarningDetailVoice] = useState<DesktopTariffVoice | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     code: string;
     description: string;
@@ -737,6 +919,14 @@ export function TariffImportPreviewModal({
   const localActiveIndex = pageView ? activeIndex : modalActiveIndex;
   const activeMetadata = metadatas[localActiveIndex];
   const activeVoices = editableVoicesList[localActiveIndex] ?? [];
+  const regularVoices = useMemo(
+    () => activeVoices.filter((v) => !isMaggiorazioneVoice(v)),
+    [activeVoices],
+  );
+  const maggiorazioniVoices = useMemo(
+    () => activeVoices.filter((v) => isMaggiorazioneVoice(v)),
+    [activeVoices],
+  );
   const validations = useMemo(
     () => metadatas.map((_, i) => getImportValidation(editableVoicesList[i] ?? [])),
     [metadatas, editableVoicesList],
@@ -746,7 +936,11 @@ export function TariffImportPreviewModal({
     () => buildImportReviewSummary(metadatas, editableVoicesList, validations),
     [editableVoicesList, metadatas, validations],
   );
-  const hasVoices = activeVoices.length > 0;
+  const activeExtractionSummary = useMemo(
+    () => buildExtractionSummary(activeMetadata, activeVoices),
+    [activeMetadata, activeVoices],
+  );
+  const hasVoices = regularVoices.length > 0;
   const canConfirm =
     metadatas.length > 0 &&
     metadatas.every((_, i) => {
@@ -764,7 +958,24 @@ export function TariffImportPreviewModal({
     () => new Set<string>(activeValidation.duplicateExamples),
     [activeValidation],
   );
-  const editableGroups = useMemo(() => groupEditableTariffVoices(activeVoices), [activeVoices]);
+  const editableGroups = useMemo(() => groupEditableTariffVoices(regularVoices), [regularVoices]);
+  const regularIndexMap = useMemo(() => {
+    const map = new Map<number, number>();
+    let displayIndex = 0;
+    activeVoices.forEach((v, i) => {
+      if (!isMaggiorazioneVoice(v)) {
+        map.set(displayIndex, i);
+        displayIndex++;
+      }
+    });
+    return map;
+  }, [activeVoices]);
+
+  const voicesWithWarnings = useMemo(
+    () => activeVoices.filter((v) => (v.warnings?.length ?? 0) > 0),
+    [activeVoices],
+  );
+
   const invalidRows = useMemo(
     () =>
       activeValidation.invalidRows
@@ -779,11 +990,12 @@ export function TariffImportPreviewModal({
   );
 
   const updateVoice = useCallback(
-    (index: number, field: keyof DesktopTariffVoice, value: string) => {
+    (displayIndex: number, field: keyof DesktopTariffVoice, value: string) => {
+      const originalIndex = regularIndexMap.get(displayIndex) ?? displayIndex;
       dispatch({
         type: "UPDATE_VOICE",
         activeIndex: localActiveIndex,
-        voiceIndex: index,
+        voiceIndex: originalIndex,
         field,
         value:
           field === "unitPrice"
@@ -797,7 +1009,7 @@ export function TariffImportPreviewModal({
               : value,
       });
     },
-    [localActiveIndex],
+    [localActiveIndex, regularIndexMap],
   );
 
   const flushGridDraftChanges = useCallback(() => {
@@ -1047,16 +1259,17 @@ export function TariffImportPreviewModal({
   }, [localActiveIndex, draftedFiles, modalReviewedFiles, flushGridDraftChanges]);
 
   const askDeleteVoice = useCallback(
-    (index: number) => {
-      const voice = activeVoices[index];
+    (displayIndex: number) => {
+      const originalIndex = regularIndexMap.get(displayIndex) ?? displayIndex;
+      const voice = activeVoices[originalIndex];
       if (!voice) return;
       setDeleteTarget({
-        code: voice.officialCode || `Riga ${index + 1}`,
+        code: voice.officialCode || `Riga ${displayIndex + 1}`,
         description: voice.description,
-        index,
+        index: originalIndex,
       });
     },
-    [activeVoices],
+    [activeVoices, regularIndexMap],
   );
 
   const confirmDeleteVoice = useCallback(() => {
@@ -1203,9 +1416,20 @@ export function TariffImportPreviewModal({
   return pageView ? (
     <>
       <div className="flex w-full flex-col gap-5 pb-28 xl:pb-0 xl:pr-[410px]">
-        <MetricsBar totalVoices={activeVoices.length} validation={activeValidation} />
-        <ImportShortcutLegend compact />
+        <ImportWorkspaceHeader
+          maggiorazioniCount={maggiorazioniVoices.length}
+          metadata={activeMetadata}
+          regularCount={regularVoices.length}
+          summary={activeExtractionSummary}
+        />
+        <ExtractionAuditStrip summary={activeExtractionSummary} />
         <div className="min-w-0">
+          {maggiorazioniVoices.length > 0 ? (
+            <MaggiorazioniPanel
+              maggiorazioni={maggiorazioniVoices}
+              onShowWarningDetail={setWarningDetailVoice}
+            />
+          ) : null}
           <VoicesPanel
             activeValidation={activeValidation}
             askDeleteVoice={askDeleteVoice}
@@ -1222,13 +1446,22 @@ export function TariffImportPreviewModal({
       </div>
       <TariffImportReviewInspector
         globalReviewSummary={reviewSummary}
+        extractionSummary={activeExtractionSummary}
         invalidRows={invalidRows}
         onFocusCategory={focusImportCategory}
         onFocusCell={focusImportCell}
+        onShowWarningDetail={setWarningDetailVoice}
         sections={categorySections}
         variant="page"
+        voicesWithWarnings={voicesWithWarnings}
       />
       {deleteDialog}
+      {warningDetailVoice ? (
+        <WarningDetailModal
+          voice={warningDetailVoice}
+          onClose={() => setWarningDetailVoice(null)}
+        />
+      ) : null}
     </>
   ) : (
     <div className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
@@ -1242,7 +1475,7 @@ export function TariffImportPreviewModal({
         exit={{ opacity: 0 }}
       />
       <m.div
-        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        className="relative flex max-h-[92vh] w-full max-w-[min(1480px,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -1277,10 +1510,24 @@ export function TariffImportPreviewModal({
             />
           ) : null}
 
-          <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="min-h-0 overflow-y-auto p-5" data-tariff-preview-scroll>
-              <MetricsBar totalVoices={activeVoices.length} validation={activeValidation} />
+              <ImportWorkspaceHeader
+                maggiorazioniCount={maggiorazioniVoices.length}
+                metadata={activeMetadata}
+                regularCount={regularVoices.length}
+                summary={activeExtractionSummary}
+              />
+              <div className="mt-3">
+                <ExtractionAuditStrip summary={activeExtractionSummary} />
+              </div>
               <div className="mt-4 min-w-0">
+                {maggiorazioniVoices.length > 0 ? (
+                  <MaggiorazioniPanel
+                    maggiorazioni={maggiorazioniVoices}
+                    onShowWarningDetail={setWarningDetailVoice}
+                  />
+                ) : null}
                 <VoicesPanel
                   activeValidation={activeValidation}
                   askDeleteVoice={askDeleteVoice}
@@ -1297,13 +1544,22 @@ export function TariffImportPreviewModal({
             </div>
             <TariffImportReviewInspector
               globalReviewSummary={reviewSummary}
+              extractionSummary={activeExtractionSummary}
               invalidRows={invalidRows}
               onFocusCategory={focusImportCategory}
               onFocusCell={focusImportCell}
+              onShowWarningDetail={setWarningDetailVoice}
               sections={categorySections}
               variant="modal"
+              voicesWithWarnings={voicesWithWarnings}
             />
           </div>
+          {warningDetailVoice ? (
+            <WarningDetailModal
+              voice={warningDetailVoice}
+              onClose={() => setWarningDetailVoice(null)}
+            />
+          ) : null}
 
           <ModalFooter
             canConfirm={canConfirm}
@@ -1329,19 +1585,25 @@ export function TariffImportPreviewModal({
 }
 
 function TariffImportReviewInspector({
+  extractionSummary,
   globalReviewSummary,
   invalidRows,
   onFocusCategory,
   onFocusCell,
+  onShowWarningDetail,
   sections,
   variant,
+  voicesWithWarnings,
 }: {
+  extractionSummary: ExtractionSummary;
   globalReviewSummary: ImportReviewSummary;
   invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
   onFocusCategory: (categoryId: string) => void;
   onFocusCell: (rowIndex: number, field: string) => void;
+  onShowWarningDetail: ((voice: DesktopTariffVoice) => void) | undefined;
   sections: TariffGridSectionSummary[];
   variant: "modal" | "page";
+  voicesWithWarnings: DesktopTariffVoice[];
 }) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("checks");
   const issueCount = globalReviewSummary.issueCount;
@@ -1349,13 +1611,16 @@ function TariffImportReviewInspector({
   const body = (
     <InspectorContent
       activeTab={activeTab}
+      extractionSummary={extractionSummary}
       globalReviewSummary={globalReviewSummary}
       invalidRows={invalidRows}
       issueCount={issueCount}
       onFocusCategory={onFocusCategory}
       onFocusCell={onFocusCell}
+      onShowWarningDetail={onShowWarningDetail}
       onTabChange={setActiveTab}
       sections={sections}
+      voicesWithWarnings={voicesWithWarnings}
     />
   );
 
@@ -1371,7 +1636,7 @@ function TariffImportReviewInspector({
 
   if (variant === "modal") {
     return (
-      <aside className="min-h-0 overflow-y-auto border-l border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-4">
+      <aside className="min-h-0 overflow-y-auto border-t border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-4 xl:border-l xl:border-t-0">
         {body}
       </aside>
     );
@@ -1380,22 +1645,28 @@ function TariffImportReviewInspector({
 
 function InspectorContent({
   activeTab,
+  extractionSummary,
   globalReviewSummary,
   invalidRows,
   issueCount,
   onFocusCategory,
   onFocusCell,
+  onShowWarningDetail,
   onTabChange,
   sections,
+  voicesWithWarnings,
 }: {
   activeTab: InspectorTab;
+  extractionSummary: ExtractionSummary;
   globalReviewSummary: ImportReviewSummary;
   invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
   issueCount: number;
   onFocusCategory: (categoryId: string) => void;
   onFocusCell: (rowIndex: number, field: string) => void;
+  onShowWarningDetail: ((voice: DesktopTariffVoice) => void) | undefined;
   onTabChange: (tab: InspectorTab) => void;
   sections: TariffGridSectionSummary[];
+  voicesWithWarnings: DesktopTariffVoice[];
 }) {
   return (
     <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]">
@@ -1411,16 +1682,25 @@ function InspectorContent({
           onTabChange={onTabChange}
           sectionsCount={sections.length}
         />
+        <div className="mt-3">
+          <ImportShortcutLegend compact />
+        </div>
         <div className="mt-3 text-12px font-semibold text-[var(--text-primary)]">
           {activeTab === "checks"
             ? "Stato import e controlli"
             : activeTab === "categories"
               ? "Indice categorie e voci"
-              : "Errori e anomalie da risolvere"}
+              : activeTab === "issues"
+                ? "Errori e anomalie da risolvere"
+                : "Avvertenze del parser"}
         </div>
         <div className="mt-3">
           {activeTab === "checks" ? (
-            <ControlPanel globalReviewSummary={globalReviewSummary} compact />
+            <ControlPanel
+              extractionSummary={extractionSummary}
+              globalReviewSummary={globalReviewSummary}
+              compact
+            />
           ) : null}
           {activeTab === "categories" ? (
             <CategoryJumpPanel onFocusCategory={onFocusCategory} sections={sections} compact />
@@ -1430,6 +1710,13 @@ function InspectorContent({
               globalReviewSummary={globalReviewSummary}
               invalidRows={invalidRows}
               onFocusCell={onFocusCell}
+              compact
+            />
+          ) : null}
+          {activeTab === "warnings" ? (
+            <WarningsPanel
+              onShowWarningDetail={onShowWarningDetail}
+              voicesWithWarnings={voicesWithWarnings}
               compact
             />
           ) : null}
@@ -1484,7 +1771,7 @@ function InspectorTabs({
   sectionsCount: number;
 }) {
   return (
-    <div className="mt-3 grid grid-cols-3 gap-1 rounded-14px bg-[var(--bg-muted)] p-1">
+    <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted-strong)]/70 p-1.5">
       <InspectorTabButton
         active={activeTab === "checks"}
         count={undefined}
@@ -1506,6 +1793,13 @@ function InspectorTabs({
         label="Errori"
         onClick={() => onTabChange("issues")}
       />
+      <InspectorTabButton
+        active={activeTab === "warnings"}
+        count={undefined}
+        icon={AlertTriangle}
+        label="Avvertenze"
+        onClick={() => onTabChange("warnings")}
+      />
     </div>
   );
 }
@@ -1526,10 +1820,10 @@ function InspectorTabButton({
   return (
     <button
       className={cn(
-        "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-11px px-2 text-11px font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
+        "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-11px px-2 text-12px font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
         active
-          ? "bg-[var(--surface-base)] text-[var(--text-primary)] shadow-sm"
-          : "text-[var(--text-secondary)] hover:bg-[var(--surface-base)]/65",
+          ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
+          : "bg-[var(--surface-base)]/58 text-[var(--text-primary)] hover:bg-[var(--surface-base)]",
       )}
       onClick={onClick}
       type="button"
@@ -1537,7 +1831,14 @@ function InspectorTabButton({
       <Icon className="size-3.5 shrink-0" />
       <span className="truncate">{label}</span>
       {typeof count === "number" ? (
-        <span className="rounded-full bg-[var(--bg-muted-strong)] px-1.5 py-0.5 text-10px tabular-nums">
+        <span
+          className={cn(
+            "rounded-full px-1.5 py-0.5 text-10px tabular-nums",
+            active
+              ? "bg-[var(--text-inverse)]/20 text-[var(--text-inverse)]"
+              : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
+          )}
+        >
           {count.toLocaleString("it-IT")}
         </span>
       ) : null}
@@ -1724,11 +2025,18 @@ function IssueLine({ count, label, ok }: { count: number; label: string; ok: boo
 
 function ControlPanel({
   compact = false,
+  extractionSummary,
   globalReviewSummary,
 }: {
   compact?: boolean;
+  extractionSummary: ExtractionSummary;
   globalReviewSummary: ImportReviewSummary;
 }) {
+  const confidencePercent =
+    extractionSummary.averageConfidence == null
+      ? null
+      : Math.round(extractionSummary.averageConfidence * 100);
+
   return (
     <div
       className={cn(
@@ -1807,6 +2115,18 @@ function ControlPanel({
           />
           <ValidationLine ok={globalReviewSummary.sourceIssues === 0} text="Ente riconosciuto" />
           <ValidationLine ok={globalReviewSummary.yearIssues === 0} text="Anno coerente" />
+          <ValidationLine
+            ok={extractionSummary.lowConfidenceRows === 0}
+            text={`${extractionSummary.lowConfidenceRows.toLocaleString("it-IT")} righe sotto soglia confidenza`}
+          />
+          <ValidationLine
+            ok={extractionSummary.parserIssues === 0}
+            text={`${extractionSummary.parserIssues.toLocaleString("it-IT")} issue audit parser`}
+          />
+          <ValidationLine
+            ok={confidencePercent == null || confidencePercent >= 85}
+            text={`Confidenza media ${confidencePercent == null ? "-" : `${confidencePercent}%`}`}
+          />
         </div>
       </div>
     </div>
@@ -1880,6 +2200,253 @@ function ControlStat({
   );
 }
 
+function WarningsPanel({
+  compact = false,
+  onShowWarningDetail,
+  voicesWithWarnings,
+}: {
+  compact?: boolean;
+  onShowWarningDetail: ((voice: DesktopTariffVoice) => void) | undefined;
+  voicesWithWarnings: DesktopTariffVoice[];
+}) {
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-18px bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
+        !compact && "shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]",
+      )}
+    >
+      <div className="border-b border-[var(--border-subtle)]/70 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            Avvertenze parser
+          </div>
+          <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-11px font-bold text-[var(--warning-base)]">
+            {voicesWithWarnings.length}
+          </span>
+        </div>
+      </div>
+      <div className={cn("space-y-1 overflow-y-auto p-2", compact ? "max-h-[34dvh]" : "max-h-56")}>
+        {voicesWithWarnings.length === 0 ? (
+          <div className="px-2 py-6 text-center text-12px font-medium text-[var(--text-secondary)]">
+            Nessuna avvertenza
+          </div>
+        ) : (
+          voicesWithWarnings.map((voice) => (
+            <button
+              className="flex w-full items-start gap-2 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+              key={voice.id}
+              onClick={() => onShowWarningDetail?.(voice)}
+              type="button"
+            >
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-[var(--warning-base)]" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-12px font-bold text-[var(--text-primary)]">
+                  {voice.officialCode}
+                </span>
+                <span className="mt-0.5 block text-11px font-medium leading-4 text-[var(--text-secondary)]">
+                  {voice.warnings?.length} avvertenza{voice.warnings?.length !== 1 ? "e" : ""}
+                </span>
+              </span>
+              <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-[var(--text-secondary)]" />
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WarningDetailModal({
+  voice,
+  onClose,
+}: {
+  voice: DesktopTariffVoice;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog className="max-w-lg" isOpen onClose={onClose} zIndex={120}>
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
+            <AlertTriangle className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-18px font-semibold leading-tight text-[var(--text-primary)]">
+              Avvertenze
+            </h3>
+            <p className="mt-1 text-13px font-medium text-[var(--text-accent)]">
+              {voice.officialCode}
+            </p>
+            {voice.description ? (
+              <p className="mt-0.5 text-12px font-medium text-[var(--text-secondary)]">
+                {voice.description}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <div className="max-h-56 space-y-3 overflow-y-auto">
+          {voice.warnings?.map((w) => (
+            <div
+              className="rounded-14px border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"
+              key={w.id}
+            >
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-10px font-bold text-[var(--warning-base)]">
+                  #{w.id || "?"}
+                </span>
+                {w.type ? (
+                  <span className="rounded-full bg-[var(--bg-muted)] px-2 py-0.5 text-10px font-bold text-[var(--text-secondary)]">
+                    {formatAuditLabel(w.type)}
+                  </span>
+                ) : null}
+                {typeof w.confidence === "number" ? (
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-10px font-bold",
+                      w.confidence >= 0.85
+                        ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+                        : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+                    )}
+                  >
+                    {Math.round(w.confidence * 100)}%
+                  </span>
+                ) : null}
+                {w.scope ? (
+                  <span className="ml-auto text-10px font-medium text-[var(--text-tertiary)]">
+                    {w.scope}
+                    {w.refCode ? ` · ${w.refCode}` : ""}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-2 text-13px font-bold leading-5 text-[var(--text-primary)]">
+                {w.title}
+              </div>
+              {w.body ? (
+                <div className="mt-1.5 text-12px font-medium leading-relaxed text-[var(--text-secondary)]">
+                  {w.body}
+                </div>
+              ) : null}
+              {(w.issues?.length ?? 0) > 0 || (w.maggiorazioneRefs?.length ?? 0) > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {w.issues?.slice(0, 4).map((issue) => (
+                    <span
+                      className="rounded-md bg-[var(--warning-soft)] px-2 py-1 text-10px font-bold text-[var(--warning-base)]"
+                      key={issue}
+                    >
+                      {formatAuditLabel(issue)}
+                    </span>
+                  ))}
+                  {w.maggiorazioneRefs?.slice(0, 3).map((ref) => (
+                    <span
+                      className="rounded-md bg-[var(--info-soft)] px-2 py-1 text-10px font-bold text-[var(--info-base)]"
+                      key={ref}
+                    >
+                      MG {ref}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+      <DialogActions>
+        <Button onClick={onClose} variant="primary">
+          Chiudi
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function MaggiorazioniPanel({
+  maggiorazioni,
+  onShowWarningDetail,
+}: {
+  maggiorazioni: DesktopTariffVoice[];
+  onShowWarningDetail?: (voice: DesktopTariffVoice) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="mb-4">
+      <button
+        className="flex w-full items-center justify-between gap-3 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--surface-base)]/46 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-base)]/70"
+        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
+            <Archive className="size-4" />
+          </div>
+          <div>
+            <div className="text-14px font-bold text-[var(--text-primary)]">
+              Maggiorazioni ({maggiorazioni.length})
+            </div>
+            <div className="text-11px font-medium text-[var(--text-secondary)]">
+              Coefficienti e sovrapprezzi applicati alle voci della tariffa
+            </div>
+          </div>
+        </div>
+        <ChevronRight
+          className={cn(
+            "size-5 text-[var(--text-secondary)] transition-transform",
+            isOpen && "rotate-90",
+          )}
+        />
+      </button>
+      {isOpen ? (
+        <div className="mt-2 overflow-x-auto rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--surface-base)]/42">
+          <div className="grid min-w-[720px] grid-cols-[160px_1fr_100px_100px] gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/44 px-4 py-2.5 text-10px font-bold uppercase tracking-0_08em text-[var(--text-secondary)]">
+            <span>Codice</span>
+            <span>Voce / Descrizione</span>
+            <span className="text-right">% Manod.</span>
+            <span className="text-right">Valore</span>
+          </div>
+          {maggiorazioni.map((m) => (
+            <div
+              className="grid min-w-[720px] grid-cols-[160px_1fr_100px_100px] items-center gap-3 border-b border-[var(--border-subtle)]/50 px-4 py-2.5 last:border-b-0"
+              key={m.id}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-12px font-bold text-[var(--text-primary)]">
+                  {m.officialCode}
+                </span>
+                {(m.warnings?.length ?? 0) > 0 ? (
+                  <button
+                    className="flex size-4 shrink-0 items-center justify-center rounded-full text-[var(--warning-base)] transition-colors hover:bg-[var(--warning-soft)]"
+                    onClick={() => onShowWarningDetail?.(m)}
+                    title="Vedi avvertenze"
+                    type="button"
+                  >
+                    <AlertTriangle className="size-3" />
+                  </button>
+                ) : null}
+              </div>
+              <span className="truncate text-12px font-semibold text-[var(--text-secondary)]">
+                {m.description || "—"}
+              </span>
+              <span className="text-right text-12px font-semibold text-[var(--text-secondary)]">
+                {m.laborPercentage != null ? `${m.laborPercentage}%` : "—"}
+              </span>
+              <span className="text-right text-12px font-bold text-[var(--text-primary)]">
+                {Number.isFinite(m.unitPrice)
+                  ? `${m.unitPrice.toLocaleString("it-IT", { minimumFractionDigits: 2 })} €`
+                  : "—"}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function cn(...classes: (string | false | undefined | null)[]): string {
   return classes.filter(Boolean).join(" ");
+}
+
+function formatAuditLabel(value: string): string {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }

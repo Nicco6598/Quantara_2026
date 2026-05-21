@@ -2,6 +2,37 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.4.2 — 2026-05-21
+
+### Tariffari — import, parser e preview
+
+- **Parser RFI con dati più ricchi e lettura corretta** — l'import conserva maggiorazioni, regole applicative, avvertenze e report di validazione. Risolto l'alias `valore` → `valore_euro` che faceva scartare silenziosamente tutte le voci. Le avvertenze vengono risolte record per record con `scope`, `refCode` e flag `isMaggiorazione` esposto a livello Rust.
+- **Import multipli più intelligenti** — reimportando lo stesso tariffario, Quantara aggiorna l'esistente invece di duplicarlo. Nei batch grandi l'ultima revisione prevale e le operazioni vengono accorpate per non bloccare la UI.
+- **Preview import ridisegnata** — il ledger vive sullo sfondo senza card bianca, le maggiorazioni hanno un pannello collassabile sopra le voci a prezzo, l'inspector laterale ha un tab "Avvertenze" con dettaglio, e la metrica in alto separa voci prezzo da MG.
+
+### SAL — MG gestibili manualmente e regole più pulite
+
+- **Dati parser filtrati per la SAL** — nel flusso SAL non vengono portati audit, confidence, source debug o issue tecnici. Restano solo maggiorazioni collegate e regole applicative, conservate anche dopo il riavvio.
+- **MG assegnabili manualmente alle voci destinatarie** — cliccando sul badge MG nel toolbar si apre un dialog con la lista delle voci eleggibili (filtrate per prefisso tariffario). Spuntando o deselezionando le voci si decide manualmente dove applicare la maggiorazione, invece della distribuzione automatica per prefisso.
+- **Disabilitazione esplicita e stati chiari** — deselezionando tutte le voci la MG viene disabilitata (`[]`) invece di cadere in auto-distribuzione. I badge cambiano colore: accent per manuale, neutro per automatica, danger per disabilitata. Se una voce destinataria viene eliminata, l'allocazione resta valida scartando gli ID orfani.
+
+### UI coerente — stessi filtri, stessa selezione multipla, stesse card
+
+- **Selezione multipla centralizzata con conferma** — nuovo hook `useMultiSelectDelete` e componente `MultiSelectBulkDeleteBar` usati da Tariffe, Materiali, Contabilità e Dettaglio progetto. Il confirm dialog mostra l'elenco (max 5 + "…e altri N") prima di eliminare. Le schermate SAL mantengono l'undo toast dopo la conferma.
+- **Filtri con lo stesso stile ovunque** — `FilterSelect`, `FilterSearch`, `FilterDateInput` e `ClearFiltersButton` allineati al TeamScreen: `h-10`, `rounded-14px`, `border`, `text-13px`, focus ring coerente. In Contabilità i filtri Appaltatore e Progetto ora lavorano in AND indipendentemente.
+- **MaterialScreen allineata** — categoria passa da FilterChip pill a `FilterSelect`. Hero mostra metriche stock invece di sidebar categorie. Card materiale ridisegnata come le tariff card (icona Package con status dot, riga stock/soglia compatta, dropdown tre puntini). Rimossi tre punti di accesso duplicati alla creazione materiale.
+- **`AddMaterialModal` ora usa il `Dialog` condiviso** — il backdrop blur copre tutta l'app via `createPortal` invece di fermarsi al contenitore scrollabile.
+- **Tariffari associati nel dettaglio progetto** — lista limitata a 5 con "Mostra tutti". Modal con "Seleziona tutti / Deseleziona tutti".
+
+### Preview import — MG separate e lista avvertenze
+
+- **Voci prezzo separate dalle maggiorazioni** — `MaggiorazioniPanel` raggruppa le MG in una sezione collassabile sopra il ledger. La `MetricsBar` passa da 4 a 5 colonne separando voci prezzo da MG.
+- **Lista avvertenze nell'inspector** — nuovo tab "Avvertenze" con tutte le voci in warning. Cliccando si apre `WarningDetailModal` con ID, scope, refCode, titolo e corpo.
+
+### TypeScript — tipi più rigorosi
+
+- **Tipi allineati a `exactOptionalPropertyTypes`** — `onShowWarningDetail` usa `Type | undefined` invece di `?`. Rimossi import e parametri inutilizzati.
+
 ## 0.4.1 — 2026-05-21
 
 ### Temi scuri finalmente corretti

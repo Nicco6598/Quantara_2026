@@ -57,6 +57,14 @@ export function mapVoiceToDraft(
   voice: DesktopTariffVoice,
   tariffBook: DesktopTariffBook,
 ): SalVoiceDraft {
+  const applicabilityRules = voice.applicabilityRules
+    ? {
+        conditions: voice.applicabilityRules.conditions ?? [],
+        mentionsMaggiorazione: voice.applicabilityRules.mentionsMaggiorazione ?? false,
+        quotaManodoperaOnly: voice.applicabilityRules.quotaManodoperaOnly ?? false,
+      }
+    : undefined;
+
   return {
     category: voice.category,
     code: voice.officialCode,
@@ -67,7 +75,9 @@ export function mapVoiceToDraft(
       code: voice.officialCode,
       description: voice.description,
     }),
+    ...(applicabilityRules ? { applicabilityRules } : {}),
     laborPercentage: voice.laborPercentage ?? 0,
+    linkedMaggiorazioni: voice.linkedMaggiorazioni ?? [],
     source: voice,
     tariffBookId: voice.tariffBookId,
     tariffBookName: tariffBook.name,

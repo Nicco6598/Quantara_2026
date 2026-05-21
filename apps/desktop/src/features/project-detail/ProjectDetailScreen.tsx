@@ -9,7 +9,6 @@ import {
   Plus,
   Radio,
   ReceiptText,
-  Trash2,
   TrendingUp,
   UsersRound,
   WalletCards,
@@ -18,7 +17,8 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { Button } from "@/components/shared/Button";
 import { SalHistoryBars, SpendingTrend } from "@/components/shared/charts";
 import { MetricCard } from "@/components/shared/MetricCard";
-import { MultiSelectBulkBar, MultiSelectToggle } from "@/components/shared/MultiSelectControls";
+import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
+import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
@@ -27,7 +27,7 @@ import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
-import { useMultiSelect } from "@/hooks/use-multi-select";
+import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
@@ -294,6 +294,8 @@ export function ProjectDetailScreen() {
     });
   }, [financials.contractual, salViews]);
 
+  const draftRows = useMemo(() => salRows.filter((r) => r.isDraft), [salRows]);
+
   const filteredSalRows = useMemo(
     () => salRows.filter((r) => filterSalStatus === "Tutti" || r.status === filterSalStatus),
     [salRows, filterSalStatus],
@@ -319,7 +321,7 @@ export function ProjectDetailScreen() {
     onSort: onSalSort,
   } = useTableSort(sortableSalRows);
 
-  const salMultiSelect = useMultiSelect(sortedSalRows);
+  const salMultiSelect = useMultiSelectDelete(sortedSalRows);
 
   const detail = useMemo(
     () =>
@@ -349,7 +351,101 @@ export function ProjectDetailScreen() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const deleteSal = useSalWorkflowStore((state) => state.deleteSal);
   const setSalStatus = useSalWorkflowStore((state) => state.setSalStatus);
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = [...salMultiSelect.selectedIds];
+    const count = ids.length;
+    const deletedSals = ids
+      .map((id) => salDocuments.find((d) => d.id === id))
+      .filter((d): d is NonNullable<typeof d> => d !== undefined);
+
+    for (const id of ids) {
+      const sal = salDocuments.find((d) => d.id === id);
+      if (sal?.materialUsage) {
+        void restoreMaterialsFromSalUsage(sal.materialUsage);
+      }
+      if (sal) useSalWorkflowStore.getState().deleteSal(sal.id);
+      try {
+        await deleteSalDocument(id);
+      } catch (error) {
+        notify({
+          message: error instanceof Error ? error.message : String(error),
+          title: "Eliminazione SAL non riuscita",
+          tone: "danger",
+        });
+        return;
+      }
+    }
+    dispatchDataChanged();
+
+    const execute = async () => {
+      for (const sal of deletedSals) {
+        deleteSal(sal.id);
+        try {
+          await deleteSalDocument(sal.id);
+        } catch {
+          /* best-effort in undo execution */
+        }
+      }
+      dispatchDataChanged();
+    };
+    const undo = async () => {
+      for (const sal of deletedSals) {
+        const salInput = {
+          projectId: sal.projectId,
+          date: sal.date,
+          description: sal.description,
+          notes: sal.notes,
+          title: sal.title,
+          lines: sal.lines,
+          voices: [] as never[],
+          status: sal.status,
+          ...(sal.economicRules ? { economicRules: sal.economicRules } : {}),
+          ...(sal.materialUsage ? { materialUsage: sal.materialUsage } : {}),
+          ...(typeof sal.total === "number" ? { total: sal.total } : {}),
+        };
+        useSalWorkflowStore.getState().createSal(salInput);
+        try {
+          await saveSalDocument(sal.projectId, sal);
+        } catch (error) {
+          notify({
+            message: error instanceof Error ? error.message : String(error),
+            title: "Ripristino SAL non riuscito",
+            tone: "danger",
+          });
+          return;
+        }
+        if (sal.materialUsage) {
+          await restoreMaterialsFromSalUsage(sal.materialUsage);
+        }
+      }
+      dispatchDataChanged();
+    };
+
+    useUndoStore.getState().push({
+      label: `${count} SAL eliminat${count === 1 ? "a" : "e"}`,
+      execute,
+      undo,
+    });
+    notify({
+      actionLabel: "Annulla",
+      message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
+      onAction: async () => {
+        await undo();
+        notify({
+          message: "Azione annullata",
+          title: "Annullato",
+          tone: "info",
+        });
+      },
+      title: "Eliminate",
+      tone: "success",
+    });
+    salMultiSelect.onDeleted();
+  }, [deleteSal, notify, salDocuments, salMultiSelect]);
+
   const [isTariffPanelOpen, setIsTariffPanelOpen] = useState(false);
+  const [isExpandedTariffs, setIsExpandedTariffs] = useState(false);
   const [pendingTariffIds, setPendingTariffIds] = useState<string[]>([]);
   const [tariffSearchQuery, setTariffSearchQuery] = useState("");
 
@@ -632,14 +728,84 @@ export function ProjectDetailScreen() {
         ))}
       </section>
 
+      {draftRows.length > 0 ? (
+        <m.section
+          className="mt-8"
+          initial={MOTION_VARIANTS.card.initial}
+          whileInView={MOTION_VARIANTS.card.whileInView}
+          viewport={MOTION_VARIANTS.card.viewport}
+          transition={MOTION_VARIANTS.card.transition}
+        >
+          <div className="mb-3 flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--warning-base)]">
+            <FileText className="size-4" />
+            Riprendi bozza
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {draftRows.slice(0, 4).map((row, index) => (
+              <m.div
+                key={row.id}
+                className="rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-4 ring-1 ring-[var(--border-subtle)]/60"
+                initial={MOTION_VARIANTS.row.initial}
+                whileInView={MOTION_VARIANTS.row.whileInView}
+                viewport={MOTION_VARIANTS.row.viewport}
+                transition={{
+                  ...MOTION_VARIANTS.row.transition,
+                  delay: index * 0.035,
+                }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-13px font-semibold text-[var(--text-primary)]">
+                    {row.progressiveLabel}
+                  </span>
+                  <span className="shrink-0 text-12px font-semibold tabular-nums text-[var(--text-primary)]">
+                    {formatMoney({ amount: row.amount, currency: "EUR" })}
+                  </span>
+                </div>
+                <div className="mt-1 text-11px text-[var(--text-tertiary)]">{row.date}</div>
+                <Button
+                  className="mt-3 w-full"
+                  onClick={() => {
+                    try {
+                      window.sessionStorage.setItem(
+                        SESSION_STORAGE_KEYS.selectedProjectDetail,
+                        JSON.stringify(selectedProject),
+                      );
+                      window.sessionStorage.setItem(SESSION_STORAGE_KEYS.salResumeDraft, row.id);
+                    } catch {
+                      /* no-op */
+                    }
+                    navigate("sal-create");
+                  }}
+                  size="sm"
+                  variant="secondary"
+                >
+                  Continua
+                </Button>
+              </m.div>
+            ))}
+          </div>
+          {draftRows.length > 4 && (
+            <p className="mt-2 text-center text-11px text-[var(--text-tertiary)]">
+              +{draftRows.length - 4} bozze nel registro completo qui sotto
+            </p>
+          )}
+        </m.section>
+      ) : null}
+
       {salViews.length > 0 ? (
-        <section className="mt-8">
+        <m.section
+          className="mt-8"
+          initial={MOTION_VARIANTS.card.initial}
+          whileInView={MOTION_VARIANTS.card.whileInView}
+          viewport={MOTION_VARIANTS.card.viewport}
+          transition={MOTION_VARIANTS.card.transition}
+        >
           <div className="mb-4 flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--info-base)]">
             <TrendingUp className="size-4" />
             Andamento spesa
           </div>
           <SpendingTrend contractualAmount={financials.contractual} views={salChartViews} />
-        </section>
+        </m.section>
       ) : null}
 
       <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -728,14 +894,20 @@ export function ProjectDetailScreen() {
 
             {salMultiSelect.count > 0 && (
               <div className="mt-3">
-                <MultiSelectBulkBar
+                <MultiSelectBulkDeleteBar
+                  allSelected={salMultiSelect.allSelected}
                   count={salMultiSelect.count}
                   entityLabel="SAL"
-                  allSelected={salMultiSelect.allSelected}
-                  someSelected={salMultiSelect.someSelected}
-                  onSelectAll={() => salMultiSelect.selectAll(sortedSalRows.map((r) => r.id))}
+                  entityLabelSingular="SAL"
+                  isDeleteConfirmOpen={salMultiSelect.isConfirmOpen}
                   onClear={salMultiSelect.clear}
                   onClose={salMultiSelect.disable}
+                  onDeleteConfirm={handleBulkDelete}
+                  onDeleteConfirmDismiss={salMultiSelect.dismissDelete}
+                  onDeleteRequest={salMultiSelect.requestDelete}
+                  onSelectAll={() => salMultiSelect.selectAll(sortedSalRows.map((r) => r.id))}
+                  selectedItemNames={salMultiSelect.selectedItems.map((r) => r.sal)}
+                  someSelected={salMultiSelect.someSelected}
                 >
                   <button
                     className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3.5 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
@@ -751,105 +923,7 @@ export function ProjectDetailScreen() {
                     <Download className="size-4" />
                     Esporta
                   </button>
-                  <button
-                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3.5 text-12px font-bold text-[var(--danger-base)] ring-1 ring-[color-mix(in_srgb,var(--danger-base)_22%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-soft)_80%,var(--danger-base)_20%)]"
-                    onClick={async () => {
-                      const ids = [...salMultiSelect.selectedIds];
-                      const count = ids.length;
-                      const deletedSals = ids
-                        .map((id) => salDocuments.find((d) => d.id === id))
-                        .filter((d): d is NonNullable<typeof d> => d !== undefined);
-
-                      for (const id of ids) {
-                        const sal = salDocuments.find((d) => d.id === id);
-                        if (sal?.materialUsage) {
-                          void restoreMaterialsFromSalUsage(sal.materialUsage);
-                        }
-                        if (sal) deleteSal(sal.id);
-                        try {
-                          await deleteSalDocument(id);
-                        } catch (error) {
-                          notify({
-                            message: error instanceof Error ? error.message : String(error),
-                            title: "Eliminazione SAL non riuscita",
-                            tone: "danger",
-                          });
-                          return;
-                        }
-                      }
-                      dispatchDataChanged();
-
-                      const execute = async () => {
-                        for (const sal of deletedSals) {
-                          deleteSal(sal.id);
-                          try {
-                            await deleteSalDocument(sal.id);
-                          } catch {
-                            /* best-effort in undo execution */
-                          }
-                        }
-                        dispatchDataChanged();
-                      };
-                      const undo = async () => {
-                        for (const sal of deletedSals) {
-                          const salInput = {
-                            projectId: sal.projectId,
-                            date: sal.date,
-                            description: sal.description,
-                            notes: sal.notes,
-                            title: sal.title,
-                            lines: sal.lines,
-                            voices: [] as never[],
-                            status: sal.status,
-                            ...(sal.economicRules ? { economicRules: sal.economicRules } : {}),
-                            ...(sal.materialUsage ? { materialUsage: sal.materialUsage } : {}),
-                            ...(typeof sal.total === "number" ? { total: sal.total } : {}),
-                          };
-                          useSalWorkflowStore.getState().createSal(salInput);
-                          try {
-                            await saveSalDocument(sal.projectId, sal);
-                          } catch (error) {
-                            notify({
-                              message: error instanceof Error ? error.message : String(error),
-                              title: "Ripristino SAL non riuscito",
-                              tone: "danger",
-                            });
-                            return;
-                          }
-                          if (sal.materialUsage) {
-                            await restoreMaterialsFromSalUsage(sal.materialUsage);
-                          }
-                        }
-                        dispatchDataChanged();
-                      };
-
-                      useUndoStore.getState().push({
-                        label: `${count} SAL eliminat${count === 1 ? "a" : "e"}`,
-                        execute,
-                        undo,
-                      });
-                      notify({
-                        actionLabel: "Annulla",
-                        message: `${count} SAL eliminat${count === 1 ? "a" : "e"} con successo.`,
-                        onAction: async () => {
-                          await undo();
-                          notify({
-                            message: "Azione annullata",
-                            title: "Annullato",
-                            tone: "info",
-                          });
-                        },
-                        title: "Eliminate",
-                        tone: "success",
-                      });
-                      salMultiSelect.disable();
-                    }}
-                    type="button"
-                  >
-                    <Trash2 className="size-4" />
-                    Elimina
-                  </button>
-                </MultiSelectBulkBar>
+                </MultiSelectBulkDeleteBar>
               </div>
             )}
 
@@ -1040,7 +1114,10 @@ export function ProjectDetailScreen() {
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  {projectTariffBookIds.map((bookId, index) => {
+                  {(isExpandedTariffs
+                    ? projectTariffBookIds
+                    : projectTariffBookIds.slice(0, 5)
+                  ).map((bookId, index) => {
                     const book = tariffBooks.find((b) => b.id === bookId);
                     if (!book) return null;
                     return (
@@ -1070,6 +1147,17 @@ export function ProjectDetailScreen() {
                       </m.div>
                     );
                   })}
+                  {projectTariffBookIds.length > 5 && (
+                    <m.button
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--bg-muted)]/40 px-3 py-2.5 text-12px font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/50 transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                      onClick={() => setIsExpandedTariffs((v) => !v)}
+                      type="button"
+                    >
+                      {isExpandedTariffs
+                        ? "Mostra meno"
+                        : `Mostra tutti i ${projectTariffBookIds.length} tariffari`}
+                    </m.button>
+                  )}
                 </div>
               )}
               {projectTariffBookIds.length > 0 ? (
@@ -1091,8 +1179,10 @@ export function ProjectDetailScreen() {
           <TariffPanelDialog
             filteredTariffBooks={filteredTariffBooks}
             isOpen={isTariffPanelOpen}
+            onClearAll={() => setPendingTariffIds([])}
             onClose={() => setIsTariffPanelOpen(false)}
             onConfirm={() => void handleSaveTariffBooks(pendingTariffIds)}
+            onSelectAll={() => setPendingTariffIds(filteredTariffBooks.map((b) => b.id))}
             onToggleTariffBook={(bookId) =>
               setPendingTariffIds((prev) =>
                 prev.includes(bookId) ? prev.filter((id) => id !== bookId) : [...prev, bookId],

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildLineViews, summarizeSalLines } from "../../domain/sal-calculations";
 import type { SalEconomicRules, SalLineDraft, SalLineView, SalVoiceDraft } from "../../types";
 
@@ -122,6 +122,172 @@ describe("buildLineViews", () => {
     expect(v0.discountableAmount).toBe(0);
     expect(v0.discountAmount).toBe(0);
     expect(v0.totalAmount).toBe(1000);
+  });
+});
+
+describe("MG distribution", () => {
+  function makeMgLine(mgCode: string, mgPercent: number): SalLineDraft {
+    return makeLine({
+      id: `mg-${mgCode}`,
+      measurementRows: [],
+      voice: makeVoice({
+        id: `v-${mgCode}`,
+        code: mgCode,
+        description: `MG ${mgCode}`,
+        unitPrice: mgPercent,
+      }),
+    });
+  }
+
+  function makeFaLine(id: string, code: string, qty: number): SalLineDraft {
+    return makeLine({
+      id,
+      measurementRows: [makeMeasurementRow(qty)],
+      voice: makeVoice({
+        id: `v-${code}`,
+        code,
+        description: `Voce ${code}`,
+        unitPrice: 100,
+      }),
+    });
+  }
+
+  it("auto-distributes MG by prefix", () => {
+    const lines = [
+      makeFaLine("fa1", "FA.001-US", 10), // gross = 1000
+      makeFaLine("fa2", "FA.002-TLS", 5), // gross = 500
+      makeMgLine("FA.MG.01", 2), // MG 2% on FA prefix
+    ];
+
+    const views = buildLineViews(lines, defaultRules);
+    const fa1 = views.find((v) => v.id === "fa1")!;
+    const fa2 = views.find((v) => v.id === "fa2")!;
+    const mg = views.find((v) => v.id === "mg-FA.MG.01")!;
+
+    // Both FA voices should get MG: FA.001 gets 1000*0.02 = 20, FA.002 gets 500*0.02 = 10
+    expect(fa1.netAmount).toBe(1000 + 20);
+    expect(fa2.netAmount).toBe(500 + 10);
+    // MG line shows total distributed
+    expect(mg.netAmount).toBe(30);
+  });
+
+  it("respects mgManualAllocations — limits to selected voices", () => {
+    const lines = [
+      makeFaLine("fa1", "FA.001-US", 10), // gross = 1000
+      makeFaLine("fa2", "FA.002-TLS", 5), // gross = 500
+      makeMgLine("FA.MG.01", 2), // MG 2%
+    ];
+
+    const rules: SalEconomicRules = {
+      ...defaultRules,
+      mgManualAllocations: {
+        "mg-FA.MG.01": ["fa1"], // only apply to FA.001
+      },
+    };
+
+    const views = buildLineViews(lines, rules);
+    const fa1 = views.find((v) => v.id === "fa1")!;
+    const fa2 = views.find((v) => v.id === "fa2")!;
+    const mg = views.find((v) => v.id === "mg-FA.MG.01")!;
+
+    // FA.001 gets MG (1000 * 0.02 = 20)
+    expect(fa1.netAmount).toBe(1000 + 20);
+    // FA.002 does NOT get MG
+    expect(fa2.netAmount).toBe(500);
+    // MG line total based only on selected voices
+    expect(mg.netAmount).toBe(20);
+  });
+
+  it("skips MG when manual allocation references non-existent IDs", () => {
+    const lines = [makeFaLine("fa1", "FA.001-US", 10), makeMgLine("FA.MG.01", 2)];
+
+    const rules: SalEconomicRules = {
+      ...defaultRules,
+      mgManualAllocations: {
+        "mg-FA.MG.01": ["nonexistent-id", "also-gone"],
+      },
+    };
+
+    const views = buildLineViews(lines, rules);
+    const fa1 = views.find((v) => v.id === "fa1")!;
+    const mg = views.find((v) => v.id === "mg-FA.MG.01")!;
+
+    // Stale IDs — no valid target → MG skipped
+    expect(fa1.netAmount).toBe(1000);
+    expect(mg.netAmount).toBe(0);
+  });
+
+  it("re-applies MG correctly after removing a voice from manual allocation", () => {
+    const lines = [
+      makeFaLine("fa1", "FA.001-US", 10), // gross = 1000
+      makeFaLine("fa2", "FA.002-TLS", 5), // gross = 500
+      makeMgLine("FA.MG.01", 2), // MG 2%
+    ];
+
+    // Step 1: manual allocation to both voices
+    const rulesBoth: SalEconomicRules = {
+      ...defaultRules,
+      mgManualAllocations: { "mg-FA.MG.01": ["fa1", "fa2"] },
+    };
+    const viewsBoth = buildLineViews(lines, rulesBoth);
+    expect(viewsBoth.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + 20);
+    expect(viewsBoth.find((v) => v.id === "fa2")?.netAmount).toBe(500 + 10);
+    expect(viewsBoth.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(30);
+
+    // Step 2: remove fa2 from manual allocation
+    const rulesOne: SalEconomicRules = {
+      ...defaultRules,
+      mgManualAllocations: { "mg-FA.MG.01": ["fa1"] },
+    };
+    const viewsOne = buildLineViews(lines, rulesOne);
+    expect(viewsOne.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + 20);
+    expect(viewsOne.find((v) => v.id === "fa2")?.netAmount).toBe(500);
+    expect(viewsOne.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(20);
+  });
+
+  it("disables MG when manual allocation has empty array", () => {
+    const lines = [
+      makeFaLine("fa1", "FA.001-US", 10), // gross = 1000
+      makeFaLine("fa2", "FA.002-TLS", 5), // gross = 500
+      makeMgLine("FA.MG.01", 2), // MG 2%
+    ];
+
+    const rules: SalEconomicRules = {
+      ...defaultRules,
+      mgManualAllocations: { "mg-FA.MG.01": [] },
+    };
+
+    const views = buildLineViews(lines, rules);
+    const fa1 = views.find((v) => v.id === "fa1")!;
+    const fa2 = views.find((v) => v.id === "fa2")!;
+    const mg = views.find((v) => v.id === "mg-FA.MG.01")!;
+
+    // Empty array = disabled → no MG applied to any voice
+    expect(fa1.netAmount).toBe(1000);
+    expect(fa2.netAmount).toBe(500);
+    expect(mg.netAmount).toBe(0);
+  });
+
+  it("auto-distributes when manual allocation has undefined key", () => {
+    const lines = [
+      makeFaLine("fa1", "FA.001-US", 10), // gross = 1000
+      makeFaLine("fa2", "FA.002-TLS", 5), // gross = 500
+      makeMgLine("FA.MG.01", 2), // MG 2%
+    ];
+
+    // Empty mgManualAllocations object — key doesn't exist
+    const rules: SalEconomicRules = {
+      ...defaultRules,
+      mgManualAllocations: {},
+    };
+
+    const views = buildLineViews(lines, rules);
+    const fa1 = views.find((v) => v.id === "fa1")!;
+    const fa2 = views.find((v) => v.id === "fa2")!;
+
+    // No entry → auto-distribute by prefix
+    expect(fa1.netAmount).toBe(1000 + 20);
+    expect(fa2.netAmount).toBe(500 + 10);
   });
 });
 

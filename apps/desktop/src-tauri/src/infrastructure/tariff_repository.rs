@@ -12,6 +12,7 @@ use std::os::windows::process::CommandExt;
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use tauri::{AppHandle, Manager};
 
 use crate::{
@@ -46,8 +47,51 @@ pub struct UpdateTariffBookRequest {
 #[serde(rename_all = "camelCase")]
 pub struct TariffWarning {
     pub id: String,
+    #[serde(default)]
+    #[serde(alias = "scope")]
+    pub scope: String,
+    #[serde(default)]
+    #[serde(alias = "ref_code")]
+    pub ref_code: String,
     pub title: String,
     pub body: String,
+    #[serde(default)]
+    #[serde(rename = "type")]
+    pub warning_type: String,
+    #[serde(default)]
+    pub confidence: Option<f64>,
+    #[serde(default)]
+    pub issues: Vec<String>,
+    #[serde(default)]
+    pub maggiorazione_refs: Vec<String>,
+    #[serde(default)]
+    pub applies_to_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TariffSourceRef {
+    #[serde(default)]
+    pub file: String,
+    #[serde(default)]
+    pub page: Option<i32>,
+    #[serde(default)]
+    pub line: Option<i32>,
+    #[serde(default)]
+    pub normalized: bool,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TariffApplicabilityRules {
+    #[serde(default)]
+    #[serde(alias = "mentions_maggiorazione")]
+    pub mentions_maggiorazione: bool,
+    #[serde(default)]
+    #[serde(alias = "quota_manodopera_only")]
+    pub quota_manodopera_only: bool,
+    #[serde(default)]
+    pub conditions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -71,6 +115,22 @@ pub struct TariffVoiceRecord {
     pub voce_desc: String,
     #[serde(default)]
     pub warnings: Vec<TariffWarning>,
+    #[serde(default)]
+    pub is_maggiorazione: bool,
+    #[serde(default)]
+    pub source: Option<TariffSourceRef>,
+    #[serde(default)]
+    pub confidence: Option<f64>,
+    #[serde(default)]
+    pub issues: Vec<String>,
+    #[serde(default)]
+    pub review_flags: Vec<String>,
+    #[serde(default)]
+    pub warning_ids: Vec<String>,
+    #[serde(default)]
+    pub linked_maggiorazioni: Vec<String>,
+    #[serde(default)]
+    pub applicability_rules: Option<TariffApplicabilityRules>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -92,6 +152,9 @@ pub struct TariffPdfImportPreview {
     pub year: i32,
     pub pages_total: i32,
     pub pages_parsed: i32,
+    pub warnings: Vec<TariffWarning>,
+    pub maggiorazione_rules: JsonValue,
+    pub validation_report: JsonValue,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -107,6 +170,7 @@ struct RfiTariffRecord {
     unita_codice: String,
     unita_label: String,
     tipo_valore: String,
+    #[serde(alias = "valore")]
     valore_euro: Option<f64>,
     perc_manodopera: Option<f64>,
     #[serde(default)]
@@ -115,6 +179,20 @@ struct RfiTariffRecord {
     gruppo_desc: String,
     #[serde(default)]
     warnings: Vec<TariffWarning>,
+    #[serde(default)]
+    warning_ids: Vec<String>,
+    #[serde(default)]
+    source: Option<TariffSourceRef>,
+    #[serde(default)]
+    confidence: Option<f64>,
+    #[serde(default)]
+    issues: Vec<String>,
+    #[serde(default)]
+    review_flags: Vec<String>,
+    #[serde(default)]
+    linked_maggiorazioni: Vec<String>,
+    #[serde(default)]
+    applicability_rules: Option<TariffApplicabilityRules>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -123,6 +201,21 @@ struct ParserOutput {
     #[serde(default)]
     maggiorazioni: Vec<RfiTariffRecord>,
     #[serde(default)]
+    warnings: Vec<TariffWarning>,
+    #[serde(default)]
+    maggiorazione_rules: JsonValue,
+    #[serde(default)]
+    validation_report: JsonValue,
+    #[serde(default)]
+    pages_total: i32,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ParsedRfiImport {
+    records: Vec<RfiTariffRecord>,
+    warnings: Vec<TariffWarning>,
+    maggiorazione_rules: JsonValue,
+    validation_report: JsonValue,
     pages_total: i32,
 }
 
@@ -269,7 +362,7 @@ pub fn list_tariff_voices(
 ) -> Result<Vec<TariffVoiceRecord>, AppError> {
     let mut statement = connection
         .prepare(
-            "SELECT id, tariff_book_id, official_code, description, category, unit_of_measure, unit_price_cents, labor_percentage
+            "SELECT id, tariff_book_id, official_code, description, category, unit_of_measure, unit_price_cents, labor_percentage, linked_maggiorazioni, applicability_rules
              FROM tariff_voices
              WHERE tariff_book_id = ?1
              ORDER BY official_code ASC",
@@ -435,13 +528,13 @@ pub fn import_tariff_pdf_preview(
         .unwrap_or("Tariffario importato")
         .replace(['_', '-'], " ");
 
-    let (records, pages_total) = if extension == "json" {
-        (parse_rfi_json_file(path)?, 0)
+    let parsed = if extension == "json" {
+        parse_rfi_json_file(path)?
     } else {
         parse_rfi_pdf_with_python(path, app)?
     };
 
-    let source_text = records
+    let source_text = parsed.records
         .iter()
         .take(200)
         .map(|record| {
@@ -454,7 +547,7 @@ pub fn import_tariff_pdf_preview(
         .join("\n");
     let year = infer_year(&fallback_name).unwrap_or(2025);
     let source_name = infer_source_name(&source_text);
-    let records = merge_duplicate_rfi_records(records);
+    let records = merge_duplicate_rfi_records(parsed.records);
     let voices = records
         .iter()
         .filter_map(|record| rfi_record_to_tariff_voice(record, "tariff_import_preview"))
@@ -465,8 +558,11 @@ pub fn import_tariff_pdf_preview(
         source_name,
         voices,
         year,
-        pages_total,
-        pages_parsed: pages_total,
+        pages_total: parsed.pages_total,
+        pages_parsed: parsed.pages_total,
+        warnings: parsed.warnings,
+        maggiorazione_rules: parsed.maggiorazione_rules,
+        validation_report: parsed.validation_report,
     })
 }
 
@@ -495,13 +591,13 @@ fn import_single_tariff_pdf(
         .unwrap_or("Tariffario importato")
         .replace(['_', '-'], " ");
 
-    let (records, pages_total) = if extension == "json" {
-        (parse_rfi_json_file(path).map_err(|e| e.to_string())?, 0)
+    let parsed = if extension == "json" {
+        parse_rfi_json_file(path).map_err(|e| e.to_string())?
     } else {
         parse_rfi_pdf_with_python_direct(path, resource_dir)?
     };
 
-    let source_text = records
+    let source_text = parsed.records
         .iter()
         .take(200)
         .map(|r| {
@@ -514,7 +610,7 @@ fn import_single_tariff_pdf(
         .join("\n");
     let year = infer_year(&fallback_name).unwrap_or(2025);
     let source_name = infer_source_name(&source_text);
-    let records = merge_duplicate_rfi_records(records);
+    let records = merge_duplicate_rfi_records(parsed.records);
     let voices = records
         .iter()
         .filter_map(|r| rfi_record_to_tariff_voice(r, "tariff_import_preview"))
@@ -525,15 +621,18 @@ fn import_single_tariff_pdf(
         source_name,
         voices,
         year,
-        pages_total,
-        pages_parsed: pages_total,
+        pages_total: parsed.pages_total,
+        pages_parsed: parsed.pages_total,
+        warnings: parsed.warnings,
+        maggiorazione_rules: parsed.maggiorazione_rules,
+        validation_report: parsed.validation_report,
     })
 }
 
 fn parse_rfi_pdf_with_python_direct(
     path: &std::path::Path,
     resource_dir: Option<&std::path::Path>,
-) -> Result<(Vec<RfiTariffRecord>, i32), String> {
+) -> Result<ParsedRfiImport, String> {
     let mut header = [0_u8; 5];
     std::fs::File::open(path)
         .and_then(|mut f| f.read_exact(&mut header))
@@ -565,11 +664,21 @@ fn parse_rfi_pdf_with_python_direct(
     if let Ok(result) = serde_json::from_str::<ParserOutput>(&json_str) {
         let mut all_records = result.records;
         all_records.extend(result.maggiorazioni);
-        return Ok((all_records, result.pages_total));
+        resolve_rfi_warnings(&mut all_records, &result.warnings);
+        return Ok(ParsedRfiImport {
+            records: all_records,
+            warnings: result.warnings,
+            maggiorazione_rules: result.maggiorazione_rules,
+            validation_report: result.validation_report,
+            pages_total: result.pages_total,
+        });
     }
     let records = serde_json::from_str::<Vec<RfiTariffRecord>>(&json_str)
         .map_err(|e| format!("RFI parser returned invalid JSON: {e}"))?;
-    Ok((records, 0))
+    Ok(ParsedRfiImport {
+        records,
+        ..ParsedRfiImport::default()
+    })
 }
 
 fn run_bundled_rfi_parser_direct(
@@ -658,7 +767,7 @@ pub fn import_tariff_pdf_preview_batch(
     Ok(successes)
 }
 
-fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
+fn parse_rfi_json_file(path: &Path) -> Result<ParsedRfiImport, AppError> {
     let bytes = std::fs::read(path).map_err(|error| AppError::Database(error.to_string()))?;
     let parser_json = String::from_utf8_lossy(&bytes);
     let parser_json = remove_json_surrogate_escapes(&parser_json);
@@ -666,13 +775,25 @@ fn parse_rfi_json_file(path: &Path) -> Result<Vec<RfiTariffRecord>, AppError> {
     if let Ok(output) = serde_json::from_str::<ParserOutput>(&parser_json) {
         let mut all_records = output.records;
         all_records.extend(output.maggiorazioni);
-        return Ok(all_records);
+        resolve_rfi_warnings(&mut all_records, &output.warnings);
+        return Ok(ParsedRfiImport {
+            records: all_records,
+            warnings: output.warnings,
+            maggiorazione_rules: output.maggiorazione_rules,
+            validation_report: output.validation_report,
+            pages_total: output.pages_total,
+        });
     }
-    serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json).map_err(|error| {
-        AppError::Validation(format!(
-            "parser JSON is not a valid RFI tariff export: {error}"
-        ))
-    })
+    serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json)
+        .map(|records| ParsedRfiImport {
+            records,
+            ..ParsedRfiImport::default()
+        })
+        .map_err(|error| {
+            AppError::Validation(format!(
+                "parser JSON is not a valid RFI tariff export: {error}"
+            ))
+        })
 }
 
 fn merge_duplicate_rfi_records(records: Vec<RfiTariffRecord>) -> Vec<RfiTariffRecord> {
@@ -720,6 +841,25 @@ fn merge_rfi_record_description(target: &mut RfiTariffRecord, duplicate: &RfiTar
     };
 }
 
+fn resolve_rfi_warnings(records: &mut Vec<RfiTariffRecord>, top_warnings: &[TariffWarning]) {
+    if top_warnings.is_empty() {
+        return;
+    }
+    let map: HashMap<String, &TariffWarning> = top_warnings
+        .iter()
+        .map(|w| (w.id.clone(), w))
+        .collect();
+    for rec in records.iter_mut() {
+        if rec.warnings.is_empty() && !rec.warning_ids.is_empty() {
+            rec.warnings = rec
+                .warning_ids
+                .iter()
+                .filter_map(|id| map.get(id).cloned().cloned())
+                .collect();
+        }
+    }
+}
+
 fn clean_import_description(value: &str) -> String {
     let cleaned = clean_text(value);
     let upper = cleaned.to_ascii_uppercase();
@@ -742,7 +882,7 @@ fn clean_import_description(value: &str) -> String {
 fn parse_rfi_pdf_with_python(
     path: &Path,
     app: Option<&AppHandle>,
-) -> Result<(Vec<RfiTariffRecord>, i32), AppError> {
+) -> Result<ParsedRfiImport, AppError> {
     let mut header = [0_u8; 5];
     File::open(path)
         .and_then(|mut file| file.read_exact(&mut header))
@@ -779,12 +919,22 @@ fn parse_rfi_pdf_with_python(
     if let Ok(result) = serde_json::from_str::<ParserOutput>(&parser_json) {
         let mut all_records = result.records;
         all_records.extend(result.maggiorazioni);
-        return Ok((all_records, result.pages_total));
+        resolve_rfi_warnings(&mut all_records, &result.warnings);
+        return Ok(ParsedRfiImport {
+            records: all_records,
+            warnings: result.warnings,
+            maggiorazione_rules: result.maggiorazione_rules,
+            validation_report: result.validation_report,
+            pages_total: result.pages_total,
+        });
     }
     let records = serde_json::from_str::<Vec<RfiTariffRecord>>(&parser_json).map_err(|error| {
         AppError::Validation(format!("RFI parser returned invalid JSON: {error}"))
     })?;
-    Ok((records, 0))
+    Ok(ParsedRfiImport {
+        records,
+        ..ParsedRfiImport::default()
+    })
 }
 
 fn parser_output_to_utf8(output: Vec<u8>) -> Result<String, AppError> {
@@ -978,7 +1128,7 @@ pub fn shutdown_rfi_parser() {
 fn parse_via_persistent_parser(
     path: &Path,
     resource_dir: &Path,
-) -> Result<(Vec<RfiTariffRecord>, i32), String> {
+) -> Result<ParsedRfiImport, String> {
     let state = rfi_parser_state();
     let mut guard = state.lock().map_err(|e| e.to_string())?;
 
@@ -993,7 +1143,14 @@ fn parse_via_persistent_parser(
         Ok(output) => {
             let mut all_records = output.records;
             all_records.extend(output.maggiorazioni);
-            Ok((all_records, output.pages_total))
+            resolve_rfi_warnings(&mut all_records, &output.warnings);
+            Ok(ParsedRfiImport {
+                records: all_records,
+                warnings: output.warnings,
+                maggiorazione_rules: output.maggiorazione_rules,
+                validation_report: output.validation_report,
+                pages_total: output.pages_total,
+            })
         }
         Err(e) => {
             // Process died — drop it so next call restarts
@@ -1110,6 +1267,14 @@ fn rfi_record_to_tariff_voice(
         voce: record.voce.clone(),
         voce_desc: record.voce_desc.clone(),
         warnings: record.warnings.clone(),
+        is_maggiorazione: record.categoria == "MG",
+        source: record.source.clone(),
+        confidence: record.confidence,
+        issues: record.issues.clone(),
+        review_flags: record.review_flags.clone(),
+        warning_ids: record.warning_ids.clone(),
+        linked_maggiorazioni: record.linked_maggiorazioni.clone(),
+        applicability_rules: record.applicability_rules.clone(),
     })
 }
 
@@ -1134,6 +1299,21 @@ fn insert_tariff_voice(
     tariff_book_id: &str,
     voice: &TariffVoiceRecord,
 ) -> Result<(), AppError> {
+    let linked_maggiorazioni_json = if voice.linked_maggiorazioni.is_empty() {
+        None
+    } else {
+        Some(
+            serde_json::to_string(&voice.linked_maggiorazioni)
+                .map_err(|error| AppError::Validation(error.to_string()))?,
+        )
+    };
+    let applicability_rules_json = voice
+        .applicability_rules
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(|error| AppError::Validation(error.to_string()))?;
+
     connection
         .execute(
             "INSERT OR REPLACE INTO tariff_voices (
@@ -1144,8 +1324,10 @@ fn insert_tariff_voice(
                 category,
                 unit_of_measure,
                 labor_percentage,
-                unit_price_cents
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                unit_price_cents,
+                linked_maggiorazioni,
+                applicability_rules
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 voice.id,
                 tariff_book_id,
@@ -1154,7 +1336,9 @@ fn insert_tariff_voice(
                 voice.category,
                 voice.unit_of_measure,
                 voice.labor_percentage,
-                money_to_cents(voice.unit_price)
+                money_to_cents(voice.unit_price),
+                linked_maggiorazioni_json,
+                applicability_rules_json
             ],
         )
         .map_err(to_database_error)?;
@@ -1174,6 +1358,8 @@ fn map_tariff_book_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TariffBookRe
 
 fn map_tariff_voice_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TariffVoiceRecord> {
     let amount_cents: i64 = row.get(6)?;
+    let linked_maggiorazioni_json: Option<String> = row.get(8)?;
+    let applicability_rules_json: Option<String> = row.get(9)?;
 
     Ok(TariffVoiceRecord {
         id: row.get(0)?,
@@ -1189,6 +1375,17 @@ fn map_tariff_voice_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TariffVoice
         voce: String::new(),
         voce_desc: String::new(),
         warnings: Vec::new(),
+        is_maggiorazione: false,
+        source: None,
+        confidence: None,
+        issues: Vec::new(),
+        review_flags: Vec::new(),
+        warning_ids: Vec::new(),
+        linked_maggiorazioni: linked_maggiorazioni_json
+            .and_then(|value| serde_json::from_str(&value).ok())
+            .unwrap_or_default(),
+        applicability_rules: applicability_rules_json
+            .and_then(|value| serde_json::from_str(&value).ok()),
     })
 }
 
@@ -1316,6 +1513,14 @@ mod tests {
                     voce: String::new(),
                     voce_desc: String::new(),
                     warnings: Vec::new(),
+                    is_maggiorazione: false,
+                    source: None,
+                    confidence: None,
+                    issues: Vec::new(),
+                    review_flags: Vec::new(),
+                    warning_ids: Vec::new(),
+                    linked_maggiorazioni: Vec::new(),
+                    applicability_rules: None,
                 }],
                 year: 2025,
             },
@@ -1376,6 +1581,14 @@ mod tests {
                 voce: String::new(),
                 voce_desc: String::new(),
                 warnings: Vec::new(),
+                is_maggiorazione: false,
+                source: None,
+                confidence: None,
+                issues: Vec::new(),
+                review_flags: Vec::new(),
+                warning_ids: Vec::new(),
+                linked_maggiorazioni: Vec::new(),
+                applicability_rules: None,
             }],
             year: 2025,
         };
@@ -1395,6 +1608,14 @@ mod tests {
             voce: String::new(),
             voce_desc: String::new(),
             warnings: Vec::new(),
+            is_maggiorazione: false,
+            source: None,
+            confidence: None,
+            issues: Vec::new(),
+            review_flags: Vec::new(),
+            warning_ids: Vec::new(),
+            linked_maggiorazioni: Vec::new(),
+            applicability_rules: None,
         }];
 
         create_tariff_book(&mut connection, request).expect("reimport replaces voices");
@@ -1434,6 +1655,14 @@ mod tests {
                     voce: String::new(),
                     voce_desc: String::new(),
                     warnings: Vec::new(),
+                    is_maggiorazione: false,
+                    source: None,
+                    confidence: None,
+                    issues: Vec::new(),
+                    review_flags: Vec::new(),
+                    warning_ids: Vec::new(),
+                    linked_maggiorazioni: Vec::new(),
+                    applicability_rules: None,
                 }],
                 year: 2026,
             },
@@ -1461,6 +1690,14 @@ mod tests {
                     voce: String::new(),
                     voce_desc: String::new(),
                     warnings: Vec::new(),
+                    is_maggiorazione: false,
+                    source: None,
+                    confidence: None,
+                    issues: Vec::new(),
+                    review_flags: Vec::new(),
+                    warning_ids: Vec::new(),
+                    linked_maggiorazioni: Vec::new(),
+                    applicability_rules: None,
                 }],
                 year: 2026,
             },

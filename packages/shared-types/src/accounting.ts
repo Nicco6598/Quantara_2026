@@ -81,6 +81,14 @@ export type DesktopTariffVoiceRecord = {
   voce?: string;
   voceDesc?: string;
   warnings?: TariffWarning[];
+  isMaggiorazione?: boolean;
+  source?: TariffSourceRef;
+  confidence?: number;
+  issues?: string[];
+  reviewFlags?: string[];
+  warningIds?: string[];
+  linkedMaggiorazioni?: string[];
+  applicabilityRules?: TariffApplicabilityRules;
 };
 
 export type DesktopTariffVoiceCountRecord = {
@@ -90,8 +98,64 @@ export type DesktopTariffVoiceCountRecord = {
 
 export type TariffWarning = {
   id: string;
+  scope?: string;
+  refCode?: string;
   title: string;
   body: string;
+  type?: string;
+  confidence?: number;
+  issues?: string[];
+  maggiorazioneRefs?: string[];
+  appliesToRefs?: string[];
+};
+
+export type TariffSourceRef = {
+  file?: string;
+  page?: number | null;
+  line?: number | null;
+  normalized?: boolean;
+};
+
+export type TariffApplicabilityRules = {
+  mentionsMaggiorazione?: boolean;
+  quotaManodoperaOnly?: boolean;
+  conditions?: string[];
+};
+
+export type TariffMaggiorazioneRule = {
+  id: string;
+  warningId?: string;
+  sourceRef?: string;
+  sourceScope?: string;
+  appliesToRefs?: string[];
+  targetMaggiorazioni?: string[];
+  base?: string;
+  percentage?: number | null;
+  conditions?: string[];
+  confidence?: string;
+  requiresHumanValidation?: boolean;
+  title?: string;
+};
+
+export type TariffValidationReport = {
+  schemaVersion?: string;
+  extractor?: string;
+  pagesTotal?: number;
+  counts?: Record<string, number>;
+  confidence?: Record<string, number>;
+  issuesByType?: Record<string, number>;
+  reviewFlagsByType?: Record<string, number>;
+  warningsByScope?: Record<string, number>;
+  warningsByType?: Record<string, number>;
+  warningIssuesByType?: Record<string, number>;
+  duplicateCodeSample?: string[];
+  unresolvedLocalMaggiorazioneRefs?: string[];
+  reviewQueue?: Array<{
+    codice?: string;
+    confidence?: number;
+    issues?: string[];
+    source?: TariffSourceRef;
+  }>;
 };
 
 export type CreateDesktopTariffBookRecordRequest = DesktopTariffBookRecord & {
@@ -107,6 +171,9 @@ export type TariffPdfMetadataRecord = {
   year: number;
   pagesTotal?: number;
   pagesParsed?: number;
+  warnings?: TariffWarning[];
+  maggiorazioneRules?: TariffMaggiorazioneRule[];
+  validationReport?: TariffValidationReport;
 };
 
 export type TariffVoiceCategory =

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
+import { useToast } from "@/components/shared/ToastProvider";
+import { reportUserActionError } from "@/lib/user-action-error";
 import { SelectedVoicesPanel } from "../components/SalCreationTables";
-import type { SalLineDraft, SalLineView, SalMeasurementRowDraft } from "../types";
+import type { SalEconomicRules, SalLineDraft, SalLineView, SalMeasurementRowDraft } from "../types";
 import { createMeasurementId } from "../types";
 
 export function MeasureStep({
+  economicRules,
   lineViews,
   onAddMeasurementRow,
+  onAllocateMg,
   onDuplicateMeasurementRow,
   onRemoveMeasurementRow,
   onUpdateMeasurementRow,
@@ -15,8 +19,10 @@ export function MeasureStep({
   onSurcharge,
   onPasteLine,
 }: {
+  economicRules: SalEconomicRules;
   lineViews: SalLineView[];
   onAddMeasurementRow: (lineId: string) => void;
+  onAllocateMg: (mgLineId: string, targetLineIds: string[]) => void;
   onDuplicateMeasurementRow: (lineId: string, measurementId: string) => void;
   onRemoveMeasurementRow: (lineId: string, measurementId: string) => void;
   onUpdateMeasurementRow: (
@@ -29,6 +35,7 @@ export function MeasureStep({
   onSurcharge: (lineId: string, p: number) => void;
   onPasteLine: (d: SalLineDraft) => void;
 }) {
+  const { notify } = useToast();
   const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
   const lastInteractedRef = useRef<string | null>(null);
 
@@ -45,14 +52,39 @@ export function MeasureStep({
         voice: line.voice,
       };
       setCopiedLine(draft);
-      navigator.clipboard.writeText(JSON.stringify({ __salDraft: true, ...draft })).catch(() => {});
+      if (!navigator.clipboard?.writeText) {
+        notify({
+          message:
+            "Clipboard di sistema non disponibile. Puoi usare il pulsante Incolla voce copiata.",
+          title: "Copia locale",
+          tone: "warning",
+        });
+        return;
+      }
+      navigator.clipboard.writeText(JSON.stringify({ __salDraft: true, ...draft })).catch((error) =>
+        reportUserActionError(error, {
+          action: "copy-line",
+          area: "sal",
+          notify,
+          title: "Copia non riuscita",
+          userMessage: "Non sono riuscito a copiare la voce negli appunti.",
+        }),
+      );
     },
-    [lineViews],
+    [lineViews, notify],
   );
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+        if (!navigator.clipboard?.readText) {
+          notify({
+            message: "Clipboard di sistema non disponibile.",
+            title: "Incolla non disponibile",
+            tone: "warning",
+          });
+          return;
+        }
         navigator.clipboard
           .readText()
           .then((text) => {
@@ -65,12 +97,20 @@ export function MeasureStep({
               /* not our clipboard format */
             }
           })
-          .catch(() => {});
+          .catch((error) =>
+            reportUserActionError(error, {
+              action: "paste-line",
+              area: "sal",
+              notify,
+              title: "Incolla non riuscito",
+              userMessage: "Non sono riuscito a leggere gli appunti.",
+            }),
+          );
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onPasteLine]);
+  }, [notify, onPasteLine]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -84,8 +124,10 @@ export function MeasureStep({
         onKeyDown={() => {}}
       >
         <SelectedVoicesPanel
+          economicRules={economicRules}
           lines={lineViews}
           copiedVoiceId={copiedLine?.id ?? null}
+          onAllocateMg={onAllocateMg}
           onCopyLine={handleCopyLine}
           onAddMeasurementRow={onAddMeasurementRow}
           onDuplicateMeasurementRow={onDuplicateMeasurementRow}

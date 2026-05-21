@@ -2,7 +2,11 @@ import type { DesktopContract, DesktopTariffBook, TariffPdfMetadata } from "@/li
 import type { TariffMetrics } from "../tariffs-types";
 
 export function getMetadataKey(meta: TariffPdfMetadata) {
-  return `${meta.name}||${meta.sourceName}||${meta.year}`;
+  return `${normalizeMetadataPart(meta.name)}||${normalizeMetadataPart(meta.sourceName)}||${meta.year}`;
+}
+
+function normalizeMetadataPart(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("it-IT");
 }
 
 export function buildTariffMetrics(tariffBooks: readonly DesktopTariffBook[]): TariffMetrics {

@@ -287,6 +287,17 @@ export function SalCreationScreen() {
     upsertLine,
   } = useSalLineActions({ lines, notify, setLines });
 
+  const handleAllocateMg = useCallback(
+    (mgLineId: string, targetLineIds: string[]) => {
+      setEconomicRules((prev) => {
+        const nextAlloc = { ...(prev.mgManualAllocations ?? {}) };
+        nextAlloc[mgLineId] = targetLineIds;
+        return { ...prev, mgManualAllocations: nextAlloc };
+      });
+    },
+    [setEconomicRules],
+  );
+
   const handleApplyTemplate = useCallback(
     (template: SalTemplate) => {
       const newLines: SalLineDraft[] = [];
@@ -708,6 +719,7 @@ export function SalCreationScreen() {
               unit: row.unit,
             })),
             netAmount: line.netAmount,
+            notes: line.notes,
             quantity: line.quantity,
             surchargePercent: line.surchargePercent,
             totalAmount: line.totalAmount,
@@ -935,7 +947,9 @@ export function SalCreationScreen() {
 
                 {phase === "measure" && (
                   <MeasureStep
+                    economicRules={economicRules}
                     lineViews={lineViews}
+                    onAllocateMg={handleAllocateMg}
                     onAddMeasurementRow={addMeasurementRow}
                     onDuplicateMeasurementRow={duplicateMeasurementRow}
                     onRemoveMeasurementRow={removeMeasurementRow}

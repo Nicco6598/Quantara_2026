@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Info, Plus, Trash2, WandSparkles, X } from "lucide-react";
+import { AlertTriangle, Info, Link2, MapPin, Plus, Trash2, WandSparkles, X } from "lucide-react";
 import {
   forwardRef,
   memo,
@@ -18,9 +18,10 @@ import type { VoiceGroup } from "../utils/tariff-grouping";
 import { formatEditablePercent } from "../utils/tariffs-validation";
 
 const CELL_BASE =
-  "h-8 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-12px font-semibold text-[var(--text-primary)] outline-none transition duration-[var(--duration-fast)] ease-standard focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
-const CELL_EDIT = "border-transparent hover:border-[var(--border-subtle)]";
-const GRID_COLS = "grid grid-cols-[160px_minmax(360px,1fr)_80px_100px_110px_36px] gap-3 px-5 py-2";
+  "h-9 min-w-0 flex-1 rounded-lg border bg-[var(--surface-base)]/54 px-2.5 text-12px font-semibold text-[var(--text-primary)] outline-none shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_45%,transparent)] transition duration-[var(--duration-fast)] ease-standard focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]";
+const CELL_EDIT =
+  "border-[color-mix(in_srgb,var(--border-subtle)_92%,var(--text-secondary)_8%)] hover:border-[var(--accent-primary)]/60 hover:bg-[var(--surface-base)]";
+const GRID_COLS = "grid grid-cols-[180px_minmax(460px,1fr)_78px_92px_108px_34px] gap-2.5 px-3 py-2";
 
 export type TariffGridSectionSummary = {
   id: string;
@@ -210,6 +211,92 @@ function ImportCell({
   );
 }
 
+function VoiceAuditPills({ voice }: { voice: DesktopTariffVoice }) {
+  const issueCount = (voice.issues?.length ?? 0) + (voice.reviewFlags?.length ?? 0);
+  const linkedCount = voice.linkedMaggiorazioni?.length ?? 0;
+  const confidence =
+    typeof voice.confidence === "number" ? Math.round(voice.confidence * 100) : null;
+  const sourcePage = voice.source?.page;
+
+  if (issueCount === 0 && linkedCount === 0 && confidence == null && sourcePage == null)
+    return null;
+
+  return (
+    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+      {confidence != null ? (
+        <span
+          className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-9px font-bold tabular-nums ${
+            confidence >= 90
+              ? "bg-[var(--success-soft)] text-[var(--success-base)]"
+              : confidence >= 80
+                ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                : "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+          }`}
+          title="Confidenza parser"
+        >
+          {confidence}%
+        </span>
+      ) : null}
+      {sourcePage != null ? (
+        <span
+          className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-muted)] px-1.5 py-0.5 text-9px font-bold text-[var(--text-secondary)]"
+          title={`Pagina sorgente ${sourcePage}${voice.source?.line ? `, riga ${voice.source.line}` : ""}`}
+        >
+          <MapPin className="size-2.5" />
+          p.{sourcePage}
+        </span>
+      ) : null}
+      {linkedCount > 0 ? (
+        <span
+          className="inline-flex items-center gap-1 rounded-md bg-[var(--info-soft)] px-1.5 py-0.5 text-9px font-bold text-[var(--info-base)]"
+          title="Maggiorazioni collegate"
+        >
+          <Link2 className="size-2.5" />
+          {linkedCount}
+        </span>
+      ) : null}
+      {issueCount > 0 ? (
+        <span
+          className="inline-flex items-center gap-1 rounded-md bg-[var(--warning-soft)] px-1.5 py-0.5 text-9px font-bold text-[var(--warning-base)]"
+          title={[...(voice.issues ?? []), ...(voice.reviewFlags ?? [])].join(", ")}
+        >
+          <AlertTriangle className="size-2.5" />
+          {issueCount}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function VoiceContextLine({ voice }: { voice: DesktopTariffVoice }) {
+  const warningCount = voice.warnings?.length ?? 0;
+  const rules = voice.applicabilityRules;
+  const conditions = rules?.conditions ?? [];
+  const parts = [
+    voice.voceDesc ? `Voce: ${voice.voceDesc}` : "",
+    voice.gruppoDesc ? `Gruppo: ${voice.gruppoDesc}` : "",
+    conditions.length > 0 ? `Condizioni: ${conditions.map(formatAuditLabel).join(", ")}` : "",
+    rules?.quotaManodoperaOnly ? "Quota manodopera" : "",
+  ].filter(Boolean);
+
+  if (parts.length === 0 && warningCount === 0) return null;
+
+  return (
+    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-2.5 text-10px font-semibold leading-4 text-[var(--text-tertiary)]">
+      {parts.slice(0, 3).map((part) => (
+        <span className="max-w-full truncate" key={part}>
+          {part}
+        </span>
+      ))}
+      {warningCount > 0 ? (
+        <span className="rounded-md bg-[var(--warning-soft)] px-1.5 py-0.5 text-[var(--warning-base)]">
+          {warningCount} avv.
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function DescriptionCell({
   draftValue,
   field,
@@ -254,7 +341,7 @@ function DescriptionCell({
 
   return (
     <textarea
-      className={`min-h-[34px] w-full resize-none rounded-md border border-transparent bg-transparent px-2.5 py-2 text-12px font-semibold leading-1_45 text-[var(--text-primary)] outline-none transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-standard hover:border-[var(--border-subtle)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
+      className={`min-h-[34px] w-full resize-none rounded-lg border border-[color-mix(in_srgb,var(--border-subtle)_92%,var(--text-secondary)_8%)] bg-[var(--surface-base)]/54 px-2.5 py-2 text-12px font-semibold leading-1_45 text-[var(--text-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_45%,transparent)] outline-none transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-standard hover:border-[var(--accent-primary)]/60 hover:bg-[var(--surface-base)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
         highlighted
           ? "border-[var(--warning-base)] bg-[color-mix(in_srgb,var(--warning-base)_10%,var(--surface-base)_90%)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--warning-base)_18%,transparent)]"
           : ""
@@ -307,11 +394,11 @@ type FlatGridItem =
   | {
       gruppo: string;
       gruppoDesc: string;
-      hasWarnings: boolean;
       key: string;
       rowsCount: number;
       type: "group";
       voiceGroupCount: number;
+      warningCount: number;
     }
   | { key: string; type: "columns" }
   | {
@@ -342,32 +429,46 @@ const VoiceRow = memo(function VoiceRow({
 
   return (
     <div
-      className={`${GRID_COLS} min-w-[900px] items-center [contain:layout_style] [content-visibility:auto] [contain-intrinsic-size:auto_44px] ${
-        isDuplicate ? "bg-[var(--warning-soft)]/25" : ""
-      } ${index % 2 === 0 && !isDuplicate ? "bg-[var(--surface-base)]/55" : ""} ${
-        isInvalid && !isDuplicate ? "border-l-2 border-l-[var(--warning-base)]/50" : ""
+      className={`${GRID_COLS} min-w-[980px] items-start rounded-xl border [contain:layout_style] [content-visibility:auto] [contain-intrinsic-size:auto_58px] ${
+        isDuplicate
+          ? "border-[var(--warning-base)]/28 bg-[var(--warning-soft)]/22"
+          : "border-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_46%,transparent)]"
+      } ${
+        index % 2 === 0 && !isDuplicate
+          ? "bg-[color-mix(in_srgb,var(--surface-base)_62%,transparent)]"
+          : ""
+      } ${
+        isInvalid && !isDuplicate
+          ? "border-l-[var(--warning-base)] shadow-[inset_3px_0_0_var(--warning-base)]"
+          : ""
       }`}
       data-voice-id={voice.id}
     >
-      <ImportCell
-        draftValue={getDraftValue("officialCode")}
-        field="officialCode"
-        highlighted={isHighlighted("officialCode")}
-        index={index}
-        onDraftChange={onDraftChange}
-        onDraftDiscard={onDraftDiscard}
-        value={voice.officialCode}
-        warnings={voice.warnings}
-      />
-      <DescriptionCell
-        draftValue={getDraftValue("description")}
-        field="description"
-        highlighted={isHighlighted("description")}
-        index={index}
-        onDraftChange={onDraftChange}
-        onDraftDiscard={onDraftDiscard}
-        value={voice.description}
-      />
+      <div className="min-w-0">
+        <ImportCell
+          draftValue={getDraftValue("officialCode")}
+          field="officialCode"
+          highlighted={isHighlighted("officialCode")}
+          index={index}
+          onDraftChange={onDraftChange}
+          onDraftDiscard={onDraftDiscard}
+          value={voice.officialCode}
+          warnings={voice.warnings}
+        />
+        <VoiceAuditPills voice={voice} />
+      </div>
+      <div className="min-w-0">
+        <DescriptionCell
+          draftValue={getDraftValue("description")}
+          field="description"
+          highlighted={isHighlighted("description")}
+          index={index}
+          onDraftChange={onDraftChange}
+          onDraftDiscard={onDraftDiscard}
+          value={voice.description}
+        />
+        <VoiceContextLine voice={voice} />
+      </div>
       <ImportCell
         draftValue={getDraftValue("unitOfMeasure")}
         field="unitOfMeasure"
@@ -554,10 +655,6 @@ export const EditableTariffVoicesGrid = memo(
       const flatItems = useMemo<FlatGridItem[]>(() => {
         const items: FlatGridItem[] = [];
 
-        if (onAddVoice) {
-          items.push({ key: "add-voice", type: "add" });
-        }
-
         for (const section of sections) {
           const sectionRowsCount = section.groups.reduce(
             (sum, group) =>
@@ -577,17 +674,23 @@ export const EditableTariffVoicesGrid = memo(
               (sum, voice) => sum + voice.children.length,
               0,
             );
-            const hasWarnings = group.voci.some((voice) =>
-              voice.children.some((child) => (child.voice.warnings?.length ?? 0) > 0),
+            const warningCount = group.voci.reduce(
+              (sum, voice) =>
+                sum +
+                voice.children.reduce(
+                  (rowSum, child) => rowSum + (child.voice.warnings?.length ?? 0),
+                  0,
+                ),
+              0,
             );
             items.push({
               gruppo: group.gruppo,
               gruppoDesc: group.gruppoDesc,
-              hasWarnings,
               key: `group-${section.categoria}-${group.gruppo}`,
               rowsCount: groupRowsCount,
               type: "group",
               voiceGroupCount: group.voci.length,
+              warningCount,
             });
 
             for (const voiceGroup of group.voci) {
@@ -619,7 +722,7 @@ export const EditableTariffVoicesGrid = memo(
         });
 
         return items;
-      }, [groups.length, onAddVoice, sections, totalVoices]);
+      }, [groups.length, sections, totalVoices]);
 
       const virtualizer = useVirtualizer({
         count: flatItems.length,
@@ -630,9 +733,9 @@ export const EditableTariffVoicesGrid = memo(
           if (item.type === "category") return 66;
           if (item.type === "group") return 58;
           if (item.type === "voice") return 50;
-          if (item.type === "columns") return 38;
+          if (item.type === "columns") return 36;
           if (item.type === "footer") return 54;
-          return 48;
+          return 62;
         },
         getItemKey: (index) => flatItems[index]?.key ?? index,
         getScrollElement: () => scrollParentRef.current,
@@ -653,7 +756,7 @@ export const EditableTariffVoicesGrid = memo(
           group: 58,
           voice: 50,
           columns: 38,
-          row: 48,
+          row: 62,
           footer: 54,
         };
 
@@ -770,18 +873,40 @@ export const EditableTariffVoicesGrid = memo(
       return (
         <div>
           {sections.length === 0 ? (
-            <div className="rounded-2xl bg-[var(--bg-muted)]/50 p-6 text-center text-13px font-medium text-[var(--text-secondary)]">
+            <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 p-8 text-center text-13px font-medium text-[var(--text-secondary)]">
               Nessuna voce da importare.
             </div>
           ) : (
-            <div className="rounded-18px border border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[var(--surface-base)] shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]">
+            <div className="overflow-hidden">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)]/70 pb-3">
+                <div className="min-w-0">
+                  <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-tertiary)]">
+                    Ledger voci estratte
+                  </div>
+                  <div className="mt-1 text-13px font-semibold text-[var(--text-secondary)]">
+                    {totalVoices.toLocaleString("it-IT")} righe in{" "}
+                    {groups.length.toLocaleString("it-IT")} voci, virtualizzate
+                  </div>
+                </div>
+                {onAddVoice ? (
+                  <button
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/56 px-3 text-12px font-bold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+                    onClick={onAddVoice}
+                    title="Aggiungi voce personalizzata"
+                    type="button"
+                  >
+                    <Plus className="size-3.5" />
+                    Nuova voce
+                  </button>
+                ) : null}
+              </div>
               <div
                 data-tariff-virtual-scroll="true"
-                className="max-h-[72vh] min-h-[520px] overflow-auto px-4 py-4"
+                className="max-h-[72vh] min-h-[520px] overflow-auto pr-2"
                 ref={scrollParentRef}
               >
                 <div
-                  className="relative"
+                  className="relative min-w-[980px]"
                   style={{
                     height: `${virtualizer.getTotalSize()}px`,
                   }}
@@ -792,7 +917,7 @@ export const EditableTariffVoicesGrid = memo(
 
                     return (
                       <div
-                        className="absolute left-0 top-0 w-full"
+                        className="absolute left-0 top-0 w-full pb-2"
                         data-index={virtualItem.index}
                         key={virtualItem.key}
                         ref={virtualizer.measureElement}
@@ -864,12 +989,21 @@ function VirtualGridItem({
 
   if (item.type === "category") {
     return (
-      <div className="scroll-mt-24 pt-5 pb-3" data-category={item.categoria} id={item.id}>
-        <div className="flex items-center gap-3">
-          <h4 className="text-18px font-semibold tracking-neg-0_03em text-[var(--text-primary)]">
-            Categorie {item.categoria || "Altre"}
-          </h4>
-          <span className="rounded-full bg-[var(--bg-muted-strong)] px-3 py-1 text-12px font-bold text-[var(--text-secondary)]">
+      <div
+        className="scroll-mt-24 border-b border-[var(--border-subtle)]/70 pt-5 pb-3"
+        data-category={item.categoria}
+        id={item.id}
+      >
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-tertiary)]">
+              Categoria
+            </div>
+            <h4 className="mt-1 text-24px font-semibold leading-none tracking-neg-0_035em text-[var(--text-primary)]">
+              {item.categoria || "Altre"}
+            </h4>
+          </div>
+          <span className="rounded-lg bg-[var(--surface-base)]/56 px-3 py-1.5 text-12px font-bold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/70">
             {item.rowsCount.toLocaleString("it-IT")}
           </span>
         </div>
@@ -879,20 +1013,24 @@ function VirtualGridItem({
 
   if (item.type === "group") {
     return (
-      <div className="rounded-t-18px border border-b-0 border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] px-5 py-3.5">
+      <div className="rounded-xl border border-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_42%,transparent)] px-3 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="rounded-md bg-[var(--info-soft)] px-2 py-1 text-12px font-bold text-[var(--info-base)]">
+            <span className="rounded-lg bg-[var(--info-soft)] px-2.5 py-1 text-12px font-bold text-[var(--info-base)]">
               {item.gruppo}
             </span>
             {item.gruppoDesc ? (
-              <span className="min-w-0 truncate text-13px font-bold text-[var(--text-secondary)]">
+              <span className="min-w-0 truncate text-13px font-bold text-[var(--text-primary)]">
                 {item.gruppoDesc}
               </span>
             ) : null}
-            {item.hasWarnings ? (
-              <span className="flex size-5 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
-                <Info className="size-3" />
+            {item.warningCount > 0 ? (
+              <span
+                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--warning-soft)] px-2.5 text-11px font-bold text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20"
+                title={`${item.warningCount.toLocaleString("it-IT")} avvertenze nel gruppo`}
+              >
+                <Info className="size-3.5" />
+                {item.warningCount.toLocaleString("it-IT")} avv.
               </span>
             ) : null}
           </div>
@@ -906,8 +1044,8 @@ function VirtualGridItem({
 
   if (item.type === "voice") {
     return (
-      <div className="flex items-center gap-3 border-x border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[var(--bg-muted)]/45 px-5 py-3">
-        <span className="rounded-md bg-[var(--warning-soft)] px-2.5 py-1 text-11px font-bold text-[var(--accent-primary)]">
+      <div className="flex items-center gap-3 rounded-xl bg-[var(--bg-muted)]/40 px-3 py-2.5">
+        <span className="rounded-lg bg-[var(--surface-base)]/70 px-2.5 py-1 text-11px font-bold text-[var(--accent-primary)] ring-1 ring-[var(--border-subtle)]/60">
           VOCE {item.voce}
         </span>
         {item.voceDesc ? (
@@ -925,7 +1063,7 @@ function VirtualGridItem({
   if (item.type === "columns") {
     return (
       <div
-        className={`${GRID_COLS} min-w-[900px] border-x border-b border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] text-10px font-bold uppercase tracking-0_08em text-[var(--text-secondary)]`}
+        className={`${GRID_COLS} min-w-[980px] rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_62%,transparent)] text-10px font-bold uppercase tracking-0_08em text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/45`}
       >
         <span>Codice</span>
         <span>Descrizione</span>
@@ -948,7 +1086,7 @@ function VirtualGridItem({
       invalidCellKeys.has(`${item.index}-unitPrice`);
 
     return (
-      <div className="border-x border-b border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)]">
+      <div>
         <VoiceRow
           draftByCellRef={draftByCellRef}
           highlightedField={highlightedCell?.rowIndex === item.index ? highlightedCell.field : null}
@@ -966,7 +1104,7 @@ function VirtualGridItem({
 
   return (
     <div className="pt-4">
-      <div className="rounded-xl border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/40 px-5 py-3 text-12px font-medium text-[var(--text-secondary)]">
+      <div className="rounded-xl border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/30 px-5 py-3 text-12px font-medium text-[var(--text-secondary)]">
         {item.totalVoices.toLocaleString("it-IT")} sottovoci in{" "}
         {item.groupCount.toLocaleString("it-IT")} voci
       </div>
@@ -977,4 +1115,8 @@ function VirtualGridItem({
 function createCategoryId(categoria: string): string {
   const safeCategoria = categoria.replace(/[^a-zA-Z0-9_-]+/g, "-") || "altre";
   return `tariff-cat-${safeCategoria}`;
+}
+
+function formatAuditLabel(value: string): string {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }

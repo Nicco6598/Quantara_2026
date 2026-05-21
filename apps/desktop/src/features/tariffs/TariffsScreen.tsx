@@ -12,8 +12,11 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { MetricCard } from "@/components/shared/MetricCard";
+import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
+import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
+import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useToast } from "@/components/shared/ToastProvider";
 
 import {
@@ -71,6 +74,20 @@ import {
   getProjectTariffBookIds,
 } from "./utils/tariffs-screen-model";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
+
+function keepLatestImportPerMetadataKey(
+  metadatas: readonly TariffImportPreviewResult[],
+): TariffImportPreviewResult[] {
+  const latestByKey = new Map<string, TariffImportPreviewResult>();
+  for (const metadata of metadatas) {
+    latestByKey.set(getMetadataKey(metadata), metadata);
+  }
+  return [...latestByKey.values()];
+}
+
+function yieldToBrowser(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 0));
+}
 
 export function TariffsScreen() {
   const FAVORITES_STORAGE_KEY = STORAGE_KEYS.tariffFavoriteBookIds;
@@ -278,6 +295,8 @@ export function TariffsScreen() {
         : baseFilteredTariffBooks,
     [activeCatalogTab, baseFilteredTariffBooks, favoriteBookIdSet],
   );
+
+  const deleteSelect = useMultiSelectDelete(visibleTariffBooks);
 
   const selectedTariffBook =
     tariffBooksState.data.find((book) => book.id === selectedTariffBookId) ??
@@ -530,95 +549,104 @@ export function TariffsScreen() {
 
     let importedCount = 0;
     let totalVoices = 0;
-    const allSavedVoices: DesktopTariffVoice[] = [];
-    const existingBookIdByMetadataKey = new Map(
-      tariffBooksState.data.map((book) => [
-        getMetadataKey({
-          name: book.name,
-          sourceName: book.sourceName,
-          voices: [],
-          year: book.year,
-        }),
+    const savedBooks: DesktopTariffBook[] = [];
+    let lastSavedResult: { tariffBookId: string; voices: DesktopTariffVoice[] } | null = null;
+    const savedVoiceEntries: Array<[string, DesktopTariffVoice[]]> = [];
+    const duplicateBookIdsToDelete = new Set<string>();
+    const existingBookIdsByMetadataKey = new Map<string, string[]>();
+
+    for (const book of tariffBooksState.data) {
+      const key = getMetadataKey({
+        name: book.name,
+        sourceName: book.sourceName,
+        voices: [],
+        year: book.year,
+      });
+      existingBookIdsByMetadataKey.set(key, [
+        ...(existingBookIdsByMetadataKey.get(key) ?? []),
         book.id,
-      ]),
+      ]);
+    }
+
+    const latestMetadatas = keepLatestImportPerMetadataKey(
+      metadatas.filter((metadata) => metadata.voices.length > 0),
     );
 
-    const ops = metadatas
-      .filter((m) => m.voices.length > 0)
-      .map(async (metadata) => {
-        const existingBookId =
-          metadata.existingBookId ?? existingBookIdByMetadataKey.get(getMetadataKey(metadata));
-        const tariffBookId = existingBookId ?? createTariffBookId(metadata);
-        const voices = metadata.voices.map((voice) => ({
-          ...voice,
-          id: `voice_${tariffBookId}_${sanitizeIdentifier(voice.officialCode)}`,
-          tariffBookId,
-        }));
+    for (const metadata of latestMetadatas) {
+      const existingBookIds = existingBookIdsByMetadataKey.get(getMetadataKey(metadata)) ?? [];
+      const existingBookId = metadata.existingBookId ?? existingBookIds[0];
+      const tariffBookId = existingBookId ?? createTariffBookId(metadata);
+      const voices = metadata.voices.map((voice) => ({
+        ...voice,
+        id: `voice_${tariffBookId}_${sanitizeIdentifier(voice.officialCode)}`,
+        tariffBookId,
+      }));
 
-        try {
-          if (existingBookId) {
-            const updated = await updateDesktopTariffBook(existingBookId, {
-              name: metadata.name,
-              sourceName: metadata.sourceName,
-              status: metadata.importStatus,
-              voices,
-              year: metadata.year,
-            });
-
-            setTariffBooksState((current) => ({
-              data: current.data.map((b) => (b.id === existingBookId ? updated : b)),
-              ...(current.source === "fallback"
-                ? { message: "Runtime browser: modifica in anteprima.", source: "fallback" }
-                : { source: "desktop" }),
-            }));
-            setSelectedTariffBookId(existingBookId);
-          } else {
-            const book = await createDesktopTariffBook({
-              id: tariffBookId,
-              name: metadata.name,
-              sourceName: metadata.sourceName,
-              status: metadata.importStatus,
-              voices,
-              year: metadata.year,
-            });
-
-            setTariffBooksState((current) => ({
-              data: [book, ...current.data.filter((item) => item.id !== book.id)],
-              ...(current.source === "fallback"
-                ? { message: "Runtime browser: import in anteprima.", source: "fallback" }
-                : { source: "desktop" }),
-            }));
-            setSelectedTariffBookId(book.id);
-          }
-
-          return { tariffBookId, voices };
-        } catch (error) {
-          notify({
-            message: `${metadata.name}: ${error instanceof Error ? error.message : String(error)}`,
-            title: existingBookId ? "Aggiornamento non riuscito" : "Importazione non riuscita",
-            tone: "danger",
+      try {
+        let savedBook: DesktopTariffBook;
+        if (existingBookId) {
+          savedBook = await updateDesktopTariffBook(existingBookId, {
+            name: metadata.name,
+            sourceName: metadata.sourceName,
+            status: metadata.importStatus,
+            voices,
+            year: metadata.year,
           });
-          return null;
+        } else {
+          savedBook = await createDesktopTariffBook({
+            id: tariffBookId,
+            name: metadata.name,
+            sourceName: metadata.sourceName,
+            status: metadata.importStatus,
+            voices,
+            year: metadata.year,
+          });
         }
-      });
 
-    const results = await Promise.all(ops);
-
-    for (const result of results) {
-      if (result) {
-        const { tariffBookId, voices } = result;
-        savedVoiceMap.current = new Map(savedVoiceMap.current).set(tariffBookId, voices);
-        catalogRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        for (const duplicateId of existingBookIds) {
+          if (duplicateId !== tariffBookId) duplicateBookIdsToDelete.add(duplicateId);
+        }
+        savedBooks.push(savedBook);
+        savedVoiceEntries.push([tariffBookId, voices]);
+        lastSavedResult = { tariffBookId, voices };
         importedCount++;
         totalVoices += voices.length;
-        allSavedVoices.push(...voices);
+      } catch (error) {
+        notify({
+          message: `${metadata.name}: ${error instanceof Error ? error.message : String(error)}`,
+          title: existingBookId ? "Aggiornamento non riuscito" : "Importazione non riuscita",
+          tone: "danger",
+        });
       }
+
+      if (latestMetadatas.length > 4) {
+        await yieldToBrowser();
+      }
+    }
+
+    if (duplicateBookIdsToDelete.size > 0) {
+      for (const duplicateId of duplicateBookIdsToDelete) {
+        try {
+          await deleteDesktopTariffBook(duplicateId);
+        } catch {
+          /* best effort cleanup: refreshed catalog below remains the source of truth */
+        }
+      }
+    }
+
+    if (savedVoiceEntries.length > 0) {
+      const nextSavedVoiceMap = new Map(savedVoiceMap.current);
+      for (const [tariffBookId, voices] of savedVoiceEntries) {
+        nextSavedVoiceMap.set(tariffBookId, voices);
+      }
+      savedVoiceMap.current = nextSavedVoiceMap;
     }
 
     clearImport();
 
     if (importedCount > 0) {
-      const lastSavedResult = results.findLast((result) => result !== null);
+      const savedBookIds = new Set(savedBooks.map((book) => book.id));
+      const duplicateBookIds = duplicateBookIdsToDelete;
 
       setActiveCatalogTab("all");
       setProjectFilter("all");
@@ -626,9 +654,22 @@ export function TariffsScreen() {
       setStatusFilter("all");
       setYearFilter("all");
 
-      if (allSavedVoices.length > 0) {
-        setVoicesState({ data: lastSavedResult?.voices ?? allSavedVoices, source: "desktop" });
+      if (lastSavedResult?.voices.length) {
+        setVoicesState({ data: lastSavedResult.voices, source: "desktop" });
       }
+      setSelectedTariffBookId(lastSavedResult?.tariffBookId ?? savedBooks.at(-1)?.id ?? "");
+      setTariffBooksState((current) => ({
+        data: [
+          ...savedBooks.toReversed(),
+          ...current.data.filter(
+            (item) => !savedBookIds.has(item.id) && !duplicateBookIds.has(item.id),
+          ),
+        ],
+        ...(current.source === "fallback"
+          ? { message: "Runtime browser: import in anteprima.", source: "fallback" }
+          : { source: "desktop" }),
+      }));
+      catalogRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       dispatchDataChanged();
       try {
         const tariffBooks = await listDesktopTariffBooks(fallbackTariffBooks);
@@ -714,11 +755,6 @@ export function TariffsScreen() {
 
     return unsub;
   }, []);
-
-  function handleSelectTariffBook(book: DesktopTariffBook) {
-    setSelectedTariffBookId(book.id);
-    setEditingBookId(null);
-  }
 
   function handleShowTariffBookDetails(book: DesktopTariffBook) {
     setSelectedTariffBookId(book.id);
@@ -842,6 +878,83 @@ export function TariffsScreen() {
         tone: "danger",
       });
     }
+  }
+
+  async function handleBulkDelete() {
+    const selectedBooks = deleteSelect.selectedItems;
+    if (selectedBooks.length === 0) return;
+
+    const results = await Promise.allSettled(
+      selectedBooks.map((book) => deleteDesktopTariffBook(book.id)),
+    );
+    const deletedIds = new Set(
+      selectedBooks.filter((_, i) => results[i]?.status === "fulfilled").map((b) => b.id),
+    );
+    const failedCount = results.filter((r) => r.status === "rejected").length;
+
+    savedVoiceMap.current = new Map(savedVoiceMap.current);
+    for (const id of deletedIds) {
+      savedVoiceMap.current.delete(id);
+    }
+
+    try {
+      const { data: allContracts } = await listDesktopContracts([]);
+      for (const contract of allContracts) {
+        if (contract.tariffPriorities?.some((tp) => deletedIds.has(tp.tariffBookId))) {
+          await updateDesktopContract(contract.id, {
+            applicationContractCode: contract.applicationContractCode,
+            contractorName: contract.contractorName ?? null,
+            contractualAmount: contract.contractualAmount.amount,
+            frameworkAgreementCode: contract.frameworkAgreementCode,
+            id: contract.id,
+            osExcludedAmount: contract.osExcludedAmount ?? null,
+            tariffPriorities: contract.tariffPriorities.filter(
+              (tp) => !deletedIds.has(tp.tariffBookId),
+            ),
+            tenderDiscountPercent: contract.tenderDiscountPercent,
+            title: contract.title,
+          });
+        }
+      }
+    } catch {
+      // best-effort cleanup
+    }
+
+    setTariffBooksState((current) => ({
+      data: current.data.filter((book) => !deletedIds.has(book.id)),
+      ...(current.source === "fallback"
+        ? { message: "Runtime browser: eliminazione in anteprima.", source: "fallback" }
+        : { source: "desktop" }),
+    }));
+
+    if (deletedIds.has(selectedTariffBookId)) {
+      const remaining = tariffBooksState.data.filter((b) => !deletedIds.has(b.id));
+      setSelectedTariffBookId(remaining[0]?.id ?? "");
+    }
+    setDetailBookId((current) => (current != null && deletedIds.has(current) ? null : current));
+    setFavoriteBookIds((current) => current.filter((id) => !deletedIds.has(id)));
+    setEditingBookId((current) => (current != null && deletedIds.has(current) ? null : current));
+
+    dispatchDataChanged();
+    deleteSelect.onDeleted();
+
+    if (deletedIds.size === 0) {
+      notify({
+        message: "Nessun tariffario eliminato.",
+        title: "Eliminazione non riuscita",
+        tone: "danger",
+      });
+      return;
+    }
+
+    notify({
+      message:
+        failedCount > 0
+          ? `${deletedIds.size} tariffari eliminati, ${failedCount} operazioni non riuscite.`
+          : `${deletedIds.size} tariffari eliminati dal catalogo.`,
+      title: failedCount > 0 ? "Eliminazione parziale" : "Eliminati",
+      tone: failedCount > 0 ? "warning" : "success",
+    });
   }
 
   return (
@@ -1071,11 +1184,36 @@ export function TariffsScreen() {
                       }}
                     />
                   ) : null}
+                  <MultiSelectToggle
+                    isEnabled={deleteSelect.isEnabled}
+                    onToggle={deleteSelect.toggleEnable}
+                    count={deleteSelect.count}
+                  />
                 </div>
               </div>
 
+              {deleteSelect.count > 0 && (
+                <div className="px-3 pt-3 lg:px-4">
+                  <MultiSelectBulkDeleteBar
+                    allSelected={deleteSelect.allSelected}
+                    count={deleteSelect.count}
+                    entityLabel="tariffari"
+                    entityLabelSingular="tariffario"
+                    isDeleteConfirmOpen={deleteSelect.isConfirmOpen}
+                    onClear={deleteSelect.clear}
+                    onClose={deleteSelect.disable}
+                    onDeleteConfirm={handleBulkDelete}
+                    onDeleteConfirmDismiss={deleteSelect.dismissDelete}
+                    onDeleteRequest={deleteSelect.requestDelete}
+                    onSelectAll={() => deleteSelect.selectAll(visibleTariffBooks.map((b) => b.id))}
+                    selectedItemNames={deleteSelect.selectedItems.map((b) => b.name)}
+                    someSelected={deleteSelect.someSelected}
+                  />
+                </div>
+              )}
+
               <div ref={catalogRef}>
-                <div className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
                   {visibleTariffBooks.length > 0 ? (
                     visibleTariffBooks.map((book) => (
                       <TariffBookPreviewCard
@@ -1084,7 +1222,7 @@ export function TariffsScreen() {
                         editForm={editForm}
                         editing={editingBookId === book.id}
                         isFavorite={favoriteBookIdSet.has(book.id)}
-                        isSelected={selectedTariffBook.id === book.id}
+                        isSelected={deleteSelect.isSelected(book.id)}
                         linkedProjectCount={linkedProjectCountByTariffBookId.get(book.id) ?? 0}
                         onCancelEdit={() => setEditingBookId(null)}
                         onDelete={() => handleDeleteFromDropdown(book.id)}
@@ -1092,9 +1230,10 @@ export function TariffsScreen() {
                         onEditFormChange={setEditForm}
                         onOpenVoices={() => handleOpenVoices(book)}
                         onSaveEdit={handleSaveEdit}
-                        onSelect={() => handleSelectTariffBook(book)}
                         onShowDetails={() => handleShowTariffBookDetails(book)}
                         onToggleFavorite={() => handleToggleFavorite(book.id)}
+                        onToggleSelect={deleteSelect.toggle}
+                        showCheckbox={deleteSelect.isEnabled}
                         showDetails={detailBookId === book.id}
                         voiceCount={voiceCountByBookId[book.id]}
                       />

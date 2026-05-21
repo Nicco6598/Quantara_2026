@@ -497,6 +497,8 @@ export function TariffPanelDialog({
   filteredTariffBooks,
   onToggleTariffBook,
   onConfirm,
+  onSelectAll,
+  onClearAll,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -507,6 +509,8 @@ export function TariffPanelDialog({
   filteredTariffBooks: DesktopTariffBook[];
   onToggleTariffBook: (bookId: string) => void;
   onConfirm: () => void;
+  onSelectAll: () => void;
+  onClearAll: () => void;
 }) {
   const selectedBooks = tariffBooks.filter((b) => pendingTariffIds.includes(b.id));
   const availableBooks = filteredTariffBooks.filter((b) => !pendingTariffIds.includes(b.id));
@@ -557,6 +561,29 @@ export function TariffPanelDialog({
       </div>
 
       <div className="mt-4 max-h-[400px] overflow-y-auto">
+        {filteredTariffBooks.length > 0 ? (
+          <div className="mb-2 flex items-center gap-2 px-0.5">
+            <button
+              className="text-11px font-semibold text-[var(--accent-primary)] hover:underline"
+              onClick={onSelectAll}
+              type="button"
+            >
+              Seleziona tutti
+            </button>
+            {pendingTariffIds.length > 0 ? (
+              <>
+                <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
+                <button
+                  className="text-11px font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
+                  onClick={onClearAll}
+                  type="button"
+                >
+                  Deseleziona tutti
+                </button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
         {!isSearching && selectedBooks.length > 0 ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">

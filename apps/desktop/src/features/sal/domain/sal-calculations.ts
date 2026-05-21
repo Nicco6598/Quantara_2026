@@ -93,8 +93,35 @@ export function buildLineViews(
 
     const tariffPrefix = extractMgTariffPrefix(mgView.voice.code);
     const mgRate = mgPercent / 100;
-    const eligibleIndexes = tariffPrefix ? (indexesByPrefix.get(tariffPrefix) ?? []) : nonMgIndexes;
-    const eligibleGross = tariffPrefix ? (grossByPrefix.get(tariffPrefix) ?? 0) : totalNonMgGross;
+
+    // Manual allocation: undefined → auto by prefix, [ ] → disabled, [ids] → specific voices
+    const hasManualAlloc =
+      rules.mgManualAllocations != null && mgView.id in rules.mgManualAllocations;
+    const manualAlloc = hasManualAlloc ? rules.mgManualAllocations?.[mgView.id] : undefined;
+    let eligibleIndexes: number[];
+    let eligibleGross: number;
+    if (hasManualAlloc) {
+      if (manualAlloc && manualAlloc.length > 0) {
+        const manualSet = new Set(manualAlloc);
+        eligibleIndexes = [];
+        let gross = 0;
+        for (let i = 0; i < views.length; i++) {
+          if (mgIndexSet.has(i)) continue;
+          const v = views[i];
+          if (v && manualSet.has(v.id)) {
+            eligibleIndexes.push(i);
+            gross += v.grossAmount;
+          }
+        }
+        eligibleGross = gross;
+      } else {
+        // Empty array = manually disabled → skip this MG entirely
+        continue;
+      }
+    } else {
+      eligibleIndexes = tariffPrefix ? (indexesByPrefix.get(tariffPrefix) ?? []) : nonMgIndexes;
+      eligibleGross = tariffPrefix ? (grossByPrefix.get(tariffPrefix) ?? 0) : totalNonMgGross;
+    }
     if (eligibleGross <= 0) continue;
     let totalDistributedMg = 0;
 
@@ -110,6 +137,16 @@ export function buildLineViews(
 
       // Recompute: (gross + surchargeLinked + mgShare) → discount
       const surchargeLinkedTotal = ev.linkedCharges.reduce((s, c) => s + c.total, 0);
+      ev.linkedCharges.push({
+        baseAmount: ev.grossAmount,
+        code: `MG.${tariffPrefix ?? "ALL"}`,
+        description: tariffPrefix
+          ? `Maggiorazione MG ${mgPercent}% su voci ${tariffPrefix}`
+          : `Maggiorazione MG ${mgPercent}% su tutte le voci`,
+        id: `${mgView.id}-mg-${ev.id}`,
+        percent: mgPercent,
+        total: mgShare,
+      });
       const newNet = roundCurrency(ev.grossAmount + surchargeLinkedTotal + mgShare);
       const discountable = ev.voice.isSafetyCost && !rules.applyDiscountToSafetyCosts ? 0 : newNet;
       const newDiscount = rules.discountEnabled
@@ -214,6 +251,7 @@ export function buildVerificationChecks(
   const zeroQtyLines: SalLineView[] = [];
   const zeroPriceLines: SalLineView[] = [];
   const highSurchargeLines: SalLineView[] = [];
+  const tariffRuleLinesWithoutSurcharge: SalLineView[] = [];
   const highDiscount = economicRules.discountEnabled && economicRules.discountPercent > 30;
   const shouldCheckMissingDiscount =
     economicRules.discountEnabled && economicRules.discountPercent > 0;
@@ -226,6 +264,14 @@ export function buildVerificationChecks(
     if (line.quantity <= 0) zeroQtyLines.push(line);
     if (line.voice.unitPrice <= 0) zeroPriceLines.push(line);
     if (line.surchargePercent > 25) highSurchargeLines.push(line);
+    if (
+      line.surchargePercent <= 0 &&
+      !line.linkedCharges.some((charge) => charge.code.startsWith("MG.")) &&
+      ((line.voice.linkedMaggiorazioni?.length ?? 0) > 0 ||
+        line.voice.applicabilityRules?.mentionsMaggiorazione)
+    ) {
+      tariffRuleLinesWithoutSurcharge.push(line);
+    }
     if (
       shouldCheckMissingDiscount &&
       !line.voice.isSafetyCost &&
@@ -379,6 +425,16 @@ export function buildVerificationChecks(
       id: "high-surcharge",
       label: "Maggiorazioni elevate",
       result: `${highSurchargeLines.length} voci`,
+      tone: "warning",
+    });
+  }
+
+  if (tariffRuleLinesWithoutSurcharge.length > 0) {
+    checks.push({
+      detail: `Le voci ${tariffRuleLinesWithoutSurcharge.map((line) => line.voice.code).join(", ")} hanno regole/maggiorazioni dal tariffario ma nessuna maggiorazione SAL applicata.`,
+      id: "tariff-mg-rules",
+      label: "Regole maggiorazione tariffario",
+      result: `${tariffRuleLinesWithoutSurcharge.length} da valutare`,
       tone: "warning",
     });
   }

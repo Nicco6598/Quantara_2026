@@ -63,6 +63,7 @@ export type SalEconomicRules = {
   applyDiscountToSafetyCosts: boolean;
   discountEnabled: boolean;
   discountPercent: number;
+  mgManualAllocations?: Record<string, string[]>;
   rounding: "cent";
 };
 

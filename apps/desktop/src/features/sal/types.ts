@@ -34,12 +34,18 @@ export type SalTariffBookOption = DesktopTariffBook & {
 };
 
 export type SalVoiceDraft = {
+  applicabilityRules?: {
+    conditions?: string[];
+    mentionsMaggiorazione?: boolean;
+    quotaManodoperaOnly?: boolean;
+  };
   category: string;
   code: string;
   description: string;
   id: string;
   isSafetyCost: boolean;
   laborPercentage: number;
+  linkedMaggiorazioni?: string[];
   source: DesktopTariffVoice;
   tariffBookId: string;
   tariffBookName: string;

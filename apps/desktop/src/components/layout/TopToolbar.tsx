@@ -8,7 +8,7 @@ import {
   Trash,
 } from "@phosphor-icons/react";
 import { AnimatePresence, m } from "framer-motion";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MOTION_DURATION, SPRING_EASE } from "@/motion";
 import { cn } from "@/lib/utils";
 import {
@@ -43,10 +43,9 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
   const meta = routeMetaMap[activeRoute];
   const pageActions = routeActionOverrides[activeRoute] ?? commonPageActions;
   const isTariffPreview = activeRoute === "tariffs" && tariffImportPhase === "preview";
-  const isMac = useSyncExternalStore(
-    () => () => {},
-    () => /Mac OS X|Macintosh/.test(navigator.userAgent),
-    () => false,
+  const isMac = useMemo(
+    () => typeof navigator !== "undefined" && /Mac OS X|Macintosh/.test(navigator.userAgent),
+    [],
   );
 
   return (
