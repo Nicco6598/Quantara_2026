@@ -313,35 +313,43 @@ export async function selectMultipleTariffPdfMetadatas(
     return [];
   }
 
-  const selectedPaths = await openDialog({
-    filters: [{ extensions: ["pdf", "json"], name: "Tariffario PDF o JSON parser" }],
-    multiple: true,
-  });
+  const selectedPaths = await runImportStage("selezione file", () =>
+    openDialog({
+      filters: [{ extensions: ["pdf", "json"], name: "Tariffario PDF o JSON parser" }],
+      multiple: true,
+    }),
+  );
 
-  if (!selectedPaths || selectedPaths.length === 0) {
+  const paths = normalizeSelectedImportPaths(selectedPaths);
+
+  if (paths.length === 0) {
     return [];
   }
 
-  const paths = selectedPaths as string[];
-
-  paths.forEach((path, index) => {
-    const fallback = inferTariffMetadataFromPath(path);
-    onProgress({ fileName: fallback.name, index, total: paths.length, status: "pending" });
+  runImportStageSync("preparazione lista file", () => {
+    paths.forEach((path, index) => {
+      const fallback = inferTariffMetadataFromPath(path);
+      onProgress({ fileName: fallback.name, index, total: paths.length, status: "pending" });
+    });
   });
 
   await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 
-  // Mark all files as "processing" synchronously so the modal shows them all at once
-  for (const [index, path] of paths.entries()) {
-    const fallback = inferTariffMetadataFromPath(path);
-    onProgress({ fileName: fallback.name, index, total: paths.length, status: "processing" });
-  }
+  runImportStageSync("avvio parsing", () => {
+    // Mark all files as "processing" synchronously so the modal shows them all at once
+    for (const [index, path] of paths.entries()) {
+      const fallback = inferTariffMetadataFromPath(path);
+      onProgress({ fileName: fallback.name, index, total: paths.length, status: "processing" });
+    }
+  });
 
   // Process all files in parallel — each resolve triggers its own progress update
   const pending = paths.map(async (path, index) => {
     const fallback = inferTariffMetadataFromPath(path);
     try {
-      const metadata = await invoke<TariffPdfMetadata>("import_tariff_pdf_preview", { path });
+      const metadata = await runImportStage(`preview parser: ${fallback.name}`, () =>
+        invoke<TariffPdfMetadata>("import_tariff_pdf_preview", { path }),
+      );
       onProgress({
         fileName: fallback.name,
         index,
@@ -365,6 +373,40 @@ export async function selectMultipleTariffPdfMetadatas(
 
   const results = await Promise.all(pending);
   return results.filter(Boolean) as TariffPdfMetadata[];
+}
+
+export function normalizeSelectedImportPaths(selectedPaths: unknown): string[] {
+  if (typeof selectedPaths === "string") {
+    return selectedPaths.length > 0 ? [selectedPaths] : [];
+  }
+
+  if (Array.isArray(selectedPaths)) {
+    return selectedPaths.filter((path): path is string => typeof path === "string");
+  }
+
+  return [];
+}
+
+async function runImportStage<T>(stage: string, action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    throw createImportStageError(stage, error);
+  }
+}
+
+function runImportStageSync<T>(stage: string, action: () => T): T {
+  try {
+    return action();
+  } catch (error) {
+    throw createImportStageError(stage, error);
+  }
+}
+
+function createImportStageError(stage: string, error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  const detail = error instanceof Error && error.stack ? `\n${error.stack}` : "";
+  return new Error(`Import tariffario fallito durante "${stage}": ${message}${detail}`);
 }
 
 export type ImportFileProgress = {
