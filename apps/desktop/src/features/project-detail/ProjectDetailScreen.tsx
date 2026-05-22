@@ -755,7 +755,7 @@ export function ProjectDetailScreen() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-13px font-semibold text-[var(--text-primary)]">
-                    {row.progressiveLabel}
+                    {row.sal}
                   </span>
                   <span className="shrink-0 text-12px font-semibold tabular-nums text-[var(--text-primary)]">
                     {formatMoney({ amount: row.amount, currency: "EUR" })}

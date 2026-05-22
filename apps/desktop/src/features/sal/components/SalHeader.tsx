@@ -70,7 +70,7 @@ export function SalHeader({
     dangerChecks.length > 0 ? "danger" : warningChecks.length > 0 ? "warning" : "success";
 
   return (
-    <header className="sticky top-0 z-[var(--z-topbar)] border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/94 shadow-[0_10px_28px_color-mix(in_srgb,var(--text-primary)_5%,transparent)] backdrop-blur-xl">
+    <header className="sticky top-0 z-[var(--z-topbar)] border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/94 shadow-[0_10px_28px_color-mix(in_srgb,var(--text-primary)_5%,transparent)] backdrop-blur-xl [will-change:filter]">
       <div className="px-4 py-2.5 lg:px-6">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)_auto] xl:items-center">
           <div className="min-w-0">

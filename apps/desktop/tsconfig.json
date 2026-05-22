@@ -7,6 +7,7 @@
       "@/*": ["src/*"],
       "@quantara/domain-utils": ["../../packages/domain-utils/src/index.ts"],
       "@quantara/excel-import": ["../../packages/excel-import/src/index.ts"],
+      "@quantara/pdf-export": ["../../packages/pdf-export/src/index.ts"],
       "@quantara/shared-types": ["../../packages/shared-types/src/index.ts"],
       "@quantara/validation": ["../../packages/validation/src/index.ts"]
     },
@@ -17,6 +18,7 @@
     "vite.config.ts",
     "../../packages/domain-utils/src",
     "../../packages/excel-import/src",
+    "../../packages/pdf-export/src",
     "../../packages/shared-types/src"
   ]
 }

@@ -80,10 +80,15 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
             mergedProjects.push(ep);
           }
         }
+        const mergedVoiceIds = new Set(voices.map((voice) => voice.id));
+        const mergedVoices =
+          voices.length > 0
+            ? [...voices, ...existing.tariffVoices.filter((voice) => !mergedVoiceIds.has(voice.id))]
+            : existing.tariffVoices;
         set({
           salDocuments: mergedDocs,
           projects: mergedProjects,
-          tariffVoices: voices,
+          tariffVoices: mergedVoices,
         });
       },
 

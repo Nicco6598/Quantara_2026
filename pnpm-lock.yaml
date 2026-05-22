@@ -35,6 +35,9 @@ importers:
       '@quantara/excel-import':
         specifier: workspace:*
         version: link:../../packages/excel-import
+      '@quantara/pdf-export':
+        specifier: workspace:*
+        version: link:../../packages/pdf-export
       '@quantara/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

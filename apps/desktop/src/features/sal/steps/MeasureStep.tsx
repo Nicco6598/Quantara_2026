@@ -1,16 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
 import { reportUserActionError } from "@/lib/user-action-error";
 import { SelectedVoicesPanel } from "../components/SalCreationTables";
-import type { SalEconomicRules, SalLineDraft, SalLineView, SalMeasurementRowDraft } from "../types";
+import type {
+  SalEconomicRules,
+  SalLineDraft,
+  SalLineView,
+  SalMeasurementRowDraft,
+  SalVoiceDraft,
+} from "../types";
 import { createMeasurementId } from "../types";
 
-export function MeasureStep({
+export const MeasureStep = memo(function MeasureStep({
   economicRules,
   lineViews,
+  voices,
+  isLoading,
   onAddMeasurementRow,
   onAllocateMg,
+  onAddMgVoice,
   onDuplicateMeasurementRow,
   onRemoveMeasurementRow,
   onUpdateMeasurementRow,
@@ -21,8 +31,11 @@ export function MeasureStep({
 }: {
   economicRules: SalEconomicRules;
   lineViews: SalLineView[];
+  voices: SalVoiceDraft[];
+  isLoading?: boolean;
   onAddMeasurementRow: (lineId: string) => void;
   onAllocateMg: (mgLineId: string, targetLineIds: string[]) => void;
+  onAddMgVoice: (voice: SalVoiceDraft) => void;
   onDuplicateMeasurementRow: (lineId: string, measurementId: string) => void;
   onRemoveMeasurementRow: (lineId: string, measurementId: string) => void;
   onUpdateMeasurementRow: (
@@ -126,8 +139,10 @@ export function MeasureStep({
         <SelectedVoicesPanel
           economicRules={economicRules}
           lines={lineViews}
+          availableVoices={voices}
           copiedVoiceId={copiedLine?.id ?? null}
           onAllocateMg={onAllocateMg}
+          onAddMgVoice={onAddMgVoice}
           onCopyLine={handleCopyLine}
           onAddMeasurementRow={onAddMeasurementRow}
           onDuplicateMeasurementRow={onDuplicateMeasurementRow}
@@ -137,6 +152,15 @@ export function MeasureStep({
           onSurcharge={onSurcharge}
           onUpdateMeasurementRow={onUpdateMeasurementRow}
         />
+
+        {isLoading && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[var(--surface-base)]/75">
+            <span className="inline-flex items-center gap-2 rounded-lg bg-[var(--surface-base)] px-4 py-2 text-13px font-bold text-[var(--text-tertiary)] shadow-sm ring-1 ring-[var(--border-subtle)]">
+              <Loader2 className="size-4 animate-spin" />
+              Caricamento voci tariffarie...
+            </span>
+          </div>
+        )}
       </div>
 
       <aside className="shrink-0 px-4 lg:px-6">
@@ -153,4 +177,4 @@ export function MeasureStep({
       </aside>
     </div>
   );
-}
+});

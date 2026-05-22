@@ -2,6 +2,27 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.4.30 — 2026-05-22
+
+### SAL — PDF più chiari, bozze più fedeli, maggiorazioni più veloci
+
+- **Export PDF SAL** — i documenti PDF (report SAL, libretto misure e situazione contabile) possono ora essere esportati.
+- **Bozze SAL più affidabili** — quando riprendi una bozza, le voci che avevi già caricato vengono conservate e quelle del progetto vengono recuperate automaticamente. Niente più cancellazioni involontarie mentre il sistema carica il catalogo completo.
+- **Maggiorazioni MG a portata di mano** — nello step Misure, le maggiorazioni applicabili vengono proposte direttamente nella parte superiore della tabella, con comandi per applicarle, scegliere a quali voci destinarle, escluderle o rimuoverle.
+
+### Dettaglio progetto — bozze con il nome giusto
+
+- **Bozze con il titolo originale** — quando riprendi una bozza dal dettaglio progetto, il nome che avevi scelto (ad esempio "SAL 01") rimane quello, senza rinumerazioni automatiche.
+
+### Prestazioni e velocità
+
+- **Step Misure più scattante su SAL grandi** — il passaggio allo step Misure è più rapido perché le righe non vengono più espanse tutte all'ingresso.
+- **Cambio fase istantaneo** — passare da uno step all'altro (Progetto, Misure, Verifica, Conferma) è immediato, senza più quei rallentamenti quando tornavi indietro sullo step Misure.
+- **Ricerca voci sempre pronta** — la barra di ricerca delle voci tariffarie resta attiva in ogni fase, senza doversi ricaricare. Funziona rapidamente anche con oltre 23.000 voci.
+- **Selezione tariffari più intelligente** — quando selezioni o deselezioni tariffari (anche con "Seleziona tutto / Deseleziona tutto"), vengono caricate o rimosse solo le voci dei tariffari cambiati, senza ricaricare l'intero catalogo.
+- **Ricerca che non blocca** — la ricerca tra le voci tariffarie non rallenta più l'interfaccia mentre elabora i risultati.
+- **Indicatore di caricamento** — durante il caricamento delle voci o la selezione massiva dei tariffari, un'animazione ti mostra che l'operazione è in corso.
+
 ## 0.4.22 — 2026-05-22
 
 ### Stability Fix

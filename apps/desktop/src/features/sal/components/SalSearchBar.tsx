@@ -1,11 +1,10 @@
-import { BookOpen } from "lucide-react";
+import { BookOpen, Loader2 } from "lucide-react";
 import { m } from "framer-motion";
-import { useCallback, useMemo } from "react";
+import { useCallback, useDeferredValue, useMemo } from "react";
 import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
 import { TemplatePicker } from "./TemplatePicker";
 import type { SalVoiceDraft } from "../types";
 import type { SalTemplate } from "@/store/template-store";
-import { useTariffSearch } from "../hooks/useTariffSearch";
 import { tariffTokenMatchesQuery } from "../utils/search-utils";
 
 type SalAutocompleteOption = {
@@ -16,6 +15,16 @@ type SalAutocompleteOption = {
   metadata?: string;
 };
 
+type IndexedVoiceOption = {
+  code: string;
+  haystack: string;
+  option: SalAutocompleteOption;
+  tariffBookId: string;
+  voice: SalVoiceDraft;
+};
+
+const MAX_SEARCH_RESULTS = 80;
+
 function normalizeSalSearch(value: string) {
   return value
     .normalize("NFD")
@@ -25,7 +34,7 @@ function normalizeSalSearch(value: string) {
     .trim();
 }
 
-function buildTariffSearchTokens(voice: SalVoiceDraft) {
+export function buildTariffSearchTokens(voice: SalVoiceDraft) {
   const normalizedName = normalizeSalSearch(voice.tariffBookName);
   const normalizedId = normalizeSalSearch(voice.tariffBookId);
   const words = normalizedName.split(" ").filter(Boolean);
@@ -36,28 +45,77 @@ function buildTariffSearchTokens(voice: SalVoiceDraft) {
   return new Set([normalizedName, normalizedId, acronym, ...words].filter(Boolean));
 }
 
-function defaultSalVoiceOptionMatches(option: SalAutocompleteOption, normalizedQuery: string) {
-  return (
-    option.value.toLowerCase().includes(normalizedQuery) ||
-    option.label.toLowerCase().includes(normalizedQuery) ||
-    Boolean(option.keywords?.toLowerCase().includes(normalizedQuery))
-  );
+function normalizeVoiceCode(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
 }
 
-function filterSalVoiceOptionsByTariffIntent({
-  options,
+function looksLikeVoicePrefix(part: string) {
+  return /^[a-z]{1,4}\d*$/.test(part);
+}
+
+function buildVoiceOption(voice: SalVoiceDraft): SalAutocompleteOption {
+  return {
+    id: voice.id,
+    label: voice.description,
+    metadata: `${voice.tariffBookName} · ${voice.category} · ${voice.unit} · ${voice.unitPrice.toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
+    value: voice.code,
+    keywords: `${voice.code} ${voice.description} ${voice.category} ${voice.tariffBookName} ${voice.tariffBookId}`,
+  };
+}
+
+export function buildIndexedVoiceOptions(voices: SalVoiceDraft[]): IndexedVoiceOption[] {
+  return voices.map((voice) => {
+    const option = buildVoiceOption(voice);
+    return {
+      code: normalizeVoiceCode(voice.code),
+      haystack: normalizeSalSearch(
+        `${voice.code} ${voice.description} ${voice.category} ${voice.tariffBookName} ${voice.tariffBookId}`,
+      ),
+      option,
+      tariffBookId: voice.tariffBookId,
+      voice,
+    };
+  });
+}
+
+function limitResults(items: IndexedVoiceOption[]) {
+  return items.slice(0, MAX_SEARCH_RESULTS).map((item) => item.option);
+}
+
+export function filterIndexedVoiceOptions({
+  index,
   query,
   tariffTokensByBookId,
-  voiceByOptionId,
 }: {
-  options: SalAutocompleteOption[];
+  index: IndexedVoiceOption[];
   query: string;
   tariffTokensByBookId: Map<string, Set<string>>;
-  voiceByOptionId: Map<string, SalVoiceDraft>;
 }) {
   const normalizedQuery = normalizeSalSearch(query);
   if (!normalizedQuery) return [];
   const queryParts = normalizedQuery.split(" ").filter(Boolean);
+
+  const prefix = queryParts[0] ?? "";
+  if (looksLikeVoicePrefix(prefix)) {
+    const prefixMatches = index.filter((item) => item.code.startsWith(prefix));
+    if (prefixMatches.length > 0) {
+      const remainingQuery = queryParts.slice(1).join(" ");
+      const remainingParts = queryParts.slice(1);
+      const matches = remainingQuery
+        ? prefixMatches.filter((item) =>
+            remainingParts.every((part) => item.haystack.includes(part)),
+          )
+        : prefixMatches;
+      return limitResults(
+        matches.sort((left, right) => left.option.value.localeCompare(right.option.value, "it-IT")),
+      );
+    }
+  }
+
   const matchedTariffIds = new Set<string>();
   const matchedQueryParts = new Set<string>();
   for (const part of queryParts) {
@@ -69,20 +127,25 @@ function filterSalVoiceOptionsByTariffIntent({
     }
   }
   if (matchedTariffIds.size === 0) {
-    return options.filter((option) => defaultSalVoiceOptionMatches(option, normalizedQuery));
+    return limitResults(
+      index.filter((item) => queryParts.every((part) => item.haystack.includes(part))),
+    );
   }
   const remainingQuery = queryParts.filter((part) => !matchedQueryParts.has(part)).join(" ");
-  return options.filter((option) => {
-    const voice = option.id ? voiceByOptionId.get(option.id) : undefined;
-    if (!voice || !matchedTariffIds.has(voice.tariffBookId)) return false;
-    return remainingQuery ? defaultSalVoiceOptionMatches(option, remainingQuery) : true;
-  });
+  const remainingParts = queryParts.filter((part) => !matchedQueryParts.has(part));
+  return limitResults(
+    index.filter((item) => {
+      if (!matchedTariffIds.has(item.tariffBookId)) return false;
+      return remainingQuery ? remainingParts.every((part) => item.haystack.includes(part)) : true;
+    }),
+  );
 }
 
 export function SalSearchBar({
   voices,
   tariffBookIds,
   linesCount,
+  isLoading,
   onSelectVoice,
   onApplyTemplate,
   onOpenTemplateDialog,
@@ -90,76 +153,65 @@ export function SalSearchBar({
   voices: SalVoiceDraft[];
   tariffBookIds: string[];
   linesCount: number;
+  isLoading?: boolean;
   onSelectVoice: (v: SalVoiceDraft) => void;
   onApplyTemplate: (t: SalTemplate) => void;
   onOpenTemplateDialog: () => void;
 }) {
-  const { setQuery: setSearchQuery, results: searchResults } = useTariffSearch(tariffBookIds);
-
-  const autocompleteOptions = useMemo(() => {
-    if (searchResults.length > 0) {
-      return searchResults.map((r) => ({
-        id: r.id,
-        label: r.description,
-        value: r.officialCode,
-        keywords: `${r.officialCode} ${r.description} ${r.category}`,
-        metadata: `${r.tariffBookId} · ${r.category} · ${r.unitOfMeasure} · ${(r.unitPriceCents / 100).toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
-      }));
-    }
-    return voices.map((v) => ({
-      id: v.id,
-      label: v.description,
-      metadata: `${v.tariffBookName} · ${v.category} · ${v.unit} · ${v.unitPrice.toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
-      value: v.code,
-      keywords: `${v.code} ${v.description} ${v.category} ${v.tariffBookName} ${v.tariffBookId}`,
-    }));
-  }, [searchResults, voices]);
-
-  const voiceByOptionId = useMemo(() => new Map(voices.map((v) => [v.id, v])), [voices]);
+  const deferredVoices = useDeferredValue(voices);
+  const searchIndex = useMemo(() => buildIndexedVoiceOptions(deferredVoices), [deferredVoices]);
+  const voiceByOptionId = useMemo(
+    () => new Map(deferredVoices.map((v) => [v.id, v])),
+    [deferredVoices],
+  );
   const tariffTokensByBookId = useMemo(() => {
     const result = new Map<string, Set<string>>();
-    for (const voice of voices) {
+    for (const voice of deferredVoices) {
+      if (result.size >= tariffBookIds.length) break;
       if (!result.has(voice.tariffBookId)) {
         result.set(voice.tariffBookId, buildTariffSearchTokens(voice));
       }
     }
     return result;
-  }, [voices]);
-
-  const hasSearchResults = searchResults.length > 0;
+  }, [deferredVoices, tariffBookIds.length]);
 
   const filterOptions = useCallback(
-    (options: SalAutocompleteOption[], query: string) => {
-      if (hasSearchResults) {
-        return query.trim() ? options : [];
-      }
-      return filterSalVoiceOptionsByTariffIntent({
-        options,
+    (_options: SalAutocompleteOption[], query: string) => {
+      return filterIndexedVoiceOptions({
+        index: searchIndex,
         query,
         tariffTokensByBookId,
-        voiceByOptionId,
       });
     },
-    [hasSearchResults, tariffTokensByBookId, voiceByOptionId],
+    [searchIndex, tariffTokensByBookId],
   );
 
   return (
     <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/30 bg-[var(--surface-base)] px-4 py-1.5 lg:flex-row lg:items-center lg:px-6">
       <div className="min-w-0 flex-1">
         <AutocompleteInput
-          options={autocompleteOptions}
-          onQueryChange={setSearchQuery}
+          options={[]}
           onSelect={(o) => {
             const v =
               (o.id ? voiceByOptionId.get(o.id) : undefined) ??
               voices.find((x) => x.code === o.value);
             if (v) onSelectVoice(v);
           }}
-          placeholder={`Cerca codice, descrizione o categoria (${voices.length} voci)...`}
+          placeholder={
+            isLoading
+              ? `Caricamento voci (${tariffBookIds.length} tariffari)...`
+              : `Cerca codice, descrizione o categoria (${voices.length} voci · ${tariffBookIds.length} tariffari)...`
+          }
           filterOptions={filterOptions}
         />
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        {isLoading && (
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--bg-muted)] px-3 text-11px font-medium text-[var(--text-tertiary)]">
+            <Loader2 className="size-3.5 animate-spin" />
+            Caricamento...
+          </span>
+        )}
         <TemplatePicker onApply={onApplyTemplate} tariffBookId={tariffBookIds[0] ?? ""} />
         {linesCount > 0 && (
           <m.button

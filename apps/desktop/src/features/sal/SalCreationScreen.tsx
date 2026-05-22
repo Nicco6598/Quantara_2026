@@ -1,10 +1,13 @@
 import { CheckCircle2 } from "lucide-react";
-import { AnimatePresence, m } from "framer-motion";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { SalDocument } from "@/features/sal/types";
 import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
-import { saveWorkbookAs, waitForUiPaint } from "@/features/projects/utils/projects-helpers";
+import {
+  savePdfAs,
+  saveWorkbookAs,
+  waitForUiPaint,
+} from "@/features/projects/utils/projects-helpers";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   confirmSalTransaction,
@@ -13,7 +16,6 @@ import {
   updateSalDocument as updateBackendSalDocument,
 } from "@/lib/sal-data";
 import { cn } from "@/lib/utils";
-import { motionVariants } from "@/motion";
 import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowService } from "@/services/sal-service";
 import { useAppStore } from "@/store/app-store";
@@ -45,6 +47,8 @@ import type {
   SalMeasurementRowDraft,
   SalProjectContext,
   SalTariffBookOption,
+  SalTariffVoice,
+  SalVoiceDraft,
   SalVerificationCheck,
 } from "./types";
 import { createMeasurementId } from "./types";
@@ -58,6 +62,37 @@ const CREATED_FLAG_KEY = SESSION_STORAGE_KEYS.salCreated;
 
 function buildDefaultSalTitle(existingCount: number) {
   return `SAL ${String(existingCount + 1).padStart(2, "0")} - Periodo corrente`;
+}
+
+function mergeResumeVoices(
+  loadedVoices: readonly SalVoiceDraft[],
+  cachedVoices: readonly SalTariffVoice[],
+): SalVoiceDraft[] {
+  const result = new Map<string, SalVoiceDraft>();
+
+  for (const voice of loadedVoices) {
+    result.set(voice.id, voice);
+  }
+
+  for (const voice of cachedVoices) {
+    if (result.has(voice.id)) continue;
+    result.set(voice.id, {
+      category: voice.category,
+      code: voice.code,
+      description: voice.description,
+      id: voice.id,
+      isSafetyCost: voice.isSafetyCost ?? false,
+      laborPercentage: voice.laborPercentage ?? 0,
+      source: voice as never,
+      tariffBookId: "",
+      tariffBookName: "",
+      tariffYear: voice.projectYear,
+      unit: voice.unit,
+      unitPrice: voice.unitPrice,
+    });
+  }
+
+  return [...result.values()];
 }
 
 export function SalCreationScreen() {
@@ -123,6 +158,7 @@ export function SalCreationScreen() {
   );
 
   const editingDraftSalId = useRef<string | null>(null);
+  const resumeMissingVoicesNotified = useRef(false);
 
   // Guard: if SAL was already created in this session, redirect to project-detail
   useEffect(() => {
@@ -143,13 +179,19 @@ export function SalCreationScreen() {
     );
     const draft = loadSalCreationDraftBySalId(resumeSalId);
 
-    if (!draft && draftSal && draftSal.lines.length > 0 && data.voices.length === 0) {
+    if (!draft && !draftSal) {
       return;
     }
 
-    sessionStorage.removeItem(SESSION_STORAGE_KEYS.salResumeDraft);
+    const resumeVoices = mergeResumeVoices(data.voices, tariffVoices);
+
+    if (!draft && draftSal && draftSal.lines.length > 0 && resumeVoices.length === 0) {
+      return;
+    }
 
     if (draft) {
+      sessionStorage.removeItem(SESSION_STORAGE_KEYS.salResumeDraft);
+      resumeMissingVoicesNotified.current = false;
       editingDraftSalId.current = resumeSalId;
       dispatch({
         type: "ALL",
@@ -169,18 +211,34 @@ export function SalCreationScreen() {
     }
 
     if (draftSal) {
+      const resumedLines = lineDraftsFromStoredSal(draftSal, resumeVoices);
+      if (draftSal.lines.length > 0 && resumedLines.length === 0) {
+        if (!resumeMissingVoicesNotified.current) {
+          notify({
+            message:
+              "La bozza esiste ma le voci tariffarie collegate non sono ancora disponibili. Verifica i tariffari associati al progetto.",
+            title: "Bozza non ripristinata",
+            tone: "warning",
+          });
+          resumeMissingVoicesNotified.current = true;
+        }
+        return;
+      }
+
+      sessionStorage.removeItem(SESSION_STORAGE_KEYS.salResumeDraft);
+      resumeMissingVoicesNotified.current = false;
       editingDraftSalId.current = resumeSalId;
       dispatch({
         type: "ALL",
         partial: {
-          lines: lineDraftsFromStoredSal(draftSal, data.voices),
+          lines: resumedLines,
           salDate: draftSal.date ?? new Date().toISOString().slice(0, 10),
           salTitle: draftSal.title || project.salTitle,
           phase: draftSal.lines.length > 0 ? "measure" : "project",
         },
       });
     }
-  }, [data.project, data.voices, data.restoreTariffBookIds, salDocuments]);
+  }, [data.project, data.voices, data.restoreTariffBookIds, salDocuments, tariffVoices, notify]);
 
   // Subscribe to step navigation from TopToolbar
   useEffect(() => {
@@ -296,6 +354,18 @@ export function SalCreationScreen() {
       });
     },
     [setEconomicRules],
+  );
+
+  const handleAddMgVoice = useCallback(
+    (voice: SalVoiceDraft) => {
+      const exists = formStateRef.current.lines.some((line) => line.voice.id === voice.id);
+      if (exists) {
+        addVoiceAsNewLine(voice);
+      } else {
+        upsertLine(voice);
+      }
+    },
+    [addVoiceAsNewLine, upsertLine],
   );
 
   const handleApplyTemplate = useCallback(
@@ -776,20 +846,70 @@ export function SalCreationScreen() {
   ]);
 
   const handlePdfPending = useCallback(
-    (kind: "libretto" | "sal" | "stampa") => {
-      notify({
-        message:
+    async (kind: "libretto" | "sal" | "stampa") => {
+      const project = data.project;
+      if (!project) {
+        notify({
+          message: "Seleziona un progetto prima di esportare il PDF.",
+          title: "Export PDF",
+          tone: "warning",
+        });
+        return;
+      }
+
+      try {
+        const { serializeAccountingPdf, serializeMeasurementBookPdf, serializeSalPdfReport } =
+          await import("@quantara/pdf-export");
+        const reportInput = buildPdfSalReportInput({
+          date: salDate,
+          lineViews,
+          project,
+          summary,
+          title: salTitle.trim() || suggestedSalTitle,
+        });
+        const fileBase = `quantara-${kind}-${slugify(salTitle.trim() || suggestedSalTitle)}-${salDate}.pdf`;
+        const bytes =
           kind === "libretto"
-            ? "Il renderer PDF del libretto misure sarà collegato al prossimo blocco export."
+            ? serializeMeasurementBookPdf(reportInput)
             : kind === "stampa"
-              ? "La stampa contabile userà il report contabilità condiviso nel prossimo blocco."
-              : "Il renderer PDF SAL sarà collegato al prossimo blocco export.",
-        title: "PDF non ancora generato",
-        tone: "info",
-      });
+              ? serializeAccountingPdf(reportInput)
+              : serializeSalPdfReport(reportInput);
+        await waitForUiPaint();
+        const savedPath = await savePdfAs(bytes, fileBase);
+        notify({
+          message: savedPath ? `${lineViews.length} voci incluse nel PDF.` : "Export annullato.",
+          title:
+            kind === "libretto"
+              ? "PDF libretto completato"
+              : kind === "stampa"
+                ? "Stampa contabile completata"
+                : "PDF SAL completato",
+          tone: savedPath ? "success" : "info",
+        });
+      } catch (error) {
+        notify({
+          message: error instanceof Error ? error.message : String(error),
+          title: "Export PDF non riuscito",
+          tone: "danger",
+        });
+      }
     },
-    [notify],
+    [data.project, lineViews, notify, salDate, salTitle, suggestedSalTitle, summary],
   );
+
+  const handlePrintAccounting = useCallback(() => {
+    void handlePdfPending("stampa");
+  }, [handlePdfPending]);
+
+  const handleExportSalPdf = useCallback(() => {
+    void handlePdfPending("sal");
+  }, [handlePdfPending]);
+
+  const handleExportMeasurementBookPdf = useCallback(() => {
+    void handlePdfPending("libretto");
+  }, [handlePdfPending]);
+
+  const handlePhaseChange = useCallback((p: SalWorkflowPhase) => setPhase(p), [setPhase]);
 
   const toolbarConfig = useMemo(
     () => ({
@@ -864,13 +984,14 @@ export function SalCreationScreen() {
         primaryDisabledReason={currentDisabledReason}
         onPrimary={goPrimary}
         onSaveDraft={handleSaveDraft}
-        onPhaseChange={(p) => setPhase(p)}
+        onPhaseChange={handlePhaseChange}
         searchBar={
-          phase === "measure" ? (
+          <div className={cn(phase !== "measure" && "hidden")}>
             <SalSearchBar
               voices={data.voices}
               tariffBookIds={selectedTariffBookIds}
               linesCount={lines.length}
+              isLoading={data.isLoading}
               onSelectVoice={(voice) => {
                 const exists = lines.some((l) => l.voice.id === voice.id);
                 if (exists) addVoiceAsNewLine(voice);
@@ -879,124 +1000,129 @@ export function SalCreationScreen() {
               onApplyTemplate={handleApplyTemplate}
               onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
             />
-          ) : undefined
+          </div>
         }
       />
 
-      <div
-        className={cn(
-          "flex-1 min-h-0",
-          phase === "measure" ? "overflow-hidden px-0 py-4 lg:py-6" : "overflow-y-auto p-4 lg:p-6",
-        )}
-      >
-        <AnimatePresence initial={false} mode="wait">
-          <m.div
-            animate={motionVariants.route.animate}
-            className={cn("min-h-full", phase === "measure" && "h-full min-h-0")}
-            exit={{ opacity: 0, scale: 0.996, y: -8 }}
-            initial={{ opacity: 0, scale: 0.992, y: 16 }}
-            key={phase}
-            transition={motionVariants.route.transition}
-          >
-            {phase === "completed" ? (
-              <CompletedView
-                createdSalTitle={createdSalTitle}
-                onClose={() => {
-                  try {
-                    window.sessionStorage.setItem(
-                      SESSION_STORAGE_KEYS.selectedProjectDetail,
-                      JSON.stringify({ id: data.project?.id }),
-                    );
-                  } catch {
-                    /* no-op */
-                  }
-                  navigate("project-detail", undefined, true);
-                }}
-                onNew={() => {
-                  setLines([]);
-                  setPhase("project");
-                }}
-                summary={summary}
-              />
-            ) : (
-              <>
-                {data.error && (
-                  <div className="mb-4 rounded-xl border border-[var(--danger-base)]/20 bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)]">
-                    {data.error}
-                  </div>
-                )}
+      <div className="relative flex-1 min-h-0">
+        {/* Tutte le fasi sono sempre montate, toggle display:none per preservare DOM e stato */}
+        <div className={cn("h-full min-h-0 overflow-hidden", phase !== "measure" && "hidden")}>
+          <MeasureStep
+            economicRules={economicRules}
+            lineViews={lineViews}
+            voices={data.voices}
+            isLoading={data.isLoading}
+            onAllocateMg={handleAllocateMg}
+            onAddMgVoice={handleAddMgVoice}
+            onAddMeasurementRow={addMeasurementRow}
+            onDuplicateMeasurementRow={duplicateMeasurementRow}
+            onRemoveMeasurementRow={removeMeasurementRow}
+            onUpdateMeasurementRow={updateMeasurementRow}
+            onRemove={removeLine}
+            onNotesChange={setNotes}
+            onSurcharge={setSurcharge}
+            onPasteLine={handlePasteLine}
+          />
+        </div>
 
-                {phase === "project" && (
-                  <ProjectStep
-                    contracts={data.contracts}
-                    onSelectContract={data.setContract}
-                    project={data.project}
-                    salDate={salDate}
-                    salTitle={salTitle}
-                    suggestedSalTitle={suggestedSalTitle}
-                    selectedTariffBooks={data.selectedTariffBooks}
-                    selectedTariffBook={data.selectedTariffBook}
-                    selectTariffBook={data.selectTariffBook}
-                    setSalDate={setSalDate}
-                    setSalTitle={setSalTitle}
-                    summary={summary}
-                    tariffBooks={data.tariffBookOptions}
-                    voicesCount={data.voices.length}
-                  />
-                )}
+        <div
+          className={cn(
+            "h-full min-h-0 overflow-y-auto p-4 lg:p-6",
+            phase !== "project" && "hidden",
+          )}
+        >
+          {data.error && (
+            <div className="mb-4 rounded-xl border border-[var(--danger-base)]/20 bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)]">
+              {data.error}
+            </div>
+          )}
+          <ProjectStep
+            contracts={data.contracts}
+            onSelectContract={data.setContract}
+            project={data.project}
+            salDate={salDate}
+            salTitle={salTitle}
+            suggestedSalTitle={suggestedSalTitle}
+            selectedTariffBooks={data.selectedTariffBooks}
+            selectedTariffBook={data.selectedTariffBook}
+            selectTariffBook={data.selectTariffBook}
+            setSelectedTariffBookIds={data.setSelectedTariffBookIds}
+            isLoading={data.isLoading}
+            setSalDate={setSalDate}
+            setSalTitle={setSalTitle}
+            summary={summary}
+            tariffBooks={data.tariffBookOptions}
+            voicesCount={data.voices.length}
+          />
+        </div>
 
-                {phase === "measure" && (
-                  <MeasureStep
-                    economicRules={economicRules}
-                    lineViews={lineViews}
-                    onAllocateMg={handleAllocateMg}
-                    onAddMeasurementRow={addMeasurementRow}
-                    onDuplicateMeasurementRow={duplicateMeasurementRow}
-                    onRemoveMeasurementRow={removeMeasurementRow}
-                    onUpdateMeasurementRow={updateMeasurementRow}
-                    onRemove={removeLine}
-                    onNotesChange={setNotes}
-                    onSurcharge={setSurcharge}
-                    onPasteLine={handlePasteLine}
-                  />
-                )}
+        <div
+          className={cn(
+            "h-full min-h-0 overflow-y-auto p-4 lg:p-6",
+            phase !== "verify" && "hidden",
+          )}
+        >
+          <VerifyStep
+            checks={checks}
+            economicRules={economicRules}
+            lineViews={lineViews}
+            materialUsage={materialUsage}
+            materials={materials}
+            onAutoSave={handleAutoSave}
+            onMaterialUsageChange={(usage) =>
+              dispatch({ type: "MATERIAL_USAGE", materialUsage: usage })
+            }
+            onMaterialsChange={(mats) => dispatch({ type: "ALL", partial: { materials: mats } })}
+            summary={summary}
+            previousSalLines={previousSalLines}
+            compareLines={compareLines}
+            onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
+          />
+        </div>
 
-                {phase === "verify" && (
-                  <VerifyStep
-                    checks={checks}
-                    economicRules={economicRules}
-                    lineViews={lineViews}
-                    materialUsage={materialUsage}
-                    materials={materials}
-                    onAutoSave={handleAutoSave}
-                    onMaterialUsageChange={(usage) =>
-                      dispatch({ type: "MATERIAL_USAGE", materialUsage: usage })
-                    }
-                    onMaterialsChange={(mats) =>
-                      dispatch({ type: "ALL", partial: { materials: mats } })
-                    }
-                    summary={summary}
-                    previousSalLines={previousSalLines}
-                    compareLines={compareLines}
-                    onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
-                  />
-                )}
+        <div
+          className={cn(
+            "h-full min-h-0 overflow-y-auto p-4 lg:p-6",
+            phase !== "confirm" && "hidden",
+          )}
+        >
+          <ConfirmStep
+            economicRules={economicRules}
+            lineViews={lineViews}
+            onExportExcel={handleExportSalExcel}
+            onExportMeasurementBookPdf={handleExportMeasurementBookPdf}
+            onExportSalPdf={handleExportSalPdf}
+            onPrintAccounting={handlePrintAccounting}
+            summary={summary}
+          />
+        </div>
 
-                {phase === "confirm" && (
-                  <ConfirmStep
-                    economicRules={economicRules}
-                    lineViews={lineViews}
-                    onExportExcel={handleExportSalExcel}
-                    onExportMeasurementBookPdf={() => handlePdfPending("libretto")}
-                    onExportSalPdf={() => handlePdfPending("sal")}
-                    onPrintAccounting={() => handlePdfPending("stampa")}
-                    summary={summary}
-                  />
-                )}
-              </>
-            )}
-          </m.div>
-        </AnimatePresence>
+        <div
+          className={cn(
+            "h-full min-h-0 overflow-y-auto p-4 lg:p-6",
+            phase !== "completed" && "hidden",
+          )}
+        >
+          <CompletedView
+            createdSalTitle={createdSalTitle}
+            onClose={() => {
+              try {
+                window.sessionStorage.setItem(
+                  SESSION_STORAGE_KEYS.selectedProjectDetail,
+                  JSON.stringify({ id: data.project?.id }),
+                );
+              } catch {
+                /* no-op */
+              }
+              navigate("project-detail", undefined, true);
+            }}
+            onNew={() => {
+              setLines([]);
+              setPhase("project");
+            }}
+            summary={summary}
+          />
+        </div>
       </div>
 
       {isTemplateDialogOpen && (
@@ -1057,6 +1183,75 @@ function disabledReason(
   if (phase === "project" && !tariffBook)
     return "Nessun tariffario disponibile. Importa un tariffario o crea un progetto con tariffario associato.";
   return "Completa i campi richiesti prima di proseguire.";
+}
+
+function buildPdfSalReportInput({
+  date,
+  lineViews,
+  project,
+  summary,
+  title,
+}: {
+  date: string;
+  lineViews: SalLineView[];
+  project: SalProjectContext;
+  summary: SalEconomicSummary;
+  title: string;
+}) {
+  return {
+    date,
+    lines: lineViews.map((line) => ({
+      discountAmount: line.discountAmount,
+      discountableAmount: line.discountableAmount,
+      grossAmount: line.grossAmount,
+      id: line.id,
+      linkedCharges: line.linkedCharges,
+      measurementRows: line.measurementRows.map((row) => ({
+        date: row.date,
+        description: row.description,
+        factor1: row.factor1,
+        factor2: row.factor2,
+        factor3: row.factor3,
+        notes: row.notes,
+        partialQuantity: row.partialQuantity,
+        ...(row.station ? { station: row.station } : {}),
+        unit: row.unit,
+      })),
+      netAmount: line.netAmount,
+      notes: line.notes,
+      quantity: line.quantity,
+      surchargePercent: line.surchargePercent,
+      totalAmount: line.totalAmount,
+      voice: {
+        category: line.voice.category,
+        code: line.voice.code,
+        description: line.voice.description,
+        isSafetyCost: line.voice.isSafetyCost,
+        unit: line.voice.unit,
+        unitPrice: line.voice.unitPrice,
+      },
+    })),
+    project: {
+      applicationContractCode: project.applicationContractCode,
+      contractAmount: project.contractAmount,
+      contractor: project.contractor,
+      frameworkAgreementCode: project.frameworkAgreementCode,
+      title: project.title,
+    },
+    summary: {
+      budgetResidual: summary.budgetResidual,
+      discountAmount: summary.discountAmount,
+      discountableAmount: summary.discountableAmount,
+      grossAmount: summary.grossAmount,
+      linkedChargeAmount: summary.linkedChargeAmount,
+      netDiscountableAmount: summary.netDiscountableAmount,
+      previousProgressiveAmount: summary.previousProgressiveAmount,
+      safetyAmount: summary.safetyAmount,
+      total: summary.total,
+      voiceCount: summary.voiceCount,
+    },
+    title,
+  };
 }
 
 /* ─── Completed view ─── */

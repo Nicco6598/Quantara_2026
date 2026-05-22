@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { m } from "framer-motion";
-import { Building2, Calculator, CheckCircle2, FileText, Wallet } from "lucide-react";
+import { Building2, Calculator, CheckCircle2, FileText, Loader2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SalProjectContext, SalTariffBookOption } from "../types";
 import type { SalEconomicSummary } from "../types";
@@ -17,6 +17,8 @@ export function ProjectStep({
   selectedTariffBooks,
   selectedTariffBook,
   selectTariffBook,
+  setSelectedTariffBookIds,
+  isLoading,
   setSalDate,
   setSalTitle,
   summary,
@@ -32,6 +34,8 @@ export function ProjectStep({
   selectedTariffBooks: SalTariffBookOption[];
   selectedTariffBook: SalTariffBookOption | null;
   selectTariffBook: (id: string) => Promise<void>;
+  setSelectedTariffBookIds: (ids: string[]) => Promise<void>;
+  isLoading?: boolean;
   setSalDate: (date: string) => void;
   setSalTitle: (value: string) => void;
   summary: SalEconomicSummary;
@@ -215,7 +219,17 @@ export function ProjectStep({
                   <span>
                     {selectedTariffBooks.length} selezionat
                     {selectedTariffBooks.length !== 1 ? "i" : "o"}
-                    {selectedTariffBook ? ` · ${voicesCount} voci caricate` : ""}
+                    {isLoading ? (
+                      <>
+                        {" · "}
+                        <Loader2 className="inline size-3 animate-spin align-text-top" />
+                        {" Caricamento voci..."}
+                      </>
+                    ) : selectedTariffBook ? (
+                      ` · ${voicesCount} voci caricate`
+                    ) : (
+                      ""
+                    )}
                   </span>
                 </>
               ) : (
@@ -225,6 +239,26 @@ export function ProjectStep({
               )}
             </div>
           </div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            className="inline-flex h-7 items-center rounded-md bg-[var(--accent-primary)]/[0.08] px-2.5 text-11px font-bold text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-primary)]/[0.12]"
+            onClick={() => void setSelectedTariffBookIds(tariffBooks.map((b) => b.id))}
+            type="button"
+          >
+            Seleziona tutto
+          </button>
+          <button
+            className="inline-flex h-7 items-center rounded-md bg-[var(--bg-muted)] px-2.5 text-11px font-bold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/60 transition-colors hover:bg-[var(--bg-muted-strong)]"
+            onClick={() => {
+              const first = tariffBooks[0];
+              if (first) void setSelectedTariffBookIds([first.id]);
+            }}
+            type="button"
+          >
+            Deseleziona tutto
+          </button>
         </div>
 
         {tariffBooks.length > 6 && (

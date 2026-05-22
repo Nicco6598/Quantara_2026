@@ -204,11 +204,17 @@ export function waitForUiPaint(): Promise<void> {
 }
 
 export function downloadWorkbook(bytes: Uint8Array, fileName: string): void {
+  downloadExportFile(
+    bytes,
+    fileName,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+}
+
+export function downloadExportFile(bytes: Uint8Array, fileName: string, mimeType: string): void {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const blob = new Blob([buffer], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -218,8 +224,28 @@ export function downloadWorkbook(bytes: Uint8Array, fileName: string): void {
 }
 
 export async function saveWorkbookAs(bytes: Uint8Array, fileName: string): Promise<string | null> {
+  return saveExportFileAs(bytes, fileName, {
+    extensions: ["xlsx"],
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    name: "Excel",
+  });
+}
+
+export async function savePdfAs(bytes: Uint8Array, fileName: string): Promise<string | null> {
+  return saveExportFileAs(bytes, fileName, {
+    extensions: ["pdf"],
+    mimeType: "application/pdf",
+    name: "PDF",
+  });
+}
+
+async function saveExportFileAs(
+  bytes: Uint8Array,
+  fileName: string,
+  filter: { extensions: string[]; mimeType: string; name: string },
+): Promise<string | null> {
   if (!isTauriRuntime()) {
-    downloadWorkbook(bytes, fileName);
+    downloadExportFile(bytes, fileName, filter.mimeType);
     return fileName;
   }
 
@@ -229,7 +255,7 @@ export async function saveWorkbookAs(bytes: Uint8Array, fileName: string): Promi
   ]);
   const path = await save({
     defaultPath: fileName,
-    filters: [{ name: "Excel", extensions: ["xlsx"] }],
+    filters: [{ name: filter.name, extensions: filter.extensions }],
   });
 
   if (!path) {

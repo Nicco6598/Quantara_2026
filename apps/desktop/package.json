@@ -1,6 +1,6 @@
 {
   "name": "@quantara/desktop",
-  "version": "0.4.22",
+  "version": "0.4.30",
   "private": true,
   "type": "module",
   "scripts": {
@@ -20,6 +20,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "@quantara/domain-utils": "workspace:*",
     "@quantara/excel-import": "workspace:*",
+    "@quantara/pdf-export": "workspace:*",
     "@quantara/shared-types": "workspace:*",
     "@quantara/ui-tokens": "workspace:*",
     "@quantara/validation": "workspace:*",

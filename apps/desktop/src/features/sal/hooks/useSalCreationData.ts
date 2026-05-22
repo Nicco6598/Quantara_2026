@@ -186,17 +186,29 @@ export function useSalCreationData() {
     }));
 
     try {
-      const voices = await loadVoicesForBooks(nextSelectedIds, state.tariffBooks);
+      let mergedVoices = state.voices;
+
+      if (isSelected) {
+        mergedVoices = mergedVoices.filter((v) => v.tariffBookId !== tariffBookId);
+      } else {
+        const newVoices = await loadVoicesForBooks([tariffBookId], state.tariffBooks);
+        const existingByKey = new Map(mergedVoices.map((v) => [v.id, v]));
+        for (const voice of newVoices) {
+          existingByKey.set(voice.id, voice);
+        }
+        mergedVoices = [...existingByKey.values()];
+      }
+
       setState((current) => ({
         ...current,
         error: null,
         isLoading: false,
-        voices,
+        voices: mergedVoices,
       }));
     } catch (error) {
       setState((current) => ({
         ...current,
-        error: error instanceof Error ? error.message : "Impossibile caricare le voci tariffarie.",
+        error: error instanceof Error ? error.message : "Errore nel cambio tariffario.",
         isLoading: false,
       }));
     }
@@ -231,6 +243,57 @@ export function useSalCreationData() {
     }
   }
 
+  async function setSelectedTariffBookIds(tariffBookIds: string[]) {
+    const validIds = tariffBookIds.filter((id) => tariffBookOptions.some((book) => book.id === id));
+    if (validIds.length === 0) return;
+
+    setState((current) => ({
+      ...current,
+      error: null,
+      isLoading: true,
+      selectedTariffBookIds: validIds,
+    }));
+
+    const currentIds = new Set(state.selectedTariffBookIds);
+    const nextIds = new Set(validIds);
+    const addedIds = validIds.filter((id) => !currentIds.has(id));
+    const removedIds = state.selectedTariffBookIds.filter((id) => !nextIds.has(id));
+    const hasUnchanged = state.selectedTariffBookIds.some((id) => nextIds.has(id));
+
+    try {
+      let mergedVoices = state.voices;
+
+      if (removedIds.length > 0) {
+        const removedSet = new Set(removedIds);
+        mergedVoices = mergedVoices.filter((v) => !removedSet.has(v.tariffBookId));
+      }
+
+      if (addedIds.length > 0) {
+        const newVoices = await loadVoicesForBooks(addedIds, state.tariffBooks);
+        const existingByKey = new Map(mergedVoices.map((v) => [v.id, v]));
+        for (const voice of newVoices) {
+          existingByKey.set(voice.id, voice);
+        }
+        mergedVoices = [...existingByKey.values()];
+      }
+
+      if (hasUnchanged || addedIds.length > 0 || removedIds.length > 0) {
+        setState((current) => ({
+          ...current,
+          error: null,
+          isLoading: false,
+          voices: mergedVoices,
+        }));
+      }
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Errore selezione tariffari.",
+        isLoading: false,
+      }));
+    }
+  }
+
   return {
     contracts: state.contracts,
     error: state.error,
@@ -241,6 +304,7 @@ export function useSalCreationData() {
     selectedTariffBook,
     selectedTariffBooks,
     selectTariffBook,
+    setSelectedTariffBookIds,
     setContract,
     tariffBookOptions,
     voices: state.voices,

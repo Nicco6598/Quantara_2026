@@ -72,6 +72,27 @@ describe("sal-workflow-store", () => {
     expect(useSalWorkflowStore.getState().salDocuments.length).toBe(2);
   });
 
+  it("preserves cached tariff voices when backend init has no voices", () => {
+    useSalWorkflowStore.setState({
+      tariffVoices: [
+        {
+          category: "RFI",
+          code: "AC.IR.A.2001.A",
+          description: "Voce salvata",
+          id: "voice_1",
+          projectYear: 2026,
+          unit: "CAD",
+          unitPrice: 100,
+        },
+      ],
+    });
+
+    useSalWorkflowStore.getState().initializeFromBackend([], [], []);
+
+    expect(useSalWorkflowStore.getState().tariffVoices).toHaveLength(1);
+    expect(useSalWorkflowStore.getState().tariffVoices[0]?.id).toBe("voice_1");
+  });
+
   it("selects document by ID after init", () => {
     const docs = [
       {

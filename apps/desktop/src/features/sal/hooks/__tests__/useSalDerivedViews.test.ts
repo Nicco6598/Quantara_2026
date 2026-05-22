@@ -160,15 +160,18 @@ describe("MG distribution", () => {
     ];
 
     const views = buildLineViews(lines, defaultRules);
-    const fa1 = views.find((v) => v.id === "fa1")!;
-    const fa2 = views.find((v) => v.id === "fa2")!;
-    const mg = views.find((v) => v.id === "mg-FA.MG.01")!;
+    const fa1 = views.find((v) => v.id === "fa1");
+    const fa2 = views.find((v) => v.id === "fa2");
+    const mg = views.find((v) => v.id === "mg-FA.MG.01");
+    expect(fa1).toBeDefined();
+    expect(fa2).toBeDefined();
+    expect(mg).toBeDefined();
 
     // Both FA voices should get MG: FA.001 gets 1000*0.02 = 20, FA.002 gets 500*0.02 = 10
-    expect(fa1.netAmount).toBe(1000 + 20);
-    expect(fa2.netAmount).toBe(500 + 10);
+    expect(fa1?.netAmount).toBe(1000 + 20);
+    expect(fa2?.netAmount).toBe(500 + 10);
     // MG line shows total distributed
-    expect(mg.netAmount).toBe(30);
+    expect(mg?.netAmount).toBe(30);
   });
 
   it("respects mgManualAllocations — limits to selected voices", () => {
@@ -186,16 +189,19 @@ describe("MG distribution", () => {
     };
 
     const views = buildLineViews(lines, rules);
-    const fa1 = views.find((v) => v.id === "fa1")!;
-    const fa2 = views.find((v) => v.id === "fa2")!;
-    const mg = views.find((v) => v.id === "mg-FA.MG.01")!;
+    const fa1 = views.find((v) => v.id === "fa1");
+    const fa2 = views.find((v) => v.id === "fa2");
+    const mg = views.find((v) => v.id === "mg-FA.MG.01");
+    expect(fa1).toBeDefined();
+    expect(fa2).toBeDefined();
+    expect(mg).toBeDefined();
 
     // FA.001 gets MG (1000 * 0.02 = 20)
-    expect(fa1.netAmount).toBe(1000 + 20);
+    expect(fa1?.netAmount).toBe(1000 + 20);
     // FA.002 does NOT get MG
-    expect(fa2.netAmount).toBe(500);
+    expect(fa2?.netAmount).toBe(500);
     // MG line total based only on selected voices
-    expect(mg.netAmount).toBe(20);
+    expect(mg?.netAmount).toBe(20);
   });
 
   it("skips MG when manual allocation references non-existent IDs", () => {
@@ -209,12 +215,14 @@ describe("MG distribution", () => {
     };
 
     const views = buildLineViews(lines, rules);
-    const fa1 = views.find((v) => v.id === "fa1")!;
-    const mg = views.find((v) => v.id === "mg-FA.MG.01")!;
+    const fa1 = views.find((v) => v.id === "fa1");
+    const mg = views.find((v) => v.id === "mg-FA.MG.01");
+    expect(fa1).toBeDefined();
+    expect(mg).toBeDefined();
 
     // Stale IDs — no valid target → MG skipped
-    expect(fa1.netAmount).toBe(1000);
-    expect(mg.netAmount).toBe(0);
+    expect(fa1?.netAmount).toBe(1000);
+    expect(mg?.netAmount).toBe(0);
   });
 
   it("re-applies MG correctly after removing a voice from manual allocation", () => {
@@ -258,14 +266,17 @@ describe("MG distribution", () => {
     };
 
     const views = buildLineViews(lines, rules);
-    const fa1 = views.find((v) => v.id === "fa1")!;
-    const fa2 = views.find((v) => v.id === "fa2")!;
-    const mg = views.find((v) => v.id === "mg-FA.MG.01")!;
+    const fa1 = views.find((v) => v.id === "fa1");
+    const fa2 = views.find((v) => v.id === "fa2");
+    const mg = views.find((v) => v.id === "mg-FA.MG.01");
+    expect(fa1).toBeDefined();
+    expect(fa2).toBeDefined();
+    expect(mg).toBeDefined();
 
     // Empty array = disabled → no MG applied to any voice
-    expect(fa1.netAmount).toBe(1000);
-    expect(fa2.netAmount).toBe(500);
-    expect(mg.netAmount).toBe(0);
+    expect(fa1?.netAmount).toBe(1000);
+    expect(fa2?.netAmount).toBe(500);
+    expect(mg?.netAmount).toBe(0);
   });
 
   it("auto-distributes when manual allocation has undefined key", () => {
@@ -282,12 +293,14 @@ describe("MG distribution", () => {
     };
 
     const views = buildLineViews(lines, rules);
-    const fa1 = views.find((v) => v.id === "fa1")!;
-    const fa2 = views.find((v) => v.id === "fa2")!;
+    const fa1 = views.find((v) => v.id === "fa1");
+    const fa2 = views.find((v) => v.id === "fa2");
+    expect(fa1).toBeDefined();
+    expect(fa2).toBeDefined();
 
     // No entry → auto-distribute by prefix
-    expect(fa1.netAmount).toBe(1000 + 20);
-    expect(fa2.netAmount).toBe(500 + 10);
+    expect(fa1?.netAmount).toBe(1000 + 20);
+    expect(fa2?.netAmount).toBe(500 + 10);
   });
 });
 
