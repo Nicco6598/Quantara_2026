@@ -1783,7 +1783,7 @@ mod tests {
         assert_eq!(preview.voices.len(), 1);
         assert_eq!(preview.voices[0].official_code, "AC.IR.A.2001.A");
         assert_eq!(preview.voices[0].unit_price, 20337.48);
-        assert_eq!(preview.pages_total, 0);
+        assert_eq!(preview.pages_total, 48);
     }
 
     #[test]

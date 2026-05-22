@@ -30,6 +30,7 @@ import {
   listDesktopTariffBooks,
   listDesktopTariffVoiceCounts,
   listDesktopTariffVoices,
+  selectMultipleTariffPdfMetadatas,
   type TariffPdfMetadata,
   updateDesktopContract,
   updateDesktopTariffBook,
@@ -87,6 +88,20 @@ function keepLatestImportPerMetadataKey(
 
 function yieldToBrowser(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, 0));
+}
+
+function formatImportError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const stackLine = error.stack
+    ?.split("\n")
+    .slice(1)
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  return stackLine ? `${error.message} (${stackLine})` : error.message;
 }
 
 export function TariffsScreen() {
@@ -367,7 +382,6 @@ export function TariffsScreen() {
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 
     try {
-      const { selectMultipleTariffPdfMetadatas } = await import("@/lib/desktopData");
       const results = await selectMultipleTariffPdfMetadatas((progress) => {
         dispatchImport({ type: "UPDATE_FILE", file: progress });
       });
@@ -403,7 +417,7 @@ export function TariffsScreen() {
     } catch (error) {
       dispatchImport({ type: "SET_PHASE", phase: "idle" });
       notify({
-        message: error instanceof Error ? error.message : String(error),
+        message: formatImportError(error),
         title: "Import tariffario non riuscito",
         tone: "danger",
       });

@@ -2,6 +2,12 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.4.22 — 2026-05-22
+
+### Stability Fix
+
+- **Fix di import tariffari** — Test fix con segnalazione dell'errore specifico in produzione.
+
 ## 0.4.21 — 2026-05-21
 
 ### Stability Fix
