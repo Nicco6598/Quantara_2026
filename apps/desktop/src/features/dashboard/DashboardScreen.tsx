@@ -1,5 +1,6 @@
 import { Calculator } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PortfolioBurn } from "@/components/shared/charts";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
@@ -8,13 +9,16 @@ import {
   buildActivityRows,
   buildFocusRows,
   buildGanttBars,
+  buildDashboardRealitySummary,
   buildOverviewMetrics,
   buildPriorityActions,
   buildSalTimeline,
+  PortfolioRealityPanel,
   PriorityActions,
   RightRail,
   TimelineGantt,
 } from "@/features/dashboard/components/DashboardSections";
+import type { DashboardOperationalTotal } from "@/features/dashboard/components/DashboardSections";
 import type { PortfolioProject } from "@/features/projects/types";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { SalDocumentView } from "@/features/sal/domain/sal-workflow";
@@ -29,7 +33,6 @@ import {
 import { readStringRecord } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
-import { PortfolioBurn } from "@/components/shared/charts";
 import { useAuditLogStore } from "@/store/audit-log-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
@@ -53,25 +56,57 @@ function timeGreeting(): string {
 
 function buildOperationalTotals(projects: PortfolioProject[], views: SalDocumentView[]) {
   const budgetById = new Map(projects.map((p) => [p.id, p.budget.amount]));
-  const totals = new Map<
-    string,
-    { approvedAmount: number; committedAmount: number; progressPercent: number }
-  >();
+  const totals = new Map<string, DashboardOperationalTotal>();
 
   for (const view of views) {
     const current = totals.get(view.projectId) ?? {
       approvedAmount: 0,
+      approvedCount: 0,
       committedAmount: 0,
+      draftAmount: 0,
+      draftCount: 0,
+      inReviewAmount: 0,
+      inReviewCount: 0,
+      lastSalDate: null,
+      lastSalTotal: 0,
       progressPercent: 0,
+      salCount: 0,
     };
     const committedAmount = current.committedAmount + view.total;
-    const approvedAmount =
-      view.status === "closed" || view.status === "approved"
-        ? current.approvedAmount + view.total
-        : current.approvedAmount;
+    const isApproved = view.status === "closed" || view.status === "approved";
+    const isInReview = view.status === "in-review";
+    const isDraft = view.status === "draft";
+    const approvedAmount = isApproved
+      ? current.approvedAmount + view.total
+      : current.approvedAmount;
+    const approvedCount = isApproved ? current.approvedCount + 1 : current.approvedCount;
+    const inReviewAmount = isInReview
+      ? current.inReviewAmount + view.total
+      : current.inReviewAmount;
+    const inReviewCount = isInReview ? current.inReviewCount + 1 : current.inReviewCount;
+    const draftAmount = isDraft ? current.draftAmount + view.total : current.draftAmount;
+    const draftCount = isDraft ? current.draftCount + 1 : current.draftCount;
+    const salDate = view.closedAt || view.date;
+    const lastSalDate =
+      current.lastSalDate === null || new Date(salDate) > new Date(current.lastSalDate)
+        ? salDate
+        : current.lastSalDate;
+    const lastSalTotal = lastSalDate === salDate ? view.total : current.lastSalTotal;
     const budget = budgetById.get(view.projectId) ?? 0;
     const progressPercent = budget > 0 ? Math.min(100, (committedAmount / budget) * 100) : 0;
-    totals.set(view.projectId, { approvedAmount, committedAmount, progressPercent });
+    totals.set(view.projectId, {
+      approvedAmount,
+      approvedCount,
+      committedAmount,
+      draftAmount,
+      draftCount,
+      inReviewAmount,
+      inReviewCount,
+      lastSalDate,
+      lastSalTotal,
+      progressPercent,
+      salCount: current.salCount + 1,
+    });
   }
 
   return totals;
@@ -178,16 +213,24 @@ export function DashboardScreen() {
 
   const salTimeline = useMemo(() => buildSalTimeline(projects, views), [projects, views]);
 
-  const metrics = useMemo(() => buildOverviewMetrics(projects), [projects]);
-  const distribution = useMemo(() => buildFocusRows(projects), [projects]);
-  const priorityActions = useMemo(() => buildPriorityActions(projects), [projects]);
-
-  const ganttBars = useMemo(() => buildGanttBars(projects, salTimeline), [projects, salTimeline]);
-
   const operationalTotals = useMemo(
     () => buildOperationalTotals(projects, views),
     [projects, views],
   );
+
+  const realitySummary = useMemo(
+    () => buildDashboardRealitySummary(projects, views, operationalTotals),
+    [projects, views, operationalTotals],
+  );
+
+  const metrics = useMemo(
+    () => buildOverviewMetrics(projects, realitySummary),
+    [projects, realitySummary],
+  );
+  const distribution = useMemo(() => buildFocusRows(projects), [projects]);
+  const priorityActions = useMemo(() => buildPriorityActions(projects), [projects]);
+
+  const ganttBars = useMemo(() => buildGanttBars(projects, salTimeline), [projects, salTimeline]);
 
   const activities = useMemo(() => buildActivityRows(auditEntries), [auditEntries]);
 
@@ -203,10 +246,7 @@ export function DashboardScreen() {
     return sum;
   }, [views]);
 
-  const escalationCount = useMemo(
-    () => projects.filter((p) => p.tone === "danger").length,
-    [projects],
-  );
+  const escalationCount = realitySummary.budgetOverrunCount;
 
   async function handleDeleteProject(projectId: string) {
     try {
@@ -282,6 +322,8 @@ export function DashboardScreen() {
             <MetricCard {...metric} key={metric.label} />
           ))}
         </div>
+
+        <PortfolioRealityPanel projects={projects} summary={realitySummary} />
 
         <PriorityActions items={priorityActions} />
 

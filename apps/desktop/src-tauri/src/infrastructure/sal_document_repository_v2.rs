@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde_json::Value;
 
 use crate::infrastructure::to_database_error;
@@ -59,7 +59,12 @@ pub fn create_sal_document_v2(
     let measurement_rows_count = lines_arr
         .map(|arr| {
             arr.iter()
-                .map(|l| l["measurementRows"].as_array().map(|m| m.len()).unwrap_or(0))
+                .map(|l| {
+                    l["measurementRows"]
+                        .as_array()
+                        .map(|m| m.len())
+                        .unwrap_or(0)
+                })
                 .sum::<usize>()
         })
         .unwrap_or(0) as i64;
@@ -96,10 +101,8 @@ pub fn create_sal_document_v2(
             let surcharge_kind = line["surcharge"]["kind"].as_str().unwrap_or("none");
             let surcharge_percent = line["surcharge"]["percent"].as_f64().unwrap_or(0.0);
 
-            let voice = voices.and_then(|va| {
-                va.iter()
-                    .find(|v| v["id"].as_str() == Some(voice_id))
-            });
+            let voice =
+                voices.and_then(|va| va.iter().find(|v| v["id"].as_str() == Some(voice_id)));
 
             let (code, vdesc, cat, unit, uprice, labor, pyear) = voice.map_or_else(
                 || Default::default(),
@@ -117,8 +120,7 @@ pub fn create_sal_document_v2(
             );
 
             let gross_cents = (quantity * uprice as f64).round() as i64;
-            let discount_cents =
-                (gross_cents as f64 * surcharge_percent / 100.0).round() as i64;
+            let discount_cents = (gross_cents as f64 * surcharge_percent / 100.0).round() as i64;
             let total_cents_line = gross_cents - discount_cents;
 
             conn.execute(
@@ -323,10 +325,7 @@ pub fn get_version(conn: &Connection, version_id: &str) -> Result<Option<Value>,
 
 pub fn delete_sal_document_v2(conn: &Connection, id: &str) -> Result<(), AppError> {
     let affected = conn
-        .execute(
-            "DELETE FROM sal_documents_v2 WHERE id = ?1",
-            params![id],
-        )
+        .execute("DELETE FROM sal_documents_v2 WHERE id = ?1", params![id])
         .map_err(to_database_error)?;
 
     if affected == 0 {
@@ -418,7 +417,10 @@ mod tests {
         let mut v = make_test_sal();
         if let Some(obj) = v.as_object_mut() {
             obj.insert("id".to_string(), Value::String(id.to_string()));
-            obj.insert("projectId".to_string(), Value::String(project_id.to_string()));
+            obj.insert(
+                "projectId".to_string(),
+                Value::String(project_id.to_string()),
+            );
         }
         v
     }
@@ -438,8 +440,14 @@ mod tests {
         setup_schema(&conn);
         create_sal_document_v2(&conn, "proj_x", &make_test_sal_with("a", "proj_x")).unwrap();
         create_sal_document_v2(&conn, "proj_y", &make_test_sal_with("b", "proj_y")).unwrap();
-        assert_eq!(list_sal_documents_v2(&conn, Some("proj_x")).unwrap().len(), 1);
-        assert_eq!(list_sal_documents_v2(&conn, Some("proj_y")).unwrap().len(), 1);
+        assert_eq!(
+            list_sal_documents_v2(&conn, Some("proj_x")).unwrap().len(),
+            1
+        );
+        assert_eq!(
+            list_sal_documents_v2(&conn, Some("proj_y")).unwrap().len(),
+            1
+        );
         assert_eq!(list_sal_documents_v2(&conn, None).unwrap().len(), 2);
     }
 
@@ -458,7 +466,10 @@ mod tests {
         setup_schema(&conn);
         create_sal_document_v2(&conn, "proj_1", &make_test_sal()).unwrap();
         delete_sal_document_v2(&conn, "test_sal_1").unwrap();
-        assert_eq!(list_sal_documents_v2(&conn, Some("proj_1")).unwrap().len(), 0);
+        assert_eq!(
+            list_sal_documents_v2(&conn, Some("proj_1")).unwrap().len(),
+            0
+        );
     }
 
     #[test]
@@ -474,7 +485,9 @@ mod tests {
         setup_schema(&conn);
         create_sal_document_v2(&conn, "p1", &make_test_sal_with("same_id", "p1")).unwrap();
         let mut v = make_test_sal_with("same_id", "p1");
-        v.as_object_mut().unwrap().insert("title".to_string(), json!("Updated"));
+        v.as_object_mut()
+            .unwrap()
+            .insert("title".to_string(), json!("Updated"));
         create_sal_document_v2(&conn, "p1", &v).unwrap();
         let docs = list_sal_documents_v2(&conn, Some("p1")).unwrap();
         assert_eq!(docs.len(), 1);

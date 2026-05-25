@@ -19,6 +19,7 @@ export type ToastInput = {
   actionLabel?: string;
   message: string;
   onAction?: () => void;
+  sound?: "auto" | "none";
   title?: string;
   tone?: ToastTone;
 };
@@ -30,6 +31,11 @@ const QUANTARA_TOAST_EVENT = "quantara-toast";
 type ToastItem = ToastInput & {
   id: string;
   tone: ToastTone;
+};
+
+type RecentToast = {
+  id: string;
+  lastShownAt: number;
 };
 
 type ToastContextValue = {
@@ -154,6 +160,7 @@ async function playToastSound(tone?: ToastTone) {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const timeoutIds = useRef(new Map<string, number>());
+  const recentToasts = useRef(new Map<string, RecentToast>());
 
   // Unlock audio context on first user gesture (macOS/WebView)
   useEffect(() => {
@@ -166,17 +173,44 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(timeoutId);
       timeoutIds.current.delete(id);
     }
+    for (const [signature, recent] of recentToasts.current) {
+      if (recent.id === id) {
+        recentToasts.current.delete(signature);
+      }
+    }
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
 
   const notify = useCallback(
     (toast: ToastInput) => {
-      void playToastSound(toast.tone);
+      const tone = toast.tone ?? "info";
+      const signature = `${tone}:${toast.title ?? ""}:${toast.message}`;
+      const now = Date.now();
+      const recent = recentToasts.current.get(signature);
+
+      if (recent && now - recent.lastShownAt < 1600) {
+        recentToasts.current.set(signature, { ...recent, lastShownAt: now });
+
+        const timeoutId = timeoutIds.current.get(recent.id);
+        if (timeoutId !== undefined) {
+          window.clearTimeout(timeoutId);
+        }
+        timeoutIds.current.set(
+          recent.id,
+          window.setTimeout(() => dismiss(recent.id), 5200),
+        );
+        return recent.id;
+      }
+
+      if (toast.sound !== "none") {
+        void playToastSound(tone);
+      }
       const id =
         typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const nextToast: ToastItem = { ...toast, id, tone: toast.tone ?? "info" };
+      const nextToast: ToastItem = { ...toast, id, tone };
+      recentToasts.current.set(signature, { id, lastShownAt: now });
 
       setToasts((current) => {
         const next = [nextToast, ...current].slice(0, 4);
@@ -187,6 +221,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             if (timeoutId !== undefined) {
               window.clearTimeout(timeoutId);
               timeoutIds.current.delete(currentToast.id);
+            }
+            for (const [currentSignature, recent] of recentToasts.current) {
+              if (recent.id === currentToast.id) {
+                recentToasts.current.delete(currentSignature);
+              }
             }
           }
         }
@@ -217,6 +256,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         window.clearTimeout(timeoutId);
       }
       timeoutIds.current.clear();
+      recentToasts.current.clear();
     },
     [],
   );
@@ -243,6 +283,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 initial={motionVariants.toast.initial}
                 key={toast.id}
                 layout="position"
+                role={toast.tone === "danger" ? "alert" : "status"}
                 transition={motionVariants.toast.transition}
               >
                 <div className="flex items-start gap-3">

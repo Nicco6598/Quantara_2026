@@ -42,7 +42,11 @@ pub fn update_contract(
     request: UpdateContractRequest,
 ) -> Result<ContractRecord, String> {
     with_db_mut(&state, |conn| {
-        let record = crate::infrastructure::contract_repository::update_contract(conn, &contract_id, request)?;
+        let record = crate::infrastructure::contract_repository::update_contract(
+            conn,
+            &contract_id,
+            request,
+        )?;
         audit_repository::append_event(conn, "contract", &contract_id, "update", None, None)?;
         Ok(record)
     })

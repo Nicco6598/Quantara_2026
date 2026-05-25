@@ -327,37 +327,6 @@ main {
   overflow-x: hidden;
 }
 
-/* ── Native date input — hide browser picker icon, keep functionality ── */
-.date-input-native {
-  appearance: none;
-  -webkit-appearance: none;
-}
-.date-input-native::-webkit-calendar-picker-indicator {
-  display: none;
-}
-.date-input-native::-webkit-inner-spin-button {
-  display: none;
-}
-
-input[type="date"]::-webkit-datetime-edit {
-  color: inherit;
-  font: inherit;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator {
-  margin-inline-start: 2px;
-  padding: 0;
-}
-
-.sal-date-input::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  filter: brightness(0) saturate(100%) opacity(0.62);
-}
-
-[data-theme^="dark"] .sal-date-input::-webkit-calendar-picker-indicator {
-  filter: invert(1) opacity(0.74);
-}
-
 /* ── Responsive container patterns ── */
 .responsive-table-wrap {
   overflow-x: auto;
@@ -550,6 +519,76 @@ body {
   box-shadow: none;
 }
 
+.window-resize-handle {
+  position: absolute;
+  z-index: var(--z-topbar);
+  pointer-events: auto;
+}
+
+.window-resize-handle-n,
+.window-resize-handle-s {
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.window-resize-handle-e,
+.window-resize-handle-w {
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.window-resize-handle-n {
+  top: 0;
+}
+
+.window-resize-handle-e {
+  right: 0;
+}
+
+.window-resize-handle-s {
+  bottom: 0;
+}
+
+.window-resize-handle-w {
+  left: 0;
+}
+
+.window-resize-handle-ne,
+.window-resize-handle-nw,
+.window-resize-handle-se,
+.window-resize-handle-sw {
+  width: 10px;
+  height: 10px;
+}
+
+.window-resize-handle-ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.window-resize-handle-nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.window-resize-handle-se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+
+.window-resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
 .window-titlebar {
   position: absolute;
   inset: 0 0 auto;
@@ -565,6 +604,75 @@ body {
   box-shadow: none;
   backdrop-filter: blur(18px) saturate(1.16);
   user-select: none;
+}
+
+.operational-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 64%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-base) 94%, var(--bg-muted) 6%);
+  padding: 12px;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.operational-toolbar-group,
+.operational-toolbar-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.operational-toolbar-actions {
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
+  padding-top: 10px;
+}
+
+.operational-panel-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.operational-card-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.operational-card-hover {
+  transition:
+    border-color var(--duration-base) var(--ease-standard),
+    background-color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard);
+}
+
+.operational-card-hover:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-subtle));
+  background: color-mix(in srgb, var(--surface-base) 92%, var(--bg-muted) 8%);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--text-primary) 6%, transparent);
+  transform: translate3d(0, -2px, 0);
+}
+
+.operational-card-hover:active {
+  transform: translate3d(0, 0, 0) scale(0.996);
+}
+
+@media (min-width: 1280px) {
+  .operational-toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .operational-toolbar-actions {
+    border-top: 0;
+    border-left: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
+    padding-top: 0;
+    padding-left: 12px;
+  }
 }
 
 .window-titlebar-drag-strip {
@@ -894,6 +1002,85 @@ body {
 .window-titlebar-button-danger:hover {
   background: color-mix(in srgb, var(--danger-base) 20%, transparent);
   color: var(--danger-base);
+}
+
+.window-titlebar-windows {
+  background: var(--surface-base);
+  border-bottom-color: var(--border-subtle);
+  backdrop-filter: none;
+}
+
+.window-titlebar-windows .window-titlebar-center {
+  left: 50%;
+}
+
+.window-titlebar-windows .window-titlebar-tool,
+.window-titlebar-windows .window-titlebar-command,
+.window-titlebar-windows .window-titlebar-route-trigger {
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  transform: none;
+}
+
+.window-titlebar-windows .window-titlebar-button {
+  width: 46px;
+  border-radius: 0;
+}
+
+.window-titlebar-windows .window-titlebar-button:hover {
+  background: color-mix(in srgb, var(--bg-muted-strong) 76%, transparent);
+}
+
+.window-titlebar-windows .window-titlebar-button-danger:hover {
+  background: #c42b1c;
+  color: white;
+}
+
+.window-titlebar-minimize-mark,
+.window-titlebar-maximize-mark,
+.window-titlebar-close-mark {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.window-titlebar-minimize-mark::before,
+.window-titlebar-maximize-mark::before,
+.window-titlebar-close-mark::before,
+.window-titlebar-close-mark::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+
+.window-titlebar-minimize-mark::before {
+  left: 1px;
+  right: 1px;
+  top: 6px;
+  height: 1.5px;
+}
+
+.window-titlebar-maximize-mark::before {
+  inset: 2px;
+  border: 1.5px solid currentColor;
+  background: transparent;
+}
+
+.window-titlebar-close-mark::before,
+.window-titlebar-close-mark::after {
+  left: 1px;
+  right: 1px;
+  top: 5px;
+  height: 1.5px;
+}
+
+.window-titlebar-close-mark::before {
+  transform: rotate(45deg);
+}
+
+.window-titlebar-close-mark::after {
+  transform: rotate(-45deg);
 }
 
 .window-titlebar-controls-macos .window-titlebar-button {

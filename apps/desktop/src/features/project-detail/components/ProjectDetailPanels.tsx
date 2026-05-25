@@ -7,45 +7,19 @@ import {
   Clock3,
   FileText,
   ListChecks,
-  type LucideIcon,
   MoreVertical,
   Search,
   ThumbsUp,
   Trash2,
   X,
 } from "lucide-react";
-import type { Dispatch, ReactNode, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { BezelSurface } from "@/components/shared/ui-primitives";
 import type { DesktopTariffBook } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
-
-export function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return <BezelSurface innerClassName={cn("p-5", className)}>{children}</BezelSurface>;
-}
-
-export function PanelTitle({ children, icon: Icon }: { children: string; icon: LucideIcon }) {
-  return (
-    <div className="flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-      <Icon className="size-4 text-[var(--info-base)]" />
-      {children}
-    </div>
-  );
-}
-
-export function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <span className="text-12px font-medium text-[var(--text-secondary)]">{label}</span>
-      <span className="max-w-[58%] text-right text-13px font-semibold text-[var(--text-primary)]">
-        {value}
-      </span>
-    </div>
-  );
-}
 
 export function MilestoneItem({
   isLast,

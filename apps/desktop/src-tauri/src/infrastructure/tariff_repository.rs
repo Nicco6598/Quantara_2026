@@ -421,13 +421,15 @@ pub fn search_tariff_voices(
                 rank
          FROM tariff_voices_fts f
          JOIN tariff_voices v ON v.rowid = f.rowid
-         WHERE tariff_voices_fts MATCH ?1"
+         WHERE tariff_voices_fts MATCH ?1",
     );
 
     if !tariff_book_ids.is_empty() {
         sql.push_str(" AND v.tariff_book_id IN (");
         for i in 0..num_books {
-            if i > 0 { sql.push_str(", "); }
+            if i > 0 {
+                sql.push_str(", ");
+            }
             sql.push_str(&format!("?{}", i + 2));
         }
         sql.push(')');
@@ -534,7 +536,8 @@ pub fn import_tariff_pdf_preview(
         parse_rfi_pdf_with_python(path, app)?
     };
 
-    let source_text = parsed.records
+    let source_text = parsed
+        .records
         .iter()
         .take(200)
         .map(|record| {
@@ -597,7 +600,8 @@ fn import_single_tariff_pdf(
         parse_rfi_pdf_with_python_direct(path, resource_dir)?
     };
 
-    let source_text = parsed.records
+    let source_text = parsed
+        .records
         .iter()
         .take(200)
         .map(|r| {
@@ -845,10 +849,8 @@ fn resolve_rfi_warnings(records: &mut Vec<RfiTariffRecord>, top_warnings: &[Tari
     if top_warnings.is_empty() {
         return;
     }
-    let map: HashMap<String, &TariffWarning> = top_warnings
-        .iter()
-        .map(|w| (w.id.clone(), w))
-        .collect();
+    let map: HashMap<String, &TariffWarning> =
+        top_warnings.iter().map(|w| (w.id.clone(), w)).collect();
     for rec in records.iter_mut() {
         if rec.warnings.is_empty() && !rec.warning_ids.is_empty() {
             rec.warnings = rec

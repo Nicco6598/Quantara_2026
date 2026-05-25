@@ -1,8 +1,9 @@
 import { Loader2 } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
 import { reportUserActionError } from "@/lib/user-action-error";
+import type { SalTemplate } from "@/store/template-store";
 import { SelectedVoicesPanel } from "../components/SalCreationTables";
 import type {
   SalEconomicRules,
@@ -17,7 +18,8 @@ export const MeasureStep = memo(function MeasureStep({
   economicRules,
   lineViews,
   voices,
-  isLoading,
+  isLoading = false,
+  isActive = false,
   onAddMeasurementRow,
   onAllocateMg,
   onAddMgVoice,
@@ -28,11 +30,18 @@ export const MeasureStep = memo(function MeasureStep({
   onNotesChange,
   onSurcharge,
   onPasteLine,
+  selectedLineId,
+  onSelectLine,
+  onSearchSelectVoice,
+  onApplyTemplate,
+  onOpenTemplateDialog,
+  tariffBookIds,
 }: {
   economicRules: SalEconomicRules;
   lineViews: SalLineView[];
   voices: SalVoiceDraft[];
   isLoading?: boolean;
+  isActive?: boolean;
   onAddMeasurementRow: (lineId: string) => void;
   onAllocateMg: (mgLineId: string, targetLineIds: string[]) => void;
   onAddMgVoice: (voice: SalVoiceDraft) => void;
@@ -47,10 +56,30 @@ export const MeasureStep = memo(function MeasureStep({
   onNotesChange: (lineId: string, notes: string) => void;
   onSurcharge: (lineId: string, p: number) => void;
   onPasteLine: (d: SalLineDraft) => void;
+  selectedLineId?: string | null | undefined;
+  onSelectLine?: ((lineId: string | null) => void) | undefined;
+  onSearchSelectVoice?: (voice: SalVoiceDraft) => void;
+  onApplyTemplate?: (template: SalTemplate) => void;
+  onOpenTemplateDialog?: () => void;
+  tariffBookIds?: string[];
 }) {
   const { notify } = useToast();
   const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
   const lastInteractedRef = useRef<string | null>(null);
+  const searchConfig = useMemo(
+    () =>
+      onSearchSelectVoice && onApplyTemplate && tariffBookIds
+        ? {
+            voices,
+            tariffBookIds,
+            isLoading,
+            onSelectVoice: onSearchSelectVoice,
+            onApplyTemplate,
+            onOpenTemplateDialog: onOpenTemplateDialog ?? (() => {}),
+          }
+        : undefined,
+    [voices, tariffBookIds, isLoading, onSearchSelectVoice, onApplyTemplate, onOpenTemplateDialog],
+  );
 
   const handleCopyLine = useCallback(
     (lineId: string) => {
@@ -88,6 +117,7 @@ export const MeasureStep = memo(function MeasureStep({
   );
 
   useEffect(() => {
+    if (!isActive) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "v") {
         if (!navigator.clipboard?.readText) {
@@ -123,7 +153,7 @@ export const MeasureStep = memo(function MeasureStep({
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [notify, onPasteLine]);
+  }, [isActive, notify, onPasteLine]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -141,6 +171,7 @@ export const MeasureStep = memo(function MeasureStep({
           lines={lineViews}
           availableVoices={voices}
           copiedVoiceId={copiedLine?.id ?? null}
+          selectedLineId={selectedLineId}
           onAllocateMg={onAllocateMg}
           onAddMgVoice={onAddMgVoice}
           onCopyLine={handleCopyLine}
@@ -150,7 +181,9 @@ export const MeasureStep = memo(function MeasureStep({
           onRemove={onRemove}
           onRemoveMeasurementRow={onRemoveMeasurementRow}
           onSurcharge={onSurcharge}
+          onSelectLine={onSelectLine}
           onUpdateMeasurementRow={onUpdateMeasurementRow}
+          {...(searchConfig ? { search: searchConfig } : {})}
         />
 
         {isLoading && (

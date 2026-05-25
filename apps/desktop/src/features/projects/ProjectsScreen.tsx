@@ -1,4 +1,5 @@
-import { FileSpreadsheet, Trash2, X } from "lucide-react";
+import { FileSpreadsheet, FolderKanban, Trash2, X } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   type ChangeEvent,
   lazy,
@@ -681,9 +682,12 @@ function ProjectExportDialog({
             );
           })
         ) : (
-          <div className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-8 text-center text-13px text-[var(--text-secondary)]">
-            Nessun progetto nel filtro corrente.
-          </div>
+          <EmptyState
+            icon={FolderKanban}
+            title="Nessun progetto nel filtro corrente."
+            description="Prova a modificare i filtri per trovare più progetti."
+            className="rounded-xl"
+          />
         )}
       </div>
 

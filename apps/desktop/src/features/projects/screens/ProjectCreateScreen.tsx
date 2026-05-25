@@ -13,11 +13,11 @@ import {
   ShieldCheck,
   WalletCards,
 } from "lucide-react";
-import type { KeyboardEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/ToastProvider";
 import { clearAutoDraft, loadAutoDraft, saveAutoDraft, useAutoSave } from "@/hooks/use-auto-save";
+import { useActionHandler } from "@/hooks/useAction";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   type CreateDesktopContractRequest,
@@ -35,6 +35,17 @@ import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { cn } from "@/lib/utils";
+import {
+  AlertBanner,
+  Button,
+  DetailList,
+  DetailRow,
+  MetricCard,
+  Panel,
+  StatusChip,
+} from "@/components/shared";
+import { CurrencyField, SelectField, TextField } from "@/components/shared/form";
+import type { SelectOption } from "@/components/shared/form";
 
 const PROJECT_AUTO_DRAFT_KEY = STORAGE_KEYS.projectAutoDraft;
 const PROJECT_STEPPER_SPRING = { type: "spring", ...motionSpring.panel } as const;
@@ -271,24 +282,13 @@ export function ProjectCreateScreen() {
   ]);
 
   const handleSubmitRef = useRef<() => Promise<void>>(async () => {});
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const actionId = (event as CustomEvent<string>).detail;
-      if (actionId === "project-goto-step-1") {
-        dispatch({ type: "NAVIGATE_STEP", payload: { step: 1, error: "" } });
-        return;
-      }
-      if (actionId === "project-goto-step-2") {
-        dispatch({ type: "NAVIGATE_STEP", payload: { step: 2, error: "" } });
-        return;
-      }
-      if (actionId === "project-submit") {
-        handleSubmitRef.current();
-      }
-    };
-    window.addEventListener("project-create-action", handler);
-    return () => window.removeEventListener("project-create-action", handler);
-  }, []);
+
+  useActionHandler(
+    "project.submit",
+    useCallback(() => {
+      handleSubmitRef.current();
+    }, []),
+  );
 
   // Subscribe to step navigation from toolbar step clicks
   useEffect(() => {
@@ -420,6 +420,24 @@ export function ProjectCreateScreen() {
       ? "warning"
       : "success";
 
+  const contractorSelectOptions: SelectOption[] = useMemo(
+    () => contractorOptions.map((name) => ({ value: name, label: name })),
+    [contractorOptions],
+  );
+
+  const budgetIvaPct = parseFloat(draft.budgetIvaPercent.replace(",", "."));
+  const hasBudgetIva =
+    draft.budgetIvaPercent !== "" && Number.isFinite(budgetIvaPct) && budgetIvaPct > 0;
+  const budgetIvaAmount =
+    hasBudgetIva && Number.isFinite(amount) ? amount * (budgetIvaPct / 100) : 0;
+  const budgetIvaTotal = hasBudgetIva && Number.isFinite(amount) ? amount + budgetIvaAmount : 0;
+
+  const osParsed = parseLocalizedMoney(draft.osExcludedAmount);
+  const osIvaPctVal = parseFloat(draft.osIvaPercent.replace(",", "."));
+  const hasOsIva = draft.osIvaPercent !== "" && Number.isFinite(osIvaPctVal) && osIvaPctVal > 0;
+  const osIvaAmount = hasOsIva && Number.isFinite(osParsed) ? osParsed * (osIvaPctVal / 100) : 0;
+  const osIvaTotal = hasOsIva && Number.isFinite(osParsed) ? osParsed + osIvaAmount : 0;
+
   return (
     <main className="relative mx-auto w-full max-w-5xl px-4 pb-10 pt-6 md:px-6">
       {showRestoreDialog && (
@@ -483,7 +501,7 @@ export function ProjectCreateScreen() {
       </nav>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_350px]">
-        <div className="min-w-0 rounded-2xl bg-[var(--surface-base)]/80 p-5 ring-1 ring-[var(--border-subtle)]/70 md:p-6">
+        <Panel padding="lg" className="min-w-0 md:p-6">
           {step === 1 ? (
             <section>
               <div className="flex items-start gap-4 border-b border-[var(--border-subtle)]/70 pb-5">
@@ -500,7 +518,7 @@ export function ProjectCreateScreen() {
                 </div>
               </div>
               <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
-                <ProjectTextField
+                <TextField
                   label="Nome progetto"
                   onChange={(v) =>
                     dispatch({
@@ -511,7 +529,7 @@ export function ProjectCreateScreen() {
                   placeholder="Linea AV/AC Milano-Verona"
                   value={draft.title}
                 />
-                <ProjectTextField
+                <TextField
                   label="Contratto applicativo"
                   onChange={(v) =>
                     dispatch({
@@ -522,7 +540,7 @@ export function ProjectCreateScreen() {
                   placeholder="CA-MV-001"
                   value={draft.applicationContractCode}
                 />
-                <ProjectTextField
+                <TextField
                   label="Accordo quadro"
                   onChange={(v) =>
                     dispatch({
@@ -533,15 +551,17 @@ export function ProjectCreateScreen() {
                   placeholder="AQ-RFI-2026"
                   value={draft.frameworkAgreementCode}
                 />
-                <ContractorSelect
-                  options={contractorOptions}
-                  value={draft.contractorName}
+                <SelectField
+                  label="Appaltatore"
                   onChange={(v) =>
                     dispatch({
                       type: "SET_DRAFT",
                       payload: (s) => ({ ...s, contractorName: sanitizeTextInput(v) }),
                     })
                   }
+                  options={contractorSelectOptions}
+                  placeholder="Seleziona appaltatore"
+                  value={draft.contractorName}
                 />
               </div>
             </section>
@@ -563,16 +583,16 @@ export function ProjectCreateScreen() {
 
               <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <ProjectCurrencyField
+                  <CurrencyField
                     label="Importo contrattuale"
+                    value={safeParseMoney(draft.contractualAmount)}
                     onChange={(v) =>
                       dispatch({
                         type: "SET_DRAFT",
-                        payload: (s) => ({ ...s, contractualAmount: v }),
+                        payload: (s) => ({ ...s, contractualAmount: v > 0 ? String(v) : "" }),
                       })
                     }
                     placeholder="26.150.000,00"
-                    value={draft.contractualAmount}
                   />
                   <IvaToggleInput
                     label="IVA su importo"
@@ -623,13 +643,16 @@ export function ProjectCreateScreen() {
               </div>
 
               <div className="mt-5">
-                <ProjectCurrencyField
+                <CurrencyField
                   label="OS Esclusi da ribassi"
+                  value={safeParseMoney(draft.osExcludedAmount)}
                   onChange={(v) =>
-                    dispatch({ type: "SET_DRAFT", payload: (s) => ({ ...s, osExcludedAmount: v }) })
+                    dispatch({
+                      type: "SET_DRAFT",
+                      payload: (s) => ({ ...s, osExcludedAmount: v > 0 ? String(v) : "" }),
+                    })
                   }
                   placeholder="1.500.000,00"
-                  value={draft.osExcludedAmount}
                 />
                 <IvaToggleInput
                   label="IVA su OS esclusi"
@@ -813,56 +836,47 @@ export function ProjectCreateScreen() {
           )}
 
           <div className="mt-6 border-t border-[var(--border-subtle)]/70 pt-5">
-            <ProjectActionFeedback message={actionFeedback} tone={actionFeedbackTone} />
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <m.button
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_86%,var(--bg-muted)_14%)] px-5 text-13px font-bold text-[var(--text-secondary)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_40%,transparent)] transition hover:bg-[var(--bg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] disabled:cursor-not-allowed disabled:opacity-45"
+            {actionFeedback ? (
+              <div className="mb-4">
+                <AlertBanner
+                  title={actionFeedback}
+                  tone={actionFeedbackTone === "success" ? "success" : "warning"}
+                />
+              </div>
+            ) : null}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button
                 disabled={step === 1 || isSaving}
-                initial={false}
+                icon={ArrowLeft}
                 onClick={() => handleGoToStep(1)}
-                transition={PROJECT_STEPPER_SPRING}
-                type="button"
-                whileTap={{ scale: 0.985, y: 1 }}
+                variant="secondary"
               >
-                <ArrowLeft className="size-4" />
                 Indietro
-              </m.button>
+              </Button>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <m.button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_86%,var(--bg-muted)_14%)] px-5 text-13px font-bold text-[var(--text-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_40%,transparent)] transition hover:bg-[var(--bg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] disabled:cursor-not-allowed disabled:opacity-45"
+                <Button
                   disabled={isSaving}
-                  initial={false}
+                  icon={Save}
                   onClick={handleSaveDraft}
-                  transition={PROJECT_STEPPER_SPRING}
-                  type="button"
-                  whileTap={{ scale: 0.985, y: 1 }}
+                  variant="secondary"
                 >
-                  <Save className="size-4" />
                   Salva bozza
-                </m.button>
+                </Button>
                 {step === 1 ? (
-                  <m.button
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-black text-[var(--text-inverse)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_28%,transparent)] transition hover:bg-[color-mix(in_srgb,var(--accent-primary)_88%,black_12%)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] disabled:cursor-not-allowed disabled:opacity-45"
+                  <Button
                     disabled={!canGoNext || isSaving}
-                    initial={false}
                     onClick={() => handleGoToStep(2)}
-                    transition={PROJECT_STEPPER_SPRING}
-                    type="button"
-                    whileTap={{ scale: 0.985, y: 1 }}
+                    variant="primary"
                   >
                     Continua
                     <ArrowRight className="size-4" />
-                  </m.button>
+                  </Button>
                 ) : (
-                  <m.button
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 text-13px font-black text-[var(--text-inverse)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_28%,transparent)] transition hover:bg-[color-mix(in_srgb,var(--accent-primary)_88%,black_12%)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] disabled:cursor-not-allowed disabled:opacity-45"
+                  <Button
                     disabled={!validation.canSubmit || isSaving}
-                    initial={false}
                     onClick={() => void handleSubmit()}
-                    transition={PROJECT_STEPPER_SPRING}
-                    type="button"
-                    whileTap={{ scale: 0.985, y: 1 }}
+                    variant="primary"
                   >
                     {isSaving
                       ? "Salvataggio..."
@@ -870,19 +884,16 @@ export function ProjectCreateScreen() {
                         ? "Aggiorna progetto"
                         : "Crea progetto"}
                     <Check className="size-4" />
-                  </m.button>
+                  </Button>
                 )}
               </div>
             </div>
           </div>
-        </div>
+        </Panel>
 
         <aside className="space-y-5">
-          <div className="rounded-2xl bg-[var(--surface-base)]/80 p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <div className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-              Anteprima
-            </div>
-            <div className="mt-4 rounded-22px bg-[var(--surface-base)] p-4 shadow-none">
+          <Panel eyebrow="Anteprima" padding="lg">
+            <div className="rounded-22px bg-[var(--surface-base)] p-4">
               <div className="truncate text-lg font-semibold text-[var(--text-primary)]">
                 {draft.title.trim() || "Nuovo progetto"}
               </div>
@@ -894,14 +905,48 @@ export function ProjectCreateScreen() {
                 {draft.contractorName.trim() || "Appaltatore da selezionare"}
               </div>
               <div className="mt-4 grid gap-3">
-                <BudgetPreviewRow
-                  amount={amount}
-                  ivaPct={draft.budgetIvaPercent}
-                  label="Importo contrattuale"
-                />
+                {Number.isFinite(amount) && amount > 0 ? (
+                  <div className="rounded-xl bg-[var(--bg-muted)]/70 p-3">
+                    <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                      Importo contrattuale
+                    </div>
+                    <DetailList className="mt-1">
+                      <DetailRow label="BASE" value={formatAmount(amount)} />
+                      {hasBudgetIva ? (
+                        <>
+                          <DetailRow
+                            label={`+ IVA (${budgetIvaPct.toLocaleString("it-IT")}%)`}
+                            value={formatAmount(budgetIvaAmount)}
+                            className="text-[var(--info-base)]"
+                          />
+                          <DetailRow
+                            label="= TOTALE"
+                            value={formatAmount(budgetIvaTotal)}
+                            className="border-t border-[var(--border-subtle)]/50 pt-1 text-[var(--info-base)] font-bold"
+                          />
+                        </>
+                      ) : (
+                        <div className="text-11px font-medium text-[var(--text-secondary)]">
+                          (IVA non applicata)
+                        </div>
+                      )}
+                    </DetailList>
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-[var(--bg-muted)]/70 p-3">
+                    <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                      Importo contrattuale
+                    </div>
+                    <div className="mt-1 text-11px font-medium text-[var(--text-secondary)]">
+                      Da inserire
+                    </div>
+                  </div>
+                )}
 
-                <PreviewMetric
-                  icon={<ShieldCheck className="size-5" />}
+                <MetricCard
+                  caption=""
+                  density="compact"
+                  icon={ShieldCheck}
                   label="Ribasso d'asta"
                   value={
                     Number.isFinite(parsedDiscount)
@@ -910,15 +955,47 @@ export function ProjectCreateScreen() {
                   }
                 />
 
-                <BudgetPreviewRow
-                  amount={parseLocalizedMoney(draft.osExcludedAmount)}
-                  ivaPct={draft.osIvaPercent}
-                  label="OS esclusi da ribasso"
-                  fallback="Non impostato"
-                />
+                {Number.isFinite(osParsed) && osParsed > 0 ? (
+                  <div className="rounded-xl bg-[var(--bg-muted)]/70 p-3">
+                    <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                      OS esclusi da ribasso
+                    </div>
+                    <DetailList className="mt-1">
+                      <DetailRow label="BASE" value={formatAmount(osParsed)} />
+                      {hasOsIva ? (
+                        <>
+                          <DetailRow
+                            label={`+ IVA (${osIvaPctVal.toLocaleString("it-IT")}%)`}
+                            value={formatAmount(osIvaAmount)}
+                            className="text-[var(--info-base)]"
+                          />
+                          <DetailRow
+                            label="= TOTALE"
+                            value={formatAmount(osIvaTotal)}
+                            className="border-t border-[var(--border-subtle)]/50 pt-1 text-[var(--info-base)] font-bold"
+                          />
+                        </>
+                      ) : (
+                        <div className="text-11px font-medium text-[var(--text-secondary)]">
+                          (IVA non applicata)
+                        </div>
+                      )}
+                    </DetailList>
+                  </div>
+                ) : (
+                  <MetricCard
+                    caption=""
+                    density="compact"
+                    icon={WalletCards}
+                    label="OS esclusi da ribasso"
+                    value="Non impostato"
+                  />
+                )}
 
-                <PreviewMetric
-                  icon={<FileText className="size-5" />}
+                <MetricCard
+                  caption=""
+                  density="compact"
+                  icon={FileText}
                   label="Tariffari associati"
                   value={
                     draft.tariffBookIds.length > 0
@@ -928,53 +1005,41 @@ export function ProjectCreateScreen() {
                 />
               </div>
             </div>
-          </div>
+          </Panel>
 
-          <div className="rounded-2xl bg-[var(--surface-base)]/80 p-5 ring-1 ring-[var(--border-subtle)]/70">
-            <div className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-              Controlli rapidi
+          <Panel eyebrow="Controlli rapidi" padding="lg">
+            <div className="mt-3 grid gap-2">
+              {[
+                { isOk: validation.checks.identity, label: "Nome progetto compilato" },
+                { isOk: validation.checks.amount, label: "Importo contrattuale valido" },
+                { isOk: validation.checks.discount, label: "Ribasso valido (0-100%)" },
+                { isOk: validation.checks.os, label: "OS esclusi < budget" },
+                { isOk: draft.tariffBookIds.length > 0, label: "Almeno un tariffario" },
+              ].map(({ isOk, label }) => (
+                <div
+                  className="flex items-center justify-between gap-2 rounded-14px bg-[var(--surface-base)] px-3 py-2"
+                  key={label}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {isOk ? (
+                      <Check className="size-4 shrink-0 text-[var(--success-base)]" />
+                    ) : (
+                      <CircleAlert className="size-4 shrink-0 text-[var(--warning-base)]" />
+                    )}
+                    <span className="truncate text-12px font-medium text-[var(--text-secondary)]">
+                      {label}
+                    </span>
+                  </span>
+                  <StatusChip dot size="sm" tone={isOk ? "success" : "warning"}>
+                    {isOk ? "OK" : "Check"}
+                  </StatusChip>
+                </div>
+              ))}
             </div>
-            <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)]">
-              <QuickCheckRow isOk={validation.checks.identity} label="Nome progetto compilato" />
-              <QuickCheckRow isOk={validation.checks.amount} label="Importo contrattuale valido" />
-              <QuickCheckRow isOk={validation.checks.discount} label="Ribasso valido (0-100%)" />
-              <QuickCheckRow isOk={validation.checks.os} label="OS esclusi &lt; budget" />
-              <QuickCheckRow isOk={draft.tariffBookIds.length > 0} label="Almeno un tariffario" />
-            </div>
-          </div>
+          </Panel>
         </aside>
       </div>
     </main>
-  );
-}
-
-function ProjectTextField({
-  label,
-  onChange,
-  onKeyDown,
-  placeholder,
-  value,
-}: {
-  label: string;
-  onChange: (v: string) => void;
-  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
-  placeholder: string;
-  value: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-        {label}
-      </span>
-      <input
-        className="mt-3 h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder={placeholder}
-        type="text"
-        value={value}
-      />
-    </label>
   );
 }
 
@@ -1042,64 +1107,6 @@ function ProjectStepButton({
         </span>
       </span>
     </m.button>
-  );
-}
-
-function ProjectActionFeedback({
-  message,
-  tone,
-}: {
-  message: string | null;
-  tone: "success" | "warning";
-}) {
-  if (!message) return null;
-
-  const isSuccess = tone === "success";
-
-  return (
-    <div
-      className={`flex items-start gap-3 rounded-14px px-4 py-3 text-13px font-medium leading-5 ${
-        isSuccess
-          ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-          : "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-      }`}
-      role={isSuccess ? "status" : "alert"}
-    >
-      {isSuccess ? (
-        <Check className="mt-0.5 size-4 shrink-0" strokeWidth={3} />
-      ) : (
-        <CircleAlert className="mt-0.5 size-4 shrink-0" />
-      )}
-      <span>{message}</span>
-    </div>
-  );
-}
-
-function ProjectCurrencyField({
-  label,
-  onChange,
-  placeholder,
-  value,
-}: {
-  label: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  value: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-        {label}
-      </span>
-      <input
-        className="mt-3 h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-        inputMode="decimal"
-        onChange={(e) => onChange(sanitizeMoneyInput(e.target.value))}
-        placeholder={placeholder}
-        type="text"
-        value={value}
-      />
-    </label>
   );
 }
 
@@ -1193,182 +1200,6 @@ function IvaToggleInput({
   );
 }
 
-function BudgetPreviewRow({
-  amount,
-  ivaPct,
-  label,
-  fallback,
-}: {
-  amount: number;
-  ivaPct: string;
-  label: string;
-  fallback?: string;
-}) {
-  const pct = parseFloat(ivaPct.replace(",", "."));
-  const hasIva = ivaPct !== "" && Number.isFinite(pct) && pct > 0;
-  const ivaAmount = hasIva && Number.isFinite(amount) ? amount * (pct / 100) : 0;
-  const total = hasIva && Number.isFinite(amount) ? amount + ivaAmount : 0;
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return (
-      <PreviewMetric
-        icon={<WalletCards className="size-5" />}
-        label={label}
-        value={fallback ?? "Da inserire"}
-      />
-    );
-  }
-
-  return (
-    <div className="rounded-xl bg-[var(--bg-muted)]/70 p-3">
-      <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-        {label}
-      </div>
-      <div className="mt-1 space-y-0.5">
-        <div className="flex items-center justify-between text-15px font-semibold text-[var(--text-primary)]">
-          <span>BASE</span>
-          <span>{formatAmount(amount)}</span>
-        </div>
-        {hasIva ? (
-          <>
-            <div className="flex items-center justify-between text-12px font-medium text-[var(--info-base)]">
-              <span>+ IVA ({pct.toLocaleString("it-IT")}%)</span>
-              <span>{formatAmount(ivaAmount)}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-[var(--border-subtle)]/50 pt-1 text-16px font-bold text-[var(--text-primary)]">
-              <span>= TOTALE</span>
-              <span>{formatAmount(total)}</span>
-            </div>
-          </>
-        ) : (
-          <div className="text-11px font-medium text-[var(--text-secondary)]">
-            (IVA non applicata)
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PreviewMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--bg-muted)]/70 p-3">
-      <div className="min-w-0">
-        <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-          {label}
-        </div>
-        <div className="mt-1 truncate text-16px font-bold tabular-nums text-[var(--text-primary)]">
-          {value}
-        </div>
-      </div>
-      <div className="text-[var(--text-secondary)]">{icon}</div>
-    </div>
-  );
-}
-
-function QuickCheckRow({ isOk, label }: { isOk: boolean; label: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2 rounded-14px bg-[var(--surface-base)] px-3 py-2">
-      <span className="flex min-w-0 items-center gap-2">
-        {isOk ? (
-          <Check className="size-4 shrink-0 text-[var(--success-base)]" />
-        ) : (
-          <CircleAlert className="size-4 shrink-0 text-[var(--warning-base)]" />
-        )}
-        <span className="truncate">{label}</span>
-      </span>
-      <span
-        className={
-          isOk
-            ? "rounded-full bg-[var(--success-soft)] px-3 py-1 text-11px font-bold text-[var(--success-base)]"
-            : "rounded-full bg-[var(--warning-soft)] px-3 py-1 text-11px font-bold text-[var(--warning-base)]"
-        }
-      >
-        {isOk ? "OK" : "Check"}
-      </span>
-    </div>
-  );
-}
-
-function ContractorSelect({
-  options,
-  value,
-  onChange,
-}: {
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [filter, setFilter] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setIsOpen(false);
-        setFilter("");
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const filtered = options.filter((o) => o.toLowerCase().includes(filter.toLowerCase()));
-
-  return (
-    <label className="block">
-      <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-        Appaltatore
-      </span>
-      <div className="relative mt-3" ref={ref}>
-        {/* biome-ignore lint/a11y/useSemanticElements: wrapper needs a div because it contains an input */}
-        <div
-          className="flex h-11 w-full cursor-pointer items-center rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus-within:border-[var(--accent-primary)] focus-within:ring-2 focus-within:ring-[var(--ring-focus)]"
-          onClick={() => setIsOpen(!isOpen)}
-          onKeyDown={() => {}}
-          role="button"
-          tabIndex={0}
-        >
-          <input
-            className="flex-1 bg-transparent outline-none text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
-            onChange={(e) => {
-              setFilter(e.target.value);
-              setIsOpen(true);
-            }}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="RFI"
-            type="text"
-            value={isOpen ? filter : value}
-          />
-        </div>
-        {isOpen ? (
-          <div className="absolute left-0 right-0 top-full z-[var(--z-dropdown-menu)] mt-2 max-h-48 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg">
-            {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-[var(--text-secondary)]">Nessun risultato</div>
-            ) : (
-              filtered.map((option) => (
-                <button
-                  className="flex w-full items-center px-3 py-2.5 text-left text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-muted)]"
-                  key={option}
-                  onClick={() => {
-                    onChange(option);
-                    setIsOpen(false);
-                    setFilter("");
-                  }}
-                  type="button"
-                >
-                  {option}
-                </button>
-              ))
-            )}
-          </div>
-        ) : null}
-      </div>
-    </label>
-  );
-}
-
 function sanitizeTextInput(value: string) {
   return value
     .replace(/\s+/g, " ")
@@ -1449,6 +1280,12 @@ function parseLocalizedMoney(value: string) {
   const normalized = decPart ? `${intPart || "0"}.${decPart}` : intPart || "0";
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function safeParseMoney(value: string): number {
+  if (!value) return 0;
+  const p = parseLocalizedMoney(value);
+  return Number.isFinite(p) ? p : 0;
 }
 
 function validateProjectIdentity(draft: ProjectFormState) {

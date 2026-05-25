@@ -1,6 +1,7 @@
+import { statusToneStyles, type StatusTone } from "@/components/shared/StatusBadge";
 import type { DesktopMaterial } from "@/lib/desktopData";
 
-export type StockTone = "danger" | "success" | "warning";
+export type StockTone = StatusTone;
 export type CategoryTone = "blue" | "green" | "orange" | "purple";
 
 export const categoryColorMap: Record<string, CategoryTone> = {
@@ -11,15 +12,15 @@ export const categoryColorMap: Record<string, CategoryTone> = {
 };
 
 export const categoryToneLabel: Record<CategoryTone, string> = {
-  blue: "bg-[var(--info-soft)] text-[var(--info-base)]",
-  green: "bg-[var(--success-soft)] text-[var(--success-base)]",
-  orange: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-  purple: "bg-[var(--bg-muted-strong)] text-[var(--accent-secondary)]",
+  blue: statusToneStyles.info,
+  green: statusToneStyles.success,
+  orange: statusToneStyles.warning,
+  purple: statusToneStyles.neutral,
 };
 
 export const CATEGORIES = ["Armamento", "Sottofondo", "Opere civili", "Impianti"];
 
-export function toneForQuantity(quantity: number, minQuantity: number): StockTone {
+export function toneForQuantity(quantity: number, minQuantity: number): StatusTone {
   if (minQuantity <= 0) return "success";
   if (quantity < minQuantity) return "danger";
   if (quantity <= minQuantity * 1.5) return "warning";

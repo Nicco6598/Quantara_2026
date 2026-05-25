@@ -2,13 +2,16 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { m } from "framer-motion";
 import {
   AlertTriangle,
+  BookOpen,
   Check,
   ChevronDown,
   ChevronsDown,
   ChevronsUp,
   Copy,
   Download,
+  FileText,
   ListChecks,
+  Loader2,
   MoreHorizontal,
   Percent,
   Plus,
@@ -16,19 +19,40 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Currency } from "@/components/shared/Currency";
-import { StatusPill } from "@/components/shared/StatusPill";
+import {
+  memo,
+  type ReactNode,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import { Currency } from "@/components/shared/Currency";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { DatePicker } from "@/components/shared/form";
+import { Panel } from "@/components/shared/Panel";
+import { StatusPill } from "@/components/shared/StatusPill";
 import { SPRING_EASE } from "@/motion";
+import type { SalTemplate } from "@/store/template-store";
+import {
+  buildIndexedVoiceOptions,
+  buildTariffSearchTokens,
+  filterIndexedVoiceOptions,
+  type SalAutocompleteOption,
+} from "./SalSearchBar";
+import { TemplatePicker } from "./TemplatePicker";
 
 export { Currency };
 
 import { cn } from "@/lib/utils";
-import { buildMeasurementTarget } from "../domain/sal-measurement-target";
 import { extractMgTariffPrefix, isMgCode } from "../domain/sal-calculations";
+import { buildMeasurementTarget } from "../domain/sal-measurement-target";
 import type {
   SalEconomicRules,
   SalEconomicSummary,
@@ -37,7 +61,49 @@ import type {
   SalVoiceDraft,
 } from "../types";
 
+type SalSearchConfig = {
+  voices: SalVoiceDraft[];
+  tariffBookIds: string[];
+  isLoading?: boolean;
+  onSelectVoice: (voice: SalVoiceDraft) => void;
+  onApplyTemplate: (template: SalTemplate) => void;
+  onOpenTemplateDialog: () => void;
+};
+
 const INITIAL_EXPANDED_MEASURE_ROWS = 8;
+const SHEET_GRID_COLS =
+  "grid-cols-[52px_136px_minmax(420px,1.35fr)_64px_118px_118px_128px_116px_106px_138px_84px]";
+const SHEET_MIN_WIDTH = "min-w-[1510px]";
+const SHEET_COLUMN_LETTERS = ["", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] as const;
+const SHEET_COLUMN_LABELS = [
+  { label: "Riga", right: false },
+  { label: "Codice voce", right: false },
+  { label: "Descrizione e categoria", right: false },
+  { label: "UM", right: false },
+  { label: "Prezzo unit.", right: true },
+  { label: "Qtà calcolata", right: true },
+  { label: "Lordo", right: true },
+  { label: "Ribasso", right: true },
+  { label: "MG %", right: true },
+  { label: "Netto SAL", right: true },
+  { label: "", right: false },
+] as const;
+const MEASURE_GRID_COLS =
+  "grid-cols-[44px_142px_112px_minmax(240px,1.15fr)_80px_80px_80px_112px_minmax(180px,0.9fr)_76px]";
+const MEASURE_MIN_WIDTH = "min-w-[1066px]";
+const MEASURE_COLUMN_LETTERS = [
+  { id: "corner", label: "" },
+  { id: "date", label: "A" },
+  { id: "station", label: "B" },
+  { id: "description", label: "C" },
+  { id: "factor-1", label: "D" },
+  { id: "factor-2", label: "E" },
+  { id: "factor-3", label: "F" },
+  { id: "partial", label: "G" },
+  { id: "notes", label: "H" },
+  { id: "actions", label: "" },
+] as const;
+type SheetDensity = "compact" | "comfortable";
 
 export function NumberValue({ value }: { value: number }) {
   return (
@@ -46,12 +112,12 @@ export function NumberValue({ value }: { value: number }) {
     </span>
   );
 }
-
 export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   economicRules,
   lines,
   availableVoices,
   copiedVoiceId,
+  selectedLineId,
   onAllocateMg,
   onAddMgVoice,
   onCopyLine,
@@ -61,12 +127,15 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onRemove,
   onRemoveMeasurementRow,
   onSurcharge,
+  onSelectLine,
   onUpdateMeasurementRow,
+  search,
 }: {
   economicRules: SalEconomicRules;
   lines: SalLineView[];
   availableVoices: SalVoiceDraft[];
   copiedVoiceId: string | null;
+  selectedLineId?: string | null | undefined;
   onAllocateMg: (mgLineId: string, targetLineIds: string[]) => void;
   onAddMgVoice: (voice: SalVoiceDraft) => void;
   onCopyLine: (lineId: string) => void;
@@ -76,17 +145,21 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onRemove: (lineId: string) => void;
   onRemoveMeasurementRow: (lineId: string, measurementId: string) => void;
   onSurcharge: (lineId: string, percent: number) => void;
+  onSelectLine?: ((lineId: string | null) => void) | undefined;
   onUpdateMeasurementRow: (
     lineId: string,
     measurementId: string,
     updates: Partial<SalMeasurementRowDraft>,
   ) => void;
+  search?: SalSearchConfig;
 }) {
   const [allocPanelMgId, setAllocPanelMgId] = useState<string | null>(null);
   const tableLines = useMemo(() => lines.filter((line) => !isMgRow(line.voice)), [lines]);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(
     () => new Set(tableLines.slice(0, INITIAL_EXPANDED_MEASURE_ROWS).map((line) => line.id)),
   );
+  const [density, setDensity] = useState<SheetDensity>("compact");
+  const isCompact = density === "compact";
   const workLines = useMemo(
     () => tableLines.filter((line) => !line.voice.isSafetyCost),
     [tableLines],
@@ -157,15 +230,23 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     count: registerItems.length,
     estimateSize: (index) => {
       const item = registerItems[index];
-      if (!item) return 72;
-      if (item.type === "section") return 37;
+      if (!item) return 68;
+      if (item.type === "section") return isCompact ? 32 : 36;
       const rowCount = Math.max(1, item.line.measurementRows.length);
-      return expandedRows.has(item.line.id) ? 216 + rowCount * 49 : 72;
+      return expandedRows.has(item.line.id)
+        ? (isCompact ? 220 : 260) + rowCount * (isCompact ? 42 : 50)
+        : isCompact
+          ? 54
+          : 68;
     },
     getItemKey: (index) => registerItems[index]?.id ?? index,
     getScrollElement: () => scrollRef.current,
     overscan: 3,
   });
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer]);
 
   useEffect(() => {
     setExpandedRows((current) => {
@@ -175,14 +256,14 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     });
   }, [tableLines]);
 
-  const handleToggleRow = (lineId: string) => {
+  const handleToggleRow = useCallback((lineId: string) => {
     setExpandedRows((current) => {
       const next = new Set(current);
       if (next.has(lineId)) next.delete(lineId);
       else next.add(lineId);
       return next;
     });
-  };
+  }, []);
 
   const handleToggleAll = useCallback(() => {
     if (allExpanded) {
@@ -207,124 +288,300 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     return () => window.removeEventListener("keydown", handler);
   }, [handleToggleAll]);
 
+  const deferredSearchVoices = useDeferredValue(search?.voices ?? []);
+  const searchIndex = useMemo(
+    () => buildIndexedVoiceOptions(deferredSearchVoices),
+    [deferredSearchVoices],
+  );
+  const voiceByOptionId = useMemo(
+    () => new Map(deferredSearchVoices.map((v) => [v.id, v])),
+    [deferredSearchVoices],
+  );
+  const searchTariffBookCount = search?.tariffBookIds.length ?? 0;
+  const tariffTokensByBookId = useMemo(() => {
+    const result = new Map<string, Set<string>>();
+    for (const voice of deferredSearchVoices) {
+      if (searchTariffBookCount > 0 && result.size >= searchTariffBookCount) break;
+      if (!result.has(voice.tariffBookId)) {
+        result.set(voice.tariffBookId, buildTariffSearchTokens(voice));
+      }
+    }
+    return result;
+  }, [deferredSearchVoices, searchTariffBookCount]);
+
+  const filterOptions = useCallback(
+    (_options: SalAutocompleteOption[], query: string) => {
+      return filterIndexedVoiceOptions({
+        index: searchIndex,
+        query,
+        tariffTokensByBookId,
+      });
+    },
+    [searchIndex, tariffTokensByBookId],
+  );
+
   const allocPanelMgLine = allocPanelMgId
     ? lines.find((line) => line.id === allocPanelMgId)
     : undefined;
 
-  const renderRow = (line: SalLineView, index: number) => (
-    <SelectedVoiceRow
-      key={line.id}
-      index={index}
-      line={line}
-      expanded={expandedRows.has(line.id)}
-      isCopied={copiedVoiceId === line.id}
-      onCopy={() => onCopyLine(line.id)}
-      onAddMeasurementRow={onAddMeasurementRow}
-      onDuplicateMeasurementRow={onDuplicateMeasurementRow}
-      onNotesChange={onNotesChange}
-      onRemove={onRemove}
-      onRemoveMeasurementRow={onRemoveMeasurementRow}
-      onSurcharge={onSurcharge}
-      onToggle={() => handleToggleRow(line.id)}
-      onUpdateMeasurementRow={onUpdateMeasurementRow}
-    />
+  const renderRow = useCallback(
+    (line: SalLineView, index: number) => (
+      <SelectedVoiceRow
+        key={line.id}
+        index={index}
+        line={line}
+        density={density}
+        expanded={expandedRows.has(line.id)}
+        isCopied={copiedVoiceId === line.id}
+        isSelected={selectedLineId === line.id}
+        onCopy={onCopyLine}
+        onAddMeasurementRow={onAddMeasurementRow}
+        onDuplicateMeasurementRow={onDuplicateMeasurementRow}
+        onNotesChange={onNotesChange}
+        onRemove={onRemove}
+        onRemoveMeasurementRow={onRemoveMeasurementRow}
+        onSurcharge={onSurcharge}
+        onSelectLine={onSelectLine}
+        onToggle={handleToggleRow}
+        onUpdateMeasurementRow={onUpdateMeasurementRow}
+      />
+    ),
+    [
+      density,
+      expandedRows,
+      copiedVoiceId,
+      selectedLineId,
+      onCopyLine,
+      onAddMeasurementRow,
+      onDuplicateMeasurementRow,
+      onNotesChange,
+      onRemove,
+      onRemoveMeasurementRow,
+      onSurcharge,
+      onSelectLine,
+      handleToggleRow,
+      onUpdateMeasurementRow,
+    ],
   );
 
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/50">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)]/40 px-4 py-2">
-        <div className="min-w-0">
-          <div className="text-12px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
-            Registro misure
-          </div>
-          <div className="mt-0.5 text-13px text-[var(--text-tertiary)]">
-            {lines.length === 0
-              ? "Nessuna voce inserita"
-              : `${tableLines.length} voc${tableLines.length === 1 ? "e" : "i"} misurabil${tableLines.length === 1 ? "e" : "i"}${
-                  mgLines.length > 0
-                    ? ` · ${mgLines.length} maggiorazion${mgLines.length === 1 ? "e" : "i"} MG`
-                    : ""
-                }${safetyLines.length > 0 ? ` · ${safetyLines.length} OS` : ""}`}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 text-11px text-[var(--text-tertiary)]">
-          <button
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.08] px-3 font-black text-[var(--accent-primary)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/[0.12] hover:text-[var(--accent-primary)]"
-            onClick={handleToggleAll}
-            title="Ctrl+Shift+E"
-            type="button"
-          >
-            {allExpanded ? <ChevronsUp className="size-4" /> : <ChevronsDown className="size-4" />}
-            {allExpanded ? "Comprimi" : "Espandi"}
-            <span className="rounded bg-[var(--surface-base)]/80 px-1.5 py-0.5 text-9px font-black text-[var(--text-tertiary)] ring-1 ring-[var(--border-subtle)]/50">
-              Ctrl Shift E
-            </span>
-          </button>
-        </div>
-      </div>
+  const summaryText =
+    lines.length === 0
+      ? "Nessuna voce inserita"
+      : `${tableLines.length} voc${tableLines.length === 1 ? "e" : "i"} misurabil${tableLines.length === 1 ? "e" : "i"}${
+          mgLines.length > 0
+            ? ` · ${mgLines.length} maggiorazion${mgLines.length === 1 ? "e" : "i"} MG`
+            : ""
+        }${safetyLines.length > 0 ? ` · ${safetyLines.length} OS` : ""}`;
+  const selectedSheetLine =
+    (selectedLineId ? tableLines.find((line) => line.id === selectedLineId) : undefined) ??
+    tableLines[0] ??
+    null;
+  const selectedSheetIndex = selectedSheetLine
+    ? tableLines.findIndex((line) => line.id === selectedSheetLine.id)
+    : -1;
+  const activeLinePosition = selectedSheetIndex >= 0 ? selectedSheetIndex + 1 : null;
 
+  return (
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)]/55 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-base)_96%,var(--bg-muted)_4%),var(--surface-base))] shadow-[0_18px_38px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
       {mgLines.length > 0 || tariffMgSignals.length > 0 || manualSurchargeLines.length > 0 ? (
-        <MaggiorazioniStepPanel
-          economicRules={economicRules}
-          lines={tableLines}
-          manualSurchargeLines={manualSurchargeLines}
-          mgLines={mgLines}
-          suggestedMgVoices={suggestedMgVoices}
-          tariffMgSignals={tariffMgSignals}
-          onAddMgVoice={onAddMgVoice}
-          onApplyAllocation={onAllocateMg}
-          onOpenAllocation={setAllocPanelMgId}
-          onRemove={onRemove}
-        />
+        <div className="border-b border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/20 p-2">
+          <MaggiorazioniStepPanel
+            economicRules={economicRules}
+            lines={tableLines}
+            manualSurchargeLines={manualSurchargeLines}
+            mgLines={mgLines}
+            suggestedMgVoices={suggestedMgVoices}
+            tariffMgSignals={tariffMgSignals}
+            onAddMgVoice={onAddMgVoice}
+            onApplyAllocation={onAllocateMg}
+            onOpenAllocation={setAllocPanelMgId}
+            onRemove={onRemove}
+          />
+        </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto" ref={scrollRef}>
-        <div className="min-w-[1460px]">
-          {/* Header row */}
-          <div className="sticky top-0 z-20 grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/40 bg-[var(--surface-base)] text-12px font-semibold uppercase tracking-wider text-[var(--text-tertiary)] shadow-[0_1px_0_var(--border-subtle)]">
-            {[
-              "N.",
-              "Codice voce",
-              "Voce / categoria",
-              "UM",
-              "Prezzo unit.",
-              "Qtà calc.",
-              "Importo lordo",
-              "Ribasso",
-              "Maggiorazioni",
-              "Netto SAL",
-              "Azioni",
-            ].map((label) => {
-              const isRight =
-                label === "Prezzo unit." ||
-                label === "Qtà calc." ||
-                label === "Importo lordo" ||
-                label === "Ribasso" ||
-                label === "Maggiorazioni" ||
-                label === "Netto SAL";
-              return (
+      <div className="min-h-0 flex-1 overflow-auto bg-[var(--surface-base)]" ref={scrollRef}>
+        <div className={cn(SHEET_MIN_WIDTH, "relative")}>
+          <div className="sticky top-0 z-30 border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)] shadow-[0_6px_18px_color-mix(in_srgb,var(--text-primary)_5%,transparent)]">
+            <div className="grid gap-2 border-b border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/18 px-3 py-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-primary)]/20 bg-[var(--accent-primary)]/[0.08] font-mono text-12px font-black text-[var(--accent-primary)]">
+                  SAL
+                </div>
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="text-12px font-black text-[var(--text-primary)]">
+                      Registro misure
+                    </span>
+                    <span className="h-4 border-l border-[var(--border-subtle)]/50" />
+                    <span className="truncate text-12px font-medium text-[var(--text-tertiary)]">
+                      {summaryText}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex min-w-0 items-center gap-2">
+                    <span className="flex h-6 shrink-0 items-center rounded border border-[var(--border-subtle)]/60 bg-[var(--surface-base)] px-2 text-10px font-black uppercase text-[var(--text-tertiary)]">
+                      Voce attiva
+                    </span>
+                    <div className="flex h-6 min-w-0 flex-1 items-center gap-2 overflow-hidden rounded border border-[var(--border-subtle)]/55 bg-[var(--surface-base)] px-2">
+                      {selectedSheetLine ? (
+                        <>
+                          <span className="shrink-0 font-mono text-11px font-black text-[var(--accent-primary)]">
+                            {activeLinePosition ? `${activeLinePosition}. ` : ""}
+                            {selectedSheetLine.voice.code}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-11px font-semibold text-[var(--text-secondary)]">
+                            {selectedSheetLine.voice.description}
+                          </span>
+                          <span className="hidden shrink-0 text-10px font-semibold text-[var(--text-tertiary)] lg:inline">
+                            {selectedSheetLine.voice.category}
+                          </span>
+                          <span className="hidden shrink-0 font-mono text-10px font-bold text-[var(--text-secondary)] lg:inline">
+                            {selectedSheetLine.voice.unit}
+                          </span>
+                          <span className="hidden shrink-0 font-mono text-10px font-bold tabular-nums text-[var(--text-secondary)] xl:inline">
+                            <Currency value={selectedSheetLine.voice.unitPrice} />
+                          </span>
+                          <span className="hidden shrink-0 font-mono text-10px font-black tabular-nums text-[var(--accent-primary)] xl:inline">
+                            <Currency value={selectedSheetLine.totalAmount} />
+                          </span>
+                        </>
+                      ) : (
+                        <span className="min-w-0 truncate text-11px font-semibold text-[var(--text-tertiary)]">
+                          Nessuna voce selezionata
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 xl:justify-end">
+                {search && (
+                  <div className="min-w-[320px] flex-1 xl:w-[500px] xl:flex-none">
+                    <AutocompleteInput
+                      options={[]}
+                      onSelect={(o) => {
+                        const v =
+                          (o.id ? voiceByOptionId.get(o.id) : undefined) ??
+                          search.voices.find((x) => x.code === o.value);
+                        if (v) search.onSelectVoice(v);
+                      }}
+                      placeholder={
+                        search.isLoading
+                          ? `Caricamento voci (${search.tariffBookIds.length} tariffari)...`
+                          : `Cerca codice, descrizione o categoria (${search.voices.length} voci)`
+                      }
+                      filterOptions={filterOptions}
+                    />
+                  </div>
+                )}
+                {search?.isLoading && (
+                  <span className="inline-flex h-8 items-center gap-1 rounded-md bg-[var(--bg-muted)] px-2 text-11px font-medium text-[var(--text-tertiary)]">
+                    <Loader2 className="size-3 animate-spin" />
+                    Caricamento
+                  </span>
+                )}
+                {search && (
+                  <>
+                    <TemplatePicker
+                      onApply={search.onApplyTemplate}
+                      tariffBookId={search.tariffBookIds[0] ?? ""}
+                    />
+                    {tableLines.length > 0 && (
+                      <button
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-subtle)]/60 bg-[var(--surface-base)] px-2.5 text-11px font-bold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                        onClick={search.onOpenTemplateDialog}
+                        type="button"
+                      >
+                        <BookOpen className="size-3.5" />
+                        Template
+                      </button>
+                    )}
+                  </>
+                )}
+                <button
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-subtle)]/60 bg-[var(--surface-base)] px-2.5 text-11px font-black text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                  onClick={() =>
+                    setDensity((current) => (current === "compact" ? "comfortable" : "compact"))
+                  }
+                  type="button"
+                >
+                  {isCompact ? "Densità compatta" : "Densità comoda"}
+                </button>
+                <button
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.08] px-2.5 text-11px font-black text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-primary)]/[0.13]"
+                  onClick={handleToggleAll}
+                  title="Ctrl+Shift+E"
+                  type="button"
+                >
+                  {allExpanded ? (
+                    <ChevronsUp className="size-3.5" />
+                  ) : (
+                    <ChevronsDown className="size-3.5" />
+                  )}
+                  {allExpanded ? "Comprimi" : "Espandi"}
+                </button>
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "grid border-b border-[var(--border-subtle)]/45 bg-[var(--bg-muted)]/40 font-mono text-10px font-black text-[var(--text-tertiary)]",
+                SHEET_GRID_COLS,
+              )}
+            >
+              {SHEET_COLUMN_LETTERS.map((letter, index) => (
                 <div
                   className={cn(
-                    "flex min-h-8 items-center border-r border-[var(--border-subtle)]/45 px-2.5 text-[var(--text-secondary)] last:border-r-0",
-                    isRight && "justify-end text-right",
+                    "flex h-6 items-center justify-center border-r border-[var(--border-subtle)]/45 last:border-r-0",
+                    index === 0 &&
+                      "sticky left-0 z-20 bg-[var(--bg-muted)]/95 shadow-[1px_0_0_color-mix(in_srgb,var(--border-subtle)_55%,transparent)]",
+                    index === 9 && "bg-[var(--accent-primary)]/[0.07] text-[var(--accent-primary)]",
                   )}
-                  key={label}
+                  key={letter || "corner"}
+                >
+                  {letter}
+                </div>
+              ))}
+            </div>
+
+            <div
+              className={cn(
+                "grid border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)] text-10px font-black uppercase text-[var(--text-tertiary)]",
+                SHEET_GRID_COLS,
+              )}
+            >
+              {SHEET_COLUMN_LABELS.map(({ label, right }, index) => (
+                <div
+                  className={cn(
+                    "flex min-h-8 items-center border-r border-[var(--border-subtle)]/45 px-2 last:border-r-0",
+                    right && "justify-end text-right",
+                    index === 0 &&
+                      "sticky left-0 z-20 justify-center bg-[var(--surface-base)] shadow-[1px_0_0_color-mix(in_srgb,var(--border-subtle)_55%,transparent)]",
+                    index === 1 &&
+                      "sticky left-[52px] z-20 bg-[var(--surface-base)] shadow-[1px_0_0_color-mix(in_srgb,var(--border-subtle)_55%,transparent)]",
+                    index === 9 && "bg-[var(--accent-primary)]/[0.06] text-[var(--accent-primary)]",
+                  )}
+                  key={label || "actions"}
                 >
                   {label}
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
 
+          {/* Virtualized rows */}
           {tableLines.length === 0 ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center gap-2 px-4 py-12 text-center">
-              <p className="text-14px font-semibold text-[var(--text-primary)]">
-                Aggiungi una voce dal campo di ricerca.
-              </p>
-              <p className="max-w-md text-13px leading-relaxed text-[var(--text-tertiary)]">
-                La griglia si popola come un foglio misure: fattori, maggiorazione, note e totali
-                restano modificabili in riga.
-              </p>
+            <div className="grid min-h-[360px] place-items-center bg-[linear-gradient(var(--border-subtle)_1px,transparent_1px),linear-gradient(90deg,var(--border-subtle)_1px,transparent_1px)] bg-[length:52px_42px] bg-[position:-1px_-1px]">
+              <div className="max-w-lg border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/95 p-6 text-center shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_7%,transparent)]">
+                <p className="text-15px font-black text-[var(--text-primary)]">
+                  Il foglio misure è vuoto
+                </p>
+                <p className="mt-2 text-13px leading-relaxed text-[var(--text-tertiary)]">
+                  Cerca una voce tariffaria in alto: ogni voce diventa una riga, con quantità,
+                  maggiorazioni e netto modificabili direttamente in griglia.
+                </p>
+              </div>
             </div>
           ) : (
             <div
@@ -373,7 +630,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
           onSave={onAllocateMg}
         />
       ) : null}
-    </div>
+    </section>
   );
 });
 
@@ -391,25 +648,34 @@ function RegisterSectionHeader({
   return (
     <div
       className={cn(
-        "grid grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-[var(--border-subtle)]/60 text-13px",
-        tone === "safety" ? "bg-[var(--danger-soft)]" : "bg-[var(--accent-primary)]/[0.08]",
+        "grid border-b border-[var(--border-subtle)]/55 text-12px",
+        SHEET_GRID_COLS,
+        tone === "safety" ? "bg-[var(--danger-soft)]" : "bg-[var(--accent-primary)]/[0.055]",
       )}
     >
-      <div className="col-span-3 flex min-h-9 items-center gap-2.5 px-3 font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+      <div className="sticky left-0 z-10 flex min-h-8 items-center justify-center border-r border-[var(--border-subtle)]/45 bg-inherit font-mono text-10px font-black text-[var(--text-tertiary)] shadow-[1px_0_0_color-mix(in_srgb,var(--border-subtle)_55%,transparent)]">
+        #
+      </div>
+      <div className="sticky left-[52px] z-10 col-span-2 flex min-h-8 items-center gap-2 border-r border-[var(--border-subtle)]/35 bg-inherit px-3 shadow-[1px_0_0_color-mix(in_srgb,var(--border-subtle)_40%,transparent)]">
         <span
           className={cn(
-            "h-2.5 w-2.5 rounded-full",
+            "h-2.5 w-2.5 rounded-sm",
             tone === "safety" ? "bg-[var(--danger-base)]" : "bg-[var(--accent-primary)]",
           )}
         />
-        {label}
+        <span className="text-11px font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+          {label}
+        </span>
       </div>
-      <div className="col-span-5 flex items-center justify-end px-2 font-medium text-[var(--text-secondary)]">
-        {count} voc{count === 1 ? "e" : "i"}
+      <div />
+      <div className="col-span-5 flex items-center justify-end gap-4 px-2">
+        <span className="text-11px font-semibold text-[var(--text-tertiary)]">
+          {count} voc{count === 1 ? "e" : "i"}
+        </span>
       </div>
       <div
         className={cn(
-          "col-span-2 flex items-center justify-end px-2 text-13px font-black tabular-nums",
+          "flex items-center justify-end px-3 text-12px font-black tabular-nums",
           tone === "safety" ? "text-[var(--danger-base)]" : "text-[var(--accent-primary)]",
         )}
       >
@@ -544,7 +810,7 @@ function MaggiorazioniStepPanel({
   const hasMoreSignals = tariffMgSignals.length > visibleSignals.length;
 
   return (
-    <div className="shrink-0 border-b border-[var(--border-subtle)]/45 bg-[var(--bg-muted)]/18 px-4 py-2">
+    <Panel variant="muted" padding="sm" className="shrink-0">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="inline-flex h-6 items-center gap-1 rounded-md bg-[var(--info-soft)] px-1.5 text-10px font-black uppercase tracking-wider text-[var(--info-base)]">
           <Percent className="size-3" />
@@ -604,11 +870,12 @@ function MaggiorazioniStepPanel({
           ) : null}
         </div>
       ) : (
-        <div className="rounded-md border border-dashed border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/55 px-2 py-1.5">
-          <div className="text-11px font-semibold text-[var(--text-primary)]">
-            Nessuna voce MG inserita.
-          </div>
-        </div>
+        <EmptyState
+          className="p-3"
+          description="Le maggiorazioni si generano dalle voci collegate nel tariffario."
+          icon={Percent}
+          title="Nessuna voce MG"
+        />
       )}
 
       {suggestedMgVoices.length > 0 ? (
@@ -633,7 +900,7 @@ function MaggiorazioniStepPanel({
           ))}
         </div>
       ) : null}
-    </div>
+    </Panel>
   );
 }
 
@@ -862,99 +1129,101 @@ function MgAllocationPanel({
 
   return (
     <Dialog className="max-w-xl" contentClassName="p-0" isOpen onClose={onClose} title="">
-      <div className="border-b border-[var(--border-subtle)]/40 px-5 py-4">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)]/[0.1]">
-            <ListChecks className="size-5 text-[var(--accent-primary)]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-14px font-bold text-[var(--text-primary)]">
-              {mgLine.voice.code}
-              <span className="ml-2 font-mono text-[var(--accent-primary)]">
-                {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
-              </span>
-            </h3>
-            <p className="mt-0.5 text-12px text-[var(--text-tertiary)]">
-              {prefix
-                ? `Assegnazione su voci con prefisso ${prefix}`
-                : "Assegnazione su tutte le voci"}
-              <span className="ml-1.5 inline-flex items-center gap-1">
-                <Badge variant="info">{eligible.length} disponibili</Badge>
-              </span>
-            </p>
+      <Panel padding="none">
+        <div className="border-b border-[var(--border-subtle)]/40 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)]/[0.1]">
+              <ListChecks className="size-5 text-[var(--accent-primary)]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-14px font-bold text-[var(--text-primary)]">
+                {mgLine.voice.code}
+                <span className="ml-2 font-mono text-[var(--accent-primary)]">
+                  {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
+                </span>
+              </h3>
+              <p className="mt-0.5 text-12px text-[var(--text-tertiary)]">
+                {prefix
+                  ? `Assegnazione su voci con prefisso ${prefix}`
+                  : "Assegnazione su tutte le voci"}
+                <span className="ml-1.5 inline-flex items-center gap-1">
+                  <Badge variant="info">{eligible.length} disponibili</Badge>
+                </span>
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {eligible.length === 0 ? (
-        <div className="px-5 py-8 text-center text-13px text-[var(--text-tertiary)]">
-          Nessuna voce {prefix ? `con prefisso ${prefix}` : ""} con importo positivo disponibile.
-        </div>
-      ) : (
-        <>
-          <div className="px-5 py-3">
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg bg-[var(--bg-muted)]/25 px-3 py-2.5 text-12px font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)]/40">
-              <input
-                checked={allSelected}
-                className="size-4 rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--ring-focus)]"
-                onChange={handleToggleAll}
-                ref={(el) => {
-                  if (el) el.indeterminate = someSelected;
-                }}
-                type="checkbox"
-              />
-              <span>{allSelected ? "Deseleziona tutto" : "Seleziona tutto"}</span>
-              <span className="ml-auto font-mono text-11px tabular-nums text-[var(--text-tertiary)]">
-                {selected.size}/{eligible.length}
-              </span>
-            </label>
+        {eligible.length === 0 ? (
+          <div className="px-5 py-8 text-center text-13px text-[var(--text-tertiary)]">
+            Nessuna voce {prefix ? `con prefisso ${prefix}` : ""} con importo positivo disponibile.
           </div>
-
-          <div className="max-h-[300px] overflow-y-auto border-t border-[var(--border-subtle)]/30">
-            {eligible.map((line, idx) => (
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 border-b border-[var(--border-subtle)]/20 px-5 py-2.5 text-12px transition-colors hover:bg-[var(--accent-primary)]/[0.03]",
-                  idx % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/15",
-                )}
-                key={line.id}
-              >
+        ) : (
+          <>
+            <div className="px-5 py-3">
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg bg-[var(--bg-muted)]/25 px-3 py-2.5 text-12px font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)]/40">
                 <input
-                  checked={selected.has(line.id)}
+                  checked={allSelected}
                   className="size-4 rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--ring-focus)]"
-                  onChange={() => handleToggle(line.id)}
+                  onChange={handleToggleAll}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected;
+                  }}
                   type="checkbox"
                 />
-                <span className="min-w-0 flex-1 truncate font-semibold text-[var(--text-primary)]">
-                  {line.voice.code}
-                </span>
-                <span className="hidden min-w-0 max-w-[260px] truncate text-[var(--text-tertiary)] sm:block">
-                  {line.voice.description}
-                </span>
-                <span className="shrink-0 font-mono text-11px font-bold tabular-nums text-[var(--text-secondary)]">
-                  <Currency value={line.grossAmount} />
+                <span>{allSelected ? "Deseleziona tutto" : "Seleziona tutto"}</span>
+                <span className="ml-auto font-mono text-11px tabular-nums text-[var(--text-tertiary)]">
+                  {selected.size}/{eligible.length}
                 </span>
               </label>
-            ))}
-          </div>
-
-          <DialogActions className="items-center justify-between px-5 py-3">
-            <Button onClick={handleRemove} size="sm" variant="ghost">
-              <Trash2 className="size-3.5" />
-              Rimuovi MG
-            </Button>
-            <div className="flex items-center gap-2">
-              <Button onClick={onClose} size="sm" variant="secondary">
-                Annulla
-              </Button>
-              <Button onClick={handleSave} size="sm" variant="primary">
-                <Check className="size-3.5" />
-                Applica a {selected.size} voc{selected.size === 1 ? "e" : "i"}
-              </Button>
             </div>
-          </DialogActions>
-        </>
-      )}
+
+            <div className="max-h-[300px] overflow-y-auto border-t border-[var(--border-subtle)]/30">
+              {eligible.map((line, idx) => (
+                <label
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3 border-b border-[var(--border-subtle)]/20 px-5 py-2.5 text-12px transition-colors hover:bg-[var(--accent-primary)]/[0.03]",
+                    idx % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/15",
+                  )}
+                  key={line.id}
+                >
+                  <input
+                    checked={selected.has(line.id)}
+                    className="size-4 rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--ring-focus)]"
+                    onChange={() => handleToggle(line.id)}
+                    type="checkbox"
+                  />
+                  <span className="min-w-0 flex-1 truncate font-semibold text-[var(--text-primary)]">
+                    {line.voice.code}
+                  </span>
+                  <span className="hidden min-w-0 max-w-[260px] truncate text-[var(--text-tertiary)] sm:block">
+                    {line.voice.description}
+                  </span>
+                  <span className="shrink-0 font-mono text-11px font-bold tabular-nums text-[var(--text-secondary)]">
+                    <Currency value={line.grossAmount} />
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <DialogActions className="items-center justify-between px-5 py-3">
+              <Button onClick={handleRemove} size="sm" variant="ghost">
+                <Trash2 className="size-3.5" />
+                Rimuovi MG
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button onClick={onClose} size="sm" variant="secondary">
+                  Annulla
+                </Button>
+                <Button onClick={handleSave} size="sm" variant="primary">
+                  <Check className="size-3.5" />
+                  Applica a {selected.size} voc{selected.size === 1 ? "e" : "i"}
+                </Button>
+              </div>
+            </DialogActions>
+          </>
+        )}
+      </Panel>
     </Dialog>
   );
 }
@@ -962,8 +1231,10 @@ function MgAllocationPanel({
 const SelectedVoiceRow = memo(function SelectedVoiceRow({
   index,
   line,
+  density,
   expanded,
   isCopied,
+  isSelected,
   onCopy,
   onAddMeasurementRow,
   onDuplicateMeasurementRow,
@@ -971,27 +1242,32 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   onRemove,
   onRemoveMeasurementRow,
   onSurcharge,
+  onSelectLine,
   onToggle,
   onUpdateMeasurementRow,
 }: {
   index: number;
   line: SalLineView;
+  density: SheetDensity;
   expanded: boolean;
   isCopied: boolean;
-  onCopy: () => void;
+  isSelected: boolean;
+  onCopy: (lineId: string) => void;
   onAddMeasurementRow: (lineId: string) => void;
   onDuplicateMeasurementRow: (lineId: string, measurementId: string) => void;
   onNotesChange: (lineId: string, notes: string) => void;
   onRemove: (lineId: string) => void;
   onRemoveMeasurementRow: (lineId: string, measurementId: string) => void;
   onSurcharge: (lineId: string, percent: number) => void;
-  onToggle: () => void;
+  onSelectLine?: ((lineId: string | null) => void) | undefined;
+  onToggle: (lineId: string) => void;
   onUpdateMeasurementRow: (
     lineId: string,
     measurementId: string,
     updates: Partial<SalMeasurementRowDraft>,
   ) => void;
 }) {
+  const isCompact = density === "compact";
   const laborPct = line.voice.laborPercentage ?? 0;
   const isIncomplete = line.status !== "complete";
   const hasTariffMgSignal = hasTariffMaggiorazioneSignal(line);
@@ -1008,106 +1284,158 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
         role="button"
         tabIndex={0}
         className={cn(
-          "grid cursor-pointer grid-cols-[58px_128px_minmax(340px,1.2fr)_70px_108px_112px_126px_118px_96px_130px_76px] border-b border-l-2 border-b-[var(--border-subtle)]/40 border-l-transparent text-12px transition-colors [content-visibility:auto] [contain-intrinsic-size:72px] hover:bg-[var(--bg-muted)]/40",
-          index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/30",
+          "group grid cursor-cell border-b border-[var(--border-subtle)]/55 text-13px transition-colors [content-visibility:auto] [contain-intrinsic-size:68px] hover:bg-[var(--accent-primary)]/[0.035]",
+          SHEET_GRID_COLS,
+          isCompact && "text-12px [contain-intrinsic-size:54px]",
+          index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/16",
           expanded &&
-            "border-l-[var(--accent-primary)] bg-[var(--accent-primary)]/[0.045] ring-1 ring-inset ring-[var(--accent-primary)]/15",
-          isIncomplete &&
-            "bg-[var(--warning-soft)]/35 ring-1 ring-inset ring-[var(--warning-base)]/20",
+            "bg-[var(--accent-primary)]/[0.055] shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--accent-primary)_28%,transparent)]",
+          isSelected &&
+            "relative z-10 outline outline-2 outline-[var(--accent-primary)] outline-offset-[-2px]",
+          isIncomplete && "bg-[var(--warning-soft)]/25 shadow-[inset_3px_0_0_var(--warning-base)]",
         )}
         title={
           isIncomplete ? "Voce incompleta: inserisci una quantità maggiore di zero." : undefined
         }
-        onClick={onToggle}
+        onClick={() => {
+          onSelectLine?.(line.id);
+        }}
+        onFocus={(event) => {
+          if (event.currentTarget === event.target) {
+            onSelectLine?.(line.id);
+          }
+        }}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") onToggle();
+          if (e.key === "Enter") {
+            onSelectLine?.(line.id);
+          }
+          if (e.key === " ") {
+            e.preventDefault();
+            onSelectLine?.(line.id);
+            onToggle(line.id);
+          }
         }}
       >
-        <GridCell muted>
+        {/* N. + expand toggle */}
+        <GridCell
+          className={cn("sticky left-0 z-10 bg-inherit px-0", isCompact && "min-h-[52px]")}
+          muted
+        >
           <button
             type="button"
             aria-label={`${expanded ? "Comprimi" : "Espandi"} dettagli ${line.voice.code}`}
-            className="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+            className={cn(
+              "flex h-full min-h-[64px] w-full cursor-pointer items-center justify-center gap-1 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+              isCompact && "min-h-[52px]",
+              isSelected && "bg-[var(--accent-primary)]/[0.08] text-[var(--accent-primary)]",
+            )}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectLine?.(line.id);
+              onToggle(line.id);
+            }}
           >
-            <ChevronDown className={cn("size-4 transition-transform", !expanded && "-rotate-90")} />
-            <span className="text-11px font-bold tabular-nums text-[var(--text-secondary)]">
+            <ChevronDown
+              className={cn("size-3.5 transition-transform", !expanded && "-rotate-90")}
+            />
+            <span className="font-mono text-11px font-black tabular-nums text-[var(--text-secondary)]">
               {index + 1}
             </span>
           </button>
         </GridCell>
-        <GridCell strong title={line.voice.code}>
-          <span className="truncate text-13px font-bold text-[var(--text-primary)]">
+
+        {/* Codice */}
+        <GridCell
+          className={cn("sticky left-[52px] z-[9] bg-inherit", isCompact && "min-h-[52px]")}
+          strong
+          title={line.voice.code}
+        >
+          <span className="truncate font-mono text-13px font-bold text-[var(--text-primary)]">
             {line.voice.code}
           </span>
         </GridCell>
-        <GridCell>
+
+        {/* Descrizione + badges */}
+        <GridCell className={cn(isCompact && "min-h-[52px] py-1")}>
           <div className="flex min-w-0 items-start gap-1.5">
-            <span className="min-w-0 flex-1">
-              <div className="whitespace-normal break-words text-13px font-semibold leading-snug text-[var(--text-primary)]">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
                 {line.voice.description}
               </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <span className="truncate text-11px font-medium text-[var(--text-secondary)]">
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <span
+                  className={cn(
+                    "truncate font-medium text-[var(--text-tertiary)]",
+                    isCompact ? "text-10px" : "text-11px",
+                  )}
+                >
                   {line.voice.category}
                 </span>
-                {laborPct > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-11px font-bold text-[var(--accent-primary)]">
-                    <span className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
+                {laborPct > 0 && (
+                  <span className="inline-flex h-5 items-center gap-1 rounded bg-[var(--accent-primary)]/10 px-1.5 text-10px font-bold text-[var(--accent-primary)]">
                     Man. {laborPct}%
                   </span>
-                ) : null}
-                {line.voice.isSafetyCost ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--danger-soft)] px-2 py-0.5 text-11px font-bold text-[var(--danger-base)]">
+                )}
+                {line.voice.isSafetyCost && (
+                  <span className="inline-flex h-5 items-center gap-1 rounded bg-[var(--danger-soft)] px-1.5 text-10px font-bold text-[var(--danger-base)]">
                     OS
                   </span>
-                ) : null}
-                {mgLinkedTotal > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--info-soft)] px-2 py-0.5 text-11px font-bold text-[var(--info-base)]">
-                    <Percent className="size-3" />
+                )}
+                {mgLinkedTotal > 0 && (
+                  <span className="inline-flex h-5 items-center gap-1 rounded bg-[var(--info-soft)] px-1.5 text-10px font-bold text-[var(--info-base)]">
                     MG <Currency value={mgLinkedTotal} />
                   </span>
-                ) : null}
-                {manualLinkedTotal > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-11px font-bold text-[var(--accent-primary)]">
-                    Man. +<Currency value={manualLinkedTotal} />
+                )}
+                {manualLinkedTotal > 0 && (
+                  <span className="inline-flex h-5 items-center gap-1 rounded bg-[var(--accent-primary)]/10 px-1.5 text-10px font-bold text-[var(--accent-primary)]">
+                    +<Currency value={manualLinkedTotal} />
                   </span>
-                ) : null}
-                {hasMissingMgDecision ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--warning-soft)] px-2 py-0.5 text-11px font-bold text-[var(--warning-base)]">
-                    <AlertTriangle className="size-3" />
-                    MG da valutare
+                )}
+                {hasMissingMgDecision && (
+                  <span className="inline-flex h-5 items-center gap-1 rounded bg-[var(--warning-soft)] px-1.5 text-10px font-bold text-[var(--warning-base)]">
+                    MG?
                   </span>
-                ) : null}
-                {isIncomplete ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--warning-soft)] px-2 py-0.5 text-11px font-bold text-[var(--warning-base)]">
-                    Da completare
+                )}
+                {isIncomplete && (
+                  <span className="inline-flex h-5 items-center gap-1 rounded bg-[var(--warning-soft)] px-1.5 text-10px font-bold text-[var(--warning-base)]">
+                    Incompleta
                   </span>
-                ) : null}
+                )}
               </div>
-            </span>
+            </div>
           </div>
         </GridCell>
-        <GridCell muted>
+
+        {/* UM */}
+        <GridCell className={cn(isCompact && "min-h-[52px]")} muted>
           <span className="text-12px font-semibold text-[var(--text-secondary)]">
             {line.voice.unit}
           </span>
         </GridCell>
-        <GridCell align="right">
+
+        {/* Prezzo unit. */}
+        <GridCell align="right" className={cn(isCompact && "min-h-[52px]")}>
           <span className="text-13px font-semibold tabular-nums text-[var(--text-secondary)]">
             <Currency value={line.voice.unitPrice} />
           </span>
         </GridCell>
-        <GridCell align="right" strong>
+
+        {/* Qtà calc. */}
+        <GridCell align="right" className={cn(isCompact && "min-h-[52px]")} strong>
           <span className="text-13px font-bold tabular-nums text-[var(--text-primary)]">
             <NumberValue value={line.quantity} />
           </span>
         </GridCell>
-        <GridCell align="right" strong>
+
+        {/* Importo lordo */}
+        <GridCell align="right" className={cn(isCompact && "min-h-[52px]")} strong>
           <span className="text-13px font-bold tabular-nums text-[var(--text-primary)]">
             <Currency value={line.grossAmount} />
           </span>
         </GridCell>
-        <GridCell align="right">
+
+        {/* Ribasso */}
+        <GridCell align="right" className={cn(isCompact && "min-h-[52px]")}>
           <span
             className={cn(
               "text-13px font-semibold tabular-nums",
@@ -1123,12 +1451,16 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             <Currency value={line.discountAmount} />
           </span>
         </GridCell>
-        <GridCell align="right" editable>
+
+        {/* Maggiorazioni (editable) */}
+        <GridCell align="right" className={cn(isCompact && "min-h-[52px]")}>
           <input
             aria-label={`Maggiorazione % per ${line.voice.code}`}
             className={cn(
-              "h-8 w-full rounded-none border-0 bg-transparent px-1.5 text-right text-13px font-bold text-[var(--text-primary)] outline-none transition focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]",
-              hasMissingMgDecision && "bg-[var(--warning-soft)]/45 text-[var(--warning-base)]",
+              "h-8 w-full max-w-[82px] rounded-sm border px-1.5 text-right font-mono text-12px font-bold tabular-nums outline-none transition",
+              hasMissingMgDecision
+                ? "border-[var(--warning-base)]/35 bg-[var(--warning-soft)]/25 text-[var(--warning-base)]"
+                : "border-transparent bg-transparent text-[var(--text-primary)] hover:border-[var(--accent-primary)]/35 hover:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]",
             )}
             inputMode="decimal"
             onChange={(event) => {
@@ -1143,75 +1475,76 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
               }
             }}
             onClick={(e) => e.stopPropagation()}
+            onFocus={() => onSelectLine?.(line.id)}
             placeholder="%"
             type="text"
             value={line.surchargePercent || ""}
           />
         </GridCell>
-        <GridCell align="right" strong>
+
+        {/* Netto SAL */}
+        <div
+          className={cn(
+            "flex min-h-[64px] min-w-0 items-center justify-end border-r border-[var(--border-subtle)]/45 bg-[var(--accent-primary)]/[0.045] px-2.5 py-1.5 last:border-r-0",
+            isCompact && "min-h-[52px]",
+          )}
+        >
           <span className="text-14px font-black tabular-nums text-[var(--accent-primary)]">
             <Currency value={line.totalAmount} />
           </span>
-        </GridCell>
-        <GridCell align="center">
+        </div>
+
+        {/* Actions */}
+        <GridCell align="center" className={cn(isCompact && "min-h-[52px]")}>
           <div className="flex items-center justify-center gap-1">
-            <m.button
+            <button
               aria-label={isCopied ? "Copiata" : "Copia voce"}
               className={cn(
-                "flex size-7 items-center justify-center rounded-md transition-all",
+                "flex size-8 items-center justify-center rounded-md transition-all",
                 isCopied
                   ? "bg-[var(--success-soft)] text-[var(--success-base)]"
                   : "text-[var(--text-tertiary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
               )}
               onClick={(e) => {
                 e.stopPropagation();
-                onCopy();
+                onCopy(line.id);
               }}
               type="button"
               title={isCopied ? "Voce copiata - premi Ctrl+V per incollare" : "Copia voce"}
-              transition={{ duration: 0.42, ease: SPRING_EASE }}
             >
               {isCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            </m.button>
-            <m.button
+            </button>
+            <button
               aria-label={`Rimuovi ${line.voice.code}`}
-              className="flex size-7 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+              className="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove(line.id);
               }}
               type="button"
-              transition={{ duration: 0.42, ease: SPRING_EASE }}
             >
               <Trash2 className="size-3.5" />
-            </m.button>
+            </button>
           </div>
         </GridCell>
       </div>
-      {expanded ? (
-        <div
-          className={cn(
-            "border-b border-[var(--border-subtle)]/30 px-3 py-2.5",
-            index % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/15",
-          )}
-        >
-          <div className="grid min-w-0 grid-cols-[58px_minmax(0,1fr)]">
-            <div className="border-r border-[var(--border-subtle)]/40" />
-            <div className="min-w-0 pl-3">
-              <MeasurementRowsTable
-                lineId={line.id}
-                voiceCode={line.voice.code}
-                voiceDescription={line.voice.description}
-                rows={line.measurementRows}
-                unit={line.voice.unit}
-                totalQuantity={line.quantity}
-                onAddRow={onAddMeasurementRow}
-                onRemoveRow={onRemoveMeasurementRow}
-                onDuplicateRow={onDuplicateMeasurementRow}
-                onUpdateRow={onUpdateMeasurementRow}
-              />
-            </div>
-          </div>
+
+      {/* Expanded: measurement rows */}
+      {expanded && (
+        <div className="border-b border-[var(--border-subtle)]/55 bg-[var(--bg-muted)]/24 px-0 py-3">
+          <MeasurementRowsTable
+            lineId={line.id}
+            density={density}
+            voiceCode={line.voice.code}
+            voiceDescription={line.voice.description}
+            rows={line.measurementRows}
+            unit={line.voice.unit}
+            totalQuantity={line.quantity}
+            onAddRow={onAddMeasurementRow}
+            onRemoveRow={onRemoveMeasurementRow}
+            onDuplicateRow={onDuplicateMeasurementRow}
+            onUpdateRow={onUpdateMeasurementRow}
+          />
           <VoiceNotes
             lineId={line.id}
             linkedCharges={line.linkedCharges}
@@ -1219,13 +1552,14 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             onNotesChange={onNotesChange}
           />
         </div>
-      ) : null}
+      )}
     </>
   );
 });
 
 function MeasurementRowsTable({
   lineId,
+  density,
   voiceCode,
   voiceDescription,
   rows,
@@ -1237,6 +1571,7 @@ function MeasurementRowsTable({
   onUpdateRow,
 }: {
   lineId: string;
+  density: SheetDensity;
   voiceCode: string;
   voiceDescription: string;
   rows: SalMeasurementRowDraft[];
@@ -1251,11 +1586,10 @@ function MeasurementRowsTable({
     updates: Partial<SalMeasurementRowDraft>,
   ) => void;
 }) {
+  const isCompact = density === "compact";
   const hasMultipleRows = rows.length > 1;
   const lastRow = rows[rows.length - 1];
   const [factorDrafts, setFactorDrafts] = useState<Record<string, string>>({});
-  const COLS =
-    "grid-cols-[142px_112px_minmax(220px,1.2fr)_74px_74px_74px_104px_minmax(160px,0.85fr)_72px]";
 
   useEffect(() => {
     setFactorDrafts((current) => {
@@ -1273,56 +1607,90 @@ function MeasurementRowsTable({
   }, [rows]);
 
   return (
-    <div className="min-w-0">
-      <div className="overflow-hidden bg-[var(--surface-base)] ring-1 ring-[var(--border-subtle)]/55">
-        <div className="grid gap-3 border-b border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/18 px-3 py-1.5 md:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="text-11px font-black uppercase tracking-wider text-[var(--text-tertiary)]">
-                Libretto misure
-              </span>
-              <span className="rounded-sm bg-[var(--bg-muted)] px-1.5 py-0.5 font-mono text-11px font-bold text-[var(--text-secondary)]">
-                {voiceCode}
-              </span>
-              <span className="min-w-0 truncate text-13px font-semibold text-[var(--text-primary)]">
-                {voiceDescription}
-              </span>
-            </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-10px text-[var(--text-tertiary)]">
-              <span className="font-semibold tabular-nums text-[var(--text-primary)]">
-                {rows.length} rig{rows.length === 1 ? "a" : "he"}
-              </span>
-              <span className="size-1 rounded-full bg-[var(--border-subtle)]" />
-              <span>
-                Totale {totalQuantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })} {unit}
-              </span>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {lastRow ? (
-              <button
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-subtle)]/60 bg-[var(--surface-base)] px-2.5 text-11px font-bold text-[var(--text-secondary)] shadow-sm transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
-                onClick={() =>
-                  onDuplicateRow(lineId, buildMeasurementTarget(lastRow.id, rows.length - 1))
-                }
-                type="button"
-              >
-                <Copy className="size-3.5" />
-                Duplica ultima
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
+    <div className="ml-[52px] min-w-0 border-l border-[var(--accent-primary)]/35 bg-[var(--surface-base)] shadow-[inset_3px_0_0_color-mix(in_srgb,var(--accent-primary)_42%,transparent)]">
+      <div className="overflow-x-auto">
+        <div className={MEASURE_MIN_WIDTH}>
           <div
-            className={`grid min-w-[1010px] ${COLS} bg-[var(--bg-muted)]/35 text-11px font-black uppercase tracking-wider text-[var(--text-secondary)]`}
+            className={cn(
+              "grid gap-3 border-b border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/20 px-3 md:grid-cols-[minmax(0,1fr)_auto]",
+              isCompact ? "py-1.5" : "py-2",
+            )}
           >
-            {["Data", "Stazione", "Descrizione", "F1", "F2", "F3", "Parziale", "Note", ""].map(
-              (label) => (
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="border border-[var(--border-subtle)]/60 bg-[var(--surface-base)] px-1.5 py-0.5 font-mono text-10px font-black text-[var(--text-tertiary)]">
+                  LIBRETTO
+                </span>
+                <span className="bg-[var(--accent-primary)]/[0.08] px-1.5 py-0.5 font-mono text-11px font-black text-[var(--accent-primary)]">
+                  {voiceCode}
+                </span>
+                <span className="min-w-0 truncate text-13px font-semibold text-[var(--text-primary)]">
+                  {voiceDescription}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-11px text-[var(--text-tertiary)]">
+                <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                  {rows.length} rig{rows.length === 1 ? "a" : "he"}
+                </span>
+                <span className="h-3 border-l border-[var(--border-subtle)]/55" />
+                <span>
+                  Totale {totalQuantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}{" "}
+                  {unit}
+                </span>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {lastRow ? (
+                <button
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-subtle)]/60 bg-[var(--surface-base)] px-2.5 text-11px font-bold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                  onClick={() =>
+                    onDuplicateRow(lineId, buildMeasurementTarget(lastRow.id, rows.length - 1))
+                  }
+                  type="button"
+                >
+                  <Copy className="size-3.5" />
+                  Duplica ultima
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div
+            className={cn(
+              "grid border-b border-[var(--border-subtle)]/45 bg-[var(--bg-muted)]/40 font-mono text-10px font-black text-[var(--text-tertiary)]",
+              MEASURE_GRID_COLS,
+            )}
+          >
+            {MEASURE_COLUMN_LETTERS.map(({ id, label }, index) => (
+              <div
+                className={cn(
+                  "flex h-5 items-center justify-center border-r border-[var(--border-subtle)]/40 last:border-r-0",
+                  index === 7 && "text-[var(--accent-primary)]",
+                )}
+                key={id}
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+
+          <div
+            className={cn(
+              "grid border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)] text-10px font-black uppercase text-[var(--text-tertiary)]",
+              MEASURE_GRID_COLS,
+            )}
+          >
+            {["#", "Data", "Stazione", "Descrizione", "F1", "F2", "F3", "Parziale", "Note", ""].map(
+              (label, index) => (
                 <div
-                  className="border-r border-[var(--border-subtle)]/40 px-2 py-2 last:border-r-0"
-                  key={label || "actions"}
+                  className={cn(
+                    "flex min-h-8 items-center border-r border-[var(--border-subtle)]/45 px-2 last:border-r-0",
+                    index === 0 && "justify-center bg-[var(--bg-muted)]/30",
+                    index >= 4 && index <= 7 && "justify-end text-right",
+                    index === 7 &&
+                      "bg-[var(--accent-primary)]/[0.055] text-[var(--accent-primary)]",
+                  )}
+                  key={label || "measure-actions"}
                 >
                   {label}
                 </div>
@@ -1331,58 +1699,78 @@ function MeasurementRowsTable({
           </div>
 
           {rows.length === 0 ? (
-            <div className="grid min-w-[1010px] grid-cols-1 border-t border-[var(--border-subtle)]/30 bg-[var(--surface-base)]">
-              <div className="px-3 py-4 text-center text-12px text-[var(--text-tertiary)]">
-                Nessuna riga misura. Aggiungi la prima riga per iniziare.
-              </div>
+            <div className="border-b border-[var(--border-subtle)]/40 bg-[var(--surface-base)] px-3 py-4 text-center text-12px text-[var(--text-tertiary)]">
+              Nessuna riga misura. Aggiungi la prima riga per iniziare.
             </div>
           ) : (
             rows.map((row, rowIndex) => {
               const rowTarget = buildMeasurementTarget(row.id, rowIndex);
               return (
                 <div
-                  className={`grid min-w-[1010px] ${COLS} border-t border-[var(--border-subtle)]/30 bg-[var(--surface-base)] text-11px font-medium transition-colors hover:bg-[var(--accent-primary)]/[0.025]`}
+                  className={cn(
+                    "grid border-b border-[var(--border-subtle)]/35 bg-[var(--surface-base)] text-11px font-medium transition-colors hover:bg-[var(--accent-primary)]/[0.025]",
+                    MEASURE_GRID_COLS,
+                  )}
                   key={`${row.id}-${row.order}`}
                 >
-                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
-                    <input
-                      aria-label="Data misura"
-                      className="sal-date-input h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2 text-13px font-medium text-[var(--text-primary)] outline-none transition [color-scheme:light] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)] dark:[color-scheme:dark]"
-                      onChange={(e) => onUpdateRow(lineId, rowTarget, { date: e.target.value })}
-                      type="date"
-                      value={row.date}
-                    />
+                  <div
+                    className={cn(
+                      "flex items-center justify-center border-r border-[var(--border-subtle)]/45 bg-[var(--bg-muted)]/22 font-mono text-10px font-black tabular-nums text-[var(--text-tertiary)]",
+                      isCompact ? "min-h-9" : "min-h-10",
+                    )}
+                  >
+                    {rowIndex + 1}
                   </div>
-                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
+                  <MeasureCell compact={isCompact}>
+                    <DatePicker
+                      ariaLabel="Data misura"
+                      className={cn(
+                        "w-full rounded-sm border-transparent bg-transparent px-1.5 text-12px font-medium hover:border-[var(--border-subtle)]/55 hover:bg-[var(--surface-base)] focus-visible:bg-[var(--surface-base)]",
+                        isCompact ? "h-7" : "h-8",
+                      )}
+                      iconClassName="hidden"
+                      onChange={(value) => onUpdateRow(lineId, rowTarget, { date: value })}
+                      placeholder="Data"
+                      value={row.date}
+                      valueClassName="text-center"
+                    />
+                  </MeasureCell>
+                  <MeasureCell compact={isCompact}>
                     <input
                       aria-label="Stazione"
-                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-13px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      className={cn(
+                        "w-full rounded-sm border border-transparent bg-transparent px-1.5 text-12px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-subtle)]/55 hover:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]",
+                        isCompact ? "h-7" : "h-8",
+                      )}
                       onChange={(e) => onUpdateRow(lineId, rowTarget, { station: e.target.value })}
                       placeholder="Stazione"
                       value={row.station ?? ""}
                     />
-                  </div>
-                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
+                  </MeasureCell>
+                  <MeasureCell compact={isCompact}>
                     <input
                       aria-label="Descrizione misura"
-                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-13px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      className={cn(
+                        "w-full rounded-sm border border-transparent bg-transparent px-1.5 text-12px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-subtle)]/55 hover:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]",
+                        isCompact ? "h-7" : "h-8",
+                      )}
                       onChange={(e) =>
                         onUpdateRow(lineId, rowTarget, { description: e.target.value })
                       }
                       placeholder="Descrizione"
                       value={row.description}
                     />
-                  </div>
+                  </MeasureCell>
                   {MEASUREMENT_FACTOR_FIELDS.map((field) => {
                     const draftKey = `${row.id}:${row.order}:${field}`;
                     return (
-                      <div
-                        className="border-r border-[var(--border-subtle)]/40 px-2 py-2"
-                        key={draftKey}
-                      >
+                      <MeasureCell compact={isCompact} key={draftKey}>
                         <input
                           aria-label={field}
-                          className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2 text-right font-mono text-13px font-semibold tabular-nums text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                          className={cn(
+                            "w-full rounded-sm border border-transparent bg-transparent px-1.5 text-right font-mono text-12px font-semibold tabular-nums text-[var(--text-primary)] outline-none transition hover:border-[var(--border-subtle)]/55 hover:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]",
+                            isCompact ? "h-7" : "h-8",
+                          )}
                           inputMode="decimal"
                           onBlur={() => {
                             setFactorDrafts((current) => {
@@ -1402,27 +1790,38 @@ function MeasurementRowsTable({
                           }}
                           value={factorDrafts[draftKey] ?? formatFactorInput(row[field])}
                         />
-                      </div>
+                      </MeasureCell>
                     );
                   })}
-                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2 text-right font-mono font-bold tabular-nums text-[var(--text-primary)]">
-                    <span className="flex h-9 items-center justify-end rounded-md bg-[var(--accent-primary)]/[0.08] px-2.5 text-13px font-bold text-[var(--accent-primary)]">
+                  <MeasureCell
+                    className="justify-end bg-[var(--accent-primary)]/[0.045]"
+                    compact={isCompact}
+                  >
+                    <span className="font-mono text-12px font-black tabular-nums text-[var(--accent-primary)]">
                       {row.partialQuantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}
                     </span>
-                  </div>
-                  <div className="border-r border-[var(--border-subtle)]/40 px-2 py-2">
+                  </MeasureCell>
+                  <MeasureCell compact={isCompact}>
                     <input
                       aria-label="Note riga"
-                      className="h-9 w-full rounded-md border border-[var(--border-subtle)]/35 bg-[var(--bg-muted)]/25 px-2.5 text-13px font-medium text-[var(--text-secondary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+                      className={cn(
+                        "w-full rounded-sm border border-transparent bg-transparent px-1.5 text-12px font-medium text-[var(--text-secondary)] outline-none transition placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-subtle)]/55 hover:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]",
+                        isCompact ? "h-7" : "h-8",
+                      )}
                       onChange={(e) => onUpdateRow(lineId, rowTarget, { notes: e.target.value })}
                       placeholder="Note"
                       value={row.notes}
                     />
-                  </div>
-                  <div className="flex items-center justify-center gap-1.5 px-1.5 py-1.5">
+                  </MeasureCell>
+                  <div
+                    className={cn(
+                      "flex items-center justify-center gap-1 border-r border-[var(--border-subtle)]/45 px-1.5 py-1 last:border-r-0",
+                      isCompact ? "min-h-9" : "min-h-10",
+                    )}
+                  >
                     <button
                       aria-label="Duplica riga"
-                      className="flex size-8 items-center justify-center rounded-md border border-[var(--border-subtle)]/45 bg-[var(--surface-base)] text-[var(--text-secondary)] shadow-sm transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
+                      className="flex size-7 items-center justify-center rounded-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]"
                       onClick={() => onDuplicateRow(lineId, rowTarget)}
                       type="button"
                     >
@@ -1431,9 +1830,9 @@ function MeasurementRowsTable({
                     <button
                       aria-label="Elimina riga"
                       className={cn(
-                        "flex size-7 items-center justify-center rounded-md transition-colors",
+                        "flex size-7 items-center justify-center rounded-sm transition-colors",
                         hasMultipleRows
-                          ? "border border-[var(--border-subtle)]/45 bg-[var(--surface-base)] text-[var(--text-secondary)] shadow-sm hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+                          ? "text-[var(--text-secondary)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
                           : "cursor-not-allowed text-[var(--text-tertiary)] opacity-35",
                       )}
                       disabled={!hasMultipleRows}
@@ -1454,21 +1853,27 @@ function MeasurementRowsTable({
           )}
 
           <button
-            className={`grid min-w-[1010px] ${COLS} border-t border-dashed border-[var(--border-subtle)]/55 bg-transparent text-left text-11px font-semibold text-[var(--text-tertiary)] transition-colors hover:border-[var(--accent-primary)]/35 hover:text-[var(--accent-primary)]`}
+            className={cn(
+              "grid border-b border-dashed border-[var(--border-subtle)]/55 bg-[var(--bg-muted)]/12 text-left text-11px font-semibold text-[var(--text-tertiary)] transition-colors hover:border-[var(--accent-primary)]/35 hover:bg-[var(--accent-primary)]/[0.025] hover:text-[var(--accent-primary)]",
+              MEASURE_GRID_COLS,
+            )}
             onClick={() => onAddRow(lineId)}
             type="button"
           >
-            <div />
-            <div className="col-span-8 flex items-center gap-2 px-2 py-2">
+            <div className="border-r border-[var(--border-subtle)]/35" />
+            <div className="col-span-9 flex min-h-9 items-center gap-2 px-2">
               <Plus className="size-3.5" />
               <span>Nuova riga misura</span>
             </div>
           </button>
 
           <div
-            className={`grid min-w-[1010px] ${COLS} border-t border-[var(--border-subtle)]/30 bg-[var(--accent-primary)]/[0.06] text-12px font-bold`}
+            className={cn(
+              "grid border-b border-[var(--border-subtle)]/40 bg-[var(--accent-primary)]/[0.065] text-12px font-bold",
+              MEASURE_GRID_COLS,
+            )}
           >
-            <div className="col-span-6 px-2 py-2 text-right text-[var(--text-tertiary)]">
+            <div className="col-span-7 px-2 py-2 text-right text-[var(--text-tertiary)]">
               sommano {unit}
             </div>
             <div className="px-2 py-2 text-right font-mono tabular-nums text-[var(--accent-primary)]">
@@ -1497,13 +1902,13 @@ function VoiceNotes({
   const linkedTotal = linkedCharges.reduce((sum, c) => sum + c.total, 0);
 
   return (
-    <div className="mt-2 rounded-lg bg-[var(--surface-base)] p-2.5 ring-1 ring-[var(--border-subtle)]/50">
-      <label className="block">
-        <span className="mb-2 block text-11px font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-          Note della voce principale
+    <div className="ml-[52px] border-l border-[var(--border-subtle)]/55 bg-[var(--surface-base)]">
+      <label className="grid border-b border-[var(--border-subtle)]/40 md:grid-cols-[164px_minmax(0,1fr)]">
+        <span className="flex min-h-[58px] items-center border-r border-[var(--border-subtle)]/45 bg-[var(--bg-muted)]/22 px-3 font-mono text-10px font-black uppercase text-[var(--text-tertiary)]">
+          Note voce
         </span>
         <textarea
-          className="min-h-[52px] w-full resize-y rounded-lg border border-[var(--border-subtle)]/50 bg-[var(--bg-muted)]/25 px-3 py-2 text-13px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+          className="min-h-[58px] w-full resize-y border-0 bg-transparent px-3 py-2 text-13px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:bg-[var(--accent-primary)]/[0.025] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
           placeholder={
             linkedTotal > 0
               ? `Annota criterio maggiorazioni: ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`
@@ -1518,9 +1923,32 @@ function VoiceNotes({
   );
 }
 
+function MeasureCell({
+  children,
+  className,
+  compact,
+}: {
+  children: ReactNode;
+  className?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-10 min-w-0 items-center border-r border-[var(--border-subtle)]/45 px-1.5 py-1 last:border-r-0",
+        compact && "min-h-9",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 function GridCell({
   align = "left",
   children,
+  className,
   editable,
   muted,
   strong,
@@ -1528,6 +1956,7 @@ function GridCell({
 }: {
   align?: "center" | "left" | "right";
   children: ReactNode;
+  className?: string;
   editable?: boolean;
   muted?: boolean;
   strong?: boolean;
@@ -1536,12 +1965,13 @@ function GridCell({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center border-r border-[var(--border-subtle)]/40 px-2.5 py-1.5 last:border-r-0",
+        "flex min-h-[64px] min-w-0 items-center border-r border-[var(--border-subtle)]/45 px-2.5 py-1.5 last:border-r-0",
         align === "center" && "justify-center text-center",
         align === "right" && "justify-end text-right tabular-nums",
         editable && "bg-[var(--bg-muted)]/25",
         muted && "text-[var(--text-tertiary)]",
         strong && "font-semibold text-[var(--text-primary)]",
+        className,
       )}
       title={title}
     >
@@ -1567,7 +1997,11 @@ export function AccountingRows({ lines }: { lines: SalLineView[] }) {
   if (lines.length === 0) {
     return (
       <div className="rounded-2xl bg-[var(--bg-muted)]/30">
-        <EmptyTableState message="Il registro SAL apparirà quando avrai selezionato almeno una voce tariffaria." />
+        <EmptyState
+          description="Il registro SAL apparirà quando avrai selezionato almeno una voce tariffaria."
+          icon={FileText}
+          title="Nessuna voce"
+        />
       </div>
     );
   }
@@ -2069,14 +2503,6 @@ function NestedTable({
           <tbody>{children}</tbody>
         </table>
       </div>
-    </div>
-  );
-}
-
-function EmptyTableState({ message }: { message: string }) {
-  return (
-    <div className="border-t border-[var(--border-subtle)] px-4 py-8 text-center text-13px text-[var(--text-tertiary)]">
-      {message}
     </div>
   );
 }

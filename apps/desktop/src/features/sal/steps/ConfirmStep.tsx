@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
 import { Download, FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { type ReactNode, useDeferredValue } from "react";
 import { cn } from "@/lib/utils";
-import { SalReceipt } from "../components/SalReceipt";
 import { FeedbackBanner, StepMetric } from "../components/SalCreationSummary";
+import { SalReceipt } from "../components/SalReceipt";
 import type { SalEconomicRules, SalEconomicSummary, SalLineView } from "../types";
 
 export function ConfirmStep({
@@ -22,6 +22,8 @@ export function ConfirmStep({
   onPrintAccounting: () => void;
   summary: SalEconomicSummary;
 }) {
+  const deferredReceiptLineViews = useDeferredValue(lineViews);
+
   return (
     <div className="space-y-4">
       <div className="sticky top-0 z-20 -mx-4 border-b border-[var(--border-subtle)]/45 bg-[var(--surface-base)]/94 px-4 py-3 shadow-[0_14px_34px_color-mix(in_srgb,var(--text-primary)_6%,transparent)] backdrop-blur-xl lg:-mx-6 lg:px-6">
@@ -82,7 +84,7 @@ export function ConfirmStep({
 
       <SalReceipt
         economicRules={economicRules}
-        lineViews={lineViews}
+        lineViews={deferredReceiptLineViews}
         summary={summary}
         title="Documento finale SAL"
       />

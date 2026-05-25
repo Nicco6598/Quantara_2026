@@ -27,6 +27,7 @@ import {
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { useToast } from "@/components/shared/ToastProvider";
+import { useActionHandler } from "@/hooks/useAction";
 
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 
@@ -1290,23 +1291,35 @@ export function TariffImportPreviewModal({
     onPageCanConfirmChangeRef.current?.(canConfirm);
   }, [canConfirm]);
 
-  useEffect(() => {
-    const handleToolbarAction = (event: Event) => {
-      const actionId = (event as CustomEvent<string>).detail;
-      if (actionId === "tariff-import-confirm" && pageViewRef.current) {
+  useActionHandler(
+    "tariff.draft.confirm",
+    useCallback(() => {
+      if (pageViewRef.current) {
         confirmChangesRef.current?.();
-      } else if (actionId === "tariff-import-save-draft") {
-        saveActiveFileAsDraft();
-      } else if (actionId === "tariff-import-toggle-reviewed") {
-        toggleActiveFileReviewed();
-      } else if (actionId === "tariff-import-delete-file") {
-        removeActiveFile();
       }
-    };
+    }, []),
+  );
 
-    window.addEventListener("tariff-preview-action", handleToolbarAction);
-    return () => window.removeEventListener("tariff-preview-action", handleToolbarAction);
-  }, [removeActiveFile, saveActiveFileAsDraft, toggleActiveFileReviewed]);
+  useActionHandler(
+    "tariff.draft.save",
+    useCallback(() => {
+      saveActiveFileAsDraft();
+    }, [saveActiveFileAsDraft]),
+  );
+
+  useActionHandler(
+    "tariff.draft.toggleReviewed",
+    useCallback(() => {
+      toggleActiveFileReviewed();
+    }, [toggleActiveFileReviewed]),
+  );
+
+  useActionHandler(
+    "tariff.draft.deleteFile",
+    useCallback(() => {
+      removeActiveFile();
+    }, [removeActiveFile]),
+  );
 
   useEffect(() => {
     const handleKeyboardShortcut = (event: KeyboardEvent) => {

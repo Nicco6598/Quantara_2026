@@ -10,22 +10,25 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
+import { Panel } from "@/components/shared/Panel";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
-import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useToast } from "@/components/shared/ToastProvider";
+import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
+import { useActionHandler } from "@/hooks/useAction";
 
 import {
   createDesktopTariffBook,
-  deleteDesktopTariffBook,
   type DesktopContract,
   type DesktopDataResult,
   type DesktopTariffBook,
   type DesktopTariffVoice,
+  deleteDesktopTariffBook,
   listDesktopContracts,
   listDesktopTariffBooks,
   listDesktopTariffVoiceCounts,
@@ -39,25 +42,13 @@ import { dispatchDataChanged } from "@/lib/sync-events";
 import { readJsonFromStorage, writeJsonToStorage } from "@/persistence/json-storage";
 import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
-import { useAppStore } from "@/store/app-store";
+import { type PendingWorkflowAction, useAppStore } from "@/store/app-store";
 
 import { QuickAction } from "./components/QuickAction";
-import {
-  Panel,
-  PanelTitle,
-  TariffBookPreviewCard,
-  TariffImportPreviewPanel,
-} from "./components/TariffScreenPanels";
 import { TariffImportLoadingModal } from "./components/TariffImportLoadingModal";
 import type { TariffImportPreviewResult } from "./components/TariffImportPreviewModal";
+import { TariffBookPreviewCard, TariffImportPreviewPanel } from "./components/TariffScreenPanels";
 import { TariffVoicesExplorerModal } from "./components/TariffVoicesExplorerModal";
-import {
-  fallbackContracts,
-  fallbackTariffBook,
-  fallbackTariffBooks,
-  fallbackTariffVoices,
-} from "./tariffs-data";
-import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
 import {
   areNumberSetsEqual,
   getScrollableAncestor,
@@ -65,6 +56,13 @@ import {
   initialImportMeta,
   isStringArray,
 } from "./state/import-meta";
+import {
+  fallbackContracts,
+  fallbackTariffBook,
+  fallbackTariffBooks,
+  fallbackTariffVoices,
+} from "./tariffs-data";
+import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
 import { groupTariffVoices } from "./utils/tariff-grouping";
 import {
   buildImportPreviewToolbarSummary,
@@ -718,59 +716,42 @@ export function TariffsScreen() {
     setDraftedImportFiles(new Set());
   }, []);
 
-  const handleWorkflowAction = useCallback(
-    (event: Event) => {
-      const customEvent = event as CustomEvent<string>;
+  const startPdfImport = useCallback(() => {
+    editPreviewBookIdMap.current = new Map();
+    setDraftedImportFiles(new Set());
+    setReviewedFiles(new Set());
+    void handlePdfImport();
+  }, [handlePdfImport]);
 
-      if (customEvent.detail === "import") {
-        editPreviewBookIdMap.current = new Map();
-        setDraftedImportFiles(new Set());
-        setReviewedFiles(new Set());
-        void handlePdfImport();
-      }
-    },
-    [handlePdfImport],
-  );
+  useActionHandler("tariff.import", startPdfImport);
 
   useEffect(() => {
-    window.addEventListener("tariff-workflow-action", handleWorkflowAction);
-    return () => window.removeEventListener("tariff-workflow-action", handleWorkflowAction);
-  }, [handleWorkflowAction]);
+    const processPendingWorkflowAction = (action: PendingWorkflowAction) => {
+      if (action !== "import-tariff") return;
+      useAppStore.getState().setPendingWorkflowAction(null);
+      startPdfImport();
+    };
 
-  const handlePreviewAction = useCallback(
-    (event: Event) => {
-      const actionId = (event as CustomEvent<string>).detail;
-
-      if (actionId === "tariff-import-cancel") {
-        clearImport();
-        return;
-      }
-
-      if (actionId.startsWith("tariff-import-select-")) {
-        const nextIndex = Number.parseInt(actionId.replace("tariff-import-select-", ""), 10);
-        if (Number.isInteger(nextIndex) && importPreviews[nextIndex]) {
-          dispatchImport({ type: "SET_INDEX", index: nextIndex });
-        }
-      }
-    },
-    [importPreviews, clearImport],
-  );
-
-  useEffect(() => {
-    window.addEventListener("tariff-preview-action", handlePreviewAction);
-    return () => window.removeEventListener("tariff-preview-action", handlePreviewAction);
-  }, [handlePreviewAction]);
-
-  useEffect(() => {
-    const unsub = useAppStore.subscribe((state) => {
-      if (state.pendingWorkflowAction === "import-tariff") {
-        window.dispatchEvent(new CustomEvent("tariff-workflow-action", { detail: "import" }));
-        useAppStore.getState().setPendingWorkflowAction(null);
+    processPendingWorkflowAction(useAppStore.getState().pendingWorkflowAction);
+    const unsub = useAppStore.subscribe((state, prev) => {
+      if (state.pendingWorkflowAction !== prev.pendingWorkflowAction) {
+        processPendingWorkflowAction(state.pendingWorkflowAction);
       }
     });
-
     return unsub;
-  }, []);
+  }, [startPdfImport]);
+
+  useActionHandler(
+    "tariff.preview.select",
+    useCallback(
+      (action) => {
+        if (action.type === "tariff.preview.select" && importPreviews[action.index]) {
+          dispatchImport({ type: "SET_INDEX", index: action.index });
+        }
+      },
+      [importPreviews],
+    ),
+  );
 
   function handleShowTariffBookDetails(book: DesktopTariffBook) {
     setSelectedTariffBookId(book.id);
@@ -1052,7 +1033,7 @@ export function TariffsScreen() {
               </div>
             }
           >
-            <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="operational-card-grid grid-flow-dense sm:grid-cols-2 xl:grid-cols-5">
               <MetricCard
                 caption="Totali nel catalogo"
                 icon={Database}
@@ -1090,11 +1071,10 @@ export function TariffsScreen() {
             </div>
           </ScreenHero>
 
-          <section className="mt-8 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
+          <section className="operational-panel-grid mt-8 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
             <div className="space-y-4 xl:self-start">
-              <Panel>
-                <PanelTitle>Azioni rapide</PanelTitle>
-                <div className="mt-4 space-y-3">
+              <Panel eyebrow="Azioni rapide">
+                <div className="space-y-3">
                   <QuickAction
                     detail="Carica un tariffario da PDF o JSON parser"
                     icon={FileText}
@@ -1131,80 +1111,85 @@ export function TariffsScreen() {
               </Panel>
             </div>
 
-            <Panel className="min-w-0 overflow-visible p-0">
-              <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <FilterChip
-                    active={activeCatalogTab === "all"}
-                    count={baseFilteredTariffBooks.length}
-                    onClick={() => setActiveCatalogTab("all")}
-                  >
-                    Tutti i tariffari
-                  </FilterChip>
-                  <FilterChip
-                    active={activeCatalogTab === "favorites"}
-                    count={favoriteCount}
-                    onClick={() => setActiveCatalogTab("favorites")}
-                  >
-                    I miei preferiti
-                  </FilterChip>
-                </div>
+            <Panel className="min-w-0 overflow-visible" padding="none">
+              <div className="border-b border-[var(--border-subtle)] p-3 lg:p-4">
+                <div className="operational-toolbar">
+                  <div className="operational-toolbar-group">
+                    <FilterChip
+                      active={activeCatalogTab === "all"}
+                      count={baseFilteredTariffBooks.length}
+                      onClick={() => setActiveCatalogTab("all")}
+                    >
+                      Tutti i tariffari
+                    </FilterChip>
+                    <FilterChip
+                      active={activeCatalogTab === "favorites"}
+                      count={favoriteCount}
+                      onClick={() => setActiveCatalogTab("favorites")}
+                    >
+                      I miei preferiti
+                    </FilterChip>
+                  </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <FilterSelect
-                    label="Anno"
-                    onChange={setYearFilter}
-                    options={["all", ...availableYears.map(String)]}
-                    value={yearFilter}
-                    displayMap={
-                      new Map<string, string>([
-                        ["all", "Tutti gli anni"],
-                        ...availableYears.map((y) => [String(y), String(y)] as const),
-                      ])
-                    }
-                  />
-                  <FilterSelect
-                    label="Progetto"
-                    onChange={setProjectFilter}
-                    options={["all", ...realContracts.map((c) => c.id)]}
-                    value={projectFilter}
-                    displayMap={
-                      new Map([
-                        ["all", realContracts.length > 0 ? "Tutti i progetti" : "Nessun progetto"],
-                        ...projectDisplayMap,
-                      ])
-                    }
-                  />
-                  <FilterSelect
-                    label="Stato"
-                    onChange={setStatusFilter}
-                    options={statusOptions}
-                    value={statusFilter}
-                    displayMap={statusDisplayMap}
-                  />
-                  <FilterSearch
-                    onChange={setQuery}
-                    placeholder="Cerca per nome, ente o ID..."
-                    value={query}
-                  />
-                  {yearFilter !== "all" ||
-                  projectFilter !== "all" ||
-                  statusFilter !== "all" ||
-                  query ? (
-                    <ClearFiltersButton
-                      onClick={() => {
-                        setYearFilter("all");
-                        setProjectFilter("all");
-                        setStatusFilter("all");
-                        setQuery("");
-                      }}
+                  <div className="operational-toolbar-actions">
+                    <FilterSelect
+                      label="Anno"
+                      onChange={setYearFilter}
+                      options={["all", ...availableYears.map(String)]}
+                      value={yearFilter}
+                      displayMap={
+                        new Map<string, string>([
+                          ["all", "Tutti gli anni"],
+                          ...availableYears.map((y) => [String(y), String(y)] as const),
+                        ])
+                      }
                     />
-                  ) : null}
-                  <MultiSelectToggle
-                    isEnabled={deleteSelect.isEnabled}
-                    onToggle={deleteSelect.toggleEnable}
-                    count={deleteSelect.count}
-                  />
+                    <FilterSelect
+                      label="Progetto"
+                      onChange={setProjectFilter}
+                      options={["all", ...realContracts.map((c) => c.id)]}
+                      value={projectFilter}
+                      displayMap={
+                        new Map([
+                          [
+                            "all",
+                            realContracts.length > 0 ? "Tutti i progetti" : "Nessun progetto",
+                          ],
+                          ...projectDisplayMap,
+                        ])
+                      }
+                    />
+                    <FilterSelect
+                      label="Stato"
+                      onChange={setStatusFilter}
+                      options={statusOptions}
+                      value={statusFilter}
+                      displayMap={statusDisplayMap}
+                    />
+                    <FilterSearch
+                      onChange={setQuery}
+                      placeholder="Cerca per nome, ente o ID..."
+                      value={query}
+                    />
+                    {yearFilter !== "all" ||
+                    projectFilter !== "all" ||
+                    statusFilter !== "all" ||
+                    query ? (
+                      <ClearFiltersButton
+                        onClick={() => {
+                          setYearFilter("all");
+                          setProjectFilter("all");
+                          setStatusFilter("all");
+                          setQuery("");
+                        }}
+                      />
+                    ) : null}
+                    <MultiSelectToggle
+                      isEnabled={deleteSelect.isEnabled}
+                      onToggle={deleteSelect.toggleEnable}
+                      count={deleteSelect.count}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1229,7 +1214,7 @@ export function TariffsScreen() {
               )}
 
               <div ref={catalogRef}>
-                <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
+                <div className="operational-card-grid p-3 md:grid-cols-2 2xl:grid-cols-3">
                   {visibleTariffBooks.length > 0 ? (
                     visibleTariffBooks.map((book) => (
                       <TariffBookPreviewCard
@@ -1255,18 +1240,16 @@ export function TariffsScreen() {
                       />
                     ))
                   ) : (
-                    <div className="col-span-full rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 p-10 text-center">
-                      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                        <Database className="size-5" />
-                      </div>
-                      <div className="mt-4 text-15px font-bold text-[var(--text-primary)]">
-                        Nessun tariffario trovato
-                      </div>
-                      <p className="mx-auto mt-2 max-w-[360px] text-13px font-medium leading-5 text-[var(--text-secondary)]">
-                        {activeCatalogTab === "favorites"
-                          ? "I filtri correnti non includono tariffari preferiti."
-                          : "Modifica i filtri o importa un nuovo PDF/JSON tariffario."}
-                      </p>
+                    <div className="col-span-full">
+                      <EmptyState
+                        icon={Database}
+                        title="Nessun tariffario trovato"
+                        description={
+                          activeCatalogTab === "favorites"
+                            ? "I filtri correnti non includono tariffari preferiti."
+                            : "Modifica i filtri o importa un nuovo PDF/JSON tariffario."
+                        }
+                      />
                     </div>
                   )}
                 </div>

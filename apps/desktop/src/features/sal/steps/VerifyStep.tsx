@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { m } from "framer-motion";
 import { ArrowRightLeft, Package } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import type { DesktopMaterial } from "@/lib/desktopData";
+import { cn } from "@/lib/utils";
+import { SalComparisonView } from "../components/SalComparisonView";
 import { SalReceipt } from "../components/SalReceipt";
 import type {
   SalEconomicRules,
@@ -11,7 +12,6 @@ import type {
   SalLineView,
   SalVerificationCheck,
 } from "../types";
-import { SalComparisonView } from "../components/SalComparisonView";
 
 export function VerifyStep({
   checks,
@@ -40,6 +40,7 @@ export function VerifyStep({
   compareLines: SalLineView[] | null;
   onToggleCompare: () => void;
 }) {
+  const deferredReceiptLineViews = useDeferredValue(lineViews);
   const [materialsLoadEpoch, setMaterialsLoadEpoch] = useState(0);
   const [isSearchingMaterials, setIsSearchingMaterials] = useState(false);
   const [materialSearch, setMaterialSearch] = useState("");
@@ -118,7 +119,7 @@ export function VerifyStep({
         {/* Receipt */}
         <SalReceipt
           economicRules={economicRules}
-          lineViews={lineViews}
+          lineViews={deferredReceiptLineViews}
           summary={summary}
           title="Verifica riepilogo"
         />

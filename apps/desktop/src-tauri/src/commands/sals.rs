@@ -3,15 +3,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::State;
 
+use crate::infrastructure::to_database_error;
 use crate::infrastructure::{
-    audit_repository, local_storage::{DbConnection, with_db, with_db_mut},
+    audit_repository,
+    local_storage::{DbConnection, with_db, with_db_mut},
     material_repository, sal_document_repository_v2, sal_repository,
 };
-use crate::infrastructure::to_database_error;
 use crate::models::app_error::AppError;
 
 #[tauri::command]
-pub fn list_sal_projects(state: State<'_, DbConnection>) -> Result<Vec<sal_repository::SalBackednProject>, String> {
+pub fn list_sal_projects(
+    state: State<'_, DbConnection>,
+) -> Result<Vec<sal_repository::SalBackednProject>, String> {
     with_db(&state, |conn| sal_repository::list_sal_projects(conn))
 }
 
@@ -44,10 +47,7 @@ pub fn save_sal_document(
     data: Value,
 ) -> Result<(), String> {
     with_db_mut(&state, |conn| {
-        let sal_id = data
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown");
+        let sal_id = data.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
         sal_document_repository_v2::create_sal_document_v2(conn, &project_id, &data)?;
         audit_repository::append_event(conn, "sal", sal_id, "create", None, Some(&data))?;
         Ok(())
@@ -65,10 +65,7 @@ pub fn update_sal_document(
             .get("projectId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AppError::Validation("SalDocument missing projectId".into()))?;
-        let _ = conn.execute(
-            "DELETE FROM sal_documents_v2 WHERE id = ?1",
-            params![id],
-        );
+        let _ = conn.execute("DELETE FROM sal_documents_v2 WHERE id = ?1", params![id]);
         sal_document_repository_v2::create_sal_document_v2(conn, project_id, &data)?;
         audit_repository::append_event(conn, "sal", &id, "update", None, Some(&data))?;
         Ok(())
@@ -149,10 +146,7 @@ pub fn get_sal_version(
 }
 
 #[tauri::command]
-pub fn delete_sal_document(
-    state: State<'_, DbConnection>,
-    id: String,
-) -> Result<(), String> {
+pub fn delete_sal_document(state: State<'_, DbConnection>, id: String) -> Result<(), String> {
     with_db_mut(&state, |conn| {
         sal_document_repository_v2::delete_sal_document_v2(conn, &id)?;
         audit_repository::append_event(conn, "sal", &id, "delete", None, None)?;

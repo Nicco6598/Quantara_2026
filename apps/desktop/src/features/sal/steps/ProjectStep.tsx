@@ -1,11 +1,14 @@
-import { useMemo, useState } from "react";
 import { m } from "framer-motion";
 import { Building2, Calculator, CheckCircle2, FileText, Loader2, Wallet } from "lucide-react";
+import { useMemo, useState } from "react";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { DatePicker } from "@/components/shared/form";
 import { cn } from "@/lib/utils";
-import type { SalProjectContext, SalTariffBookOption } from "../types";
-import type { SalEconomicSummary } from "../types";
-import { Currency } from "../components/SalCreationTables";
 import { EconomicEquation } from "../components/SalCreationSummary";
+import { Currency } from "../components/SalCreationTables";
+import type { SalEconomicSummary, SalProjectContext, SalTariffBookOption } from "../types";
+
+const MAX_RENDERED_TARIFF_BOOKS = 80;
 
 export function ProjectStep({
   project,
@@ -55,22 +58,25 @@ export function ProjectStep({
         b.id.toLowerCase().includes(q),
     );
   }, [tariffBooks, tariffSearch]);
+  const selectedTariffBookIdSet = useMemo(
+    () => new Set(selectedTariffBooks.map((book) => book.id)),
+    [selectedTariffBooks],
+  );
+  const visibleTariffBooks = useMemo(
+    () => filteredTariffBooks.slice(0, MAX_RENDERED_TARIFF_BOOKS),
+    [filteredTariffBooks],
+  );
+  const hiddenTariffBookCount = Math.max(0, filteredTariffBooks.length - visibleTariffBooks.length);
 
   const showContractSelector = contracts.length > 1 && onSelectContract;
 
   if (!project) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-16 text-center">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--bg-muted)]">
-          <Building2 className="size-7 text-[var(--text-tertiary)]" />
-        </div>
-        <p className="mt-4 text-15px font-semibold text-[var(--text-primary)]">
-          Nessun contratto disponibile
-        </p>
-        <p className="mt-1.5 max-w-sm text-13px leading-relaxed text-[var(--text-secondary)]">
-          Crea o apri un progetto prima di generare una SAL.
-        </p>
-      </div>
+      <EmptyState
+        description="Crea o apri un progetto prima di generare una SAL."
+        icon={Building2}
+        title="Nessun contratto disponibile"
+      />
     );
   }
 
@@ -195,11 +201,11 @@ export function ProjectStep({
               >
                 Data SAL
               </label>
-              <input
-                className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)]/30 px-3.5 pr-2 text-14px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)] [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:opacity-70"
+              <DatePicker
+                ariaLabel="Data SAL"
+                className="mt-1.5 h-10 rounded-lg bg-[var(--bg-muted)]/30 text-14px font-semibold focus-visible:bg-[var(--surface-base)]"
                 id="sal-date-input"
-                onChange={(e) => setSalDate(e.target.value)}
-                type="date"
+                onChange={setSalDate}
                 value={salDate}
               />
             </div>
@@ -285,8 +291,8 @@ export function ProjectStep({
         )}
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {filteredTariffBooks.map((book) => {
-            const isSelected = selectedTariffBooks.some((b) => b.id === book.id);
+          {visibleTariffBooks.map((book) => {
+            const isSelected = selectedTariffBookIdSet.has(book.id);
             return (
               <m.button
                 key={book.id}
@@ -327,6 +333,12 @@ export function ProjectStep({
             );
           })}
         </div>
+        {hiddenTariffBookCount > 0 ? (
+          <div className="mt-2 text-11px font-medium text-[var(--text-tertiary)]">
+            Mostrati {visibleTariffBooks.length} tariffari su {filteredTariffBooks.length}. Usa la
+            ricerca per restringere l'elenco.
+          </div>
+        ) : null}
       </div>
 
       {/* Metrics */}

@@ -2,10 +2,12 @@ import { m } from "framer-motion";
 import { Building2, ChevronDown, FileText, FolderKanban, Grid3x3 } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { MOTION_VARIANTS, motionDuration, motionEase } from "@/motion";
+import { StatusChip } from "@/components/shared/StatusChip";
 import type { StatusTone } from "@/components/shared/StatusBadge";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { SAL_STATUS_LABELS, SAL_STATUS_TONE_KEYS } from "@/lib/sal-status";
 
 type SalNode = {
   amount: number;
@@ -456,37 +458,13 @@ function SalGraphLeaf({ isLast, sal }: { isLast: boolean; sal: SalNode }) {
 
 /* ─── Status pill ─── */
 
-const SAL_STATUS_TONES: Record<string, string> = {
-  success: "bg-[var(--success-soft)] text-[var(--success-base)]",
-  info: "bg-[var(--info-soft)] text-[var(--info-base)]",
-  warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-  danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-};
-
-const SAL_STATUS_LABELS: Record<string, string> = {
-  closed: "Approvata",
-  approved: "Approvata",
-  "in-review": "Revisione",
-  draft: "Bozza",
-};
-
 function SalStatusPill({ status }: { status: string }) {
-  const tone =
-    status === "closed" || status === "approved"
-      ? "success"
-      : status === "in-review"
-        ? "info"
-        : "warning";
+  const tone = SAL_STATUS_TONE_KEYS[status] ?? "warning";
 
   return (
-    <span
-      className={cn(
-        "shrink-0 rounded-full px-1.5 py-0.5 text-9px font-semibold",
-        SAL_STATUS_TONES[tone] || SAL_STATUS_TONES.warning,
-      )}
-    >
+    <StatusChip size="sm" tone={tone}>
       {SAL_STATUS_LABELS[status] || status}
-    </span>
+    </StatusChip>
   );
 }
 

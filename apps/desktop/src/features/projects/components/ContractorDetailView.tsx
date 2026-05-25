@@ -10,6 +10,7 @@ import { FilterSearch } from "@/components/filters";
 import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { MetricCard } from "@/components/shared/MetricCard";
+import { Panel } from "@/components/shared/Panel";
 import type {
   ActivityItem,
   ApprovalItem,
@@ -21,7 +22,7 @@ import type {
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { ControlRailPanel } from "./ControlRailPanel";
 import { ProjectsWorkbench } from "./ProjectsWorkbench";
-import { BezelSurface, CompactRail, FocusChip } from "./workspace-ui";
+import { CompactRail, FocusChip } from "./workspace-ui";
 
 type FocusOption = {
   label: string;
@@ -151,7 +152,7 @@ export function ContractorDetailView({
           </div>
         </div>
 
-        <BezelSurface className="self-start md:translate-y-2" innerClassName="p-5">
+        <Panel className="self-start md:translate-y-2" padding="lg">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
@@ -173,7 +174,7 @@ export function ContractorDetailView({
               Appaltatori
             </Button>
           </div>
-        </BezelSurface>
+        </Panel>
       </section>
 
       <section className="mt-3 grid gap-4 2xl:grid-cols-[3fr_1fr]">

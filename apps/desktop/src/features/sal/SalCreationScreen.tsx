@@ -1,13 +1,23 @@
-import { CheckCircle2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import type { SalDocument } from "@/features/sal/types";
+import { CheckCircle2, Receipt, WalletCards } from "lucide-react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/shared/Button";
+import { MetricCard } from "@/components/shared/MetricCard";
 import { useToast } from "@/components/shared/ToastProvider";
 import {
   savePdfAs,
   saveWorkbookAs,
   waitForUiPaint,
 } from "@/features/projects/utils/projects-helpers";
+import type { SalDocument } from "@/features/sal/types";
+import { useActionHandler } from "@/hooks/useAction";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   confirmSalTransaction,
@@ -15,16 +25,13 @@ import {
   saveSalProject,
   updateSalDocument as updateBackendSalDocument,
 } from "@/lib/sal-data";
-import { cn } from "@/lib/utils";
 import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowService } from "@/services/sal-service";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import type { SalTemplate } from "@/store/template-store";
-import { SalHeader } from "./components/SalHeader";
-import { SalSearchBar } from "./components/SalSearchBar";
 import { SaveAsTemplateDialog } from "./components/SaveAsTemplateDialog";
-import { defaultSalEconomicRules, isMgCode } from "./domain/sal-calculations";
+import { defaultSalEconomicRules } from "./domain/sal-calculations";
 import {
   clearSalCreationDraft,
   clearSalCreationDraftBySalId,
@@ -37,8 +44,13 @@ import { useSalCreationData } from "./hooks/useSalCreationData";
 import { useSalDerivedViews } from "./hooks/useSalDerivedViews";
 import { useSalDraftAutosave } from "./hooks/useSalDraftAutosave";
 import { useSalLineActions } from "./hooks/useSalLineActions";
+import { SalWorkspace } from "./SalWorkspace";
 import { PHASE_ORDER, salFormReducer, surchargeKindFromPercent } from "./state/sal-form-state";
 import { getNextPhase, type SalWorkflowPhase } from "./state/workflow";
+import { ConfirmStep } from "./steps/ConfirmStep";
+import { MeasureStep } from "./steps/MeasureStep";
+import { ProjectStep } from "./steps/ProjectStep";
+import { VerifyStep } from "./steps/VerifyStep";
 import type {
   SalEconomicRules,
   SalEconomicSummary,
@@ -48,15 +60,10 @@ import type {
   SalProjectContext,
   SalTariffBookOption,
   SalTariffVoice,
-  SalVoiceDraft,
   SalVerificationCheck,
+  SalVoiceDraft,
 } from "./types";
 import { createMeasurementId } from "./types";
-
-import { ProjectStep } from "./steps/ProjectStep";
-import { MeasureStep } from "./steps/MeasureStep";
-import { VerifyStep } from "./steps/VerifyStep";
-import { ConfirmStep } from "./steps/ConfirmStep";
 
 const CREATED_FLAG_KEY = SESSION_STORAGE_KEYS.salCreated;
 
@@ -152,7 +159,10 @@ export function SalCreationScreen() {
   const setPhase = useCallback(
     (updater: SalWorkflowPhase | ((prev: SalWorkflowPhase) => SalWorkflowPhase)) => {
       const prev = formStateRef.current.phase;
-      dispatch({ type: "PHASE", phase: typeof updater === "function" ? updater(prev) : updater });
+      const nextPhase = typeof updater === "function" ? updater(prev) : updater;
+      startTransition(() => {
+        dispatch({ type: "PHASE", phase: nextPhase });
+      });
     },
     [],
   );
@@ -268,6 +278,7 @@ export function SalCreationScreen() {
     [data.selectedTariffBooks],
   );
 
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [compareLines, setCompareLines] = useState<SalLineView[] | null>(null);
@@ -939,129 +950,118 @@ export function SalCreationScreen() {
     useAppStore.getState().setSalToolbar(toolbarConfig);
   }, [toolbarConfig]);
 
-  const headerCockpit = useMemo(
-    () => ({
-      budgetResidual: summary.budgetResidual,
-      checks,
-      incompleteCount: lineViews.filter(
-        (line) => !isMgCode(line.voice.code) && line.status !== "complete",
-      ).length,
-      voiceCount: lineViews.filter((line) => !isMgCode(line.voice.code)).length,
-    }),
-    [checks, lineViews, summary.budgetResidual],
+  const handleSaveDraftRef = useRef(handleSaveDraft);
+  handleSaveDraftRef.current = handleSaveDraft;
+  const goPrimaryRef = useRef(goPrimary);
+  goPrimaryRef.current = goPrimary;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+
+  useActionHandler(
+    "sal.saveDraft",
+    useCallback(() => {
+      if (phaseRef.current === "completed") return;
+      handleSaveDraftRef.current();
+    }, []),
   );
 
-  const actionHandlersRef = useRef({ goPrimary, handleSaveDraft, phase });
-  actionHandlersRef.current = { goPrimary, handleSaveDraft, phase };
-
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const actionId = (event as CustomEvent<string>).detail;
-      const { goPrimary, handleSaveDraft, phase } = actionHandlersRef.current;
-      if (phase === "completed") return;
-      if (actionId === "sal-save-draft") {
-        handleSaveDraft();
-        return;
-      }
-      if (actionId === "sal-confirm") {
-        goPrimary();
-      }
-    };
-    window.addEventListener("sal-create-action", handler);
-    return () => window.removeEventListener("sal-create-action", handler);
-  }, []);
+  useActionHandler(
+    "sal.confirm",
+    useCallback(() => {
+      if (phaseRef.current === "completed") return;
+      goPrimaryRef.current();
+    }, []),
+  );
 
   return (
-    <div className="flex h-[calc(100dvh-48px)] flex-col">
-      <SalHeader
+    <>
+      <SalWorkspace
         phase={phase}
+        onPhaseChange={handlePhaseChange}
         salTitle={salTitle}
         suggestedSalTitle={suggestedSalTitle}
         projectTitle={data.project?.title ?? null}
+        contractor={data.project?.contractor ?? null}
         total={summary.total}
-        cockpit={headerCockpit}
+        summary={summary}
         canContinue={canContinue}
         primaryDisabledReason={currentDisabledReason}
         onPrimary={goPrimary}
         onSaveDraft={handleSaveDraft}
-        onPhaseChange={handlePhaseChange}
-        searchBar={
-          <div className={cn(phase !== "measure" && "hidden")}>
-            <SalSearchBar
-              voices={data.voices}
-              tariffBookIds={selectedTariffBookIds}
-              linesCount={lines.length}
+        onExportPdf={handleExportSalPdf}
+        onExportExcel={handleExportSalExcel}
+        selectedLineId={selectedLineId}
+        onSelectLine={setSelectedLineId}
+        lineViews={lineViews}
+        economicRules={economicRules}
+        checks={checks}
+      >
+        {/* Project phase */}
+        {phase === "project" && (
+          <>
+            {data.error && (
+              <div className="mb-4 rounded-xl border border-[var(--danger-base)]/20 bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)]">
+                {data.error}
+              </div>
+            )}
+            <ProjectStep
+              contracts={data.contracts}
+              onSelectContract={data.setContract}
+              project={data.project}
+              salDate={salDate}
+              salTitle={salTitle}
+              suggestedSalTitle={suggestedSalTitle}
+              selectedTariffBooks={data.selectedTariffBooks}
+              selectedTariffBook={data.selectedTariffBook}
+              selectTariffBook={data.selectTariffBook}
+              setSelectedTariffBookIds={data.setSelectedTariffBookIds}
               isLoading={data.isLoading}
-              onSelectVoice={(voice) => {
-                const exists = lines.some((l) => l.voice.id === voice.id);
-                if (exists) addVoiceAsNewLine(voice);
-                else upsertLine(voice);
-              }}
-              onApplyTemplate={handleApplyTemplate}
-              onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
+              setSalDate={setSalDate}
+              setSalTitle={setSalTitle}
+              summary={summary}
+              tariffBooks={data.tariffBookOptions}
+              voicesCount={data.voices.length}
             />
-          </div>
-        }
-      />
+          </>
+        )}
 
-      <div className="relative flex-1 min-h-0">
-        {/* Tutte le fasi sono sempre montate, toggle display:none per preservare DOM e stato */}
-        <div className={cn("h-full min-h-0 overflow-hidden", phase !== "measure" && "hidden")}>
-          <MeasureStep
-            economicRules={economicRules}
-            lineViews={lineViews}
-            voices={data.voices}
-            isLoading={data.isLoading}
-            onAllocateMg={handleAllocateMg}
-            onAddMgVoice={handleAddMgVoice}
-            onAddMeasurementRow={addMeasurementRow}
-            onDuplicateMeasurementRow={duplicateMeasurementRow}
-            onRemoveMeasurementRow={removeMeasurementRow}
-            onUpdateMeasurementRow={updateMeasurementRow}
-            onRemove={removeLine}
-            onNotesChange={setNotes}
-            onSurcharge={setSurcharge}
-            onPasteLine={handlePasteLine}
-          />
-        </div>
-
-        <div
-          className={cn(
-            "h-full min-h-0 overflow-y-auto p-4 lg:p-6",
-            phase !== "project" && "hidden",
-          )}
-        >
-          {data.error && (
-            <div className="mb-4 rounded-xl border border-[var(--danger-base)]/20 bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)]">
-              {data.error}
+        {/* Measure phase */}
+        {phase === "measure" && (
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="min-h-0 flex-1">
+              <MeasureStep
+                economicRules={economicRules}
+                lineViews={lineViews}
+                voices={data.voices}
+                isLoading={data.isLoading}
+                isActive
+                tariffBookIds={selectedTariffBookIds}
+                onAllocateMg={handleAllocateMg}
+                onAddMgVoice={handleAddMgVoice}
+                onAddMeasurementRow={addMeasurementRow}
+                onDuplicateMeasurementRow={duplicateMeasurementRow}
+                onRemoveMeasurementRow={removeMeasurementRow}
+                onUpdateMeasurementRow={updateMeasurementRow}
+                onRemove={removeLine}
+                onNotesChange={setNotes}
+                onSurcharge={setSurcharge}
+                onPasteLine={handlePasteLine}
+                selectedLineId={selectedLineId}
+                onSelectLine={setSelectedLineId}
+                onSearchSelectVoice={(voice) => {
+                  const exists = lines.some((l) => l.voice.id === voice.id);
+                  if (exists) addVoiceAsNewLine(voice);
+                  else upsertLine(voice);
+                }}
+                onApplyTemplate={handleApplyTemplate}
+                onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
+              />
             </div>
-          )}
-          <ProjectStep
-            contracts={data.contracts}
-            onSelectContract={data.setContract}
-            project={data.project}
-            salDate={salDate}
-            salTitle={salTitle}
-            suggestedSalTitle={suggestedSalTitle}
-            selectedTariffBooks={data.selectedTariffBooks}
-            selectedTariffBook={data.selectedTariffBook}
-            selectTariffBook={data.selectTariffBook}
-            setSelectedTariffBookIds={data.setSelectedTariffBookIds}
-            isLoading={data.isLoading}
-            setSalDate={setSalDate}
-            setSalTitle={setSalTitle}
-            summary={summary}
-            tariffBooks={data.tariffBookOptions}
-            voicesCount={data.voices.length}
-          />
-        </div>
+          </div>
+        )}
 
-        <div
-          className={cn(
-            "h-full min-h-0 overflow-y-auto p-4 lg:p-6",
-            phase !== "verify" && "hidden",
-          )}
-        >
+        {/* Verify phase */}
+        {phase === "verify" && (
           <VerifyStep
             checks={checks}
             economicRules={economicRules}
@@ -1078,14 +1078,10 @@ export function SalCreationScreen() {
             compareLines={compareLines}
             onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
           />
-        </div>
+        )}
 
-        <div
-          className={cn(
-            "h-full min-h-0 overflow-y-auto p-4 lg:p-6",
-            phase !== "confirm" && "hidden",
-          )}
-        >
+        {/* Confirm phase */}
+        {phase === "confirm" && (
           <ConfirmStep
             economicRules={economicRules}
             lineViews={lineViews}
@@ -1095,14 +1091,10 @@ export function SalCreationScreen() {
             onPrintAccounting={handlePrintAccounting}
             summary={summary}
           />
-        </div>
+        )}
 
-        <div
-          className={cn(
-            "h-full min-h-0 overflow-y-auto p-4 lg:p-6",
-            phase !== "completed" && "hidden",
-          )}
-        >
+        {/* Completed view */}
+        {phase === "completed" && (
           <CompletedView
             createdSalTitle={createdSalTitle}
             onClose={() => {
@@ -1122,8 +1114,8 @@ export function SalCreationScreen() {
             }}
             summary={summary}
           />
-        </div>
-      </div>
+        )}
+      </SalWorkspace>
 
       {isTemplateDialogOpen && (
         <SaveAsTemplateDialog
@@ -1142,7 +1134,7 @@ export function SalCreationScreen() {
           })}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -1282,13 +1274,26 @@ function CompletedView({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard label="Totale SAL" value={<Currency value={summary.total} />} accent />
         <MetricCard
-          label="Budget residuo"
-          value={<Currency value={summary.budgetResidual} />}
-          tone={summary.budgetResidual >= 0 ? "success" : "danger"}
+          caption="Importo complessivo della revisione"
+          icon={Receipt}
+          label="Totale SAL"
+          tone="info"
+          value={<Currency value={summary.total} />}
         />
-        <MetricCard label="Stato" value="Confermata" />
+        <MetricCard
+          caption="Differenza tra budget e importo SAL"
+          icon={WalletCards}
+          label="Budget residuo"
+          tone={summary.budgetResidual >= 0 ? "success" : "danger"}
+          value={<Currency value={summary.budgetResidual} />}
+        />
+        <MetricCard
+          caption="La revisione è stata generata"
+          icon={CheckCircle2}
+          label="Stato"
+          value="Confermata"
+        />
       </div>
 
       <div className="flex justify-end gap-2">
@@ -1302,38 +1307,6 @@ function CompletedView({
     </div>
   );
 }
-
-function MetricCard({
-  label,
-  value,
-  accent,
-  tone,
-}: {
-  label: string;
-  value: React.ReactNode;
-  accent?: boolean;
-  tone?: "success" | "danger";
-}) {
-  return (
-    <div className="rounded-xl bg-[var(--surface-base)] p-5 ring-1 ring-[var(--border-subtle)]/50">
-      <div className="text-10px font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
-        {label}
-      </div>
-      <div
-        className={cn(
-          "mt-1 text-22px font-bold leading-none",
-          accent && "text-[var(--accent-primary)]",
-          tone === "success" && "text-[var(--success-base)]",
-          tone === "danger" && "text-[var(--danger-base)]",
-          !accent && !tone && "text-[var(--text-primary)]",
-        )}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function Currency({ value }: { value: number }) {
   return (
     <span className="tabular-nums">

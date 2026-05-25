@@ -16,16 +16,16 @@ import {
   Sparkle,
   Trash,
   WaveSine,
-  WarningCircle,
 } from "@phosphor-icons/react";
 import { m } from "framer-motion";
 import { useCallback, useEffect, useReducer, useState } from "react";
+import { AlertBanner } from "@/components/shared/AlertBanner";
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
+import { Panel } from "@/components/shared/Panel";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface } from "@/components/shared/ui-primitives";
 import { APP_VERSION } from "@/generated/appVersion";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
 import {
@@ -125,7 +125,7 @@ function ThemeCard() {
     setDarkThemePref,
   } = useThemeState();
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
           <Palette className="size-5" weight="light" />
@@ -329,14 +329,14 @@ function ThemeCard() {
           ))}
         </div>
       </div>
-    </BezelSurface>
+    </Panel>
   );
 }
 
 function MotionCard() {
   const { motionMode, setMotionMode } = usePreferenceState();
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
           <WaveSine className="size-5" weight="light" />
@@ -367,7 +367,7 @@ function MotionCard() {
           onClick={() => setMotionMode("reduced")}
         />
       </div>
-    </BezelSurface>
+    </Panel>
   );
 }
 
@@ -382,7 +382,7 @@ function UpdateCheckCard({
 }) {
   const releaseStatus = getReleaseStatus(updateState);
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="flex items-center gap-3">
         <span
           className={cn(
@@ -443,7 +443,7 @@ function UpdateCheckCard({
           Ultimo controllo {formatTimestamp(releaseStatus.checkedAt)}
         </div>
       ) : null}
-    </BezelSurface>
+    </Panel>
   );
 }
 
@@ -475,7 +475,7 @@ function BackupRestoreCard({
   onTogglePassphraseText: () => void;
 }) {
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
           <FloppyDisk className="size-5" weight="light" />
@@ -492,7 +492,7 @@ function BackupRestoreCard({
       <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
         Crea un backup completo del database o ripristina da un file .qbk esistente.
       </p>
-      {dbInfoError ? <DatabaseInfoWarning message={dbInfoError} /> : null}
+      {dbInfoError ? <AlertBanner title={dbInfoError} tone="warning" /> : null}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
           <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
@@ -588,7 +588,7 @@ function BackupRestoreCard({
           {backupResult}
         </div>
       ) : null}
-    </BezelSurface>
+    </Panel>
   );
 }
 
@@ -606,7 +606,7 @@ function IntegrityCheckCard({
   onIntegrityCheck: () => void;
 }) {
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
           <ShieldCheck className="size-5" weight="light" />
@@ -623,7 +623,7 @@ function IntegrityCheckCard({
       <p className="mt-2 text-12px leading-5 text-[var(--text-secondary)]">
         Controlla lo stato del database locale, dimensione e accessibilita dei dati.
       </p>
-      {dbInfoError ? <DatabaseInfoWarning message={dbInfoError} /> : null}
+      {dbInfoError ? <AlertBanner title={dbInfoError} tone="warning" /> : null}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-[var(--bg-muted)] px-3 py-2.5 ring-1 ring-[var(--border-subtle)]">
           <div className="text-10px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
@@ -675,23 +675,14 @@ function IntegrityCheckCard({
           {integrityResult}
         </div>
       ) : null}
-    </BezelSurface>
-  );
-}
-
-function DatabaseInfoWarning({ message }: { message: string }) {
-  return (
-    <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--warning-soft)] px-3 py-2 text-12px font-medium text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20">
-      <WarningCircle className="mt-0.5 size-3.5 shrink-0" weight="bold" />
-      <span>Info database non disponibile: {message}</span>
-    </div>
+    </Panel>
   );
 }
 
 function BuildInfoCard() {
   const { pendingReleaseNotes } = usePendingReleaseNotes();
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
           <GitBranch className="size-5" weight="light" />
@@ -727,7 +718,7 @@ function BuildInfoCard() {
           </div>
         ) : null}
       </div>
-    </BezelSurface>
+    </Panel>
   );
 }
 
@@ -739,7 +730,7 @@ function ReleaseRulesCard() {
     showReleaseNotesAfterUpdate,
   } = usePreferenceState();
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
           <BellRinging className="size-5" weight="light" />
@@ -767,14 +758,14 @@ function ReleaseRulesCard() {
           onChange={setShowReleaseNotesAfterUpdate}
         />
       </div>
-    </BezelSurface>
+    </Panel>
   );
 }
 
 function AuditLogCard() {
   const auditEntries = useAuditLogStore((state) => state.entries);
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="flex items-center gap-3">
         <span
           className={cn(
@@ -828,7 +819,7 @@ function AuditLogCard() {
           Cancella registro
         </Button>
       ) : null}
-    </BezelSurface>
+    </Panel>
   );
 }
 
@@ -1027,7 +1018,7 @@ export function SettingsScreen() {
         }
       />
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="operational-card-grid mt-8 lg:grid-cols-2 xl:grid-cols-3">
         <ThemeCard />
         <MotionCard />
         <UpdateCheckCard
@@ -1037,7 +1028,7 @@ export function SettingsScreen() {
         />
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+      <div className="operational-card-grid mt-5 lg:grid-cols-2">
         <BackupRestoreCard
           dbInfo={dbInfo}
           dbInfoError={dbInfoError}
@@ -1061,7 +1052,7 @@ export function SettingsScreen() {
         />
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="operational-card-grid mt-5 lg:grid-cols-2 xl:grid-cols-3">
         <BuildInfoCard />
         <ReleaseRulesCard />
         <AuditLogCard />

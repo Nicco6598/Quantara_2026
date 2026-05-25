@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { buildSpendingTrend } from "./chart-helpers";
+import { buildCalendarAxisTicks, buildSpendingTrend } from "./chart-helpers";
 import { UplotChart } from "./UplotChart";
 import { useChartColors } from "./useChartColors";
 
@@ -11,60 +11,6 @@ type SpendingTrendProps = {
   views: Array<{ date: string; closedAt?: string; total: number }>;
   contractualAmount: number;
 };
-
-function toDayStart(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function toTimestamp(date: Date) {
-  return Math.floor(date.getTime() / 1000);
-}
-
-function buildCalendarAxisTicks(dates: number[]) {
-  if (dates.length === 0) {
-    return { dateTicks: [] as number[], monthTicks: [] as Array<{ ts: number; label: string }> };
-  }
-
-  const first = toDayStart(new Date((dates[0] as number) * 1000));
-  const last = toDayStart(new Date((dates[dates.length - 1] as number) * 1000));
-  const firstYear = first.getFullYear();
-  const firstMonth = first.getMonth();
-  const lastYear = last.getFullYear();
-  const lastMonth = last.getMonth();
-  const rangeMonths = (lastYear - firstYear) * 12 + lastMonth - firstMonth + 1;
-  const rangeDays = Math.max(1, Math.ceil((toTimestamp(last) - toTimestamp(first)) / 86400));
-  const mondayStep = rangeDays > 220 ? 4 : rangeDays > 120 ? 2 : 1;
-
-  const dateTickSet = new Set<number>();
-  const monthTicks: Array<{ ts: number; label: string }> = [];
-
-  for (let i = 0; i < rangeMonths; i++) {
-    const monthStart = toDayStart(new Date(firstYear, firstMonth + i, 1));
-    const monthMarker = i === 0 && monthStart < first ? first : monthStart;
-    if (monthMarker >= first && monthMarker <= last) {
-      monthTicks.push({
-        label: monthStart.toLocaleDateString("it-IT", { month: "short" }).toUpperCase(),
-        ts: toTimestamp(monthMarker),
-      });
-    }
-
-    const monday = new Date(monthStart);
-    monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7));
-    let mondayIndex = 0;
-    while (monday.getMonth() === monthStart.getMonth()) {
-      if (monday >= first && monday <= last && mondayIndex % mondayStep === 0) {
-        dateTickSet.add(toTimestamp(monday));
-      }
-      mondayIndex++;
-      monday.setDate(monday.getDate() + 7);
-    }
-  }
-
-  return {
-    dateTicks: [...dateTickSet].sort((left, right) => left - right),
-    monthTicks,
-  };
-}
 
 function buildPreCumulative(
   all: Array<{ date: string; closedAt?: string; total: number }>,

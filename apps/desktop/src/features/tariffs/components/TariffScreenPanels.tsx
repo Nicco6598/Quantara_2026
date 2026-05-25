@@ -9,22 +9,22 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import type { Dispatch, ReactNode, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useRef, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
+import { DetailList, DetailRow } from "@/components/shared/DetailList";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
-import { BezelSurface } from "@/components/shared/ui-primitives";
-import { MOTION_VARIANTS } from "@/motion";
 import type { DesktopTariffBook, TariffPdfMetadata } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
+import { MOTION_VARIANTS } from "@/motion";
+import type { EditTariffBookForm } from "../tariffs-types";
 import { TariffEditField } from "./TariffEditField";
 import {
   TariffImportPreviewModal,
   type TariffImportPreviewResult,
 } from "./TariffImportPreviewModal";
-import type { EditTariffBookForm } from "../tariffs-types";
 
 export function TariffBookPreviewCard({
   book,
@@ -72,10 +72,10 @@ export function TariffBookPreviewCard({
   return (
     <m.article
       className={cn(
-        "relative rounded-14px border p-3 text-left transition-colors duration-[var(--duration-fast)]",
+        "operational-card-hover relative rounded-[18px] border p-3 text-left",
         isSelected
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
-          : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
+          : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
       )}
       initial={MOTION_VARIANTS.row.initial}
       transition={MOTION_VARIANTS.row.transition}
@@ -266,20 +266,19 @@ export function TariffBookPreviewCard({
             initial={MOTION_VARIANTS.viewSwap.initial}
             transition={MOTION_VARIANTS.viewSwap.transition}
           >
-            <div className="grid gap-2 text-12px font-medium text-[var(--text-secondary)]">
-              <DetailLine label="ID" value={book.id} />
-              <DetailLine label="Ente" value={book.sourceName} />
-              <DetailLine label="Stato" value={book.status} />
-              <DetailLine label="Progetti collegati" value={`${linkedProjectCount}`} />
-              <DetailLine label="Sottovoci" value={displayVoiceCount} />
-            </div>
+            <DetailList>
+              <DetailRow label="ID" value={book.id} />
+              <DetailRow label="Ente" value={book.sourceName} />
+              <DetailRow label="Stato" value={book.status} />
+              <DetailRow label="Progetti collegati" value={`${linkedProjectCount}`} />
+              <DetailRow label="Sottovoci" value={displayVoiceCount} />
+            </DetailList>
           </m.div>
         ) : null}
       </div>
     </m.article>
   );
 }
-
 export function TariffImportPreviewPanel({
   draftedImportFiles,
   getExistingBookIds,
@@ -366,31 +365,6 @@ export function TariffImportPreviewPanel({
           pageView
         />
       </div>
-    </div>
-  );
-}
-
-function DetailLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid grid-cols-[112px_minmax(0,1fr)] items-baseline gap-3">
-      <span className="text-10px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
-        {label}
-      </span>
-      <span className="truncate text-right text-12px font-semibold text-[var(--text-primary)]">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-export function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return <BezelSurface innerClassName={cn("p-4", className)}>{children}</BezelSurface>;
-}
-
-export function PanelTitle({ children }: { children: string }) {
-  return (
-    <div className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-      {children}
     </div>
   );
 }

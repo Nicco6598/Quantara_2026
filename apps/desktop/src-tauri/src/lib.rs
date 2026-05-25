@@ -54,7 +54,18 @@ pub fn run() {
                     .build()?;
             }
 
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(target_os = "windows")]
+            {
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                    .title("Quantara")
+                    .inner_size(1440.0, 900.0)
+                    .min_inner_size(1180.0, 720.0)
+                    .maximized(true)
+                    .decorations(false)
+                    .build()?;
+            }
+
+            #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
             {
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                     .title("Quantara")

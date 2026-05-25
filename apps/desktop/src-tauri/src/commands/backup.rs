@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 
 use crate::infrastructure::local_storage::{
-    get_app_data_dir, get_database_path, reopen_connection, DbConnection,
+    DbConnection, get_app_data_dir, get_database_path, reopen_connection,
 };
 
 fn default_format_version() -> u32 {
@@ -55,18 +55,14 @@ fn sha256_hex(data: &[u8]) -> String {
 /// Open the database, force a full WAL checkpoint, then export a consistent
 /// snapshot via VACUUM INTO.
 fn create_consistent_snapshot(db_path: &Path, temp_dir: &Path) -> Result<PathBuf, String> {
-    let conn =
-        Connection::open(db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
+    let conn = Connection::open(db_path).map_err(|e| format!("Failed to open DB: {}", e))?;
 
     conn.execute_batch("PRAGMA wal_checkpoint(FULL);")
         .map_err(|e| format!("WAL checkpoint failed: {}", e))?;
 
     let temp_path = temp_dir.join("quantara_snapshot.sqlite3");
-    conn.execute(
-        "VACUUM INTO ?1",
-        [temp_path.to_string_lossy().as_ref()],
-    )
-    .map_err(|e| format!("VACUUM INTO failed: {}", e))?;
+    conn.execute("VACUUM INTO ?1", [temp_path.to_string_lossy().as_ref()])
+        .map_err(|e| format!("VACUUM INTO failed: {}", e))?;
 
     Ok(temp_path)
 }
@@ -78,8 +74,7 @@ fn create_temp_dir() -> Result<PathBuf, String> {
         .unwrap_or_default()
         .as_nanos() as u64;
     temp.push(format!("quantara_backup_{}", suffix));
-    std::fs::create_dir_all(&temp)
-        .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+    std::fs::create_dir_all(&temp).map_err(|e| format!("Failed to create temp dir: {}", e))?;
     Ok(temp)
 }
 
@@ -271,9 +266,7 @@ pub fn backup_database_encrypted(
     output
         .write_all(metadata_json.as_bytes())
         .map_err(to_error)?;
-    output
-        .write_all(&ls_len.to_le_bytes())
-        .map_err(to_error)?;
+    output.write_all(&ls_len.to_le_bytes()).map_err(to_error)?;
     output.write_all(&encrypted_ls).map_err(to_error)?;
     output.write_all(&encrypted_db).map_err(to_error)?;
 
@@ -342,12 +335,10 @@ pub fn restore_database_encrypted(
         return Err("il file di backup non contiene dati del database".to_string());
     }
 
-    let ls_bytes =
-        crate::infrastructure::encryption::decrypt_data(&key, &encrypted_ls)
-            .map_err(|e| format!("errore decifratura localStorage: {e}"))?;
-    let db_bytes =
-        crate::infrastructure::encryption::decrypt_data(&key, &encrypted_db)
-            .map_err(|e| format!("errore decifratura database: {e}"))?;
+    let ls_bytes = crate::infrastructure::encryption::decrypt_data(&key, &encrypted_ls)
+        .map_err(|e| format!("errore decifratura localStorage: {e}"))?;
+    let db_bytes = crate::infrastructure::encryption::decrypt_data(&key, &encrypted_db)
+        .map_err(|e| format!("errore decifratura database: {e}"))?;
 
     let localstorage_json =
         String::from_utf8(ls_bytes).map_err(|e| format!("localstorage non valido: {e}"))?;
@@ -449,7 +440,9 @@ fn hex_decode(hex: &str) -> Result<Vec<u8>, String> {
     }
     (0..hex.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).map_err(|e| format!("hex decode error: {e}")))
+        .map(|i| {
+            u8::from_str_radix(&hex[i..i + 2], 16).map_err(|e| format!("hex decode error: {e}"))
+        })
         .collect()
 }
 

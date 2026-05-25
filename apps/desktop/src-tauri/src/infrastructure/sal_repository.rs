@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
 use crate::infrastructure::to_database_error;
@@ -22,9 +22,8 @@ pub fn list_sal_projects(connection: &Connection) -> Result<Vec<SalBackednProjec
     let rows = statement
         .query_map([], |row| {
             let json: String = row.get(0)?;
-            serde_json::from_str::<SalBackednProject>(&json).map_err(|e| {
-                rusqlite::Error::ToSqlConversionFailure(Box::new(e))
-            })
+            serde_json::from_str::<SalBackednProject>(&json)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .map_err(to_database_error)?
         .collect::<Result<Vec<_>, _>>()
@@ -37,8 +36,7 @@ pub fn upsert_sal_project(
     connection: &mut Connection,
     project: &SalBackednProject,
 ) -> Result<(), AppError> {
-    let json =
-        serde_json::to_string(project).map_err(|e| AppError::Serde(e.to_string()))?;
+    let json = serde_json::to_string(project).map_err(|e| AppError::Serde(e.to_string()))?;
 
     connection
         .execute(
@@ -49,5 +47,3 @@ pub fn upsert_sal_project(
 
     Ok(())
 }
-
-

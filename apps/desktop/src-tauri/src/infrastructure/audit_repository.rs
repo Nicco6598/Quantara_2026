@@ -35,7 +35,14 @@ pub fn append_event(
     conn.execute(
         "INSERT INTO audit_events (id, entity_type, entity_id, action, actor_id, payload)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![id, entity_type, entity_id, action, effective_actor_id, payload_json],
+        rusqlite::params![
+            id,
+            entity_type,
+            entity_id,
+            action,
+            effective_actor_id,
+            payload_json
+        ],
     )
     .map_err(to_database_error)?;
 
@@ -71,8 +78,18 @@ mod tests {
     fn test_append_event() {
         let conn = Connection::open_in_memory().unwrap();
         setup_schema(&conn);
-        append_event(&conn, "sal", "sal_123", "confirm", Some("test_member"), None).unwrap();
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM audit_events", [], |row| row.get(0)).unwrap();
+        append_event(
+            &conn,
+            "sal",
+            "sal_123",
+            "confirm",
+            Some("test_member"),
+            None,
+        )
+        .unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM audit_events", [], |row| row.get(0))
+            .unwrap();
         assert_eq!(count, 1);
     }
 
@@ -81,8 +98,20 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         setup_schema(&conn);
         let payload = json!({"id": "sal_123", "total": 5000.0});
-        append_event(&conn, "sal", "sal_123", "create", Some("test_member"), Some(&payload)).unwrap();
-        let stored: String = conn.query_row("SELECT payload FROM audit_events LIMIT 1", [], |row| row.get(0)).unwrap();
+        append_event(
+            &conn,
+            "sal",
+            "sal_123",
+            "create",
+            Some("test_member"),
+            Some(&payload),
+        )
+        .unwrap();
+        let stored: String = conn
+            .query_row("SELECT payload FROM audit_events LIMIT 1", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         assert!(stored.contains("sal_123"));
         assert!(stored.contains("5000"));
     }
@@ -92,7 +121,11 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         setup_schema(&conn);
         append_event(&conn, "material", "mat_001", "deduct", None, None).unwrap();
-        let actor: Option<String> = conn.query_row("SELECT actor_id FROM audit_events LIMIT 1", [], |row| row.get(0)).unwrap();
+        let actor: Option<String> = conn
+            .query_row("SELECT actor_id FROM audit_events LIMIT 1", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         assert!(actor.is_some());
         assert_eq!(actor.unwrap(), "test_member");
     }
@@ -104,7 +137,9 @@ mod tests {
         append_event(&conn, "sal", "s1", "create", None, None).unwrap();
         append_event(&conn, "sal", "s1", "update", None, None).unwrap();
         append_event(&conn, "sal", "s1", "delete", None, None).unwrap();
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM audit_events", [], |row| row.get(0)).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM audit_events", [], |row| row.get(0))
+            .unwrap();
         assert_eq!(count, 3);
     }
 
@@ -112,8 +147,20 @@ mod tests {
     fn test_explicit_actor_overrides_auto() {
         let conn = Connection::open_in_memory().unwrap();
         setup_schema(&conn);
-        append_event(&conn, "contract", "c_001", "create", Some("custom_actor"), None).unwrap();
-        let actor: String = conn.query_row("SELECT actor_id FROM audit_events LIMIT 1", [], |row| row.get(0)).unwrap();
+        append_event(
+            &conn,
+            "contract",
+            "c_001",
+            "create",
+            Some("custom_actor"),
+            None,
+        )
+        .unwrap();
+        let actor: String = conn
+            .query_row("SELECT actor_id FROM audit_events LIMIT 1", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         assert_eq!(actor, "custom_actor");
     }
 }

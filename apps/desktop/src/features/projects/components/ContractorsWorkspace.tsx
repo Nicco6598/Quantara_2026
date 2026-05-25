@@ -6,6 +6,7 @@ import {
   Building2,
   CheckCircle2,
   ClipboardList,
+  FolderKanban,
   HardHat,
   Layers3,
   ListTree,
@@ -20,13 +21,15 @@ import {
 import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { MOTION_VARIANTS } from "@/motion";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { MetricCard } from "@/components/shared/MetricCard";
-import type { StatusTone } from "@/components/shared/StatusBadge";
+import { Panel } from "@/components/shared/Panel";
+import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
+import { SAL_STATUS_LABELS, SAL_STATUS_TONE_KEYS } from "@/lib/sal-status";
 import { cn } from "@/lib/utils";
-import { BezelSurface } from "./workspace-ui";
+import { MOTION_VARIANTS } from "@/motion";
 
 type ContractorsWorkspaceProps = {
   activeProjectsCount: number;
@@ -210,7 +213,7 @@ function PortfolioSnapshot({
   watchedFolders: number;
 }) {
   return (
-    <BezelSurface className="self-start xl:translate-y-2" innerClassName="p-5">
+    <Panel className="self-start xl:translate-y-2" padding="lg">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
@@ -226,12 +229,13 @@ function PortfolioSnapshot({
       </div>
 
       <div className="mt-5 grid grid-cols-3 gap-2">
-        <SnapshotCell label="Cartelle" value={`${foldersCount}`} />
-        <SnapshotCell label="Progetti" value={`${activeProjectsCount}`} />
-        <SnapshotCell
+        <PortfolioSnapshotTile icon={FolderKanban} label="Cartelle" value={foldersCount} />
+        <PortfolioSnapshotTile icon={Layers3} label="Progetti" value={activeProjectsCount} />
+        <PortfolioSnapshotTile
+          icon={ShieldCheck}
           label="Presidio"
-          value={`${watchedFolders}`}
-          tone={watchedFolders > 0 ? "warning" : "success"}
+          tone={watchedFolders > 0 ? "warning" : "info"}
+          value={watchedFolders}
         />
       </div>
 
@@ -248,32 +252,41 @@ function PortfolioSnapshot({
           </div>
         </div>
       </div>
-    </BezelSurface>
+    </Panel>
   );
 }
 
-function SnapshotCell({
+function PortfolioSnapshotTile({
+  icon: Icon,
   label,
-  tone = "neutral",
+  tone = "info",
   value,
 }: {
+  icon: LucideIcon;
   label: string;
-  tone?: StatusTone;
-  value: string;
+  tone?: "info" | "warning";
+  value: number;
 }) {
   return (
-    <div className="rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2">
-      <div
-        className={cn(
-          "text-16px font-semibold leading-none tabular-nums",
-          tone === "warning" && "text-[var(--warning-base)]",
-          tone === "success" && "text-[var(--success-base)]",
-          tone === "neutral" && "text-[var(--text-primary)]",
-        )}
-      >
-        {value}
+    <div className="min-w-0 rounded-10px border border-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_86%,var(--bg-muted)_14%)] px-2.5 py-2.5">
+      <div className="flex items-center justify-between gap-1.5">
+        <span
+          className={cn(
+            "flex size-6 shrink-0 items-center justify-center rounded-8px",
+            tone === "warning"
+              ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+              : "bg-[var(--info-soft)] text-[var(--info-base)]",
+          )}
+        >
+          <Icon className="size-3.5" />
+        </span>
+        <span className="shrink-0 text-18px font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+          {value}
+        </span>
       </div>
-      <div className="mt-1 text-10px font-medium text-[var(--text-secondary)]">{label}</div>
+      <div className="mt-2 text-[10px] font-semibold leading-tight text-[var(--text-secondary)]">
+        {label}
+      </div>
     </div>
   );
 }
@@ -290,10 +303,13 @@ function WorkspaceRailCard({
   tone?: StatusTone;
 }) {
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div className="mb-4 flex items-center gap-3">
         <span
-          className={cn("flex size-8 items-center justify-center rounded-18px", toneSurface(tone))}
+          className={cn(
+            "flex size-8 items-center justify-center rounded-18px",
+            statusToneStyles[tone],
+          )}
         >
           <Icon className="size-4" />
         </span>
@@ -302,7 +318,7 @@ function WorkspaceRailCard({
         </h3>
       </div>
       {children}
-    </BezelSurface>
+    </Panel>
   );
 }
 
@@ -322,7 +338,7 @@ function InsightRow({
       <span
         className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-18px",
-          toneSurface(tone),
+          statusToneStyles[tone],
         )}
       >
         <Icon className="size-4" />
@@ -362,7 +378,7 @@ function ContractorFoldersPanel({
   }, [folders, query]);
 
   return (
-    <BezelSurface innerClassName="overflow-hidden p-0">
+    <Panel padding="none">
       <div className="flex flex-col gap-4 border-b border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] p-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -404,9 +420,19 @@ function ContractorFoldersPanel({
       </div>
 
       {folders.length === 0 ? (
-        <EmptyContractorsState onOpenCreateContractor={onOpenCreateContractor} />
+        <EmptyState
+          icon={Building2}
+          title="Vuoi aggiungere un nuovo appaltatore?"
+          description="Crea manualmente o importa da Excel per iniziare subito."
+          action={{ label: "Crea appaltatore", onClick: onOpenCreateContractor }}
+          className="px-4 py-8 xl:px-5"
+        />
       ) : filteredFolders.length === 0 ? (
-        <NoResultsState query={query} />
+        <EmptyState
+          icon={Search}
+          title="Nessuna cartella trovata"
+          description={`Nessun appaltatore corrisponde a "${query}".`}
+        />
       ) : (
         <m.div layout className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
           <AnimatePresence initial={false}>
@@ -436,23 +462,9 @@ function ContractorFoldersPanel({
           </span>
         </div>
       ) : null}
-    </BezelSurface>
+    </Panel>
   );
 }
-
-const SAL_STATUS_LABELS: Record<string, string> = {
-  approved: "Approvato",
-  closed: "Chiuso",
-  draft: "Bozza",
-  "in-review": "Revisione",
-};
-
-const SAL_STATUS_TONES: Record<string, string> = {
-  approved: "text-[var(--success-base)]",
-  closed: "text-[var(--success-base)]",
-  draft: "text-[var(--text-tertiary)]",
-  "in-review": "text-[var(--info-base)]",
-};
 
 function formatRecentDate(dateStr: string): string {
   const now = new Date();
@@ -480,11 +492,11 @@ function ContractorCard({
   const budgetLabel = formatMoney({ amount: folder.budget, currency: "EUR" });
 
   return (
-    <div className="group relative rounded-[30px] bg-[color-mix(in_srgb,var(--border-subtle)_52%,transparent)] p-[2px] shadow-[0_16px_42px_color-mix(in_srgb,var(--text-primary)_5%,transparent)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_24px_56px_color-mix(in_srgb,var(--text-primary)_12%,transparent)] motion-safe:active:scale-[0.99]">
+    <div className="group relative rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-[0_1px_2px_color-mix(in_srgb,var(--text-primary)_4%,transparent)] transition-[border-color,background-color,box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-safe:hover:-translate-y-1 motion-safe:hover:border-[color-mix(in_srgb,var(--accent-primary)_26%,var(--border-subtle))] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] motion-safe:hover:shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_7%,transparent)] motion-safe:active:translate-y-0 motion-safe:active:scale-[0.995]">
       <m.article
         layout
         animate={MOTION_VARIANTS.card.whileInView}
-        className="relative overflow-hidden rounded-[28px] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]"
+        className="relative overflow-hidden rounded-[17px] ring-1 ring-inset ring-[color-mix(in_srgb,var(--surface-highlight)_34%,transparent)]"
         exit={{ opacity: 0, scale: 0.994, y: 10 }}
         initial={MOTION_VARIANTS.card.initial}
         transition={MOTION_VARIANTS.card.transition}
@@ -495,7 +507,7 @@ function ContractorCard({
 
         <button
           aria-label={`Apri ${folder.contractor}`}
-          className="relative z-10 flex w-full flex-col p-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+          className="relative z-10 flex w-full flex-col p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
           onClick={() => onOpenFolder(folder.id)}
           type="button"
         >
@@ -518,41 +530,45 @@ function ContractorCard({
             <span
               className={cn(
                 "mt-1 shrink-0 rounded-full px-2.5 py-0.5 text-10px font-semibold tracking-[-0.01em]",
-                toneSurface(health.tone),
+                statusToneStyles[health.tone],
               )}
             >
               {health.label}
             </span>
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            <CockpitMetric icon={TrendingUp} label="Budget" value={budgetLabel} />
-            <CockpitMetric icon={Layers3} label="Progetti" value={`${folder.projectCount}`} />
-            <CockpitMetric
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <ContractorMetricTile icon={TrendingUp} label="Budget" value={budgetLabel} />
+            <ContractorMetricTile
+              icon={Layers3}
+              label="Progetti"
+              value={`${folder.projectCount}`}
+            />
+            <ContractorMetricTile
               icon={folder.criticalCount > 0 ? AlertTriangle : ShieldCheck}
               label="Criticità"
-              tone={folder.criticalCount > 0 ? "warning" : "neutral"}
+              tone={folder.criticalCount > 0 ? "warning" : "info"}
               value={`${folder.criticalCount}`}
             />
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="min-w-0 rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] p-3.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)]">
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            <div className="min-w-0 rounded-10px border border-[color-mix(in_srgb,var(--border-subtle)_52%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_46%,transparent)] p-3">
+              <div className="grid gap-1">
+                <dt className="text-[10px] font-semibold leading-tight text-[var(--text-secondary)]">
                   Esposizione SAL
                 </dt>
-                <span className="text-14px font-semibold tabular-nums text-[var(--accent-primary)]">
+                <span className="text-14px font-semibold leading-tight tabular-nums text-[var(--accent-primary)]">
                   {exposureLabel}
                 </span>
               </div>
             </div>
-            <div className="min-w-0 rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] p-3.5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)]">
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            <div className="min-w-0 rounded-10px border border-[color-mix(in_srgb,var(--border-subtle)_52%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_46%,transparent)] p-3">
+              <div className="grid gap-1">
+                <dt className="text-[10px] font-semibold leading-tight text-[var(--text-secondary)]">
                   Finestre SAL
                 </dt>
-                <span className="text-14px font-semibold tabular-nums text-[var(--text-primary)]">
+                <span className="text-14px font-semibold leading-tight tabular-nums text-[var(--text-primary)]">
                   {folder.salWindowCount}
                 </span>
               </div>
@@ -560,7 +576,7 @@ function ContractorCard({
           </div>
 
           {folder.recentSal && (
-            <div className="mt-3 rounded-[20px] bg-[color-mix(in_srgb,var(--bg-muted)_50%,transparent)] px-3.5 py-3">
+            <div className="mt-3 rounded-10px bg-[color-mix(in_srgb,var(--bg-muted)_50%,transparent)] px-3.5 py-3">
               <div className="flex items-center gap-2.5">
                 <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)]/12">
                   <div className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
@@ -573,7 +589,9 @@ function ContractorCard({
                     <span
                       className={cn(
                         "shrink-0 font-medium",
-                        SAL_STATUS_TONES[folder.recentSal.status] || "text-[var(--text-tertiary)]",
+                        statusToneStyles[
+                          SAL_STATUS_TONE_KEYS[folder.recentSal.status] ?? "neutral"
+                        ] || "text-[var(--text-tertiary)]",
                       )}
                     >
                       {SAL_STATUS_LABELS[folder.recentSal.status] || folder.recentSal.status}
@@ -594,12 +612,47 @@ function ContractorCard({
   );
 }
 
+function ContractorMetricTile({
+  icon: Icon,
+  label,
+  tone = "info",
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  tone?: "info" | "warning";
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-10px border border-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_76%,var(--bg-muted)_24%)] p-2.5">
+      <div className="flex items-center gap-1.5">
+        <span
+          className={cn(
+            "flex size-5 shrink-0 items-center justify-center rounded-8px",
+            tone === "warning"
+              ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+              : "bg-[var(--info-soft)] text-[var(--info-base)]",
+          )}
+        >
+          <Icon className="size-3" />
+        </span>
+        <span className="min-w-0 text-10px font-semibold leading-tight text-[var(--text-secondary)]">
+          {label}
+        </span>
+      </div>
+      <div className="mt-2 break-words text-13px font-semibold leading-tight tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function ContractorAvatar({ initials, tone }: { initials: string; tone: StatusTone }) {
   return (
     <span
       className={cn(
         "flex size-12 shrink-0 items-center justify-center rounded-[14px] text-16px font-semibold tracking-neg-0_03em shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_80%,transparent)]",
-        toneSurface(tone),
+        statusToneStyles[tone],
       )}
     >
       {initials}
@@ -645,81 +698,6 @@ function ContractorMenu({
   );
 }
 
-function CockpitMetric({
-  icon: Icon,
-  label,
-  tone = "neutral",
-  value,
-}: {
-  icon?: LucideIcon;
-  label: string;
-  tone?: StatusTone;
-  value: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-[22px] bg-[color-mix(in_srgb,var(--surface-base)_66%,var(--bg-muted)_34%)] p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border-subtle)_44%,transparent)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-safe:group-hover:bg-[color-mix(in_srgb,var(--surface-base)_58%,var(--bg-muted)_42%)]">
-      {Icon && (
-        <Icon
-          className={cn(
-            "mb-1.5 size-3.5",
-            tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--accent-primary)]",
-          )}
-          strokeWidth={1.8}
-        />
-      )}
-      <dt className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-        {label}
-      </dt>
-      <dd
-        className={cn(
-          "mt-0.5 truncate text-16px font-semibold tabular-nums tracking-[-0.01em]",
-          tone === "warning" ? "text-[var(--warning-base)]" : "text-[var(--text-primary)]",
-        )}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function EmptyContractorsState({ onOpenCreateContractor }: { onOpenCreateContractor: () => void }) {
-  return (
-    <div className="px-4 py-8 xl:px-5">
-      <button
-        className="w-full rounded-26px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_70%,transparent)] px-6 py-12 text-center"
-        onClick={onOpenCreateContractor}
-        type="button"
-      >
-        <span className="mx-auto flex size-14 items-center justify-center rounded-22px bg-[var(--info-soft)] text-[var(--info-base)]">
-          <Building2 className="size-6" />
-        </span>
-        <span className="mt-5 block text-15px font-semibold text-[var(--text-primary)]">
-          Vuoi aggiungere un nuovo appaltatore?
-        </span>
-        <span className="mt-2 block text-13px text-[var(--text-secondary)]">
-          Crea manualmente o importa da Excel per iniziare subito.
-        </span>
-      </button>
-    </div>
-  );
-}
-
-function NoResultsState({ query }: { query: string }) {
-  return (
-    <div className="px-4 py-10 text-center">
-      <div className="mx-auto flex size-12 items-center justify-center rounded-22px bg-[var(--bg-muted)] text-[var(--text-secondary)]">
-        <Search className="size-5" />
-      </div>
-      <div className="mt-4 text-14px font-semibold text-[var(--text-primary)]">
-        Nessuna cartella trovata
-      </div>
-      <p className="mt-2 text-12px text-[var(--text-secondary)]">
-        Nessun appaltatore corrisponde a “{query}”.
-      </p>
-    </div>
-  );
-}
-
 function getFolderHealth(folder: ContractorFolder): FolderHealth {
   if (folder.criticalCount > 0 || folder.salWindowCount > 0) {
     return { label: "Presidio", score: 62, tone: "warning" };
@@ -747,14 +725,4 @@ function getContractorInitials(contractor: string) {
   const second = words[1] ?? first.slice(1, 2) ?? "P";
   const initials = `${first.slice(0, 1)}${second.slice(0, 1)}`;
   return initials.toLocaleUpperCase("it-IT");
-}
-
-function toneSurface(tone: StatusTone) {
-  return {
-    danger: "bg-[var(--danger-soft)] text-[var(--danger-base)]",
-    info: "bg-[var(--info-soft)] text-[var(--info-base)]",
-    neutral: "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-    success: "bg-[var(--success-soft)] text-[var(--success-base)]",
-    warning: "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-  }[tone];
 }

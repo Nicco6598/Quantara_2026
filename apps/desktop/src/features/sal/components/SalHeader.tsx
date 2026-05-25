@@ -1,12 +1,22 @@
-import type { ReactNode } from "react";
 import { m } from "framer-motion";
-import { ArrowRight, Check, Circle, FileText, Save, WalletCards } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Circle,
+  Download,
+  FileDown,
+  FileSpreadsheet,
+  FileText,
+  Save,
+  WalletCards,
+} from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/shared/Button";
 import { cn } from "@/lib/utils";
-import { Currency } from "./SalCreationTables";
-import type { SalVerificationCheck } from "../types";
 import type { SalWorkflowPhase } from "../state/workflow";
 import { getPhaseIndex } from "../state/workflow";
+import type { SalVerificationCheck } from "../types";
+import { Currency } from "./SalCreationTables";
 
 const STEPS: {
   id: Exclude<SalWorkflowPhase, "completed">;
@@ -36,6 +46,7 @@ export function SalHeader({
   canContinue,
   primaryDisabledReason,
   searchBar,
+  downloadActions = [],
   onPrimary,
   onSaveDraft,
   onPhaseChange,
@@ -54,6 +65,12 @@ export function SalHeader({
   canContinue: boolean;
   primaryDisabledReason: string | null;
   searchBar?: ReactNode;
+  downloadActions?: Array<{
+    disabled?: boolean;
+    kind: "excel" | "pdf" | "other";
+    label: string;
+    onClick: () => void;
+  }>;
   onPrimary: () => void;
   onSaveDraft: () => void;
   onPhaseChange: (phase: Exclude<SalWorkflowPhase, "completed">) => void;
@@ -180,17 +197,56 @@ export function SalHeader({
               </div>
             ) : null}
 
-            <Button
-              aria-label="Salva bozza"
-              className="h-9 text-11px"
-              icon={Save}
-              onClick={onSaveDraft}
-              size="toolbar"
-              type="button"
-              variant="outline"
-            >
-              <span className="hidden sm:inline">Bozza</span>
-            </Button>
+            <div className="flex items-center gap-1.5 rounded-xl border border-[var(--warning-base)]/18 bg-[var(--warning-soft)]/20 p-1">
+              <span className="hidden px-2 text-9px font-black uppercase tracking-0_14em text-[var(--warning-base)] lg:inline">
+                Lavoro
+              </span>
+              <Button
+                aria-label="Salva bozza locale"
+                className="h-8 rounded-lg px-2.5 text-11px text-[var(--warning-base)]"
+                icon={Save}
+                onClick={onSaveDraft}
+                size="toolbar"
+                title="Salva lo stato modificabile della SAL, non genera un file."
+                type="button"
+                variant="outline"
+              >
+                <span className="hidden sm:inline">Salva bozza</span>
+              </Button>
+            </div>
+
+            {downloadActions.length > 0 ? (
+              <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/28 p-1">
+                <span className="hidden px-2 text-9px font-black uppercase tracking-0_14em text-[var(--text-tertiary)] lg:inline">
+                  File
+                </span>
+                {downloadActions.map((action) => {
+                  const Icon =
+                    action.kind === "excel"
+                      ? FileSpreadsheet
+                      : action.kind === "pdf"
+                        ? FileText
+                        : FileDown;
+                  return (
+                    <Button
+                      aria-label={`Scarica ${action.label}`}
+                      className="h-8 rounded-lg px-2.5 text-11px"
+                      disabled={action.disabled}
+                      icon={Icon}
+                      key={`${action.kind}-${action.label}`}
+                      onClick={action.onClick}
+                      size="toolbar"
+                      title={`Genera un file scaricabile: ${action.label}`}
+                      type="button"
+                      variant="outline"
+                    >
+                      <span className="hidden sm:inline">{action.label}</span>
+                      <Download className="size-3 opacity-65" />
+                    </Button>
+                  );
+                })}
+              </div>
+            ) : null}
 
             <Button
               aria-disabled={!canUsePrimary}

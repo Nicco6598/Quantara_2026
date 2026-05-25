@@ -1,6 +1,6 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
 };
 use rand::RngCore;
 use sha2::{Digest, Sha256};
@@ -31,8 +31,8 @@ pub fn derive_key_from_passphrase(passphrase: &str, salt: &[u8]) -> [u8; KEY_SIZ
 }
 
 pub fn encrypt_data(key: &[u8; KEY_SIZE], plaintext: &[u8]) -> Result<Vec<u8>, String> {
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| format!("Failed to create cipher: {}", e))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| format!("Failed to create cipher: {}", e))?;
 
     let mut nonce_bytes = [0u8; NONCE_SIZE];
     rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
@@ -57,8 +57,8 @@ pub fn decrypt_data(key: &[u8; KEY_SIZE], data: &[u8]) -> Result<Vec<u8>, String
     let (nonce_bytes, ciphertext) = data.split_at(NONCE_SIZE);
     let nonce = Nonce::from_slice(nonce_bytes);
 
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| format!("Failed to create cipher: {}", e))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| format!("Failed to create cipher: {}", e))?;
 
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
@@ -112,7 +112,10 @@ mod tests {
         let plaintext = b"same data";
         let encrypted1 = encrypt_data(&key, plaintext).expect("encryption 1 failed");
         let encrypted2 = encrypt_data(&key, plaintext).expect("encryption 2 failed");
-        assert_ne!(encrypted1, encrypted2, "two encryptions of same data should differ");
+        assert_ne!(
+            encrypted1, encrypted2,
+            "two encryptions of same data should differ"
+        );
     }
 
     #[test]
@@ -147,7 +150,10 @@ mod tests {
         let salt = generate_salt();
         let key1 = derive_key_from_passphrase("pass1", &salt);
         let key2 = derive_key_from_passphrase("pass2", &salt);
-        assert_ne!(key1, key2, "different passphrases should produce different keys");
+        assert_ne!(
+            key1, key2,
+            "different passphrases should produce different keys"
+        );
     }
 
     #[test]

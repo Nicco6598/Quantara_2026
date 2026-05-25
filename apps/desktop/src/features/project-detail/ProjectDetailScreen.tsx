@@ -16,14 +16,15 @@ import {
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { SalHistoryBars, SpendingTrend } from "@/components/shared/charts";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
+import { Panel } from "@/components/shared/Panel";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
@@ -51,15 +52,14 @@ import { MOTION_VARIANTS } from "@/motion";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
+import { DetailList, DetailRow } from "@/components/shared/DetailList";
+
 import {
   DeleteConfirmDialog,
   InfoBlock,
   MilestoneItem,
-  Panel,
-  PanelTitle,
   PerformanceIndexBar,
   SalCard,
-  SummaryRow,
   TariffPanelDialog,
 } from "./components/ProjectDetailPanels";
 import { ProjectTimeline } from "./components/ProjectTimeline";
@@ -569,9 +569,10 @@ export function ProjectDetailScreen() {
   if (!selectedProject || !detail) {
     return (
       <div className="pt-4">
-        <BezelSurface innerClassName="p-5 text-sm text-[var(--text-secondary)]">
-          Nessun progetto locale disponibile.
-        </BezelSurface>
+        <Panel padding="lg">
+          <span className="font-semibold text-[var(--text-primary)]">Attenzione:</span> Progetto non
+          trovato o dati non disponibili.
+        </Panel>
       </div>
     );
   }
@@ -834,20 +835,20 @@ export function ProjectDetailScreen() {
                 <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                   Quadro economico
                 </div>
-                <dl className="mt-3 divide-y divide-[var(--border-subtle)]/70">
-                  <SummaryRow
+                <DetailList className="mt-3">
+                  <DetailRow
                     label="Budget contrattuale"
                     value={formatMoney({ amount: detail.budget.contractual, currency: "EUR" })}
                   />
-                  <SummaryRow
+                  <DetailRow
                     label="Impegnato"
                     value={formatMoney({ amount: detail.budget.committed, currency: "EUR" })}
                   />
-                  <SummaryRow
+                  <DetailRow
                     label="Approvato"
                     value={formatMoney({ amount: detail.budget.approvedAmount, currency: "EUR" })}
                   />
-                </dl>
+                </DetailList>
               </div>
 
               <div className="grid rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4 md:grid-cols-2">
@@ -1051,12 +1052,12 @@ export function ProjectDetailScreen() {
                 </>
               ) : null}
               {sortedSalRows.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 rounded-xl border-[0.5px] border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 px-4 py-8 text-center">
-                  <FileText className="size-8 text-[var(--text-secondary)]" />
-                  <p className="text-13px font-medium text-[var(--text-secondary)]">
-                    Nessuna SAL registrata per questo progetto.
-                  </p>
-                </div>
+                <EmptyState
+                  icon={FileText}
+                  title="Nessuna SAL registrata per questo progetto."
+                  description="Le SAL compariranno qui dopo la prima registrazione."
+                  className="rounded-xl"
+                />
               ) : null}
             </div>
           </Panel>
@@ -1064,54 +1065,47 @@ export function ProjectDetailScreen() {
 
         <aside className="min-w-0 space-y-4">
           <ProjectTimeline project={selectedProject} salDocuments={salDocuments} />
-          <Panel>
-            <PanelTitle icon={Radio}>Presidio rapido</PanelTitle>
-            <dl className="mt-4 divide-y divide-[var(--border-subtle)]/70">
-              <SummaryRow label="Inizio" value={detail.startDate} />
-              <SummaryRow label="Fine prevista" value={detail.endDate} />
-              <SummaryRow label="Ultimo aggiornamento" value={detail.lastUpdate} />
-              <SummaryRow label="SAL" value={String(detail.sal.current)} />
-              <SummaryRow label="Responsabile" value={detail.manager} />
-              <SummaryRow label="Prossima milestone" value={detail.nextMilestone} />
-              <SummaryRow label="Rischio materiale" value={detail.materialRisk} />
-              <SummaryRow
+          <Panel icon={Radio} title="Presidio rapido">
+            <DetailList>
+              <DetailRow label="Inizio" value={detail.startDate} />
+              <DetailRow label="Fine prevista" value={detail.endDate} />
+              <DetailRow label="Ultimo aggiornamento" value={detail.lastUpdate} />
+              <DetailRow label="SAL" value={String(detail.sal.current)} />
+              <DetailRow label="Responsabile" value={detail.manager} />
+              <DetailRow label="Prossima milestone" value={detail.nextMilestone} />
+              <DetailRow label="Rischio materiale" value={detail.materialRisk} />
+              <DetailRow
                 label="Residuo budget"
                 value={formatMoney({ amount: financials.residual, currency: "EUR" })}
               />
-            </dl>
+            </DetailList>
           </Panel>
 
-          <Panel>
-            <div className="flex items-center justify-between">
-              <PanelTitle icon={FileText}>Tariffari associati</PanelTitle>
-              {projectTariffBookIds.length > 0 ? (
+          <Panel
+            icon={FileText}
+            title="Tariffari associati"
+            action={
+              projectTariffBookIds.length > 0 ? (
                 <span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-11px font-semibold text-[var(--info-base)]">
                   {projectTariffBookIds.length}
                 </span>
-              ) : null}
-            </div>
-            <div className="mt-4 space-y-2">
+              ) : undefined
+            }
+          >
+            <div className="space-y-2">
               {projectTariffBookIds.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/30 px-4 py-5 text-center">
-                  <FileText className="mx-auto size-6 text-[var(--text-tertiary)]" />
-                  <p className="mt-2 text-12px font-medium text-[var(--text-secondary)]">
-                    Nessun tariffario
-                  </p>
-                  <p className="mt-0.5 text-11px text-[var(--text-tertiary)]">
-                    Collega i tariffari al progetto per usarli in SAL.
-                  </p>
-                  <button
-                    className="mt-3 inline-flex items-center gap-1 rounded-full bg-[var(--info-soft)] px-3 py-1.5 text-11px font-semibold text-[var(--info-base)] transition-colors hover:bg-[var(--info-soft)]/80"
-                    onClick={() => {
+                <EmptyState
+                  icon={FileText}
+                  title="Nessun tariffario"
+                  description="Collega i tariffari al progetto per usarli in SAL."
+                  action={{
+                    label: "Aggiungi",
+                    onClick: () => {
                       setPendingTariffIds([...projectTariffBookIds]);
                       setIsTariffPanelOpen(true);
-                    }}
-                    type="button"
-                  >
-                    <Plus className="size-3.5" />
-                    Aggiungi
-                  </button>
-                </div>
+                    },
+                  }}
+                />
               ) : (
                 <div className="space-y-1.5">
                   {(isExpandedTariffs
@@ -1194,9 +1188,8 @@ export function ProjectDetailScreen() {
             tariffBooks={tariffBooks}
           />
 
-          <Panel>
-            <PanelTitle icon={UsersRound}>Team progetto</PanelTitle>
-            <div className="mt-4 space-y-2.5">
+          <Panel icon={UsersRound} title="Team progetto">
+            <div className="space-y-2.5">
               {projectTeam.map((member) => (
                 <div
                   className="flex items-center gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2.5"
@@ -1218,9 +1211,8 @@ export function ProjectDetailScreen() {
             </div>
           </Panel>
 
-          <Panel>
-            <PanelTitle icon={Activity}>Attivita recenti</PanelTitle>
-            <div className="mt-4 space-y-3">
+          <Panel icon={Activity} title="Attivita recenti">
+            <div className="space-y-3">
               {recentActivities.slice(0, 1).map((activity) => (
                 <div
                   className="flex items-start gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-3"

@@ -95,11 +95,20 @@ export function AutocompleteInput({
       return;
     }
     measureRef.current();
-    const onScroll = () => measureRef.current();
-    const onResize = () => measureRef.current();
+    let rafId: number | null = null;
+    const onScroll = () => {
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          measureRef.current();
+          rafId = null;
+        });
+      }
+    };
+    const onResize = onScroll;
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onResize);
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
     };

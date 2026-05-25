@@ -2,12 +2,13 @@ import { BookOpen, Loader2 } from "lucide-react";
 import { m } from "framer-motion";
 import { useCallback, useDeferredValue, useMemo } from "react";
 import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
+import { cn } from "@/lib/utils";
 import { TemplatePicker } from "./TemplatePicker";
 import type { SalVoiceDraft } from "../types";
 import type { SalTemplate } from "@/store/template-store";
 import { tariffTokenMatchesQuery } from "../utils/search-utils";
 
-type SalAutocompleteOption = {
+export type SalAutocompleteOption = {
   id?: string;
   label: string;
   value: string;
@@ -149,6 +150,7 @@ export function SalSearchBar({
   onSelectVoice,
   onApplyTemplate,
   onOpenTemplateDialog,
+  className,
 }: {
   voices: SalVoiceDraft[];
   tariffBookIds: string[];
@@ -157,6 +159,7 @@ export function SalSearchBar({
   onSelectVoice: (v: SalVoiceDraft) => void;
   onApplyTemplate: (t: SalTemplate) => void;
   onOpenTemplateDialog: () => void;
+  className?: string;
 }) {
   const deferredVoices = useDeferredValue(voices);
   const searchIndex = useMemo(() => buildIndexedVoiceOptions(deferredVoices), [deferredVoices]);
@@ -187,7 +190,7 @@ export function SalSearchBar({
   );
 
   return (
-    <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/30 bg-[var(--surface-base)] px-4 py-1.5 lg:flex-row lg:items-center lg:px-6">
+    <div className={cn("flex flex-col gap-2 lg:flex-row lg:items-center", className)}>
       <div className="min-w-0 flex-1">
         <AutocompleteInput
           options={[]}

@@ -35,7 +35,11 @@ pub fn update_tariff_book(
     request: UpdateTariffBookRequest,
 ) -> Result<TariffBookRecord, String> {
     with_db_mut(&state, |conn| {
-        let book = crate::infrastructure::tariff_repository::update_tariff_book(conn, &tariff_book_id, request)?;
+        let book = crate::infrastructure::tariff_repository::update_tariff_book(
+            conn,
+            &tariff_book_id,
+            request,
+        )?;
         audit_repository::append_event(conn, "tariff_book", &tariff_book_id, "update", None, None)?;
         Ok(book)
     })

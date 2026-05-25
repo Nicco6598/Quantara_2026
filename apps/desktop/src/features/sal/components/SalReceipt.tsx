@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
 import {
   Calculator,
   ChevronDown,
@@ -10,6 +8,9 @@ import {
   TrendingUp,
   WalletCards,
 } from "lucide-react";
+import type { ReactNode } from "react";
+import { useMemo, useState } from "react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
 import { extractMgTariffPrefix, isMgCode } from "../domain/sal-calculations";
 import type {
@@ -30,6 +31,8 @@ type MgAllocation = {
 };
 
 type ReceiptTone = "accent" | "danger" | "info";
+
+const RECEIPT_INITIAL_LINE_LIMIT = 80;
 
 export function SalReceipt({
   lineViews,
@@ -64,7 +67,11 @@ export function SalReceipt({
       />
 
       {!hasContent ? (
-        <EmptyReceipt />
+        <EmptyState
+          description="Aggiungi voci e misure per generare la ricevuta contabile."
+          icon={ReceiptText}
+          title="Nessuna voce inserita"
+        />
       ) : (
         <div className="grid lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 divide-y divide-[var(--border-subtle)]/35">
@@ -193,13 +200,16 @@ function ReceiptSection({
   startIndex: number;
   tone: ReceiptTone;
 }) {
+  const [showAllLines, setShowAllLines] = useState(false);
   const amount = lines.reduce((sum, line) => sum + line.totalAmount, 0);
+  const visibleLines = showAllLines ? lines : lines.slice(0, RECEIPT_INITIAL_LINE_LIMIT);
+  const hiddenLineCount = lines.length - visibleLines.length;
 
   return (
     <section>
       <SectionHeader amount={amount} count={lines.length} icon={icon} label={label} tone={tone} />
       <div className="divide-y divide-[var(--border-subtle)]/22">
-        {lines.map((line, index) => (
+        {visibleLines.map((line, index) => (
           <ReceiptLine
             discountPercent={discountPercent}
             index={startIndex + index}
@@ -210,6 +220,15 @@ function ReceiptSection({
           />
         ))}
       </div>
+      {hiddenLineCount > 0 ? (
+        <button
+          className="flex w-full items-center justify-center border-t border-[var(--border-subtle)]/25 px-4 py-3 text-12px font-bold text-[var(--accent-primary)] transition-colors hover:bg-[var(--bg-muted)]/35"
+          onClick={() => setShowAllLines(true)}
+          type="button"
+        >
+          Mostra altre {hiddenLineCount} voci
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -380,7 +399,10 @@ function MgSection({
   lines: SalLineView[];
   startIndex: number;
 }) {
+  const [showAllLines, setShowAllLines] = useState(false);
   const amount = lines.reduce((sum, line) => sum + line.totalAmount, 0);
+  const visibleLines = showAllLines ? lines : lines.slice(0, RECEIPT_INITIAL_LINE_LIMIT);
+  const hiddenLineCount = lines.length - visibleLines.length;
 
   return (
     <section>
@@ -392,7 +414,7 @@ function MgSection({
         tone="info"
       />
       <div className="divide-y divide-[var(--border-subtle)]/22">
-        {lines.map((line, index) => {
+        {visibleLines.map((line, index) => {
           const allocations = allocationsByMgLine.get(line.id) ?? [];
           const baseAmount = allocations.reduce(
             (sum, allocation) => sum + allocation.baseAmount,
@@ -431,6 +453,15 @@ function MgSection({
           );
         })}
       </div>
+      {hiddenLineCount > 0 ? (
+        <button
+          className="flex w-full items-center justify-center border-t border-[var(--border-subtle)]/25 px-4 py-3 text-12px font-bold text-[var(--accent-primary)] transition-colors hover:bg-[var(--bg-muted)]/35"
+          onClick={() => setShowAllLines(true)}
+          type="button"
+        >
+          Mostra altre {hiddenLineCount} maggiorazioni
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -805,20 +836,6 @@ function ProgressBar({ currentPct, previousPct }: { currentPct: number; previous
           />
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function EmptyReceipt() {
-  return (
-    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-      <span className="flex size-12 items-center justify-center rounded-xl bg-[var(--bg-muted)] text-[var(--text-secondary)]">
-        <ReceiptText className="size-5" />
-      </span>
-      <p className="mt-3 text-14px font-black text-[var(--text-primary)]">Nessuna voce inserita</p>
-      <p className="mt-1 max-w-sm text-13px leading-relaxed text-[var(--text-secondary)]">
-        Aggiungi voci e misure per generare la ricevuta contabile.
-      </p>
     </div>
   );
 }

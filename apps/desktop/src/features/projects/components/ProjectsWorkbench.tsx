@@ -15,12 +15,13 @@ import { memo, type ReactNode, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { MOTION_VARIANTS } from "@/motion";
+import { Panel } from "@/components/shared/Panel";
+import { statusToneStyles } from "@/components/shared/StatusBadge";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { BezelSurface } from "./workspace-ui";
+import { MOTION_VARIANTS } from "@/motion";
 
 type ProjectsWorkbenchProps = {
   children?: ReactNode;
@@ -51,7 +52,7 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   const actionsRef = useRef<HTMLDivElement>(null);
 
   return (
-    <BezelSurface innerClassName="overflow-hidden p-0">
+    <Panel padding="none">
       <div className="flex flex-col gap-4 border-b border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -141,7 +142,7 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
           </div>
         )}
       </div>
-    </BezelSurface>
+    </Panel>
   );
 });
 
@@ -158,8 +159,8 @@ function WorkbenchRow({
   onOpenProject: (project: PortfolioProject) => void;
   project: PortfolioProject;
 }) {
-  const toneClass = getProjectToneClass(project);
-  const progressColor = getProgressColor(project);
+  const toneClass = statusToneStyles[project.tone];
+  const progressColor = statusToneStyles[project.tone];
   const salProgress =
     project.budget.amount > 0
       ? Math.min(100, (project.salValue.amount / project.budget.amount) * 100)
@@ -240,7 +241,6 @@ function WorkbenchRow({
     </div>
   );
 }
-
 function ProjectIdentity({ project, toneClass }: { project: PortfolioProject; toneClass: string }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
@@ -472,28 +472,4 @@ function InlineMetric({ detail, label, value }: { detail: string; label: string;
       <div className="text-11px text-[var(--text-secondary)]">{detail}</div>
     </div>
   );
-}
-
-function getProjectToneClass(project: PortfolioProject) {
-  if (project.tone === "warning") {
-    return "bg-[var(--warning-soft)] text-[var(--warning-base)]";
-  }
-
-  if (project.tone === "danger") {
-    return "bg-[var(--danger-soft)] text-[var(--danger-base)]";
-  }
-
-  return "bg-[var(--success-soft)] text-[var(--success-base)]";
-}
-
-function getProgressColor(project: PortfolioProject) {
-  if (project.tone === "danger") {
-    return "text-[var(--danger-base)]";
-  }
-
-  if (project.tone === "warning") {
-    return "text-[var(--warning-base)]";
-  }
-
-  return "text-[var(--info-base)]";
 }

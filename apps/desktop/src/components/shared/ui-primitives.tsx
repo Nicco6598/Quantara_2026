@@ -1,7 +1,7 @@
 import { m } from "framer-motion";
 import type { ReactNode } from "react";
-import { MOTION_DURATION, SPRING_EASE } from "@/motion";
 import { cn } from "@/lib/utils";
+import { MOTION_DURATION, SPRING_EASE } from "@/motion";
 
 export function BezelSurface({
   children,
@@ -15,7 +15,7 @@ export function BezelSurface({
   return (
     <m.section
       className={cn(
-        "min-w-0 rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
+        "min-w-0 rounded-[18px] border border-[color-mix(in_srgb,var(--border-subtle)_64%,transparent)] bg-[var(--surface-base)] shadow-[0_1px_2px_color-mix(in_srgb,var(--text-primary)_4%,transparent)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--surface-highlight)_24%,transparent)]",
         className,
       )}
       initial={{ opacity: 0, y: 18, scale: 0.992 }}
@@ -23,7 +23,7 @@ export function BezelSurface({
       viewport={{ amount: 0.18, once: true }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
     >
-      <div className={cn("h-full rounded-22px bg-[var(--surface-base)]", innerClassName)}>
+      <div className={cn("h-full rounded-[17px] bg-[var(--surface-base)]", innerClassName)}>
         {children}
       </div>
     </m.section>

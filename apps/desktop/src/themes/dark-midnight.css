@@ -66,8 +66,8 @@
   --selection-bg: #2c2854;
   --selection-text: var(--text-primary);
   --overlay-bg: rgb(0 0 0 / 0.55);
-  --shadow-soft: 0 12px 30px rgb(0 0 0 / 42%);
-  --shadow-panel: 0 18px 48px rgb(0 0 0 / 52%);
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 34%);
+  --shadow-panel: 0 8px 22px rgb(0 0 0 / 40%);
   --chart-1: #7c6ac8;
   --chart-2: #5a8ac8;
   --chart-3: #5aaa8a;

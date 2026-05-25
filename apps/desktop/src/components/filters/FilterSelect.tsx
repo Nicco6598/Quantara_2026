@@ -33,7 +33,7 @@ export function FilterSelect({
   return (
     <div className="relative" ref={ref}>
       <button
-        className="inline-flex h-10 min-w-[160px] items-center justify-between rounded-14px border border-[var(--border-subtle)] bg-[var(--bg-muted)] px-3.5 text-13px font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+        className="inline-flex h-10 min-w-[160px] items-center justify-between rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3.5 text-13px font-medium text-[var(--text-primary)] outline-none transition-[border-color,background-color,box-shadow] duration-[var(--duration-fast)] hover:bg-[color-mix(in_srgb,var(--surface-base)_86%,var(--bg-muted)_14%)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
@@ -47,7 +47,7 @@ export function FilterSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-[var(--z-dropdown-menu)] mt-1 w-max min-w-full overflow-hidden rounded-14px bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]">
+        <div className="absolute left-0 top-full z-[var(--z-dropdown-menu)] mt-1 w-max min-w-full overflow-hidden rounded-[12px] bg-[var(--surface-base)] p-1 shadow-soft ring-1 ring-[var(--border-subtle)]">
           {options.map((opt) => {
             const displayOpt = displayMap?.get(opt) ?? opt;
             const isSelected = opt === value;

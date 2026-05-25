@@ -2,6 +2,16 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.4.31 — 2026-05-25
+
+### Vari Fix di ottimizzazione e bug - Fix di performance e bug 
+
+- **Bug e Performance Fix** — Velocizzate, ottimizzate e sistemate varie problematiche nell'app.
+
+### Limata Grafica SAL - sistemato il layout grafico
+
+- **SAL Refactor** — Leggermente ridisegnata la schermata di creazione SAL inclusa la tabella di inserimento voci.
+
 ## 0.4.30 — 2026-05-22
 
 ### SAL — PDF più chiari, bozze più fedeli, maggiorazioni più veloci

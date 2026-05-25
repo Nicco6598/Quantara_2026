@@ -1,40 +1,60 @@
+import { BezelSurface } from "@/components/shared/ui-primitives";
+import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 type QuickActionProps = {
   children?: ReactNode;
+  className?: string;
   detail: string;
   icon: LucideIcon;
   label: string;
+  layout?: "card" | "row";
   onClick: () => void;
-  tone?: "info" | "success" | "warning";
+  size?: "md" | "sm";
+  tone?: StatusTone;
 };
 
 export function QuickAction({
+  className,
   detail,
   icon: Icon,
   label,
+  layout = "row",
   onClick,
+  size = "md",
   tone = "info",
 }: QuickActionProps) {
-  const toneClass =
-    tone === "success"
-      ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-      : tone === "warning"
-        ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-        : "bg-[var(--info-soft)] text-[var(--info-base)]";
+  const isCardLayout = layout === "card";
+  const isCompact = size === "sm";
 
-  return (
+  const content = (
     <button
-      className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-[var(--bg-muted)]"
+      className={cn(
+        "flex w-full items-center gap-3 text-left transition-colors",
+        isCardLayout ? "p-4" : "rounded-lg p-2 hover:bg-[var(--bg-muted)]",
+        className,
+      )}
       onClick={onClick}
       type="button"
     >
-      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${toneClass}`}>
+      <span
+        className={cn(
+          "grid shrink-0 place-items-center rounded-lg",
+          isCompact ? "size-8" : "size-9",
+          statusToneStyles[tone],
+        )}
+      >
         <Icon className="size-4" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-13px font-bold text-[var(--text-primary)]">
+        <span
+          className={cn(
+            "block truncate font-bold text-[var(--text-primary)]",
+            isCompact ? "text-12px" : "text-13px",
+          )}
+        >
           {label}
         </span>
         <span className="block truncate text-11px font-medium text-[var(--text-secondary)]">
@@ -43,4 +63,10 @@ export function QuickAction({
       </span>
     </button>
   );
+
+  if (isCardLayout) {
+    return <BezelSurface innerClassName="p-0">{content}</BezelSurface>;
+  }
+
+  return content;
 }

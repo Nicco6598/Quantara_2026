@@ -56,7 +56,12 @@ pub fn adjust_material_stock(
     description: String,
 ) -> Result<MaterialRecord, String> {
     with_db_mut(&state, |conn| {
-        let record = material_repository::adjust_material_stock(conn, &material_id, new_quantity, &description)?;
+        let record = material_repository::adjust_material_stock(
+            conn,
+            &material_id,
+            new_quantity,
+            &description,
+        )?;
         audit_repository::append_event(conn, "material", &material_id, "stock_adjust", None, None)?;
         Ok(record)
     })
@@ -67,7 +72,7 @@ pub fn deduct_materials(
     state: State<'_, DbConnection>,
     deductions: Vec<(String, f64, String)>,
 ) -> Result<Vec<MaterialRecord>, String> {
-    with_db_mut(&state, |conn | {
+    with_db_mut(&state, |conn| {
         let results = material_repository::deduct_materials(conn, &deductions)?;
 
         for (material_id, _, _sal_id) in &deductions {

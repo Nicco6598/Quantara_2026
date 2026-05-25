@@ -8,7 +8,6 @@ import {
   ReceiptText,
   ShieldCheck,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClearFiltersButton,
@@ -18,8 +17,10 @@ import {
   FilterTemplatePicker,
 } from "@/components/filters";
 import { Button } from "@/components/shared/Button";
+import { DetailList, DetailRow } from "@/components/shared/DetailList";
 import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
+import { Panel } from "@/components/shared/Panel";
 import { SavedViewSelector } from "@/components/shared/SavedViewSelector";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
@@ -27,12 +28,11 @@ import { SeverityBar, severityToneForPercentage } from "@/components/shared/Seve
 import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface } from "@/components/shared/ui-primitives";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
-import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useTableSort } from "@/hooks/use-table-sort";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { listDesktopContracts, restoreMaterialsFromSalUsage } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
 import { saveSalDocument } from "@/lib/sal-data";
@@ -344,8 +344,8 @@ export function AccountingScreen() {
           }
         />
 
-        <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="mt-5 operational-toolbar">
+          <div className="operational-toolbar-group">
             <FilterSelect
               label="Appaltatore"
               onChange={setFilterContractor}
@@ -374,7 +374,7 @@ export function AccountingScreen() {
             />
             {hasActiveFilters ? <ClearFiltersButton onClick={clearFilters} /> : null}
           </div>
-          <div className="flex items-center gap-3 pl-2 before:block before:h-6 before:w-px before:bg-[var(--border-subtle)]">
+          <div className="operational-toolbar-actions">
             <SavedViewSelector
               currentFilters={{
                 contractor: filterContractor,
@@ -415,9 +415,9 @@ export function AccountingScreen() {
         </div>
       </section>
 
-      <section className="mt-6 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="operational-panel-grid mt-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-5">
-          <Panel className="p-0">
+          <Panel padding="none">
             <div className="grid gap-4 p-4 2xl:grid-cols-[minmax(0,1fr)_420px]">
               <div className="min-w-0">
                 <div className="flex items-center justify-between px-2 pt-2">
@@ -655,15 +655,15 @@ export function AccountingScreen() {
               </h3>
             </div>
 
-            <div className="mt-4 space-y-3">
-              <SummaryRow label="SAL selezionati" value={String(selection.length)} />
-              <SummaryRow label="di cui chiusi" value={String(metrics.closedCount)} />
-              <SummaryRow label="di cui bozze" value={String(metrics.draftCount)} />
-              <SummaryRow
+            <DetailList>
+              <DetailRow label="SAL selezionati" value={String(selection.length)} />
+              <DetailRow label="di cui chiusi" value={String(metrics.closedCount)} />
+              <DetailRow label="di cui bozze" value={String(metrics.draftCount)} />
+              <DetailRow
                 label="Importo totale"
                 value={formatMoney({ amount: metrics.total, currency: "EUR" })}
               />
-              <SummaryRow
+              <DetailRow
                 label="% budget totale"
                 value={
                   metrics.budget > 0
@@ -671,7 +671,7 @@ export function AccountingScreen() {
                     : "—"
                 }
               />
-            </div>
+            </DetailList>
 
             <div className="mt-5 grid gap-2">
               <Button
@@ -762,18 +762,5 @@ export function AccountingScreen() {
         </aside>
       </section>
     </ScreenLayout>
-  );
-}
-
-function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return <BezelSurface innerClassName={cn("p-4", className)}>{children}</BezelSurface>;
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 text-13px last:border-b-0 last:pb-0">
-      <span className="font-medium text-[var(--text-secondary)]">{label}</span>
-      <span className="font-semibold text-[var(--text-primary)]">{value}</span>
-    </div>
   );
 }

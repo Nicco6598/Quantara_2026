@@ -1,7 +1,7 @@
 use serde_json::Value;
 use tauri::State;
 
-use crate::infrastructure::local_storage::{with_db, with_db_mut, DbConnection};
+use crate::infrastructure::local_storage::{DbConnection, with_db, with_db_mut};
 use crate::infrastructure::{audit_repository, workspace_repository};
 use crate::models::app_error::AppError;
 
@@ -42,10 +42,7 @@ pub fn update_member(
 }
 
 #[tauri::command]
-pub fn delete_member(
-    state: State<'_, DbConnection>,
-    id: String,
-) -> Result<(), String> {
+pub fn delete_member(state: State<'_, DbConnection>, id: String) -> Result<(), String> {
     with_db_mut(&state, |conn| {
         let _member = workspace_repository::get_member_by_id(conn, &id)?
             .ok_or_else(|| AppError::NotFound(format!("Member {} not found", id)))?;

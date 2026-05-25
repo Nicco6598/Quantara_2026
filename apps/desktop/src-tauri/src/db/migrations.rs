@@ -1,4 +1,4 @@
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 pub const CURRENT_SCHEMA_VERSION: i32 = 11;
 
@@ -9,16 +9,56 @@ struct Migration {
 }
 
 const MIGRATIONS: &[Migration] = &[
-    Migration { version: 1, name: "initial_schema", sql: include_str!("../../migrations/0001_initial.sql") },
-    Migration { version: 2, name: "tariff_voices", sql: include_str!("../../migrations/0002_tariff_voices.sql") },
-    Migration { version: 3, name: "materials", sql: include_str!("../../migrations/0003_materials.sql") },
-    Migration { version: 4, name: "indexes", sql: include_str!("../../migrations/0004_indexes.sql") },
-    Migration { version: 5, name: "sal_workflow", sql: include_str!("../../migrations/0005_sal_workflow.sql") },
-    Migration { version: 6, name: "audit_events", sql: include_str!("../../migrations/0006_audit_events.sql") },
-    Migration { version: 7, name: "fts_tariff_voices", sql: include_str!("../../migrations/0007_fts_tariff_voices.sql") },
-    Migration { version: 8, name: "sal_normalization", sql: include_str!("../../migrations/0008_sal_normalization.sql") },
-    Migration { version: 10, name: "sal_versioning", sql: include_str!("../../migrations/0010_sal_versioning.sql") },
-    Migration { version: 11, name: "users_rbac", sql: include_str!("../../migrations/0011_users_rbac.sql") },
+    Migration {
+        version: 1,
+        name: "initial_schema",
+        sql: include_str!("../../migrations/0001_initial.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "tariff_voices",
+        sql: include_str!("../../migrations/0002_tariff_voices.sql"),
+    },
+    Migration {
+        version: 3,
+        name: "materials",
+        sql: include_str!("../../migrations/0003_materials.sql"),
+    },
+    Migration {
+        version: 4,
+        name: "indexes",
+        sql: include_str!("../../migrations/0004_indexes.sql"),
+    },
+    Migration {
+        version: 5,
+        name: "sal_workflow",
+        sql: include_str!("../../migrations/0005_sal_workflow.sql"),
+    },
+    Migration {
+        version: 6,
+        name: "audit_events",
+        sql: include_str!("../../migrations/0006_audit_events.sql"),
+    },
+    Migration {
+        version: 7,
+        name: "fts_tariff_voices",
+        sql: include_str!("../../migrations/0007_fts_tariff_voices.sql"),
+    },
+    Migration {
+        version: 8,
+        name: "sal_normalization",
+        sql: include_str!("../../migrations/0008_sal_normalization.sql"),
+    },
+    Migration {
+        version: 10,
+        name: "sal_versioning",
+        sql: include_str!("../../migrations/0010_sal_versioning.sql"),
+    },
+    Migration {
+        version: 11,
+        name: "users_rbac",
+        sql: include_str!("../../migrations/0011_users_rbac.sql"),
+    },
 ];
 
 fn compute_migration_checksum(sql: &str) -> String {
@@ -45,10 +85,16 @@ fn ensure_migration_extended_columns(connection: &rusqlite::Connection) -> rusql
     };
 
     if !columns.iter().any(|c| c == "name") {
-        connection.execute("ALTER TABLE schema_migrations ADD COLUMN name TEXT NOT NULL DEFAULT ''", [])?;
+        connection.execute(
+            "ALTER TABLE schema_migrations ADD COLUMN name TEXT NOT NULL DEFAULT ''",
+            [],
+        )?;
     }
     if !columns.iter().any(|c| c == "checksum") {
-        connection.execute("ALTER TABLE schema_migrations ADD COLUMN checksum TEXT NOT NULL DEFAULT ''", [])?;
+        connection.execute(
+            "ALTER TABLE schema_migrations ADD COLUMN checksum TEXT NOT NULL DEFAULT ''",
+            [],
+        )?;
     }
     Ok(())
 }
@@ -122,7 +168,10 @@ fn ensure_tariff_voice_sal_rule_fields(connection: &rusqlite::Connection) -> rus
             .collect::<rusqlite::Result<Vec<_>>>()?
     };
 
-    if !columns.iter().any(|column| column == "linked_maggiorazioni") {
+    if !columns
+        .iter()
+        .any(|column| column == "linked_maggiorazioni")
+    {
         connection.execute(
             "ALTER TABLE tariff_voices ADD COLUMN linked_maggiorazioni TEXT",
             [],
@@ -141,11 +190,9 @@ fn ensure_tariff_voice_sal_rule_fields(connection: &rusqlite::Connection) -> rus
 
 fn migrate_sal_json_to_v2(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
     let source_count: i64 = connection
-        .query_row(
-            "SELECT COUNT(*) FROM sal_workflow_documents",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT COUNT(*) FROM sal_workflow_documents", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
 
     if source_count == 0 {
@@ -153,20 +200,16 @@ fn migrate_sal_json_to_v2(connection: &rusqlite::Connection) -> rusqlite::Result
     }
 
     let migrated_count: i64 = connection
-        .query_row(
-            "SELECT COUNT(*) FROM sal_documents_v2",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT COUNT(*) FROM sal_documents_v2", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
 
     if migrated_count >= source_count {
         return Ok(());
     }
 
-    let mut stmt = connection.prepare(
-        "SELECT id, project_id, data FROM sal_workflow_documents",
-    )?;
+    let mut stmt = connection.prepare("SELECT id, project_id, data FROM sal_workflow_documents")?;
 
     let rows: Vec<(String, String, String)> = stmt
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
@@ -240,10 +283,8 @@ fn migrate_sal_json_to_v2(connection: &rusqlite::Connection) -> rusqlite::Result
                 let surcharge_kind = line["surcharge"]["kind"].as_str().unwrap_or("none");
                 let surcharge_percent = line["surcharge"]["percent"].as_f64().unwrap_or(0.0);
 
-                let voice = voices.and_then(|va| {
-                    va.iter()
-                        .find(|v| v["id"].as_str() == Some(voice_id))
-                });
+                let voice =
+                    voices.and_then(|va| va.iter().find(|v| v["id"].as_str() == Some(voice_id)));
 
                 let (code, vdesc, cat, unit, uprice, labor, pyear) = voice.map_or_else(
                     || Default::default(),
@@ -466,7 +507,9 @@ mod tests {
         apply_migrations(&conn).expect("migrations should apply");
 
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| {
+                row.get(0)
+            })
             .expect("schema_migrations should exist");
         assert!(count > 0, "at least some migrations should be recorded");
 
@@ -506,14 +549,20 @@ mod tests {
         apply_migrations(&conn).expect("migrations should apply");
 
         let has_checksum: bool = {
-            let mut stmt = conn.prepare("PRAGMA table_info(schema_migrations)").unwrap();
-            let columns: Vec<String> = stmt.query_map([], |row| row.get(1))
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(schema_migrations)")
+                .unwrap();
+            let columns: Vec<String> = stmt
+                .query_map([], |row| row.get(1))
                 .unwrap()
                 .filter_map(|r| r.ok())
                 .collect();
             columns.contains(&"checksum".to_string())
         };
-        assert!(has_checksum, "schema_migrations should have checksum column");
+        assert!(
+            has_checksum,
+            "schema_migrations should have checksum column"
+        );
     }
 
     #[test]
@@ -531,7 +580,10 @@ mod tests {
 
         assert!(!checksums.is_empty(), "checksums should be stored");
         for (version, checksum) in &checksums {
-            assert!(!checksum.is_empty(), "checksum for migration {version} should not be empty");
+            assert!(
+                !checksum.is_empty(),
+                "checksum for migration {version} should not be empty"
+            );
         }
     }
 }

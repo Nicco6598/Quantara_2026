@@ -1,6 +1,6 @@
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { BezelSurface } from "@/components/shared/ui-primitives";
+import { Panel } from "@/components/shared/Panel";
 import type { ActivityItem, ControlSignal } from "../types";
 import { getTonePalette } from "../utils/projects-helpers";
 
@@ -12,7 +12,7 @@ export function ControlRailPanel({
   signals: ControlSignal[];
 }) {
   return (
-    <BezelSurface innerClassName="p-5">
+    <Panel padding="lg">
       <div>
         <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
           Presidio trasversale
@@ -96,6 +96,6 @@ export function ControlRailPanel({
           )}
         </div>
       </div>
-    </BezelSurface>
+    </Panel>
   );
 }

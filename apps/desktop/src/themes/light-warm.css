@@ -50,6 +50,6 @@
   --skeleton-shimmer: #f0eae0;
   --selection-bg: #d0c0ae;
   --overlay-bg: rgb(0 0 0 / 0.45);
-  --shadow-soft: 0 10px 28px rgb(45 40 34 / 7%);
-  --shadow-panel: 0 18px 48px rgb(45 40 34 / 10%);
+  --shadow-soft: 0 1px 2px rgb(45 40 34 / 6%);
+  --shadow-panel: 0 6px 18px rgb(45 40 34 / 8%);
 }

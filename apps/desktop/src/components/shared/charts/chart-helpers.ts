@@ -10,6 +10,70 @@ function sortByDate<T extends { date: string; closedAt?: string }>(views: T[]): 
   });
 }
 
+function toDayStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function toTimestamp(date: Date): number {
+  return Math.floor(date.getTime() / 1000);
+}
+
+export function buildCalendarAxisTicks(dates: number[]): {
+  dateTicks: number[];
+  monthTicks: Array<{ ts: number; label: string }>;
+} {
+  if (dates.length === 0) {
+    return { dateTicks: [], monthTicks: [] };
+  }
+
+  const sortedDates = [...dates].sort((left, right) => left - right);
+  const firstRaw = sortedDates[0];
+  const lastRaw = sortedDates.at(-1);
+  if (firstRaw === undefined || lastRaw === undefined) {
+    return { dateTicks: [], monthTicks: [] };
+  }
+
+  const first = toDayStart(new Date(firstRaw * 1000));
+  const last = toDayStart(new Date(lastRaw * 1000));
+  const firstYear = first.getFullYear();
+  const firstMonth = first.getMonth();
+  const lastYear = last.getFullYear();
+  const lastMonth = last.getMonth();
+  const rangeMonths = (lastYear - firstYear) * 12 + lastMonth - firstMonth + 1;
+  const rangeDays = Math.max(1, Math.ceil((toTimestamp(last) - toTimestamp(first)) / 86400));
+  const mondayStep = rangeDays > 220 ? 4 : rangeDays > 120 ? 2 : 1;
+
+  const dateTickSet = new Set<number>();
+  const monthTicks: Array<{ ts: number; label: string }> = [];
+
+  for (let i = 0; i < rangeMonths; i++) {
+    const monthStart = toDayStart(new Date(firstYear, firstMonth + i, 1));
+    const monthMarker = i === 0 && monthStart < first ? first : monthStart;
+    if (monthMarker >= first && monthMarker <= last) {
+      monthTicks.push({
+        label: monthStart.toLocaleDateString("it-IT", { month: "short" }).toUpperCase(),
+        ts: toTimestamp(monthMarker),
+      });
+    }
+
+    const monday = new Date(monthStart);
+    monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7));
+    let mondayIndex = 0;
+    while (monday.getMonth() === monthStart.getMonth()) {
+      if (monday >= first && monday <= last && mondayIndex % mondayStep === 0) {
+        dateTickSet.add(toTimestamp(monday));
+      }
+      mondayIndex++;
+      monday.setDate(monday.getDate() + 7);
+    }
+  }
+
+  return {
+    dateTicks: [...dateTickSet].sort((left, right) => left - right),
+    monthTicks,
+  };
+}
+
 function sCurveVal(frac: number, center: number, k: number, f0: number, f1: number): number {
   if (frac <= 0) return 0;
   if (frac >= 1) return 1;

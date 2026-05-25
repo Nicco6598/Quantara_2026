@@ -12,6 +12,15 @@ type UplotChartProps = {
   height?: number;
   onReady?: (chart: uPlot) => void;
   animateData?: boolean;
+  tooltipAnchorSeries?: number;
+  tooltipMaxDistance?: number;
+  tooltipRenderer?: (context: {
+    chart: uPlot;
+    colors: ReturnType<typeof useChartColors>["colors"];
+    data: uPlot.AlignedData;
+    index: number;
+    xValue: number;
+  }) => string | null;
 };
 
 function easeOutCubic(t: number): number {
@@ -25,6 +34,9 @@ export function UplotChart({
   height = 280,
   onReady,
   animateData,
+  tooltipAnchorSeries = 1,
+  tooltipMaxDistance,
+  tooltipRenderer,
 }: UplotChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<uPlot | null>(null);
@@ -106,6 +118,12 @@ export function UplotChart({
 
   const dataRef = useRef(data);
   dataRef.current = data;
+  const tooltipAnchorSeriesRef = useRef(tooltipAnchorSeries);
+  tooltipAnchorSeriesRef.current = tooltipAnchorSeries;
+  const tooltipMaxDistanceRef = useRef(tooltipMaxDistance);
+  tooltipMaxDistanceRef.current = tooltipMaxDistance;
+  const tooltipRendererRef = useRef(tooltipRenderer);
+  tooltipRendererRef.current = tooltipRenderer;
   const prevDataRef = useRef<uPlot.AlignedData | null>(null);
 
   const resolveColor = useCallback(
@@ -247,8 +265,10 @@ export function UplotChart({
           const t = self.cursor.top ?? 0;
           const pointLeft = self.valToPos(xVal as number, "x");
           const primarySeries = self.series[1] as Record<string, unknown> | undefined;
+          const maxDistance =
+            tooltipMaxDistanceRef.current ?? (primarySeries?.type === "bars" ? 32 : undefined);
 
-          if (primarySeries?.type === "bars" && Math.abs(pointLeft - l) > 32) {
+          if (typeof maxDistance === "number" && Math.abs(pointLeft - l) > maxDistance) {
             tooltip.style.opacity = "0";
             return;
           }
@@ -260,18 +280,29 @@ export function UplotChart({
             year: "numeric",
           });
 
-          let html = `<div style="font-size:10px;font-weight:600;color:var(--text-secondary)">${dateStr}</div>`;
-          for (let i = 1; i < dataRef.current.length; i++) {
-            const val = (dataRef.current[i]?.[idx] as number) ?? 0;
-            const label = (self.series[i]?.label || `Serie ${i}`) as string;
-            const stroke =
-              typeof self.series[i]?.stroke === "string"
-                ? (self.series[i]?.stroke as string)
-                : colors.chart1;
-            html += `<div style="margin-top:2px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-primary)">
+          let html =
+            tooltipRendererRef.current?.({
+              chart: self,
+              colors,
+              data: dataRef.current,
+              index: idx,
+              xValue: xVal as number,
+            }) ?? null;
+
+          if (!html) {
+            html = `<div style="font-size:10px;font-weight:600;color:var(--text-secondary)">${dateStr}</div>`;
+            for (let i = 1; i < dataRef.current.length; i++) {
+              const val = (dataRef.current[i]?.[idx] as number) ?? 0;
+              const label = (self.series[i]?.label || `Serie ${i}`) as string;
+              const stroke =
+                typeof self.series[i]?.stroke === "string"
+                  ? (self.series[i]?.stroke as string)
+                  : colors.chart1;
+              html += `<div style="margin-top:2px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-primary)">
           <span style="width:6px;height:6px;border-radius:50%;background:${stroke};flex-shrink:0"></span>
           ${label}: ${val.toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 0 })}
         </div>`;
+            }
           }
 
           tooltip.innerHTML = html;
@@ -281,10 +312,16 @@ export function UplotChart({
           const containerHeight = container?.clientHeight ?? 0;
           const plotLeft = self.bbox.left / devicePixelRatio;
           const plotTop = self.bbox.top / devicePixelRatio;
+          const anchorSeries = tooltipAnchorSeriesRef.current;
+          const anchorValue = dataRef.current[anchorSeries]?.[idx];
+          const anchorScale = (self.series[anchorSeries]?.scale as string | undefined) ?? "y";
           const offsetX = 14;
           const offsetY = 14;
-          const cursorX = plotLeft + l;
-          const cursorY = plotTop + t;
+          const cursorX = plotLeft + pointLeft;
+          const cursorY =
+            typeof anchorValue === "number" && Number.isFinite(anchorValue)
+              ? plotTop + self.valToPos(anchorValue, anchorScale)
+              : plotTop + t;
           const preferredRight = cursorX + offsetX;
           const preferredLeft = cursorX - tooltip.offsetWidth - offsetX;
           const maxLeft = Math.max(8, containerWidth - tooltip.offsetWidth - 8);

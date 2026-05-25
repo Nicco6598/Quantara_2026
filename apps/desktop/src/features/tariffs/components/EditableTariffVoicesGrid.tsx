@@ -1,5 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AlertTriangle, Info, Link2, MapPin, Plus, Trash2, WandSparkles, X } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   forwardRef,
   memo,
@@ -873,9 +874,12 @@ export const EditableTariffVoicesGrid = memo(
       return (
         <div>
           {sections.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 p-8 text-center text-13px font-medium text-[var(--text-secondary)]">
-              Nessuna voce da importare.
-            </div>
+            <EmptyState
+              icon={Info}
+              title="Nessuna voce da importare."
+              description="Le voci importate appariranno qui."
+              className="rounded-2xl"
+            />
           ) : (
             <div className="overflow-hidden">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)]/70 pb-3">

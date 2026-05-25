@@ -81,8 +81,8 @@
   --selection-text: var(--color-neutral-900);
   --overlay-bg: rgb(0 0 0 / 0.45);
 
-  --shadow-soft: 0 10px 28px rgb(31 38 49 / 7%);
-  --shadow-panel: 0 18px 48px rgb(31 38 49 / 10%);
+  --shadow-soft: 0 1px 2px rgb(31 38 49 / 6%);
+  --shadow-panel: 0 6px 18px rgb(31 38 49 / 8%);
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -230,18 +230,18 @@
   --radius-2xs: 2px;
   --radius-xl: 16px;
   --radius-2xl: 20px;
-  --radius-3xl: 24px;
-  --radius-4xl: 28px;
-  --radius-5xl: 30px;
+  --radius-3xl: 10px;
+  --radius-4xl: 12px;
+  --radius-5xl: 12px;
   --radius-5px: 5px;
   --radius-10px: 10px;
   --radius-11px: 11px;
   --radius-13px: 13px;
   --radius-14px: 14px;
-  --radius-17px: 17px;
-  --radius-18px: 18px;
-  --radius-22px: 22px;
-  --radius-26px: 26px;
+  --radius-17px: 8px;
+  --radius-18px: 8px;
+  --radius-22px: 8px;
+  --radius-26px: 10px;
   --radius-full: 999px;
 
   /* ── Font weights ── */
@@ -372,8 +372,8 @@
   --selection-bg: #1a2640;
   --selection-text: var(--text-primary);
   --overlay-bg: rgb(0 0 0 / 0.55);
-  --shadow-soft: 0 12px 30px rgb(0 0 0 / 36%);
-  --shadow-panel: 0 18px 48px rgb(0 0 0 / 48%);
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 32%);
+  --shadow-panel: 0 8px 22px rgb(0 0 0 / 38%);
   --chart-1: #5a8ae0;
   --chart-2: #6a9ac8;
   --chart-3: #4aaa8a;

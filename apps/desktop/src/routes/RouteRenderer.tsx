@@ -2,7 +2,7 @@ import { AnimatePresence, m } from "framer-motion";
 import { lazy, Suspense } from "react";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { motionVariants } from "@/motion";
-import type { PendingWorkflowAction, QuantaraRoute } from "@/store/app-store";
+import type { QuantaraRoute } from "@/store/app-store";
 import { routeScreens } from "./route-config";
 
 const PlaceholderScreen = lazy(() =>
@@ -11,7 +11,6 @@ const PlaceholderScreen = lazy(() =>
 
 type RouteRendererProps = {
   activeRoute: QuantaraRoute;
-  pendingWorkflowAction: PendingWorkflowAction;
 };
 
 function ScreenSkeleton() {
@@ -30,11 +29,11 @@ function ScreenGuard({ children, resetKey }: { children: React.ReactNode; resetK
   );
 }
 
-export function RouteRenderer({ activeRoute, pendingWorkflowAction }: RouteRendererProps) {
+export function RouteRenderer({ activeRoute }: RouteRendererProps) {
   const Screen = routeScreens[activeRoute];
 
   return (
-    <ScreenGuard resetKey={`${activeRoute}:${pendingWorkflowAction ?? "idle"}`}>
+    <ScreenGuard resetKey={activeRoute}>
       <AnimatePresence mode="popLayout">
         <m.div
           className="min-h-full transform-gpu will-change-[opacity,transform] [backface-visibility:hidden] [contain:paint]"

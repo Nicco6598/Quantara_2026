@@ -2,30 +2,37 @@ import { m } from "framer-motion";
 import {
   AlertTriangle,
   Building2,
+  CalendarDays,
   ChevronRight,
+  CircleDollarSign,
   FileText,
   FolderKanban,
   HardHat,
+  MapPin,
   Plus,
+  Route,
+  Target,
   Trash2,
   TrendingUp,
   Upload,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
-import { ModernDonut, SegmentBars } from "@/components/shared/LegacyCharts";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { MOTION_VARIANTS } from "@/motion";
-import type { StatusTone } from "@/components/shared/StatusBadge";
-import { BezelSurface } from "@/components/shared/ui-primitives";
-import type { PortfolioProject } from "@/features/projects/types";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ModernDonut, SegmentBars } from "@/components/shared/LegacyCharts";
+import { Panel } from "@/components/shared/Panel";
+import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
 import {
   calculateProjectPerformanceForecast,
   type ProjectFinancials,
   type SalProgressRow,
 } from "@/features/project-detail/domain/project-detail-model";
+import type { PortfolioProject } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { MOTION_VARIANTS } from "@/motion";
 import type { AuditEntry } from "@/store/audit-log-store";
 
 export type GanttBar = {
@@ -38,13 +45,71 @@ export type GanttBar = {
   color: string;
   tone: StatusTone;
   progress: number;
+  budgetAmount: number;
+  contractor: string;
+  financialProgress: number;
+  forecastDeltaDays: number;
+  healthLabel: string;
+  location: string;
+  lot: string;
+  manager: string;
+  milestone: string;
+  phase: string;
+  physicalProgress: number;
+  salAmount: number;
+  salState: string;
+};
+
+export type DashboardSalView = {
+  projectId: string;
+  date: string;
+  closedAt?: string;
+  status: string;
+  total: number;
+};
+
+export type DashboardOperationalTotal = {
+  approvedAmount: number;
+  approvedCount: number;
+  committedAmount: number;
+  draftAmount: number;
+  draftCount: number;
+  inReviewAmount: number;
+  inReviewCount: number;
+  lastSalDate: string | null;
+  lastSalTotal: number;
+  progressPercent: number;
+  salCount: number;
+};
+
+export type DashboardRealitySummary = {
+  approvedAmount: number;
+  approvedCount: number;
+  budgetOverrunAmount: number;
+  budgetOverrunCount: number;
+  committedAmount: number;
+  draftAmount: number;
+  draftCount: number;
+  inReviewAmount: number;
+  inReviewCount: number;
+  lastSal: {
+    amount: number;
+    date: string;
+    projectTitle: string;
+    status: string;
+  } | null;
+  progressPercent: number;
+  residualAmount: number;
+  salCount: number;
+  totalBudget: number;
+  withoutSalCount: number;
 };
 
 export function PriorityActions({ items }: { items: PortfolioProject[] }) {
   if (items.length === 0) return null;
 
   return (
-    <BezelSurface innerClassName="p-4">
+    <Panel>
       <div className="space-y-3">
         {items.slice(0, 4).map((project, index) => (
           <m.div
@@ -87,11 +152,644 @@ export function PriorityActions({ items }: { items: PortfolioProject[] }) {
           +{items.length - 4} altri element{items.length - 4 === 1 ? "o" : "i"}
         </div>
       ) : null}
-    </BezelSurface>
+    </Panel>
+  );
+}
+
+export function PortfolioRealityPanel({
+  projects,
+  summary,
+}: {
+  projects: PortfolioProject[];
+  summary: DashboardRealitySummary;
+}) {
+  if (projects.length === 0 && summary.salCount === 0) return null;
+
+  const activeAmount = summary.draftAmount + summary.inReviewAmount;
+  const activeCount = summary.draftCount + summary.inReviewCount;
+
+  return (
+    <Panel className="overflow-hidden" padding="none">
+      <div className="grid gap-px bg-[var(--border-subtle)]/55 md:grid-cols-[1.2fr_1fr_1fr]">
+        <RealityBlock
+          icon={FileText}
+          eyebrow="SAL reali"
+          title={`${summary.salCount} document${summary.salCount === 1 ? "o" : "i"}`}
+          detail={`${summary.approvedCount} approvat${summary.approvedCount === 1 ? "o" : "i"} · ${activeCount} apert${activeCount === 1 ? "o" : "i"}`}
+        >
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <MiniStat label="Approvati" value={String(summary.approvedCount)} tone="success" />
+            <MiniStat label="Revisione" value={String(summary.inReviewCount)} tone="info" />
+            <MiniStat label="Bozze" value={String(summary.draftCount)} tone="warning" />
+          </div>
+        </RealityBlock>
+
+        <RealityBlock
+          icon={CircleDollarSign}
+          eyebrow="Importi"
+          title={formatCompactMoney(summary.committedAmount)}
+          detail={`Residuo ${formatCompactMoney(summary.residualAmount)}`}
+        >
+          <div className="mt-4 space-y-2">
+            <AmountLine label="Approvato" value={summary.approvedAmount} />
+            <AmountLine label="Aperto" value={activeAmount} />
+          </div>
+        </RealityBlock>
+
+        <RealityBlock
+          icon={Target}
+          eyebrow="Copertura budget"
+          title={`${summary.progressPercent.toFixed(1)}%`}
+          detail={`${summary.withoutSalCount} cantier${summary.withoutSalCount === 1 ? "e" : "i"} senza SAL`}
+        >
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+            <div
+              className={cn(
+                "h-full rounded-full",
+                summary.budgetOverrunAmount > 0
+                  ? "bg-[var(--danger-base)]"
+                  : "bg-[var(--accent-primary)]",
+              )}
+              style={{ width: `${clampPercent(summary.progressPercent)}%` }}
+            />
+          </div>
+          <div className="mt-2 text-11px font-semibold text-[var(--text-secondary)]">
+            {summary.budgetOverrunCount > 0
+              ? `${summary.budgetOverrunCount} budget superat${summary.budgetOverrunCount === 1 ? "o" : "i"}`
+              : "Budget nei limiti sui dati SAL"}
+          </div>
+        </RealityBlock>
+      </div>
+
+      <div className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_1.2fr]">
+        <RealityFooterItem
+          icon={CalendarDays}
+          label="Ultimo SAL"
+          value={
+            summary.lastSal
+              ? `${formatShortDate(new Date(summary.lastSal.date))} · ${summary.lastSal.projectTitle}`
+              : "Nessun SAL registrato"
+          }
+        />
+        <RealityFooterItem
+          icon={TrendingUp}
+          label="Ultimo importo"
+          value={
+            summary.lastSal
+              ? formatMoney({ amount: summary.lastSal.amount, currency: "EUR" })
+              : "0,00 €"
+          }
+        />
+        <RealityFooterItem
+          icon={AlertTriangle}
+          label="Segnali da guardare"
+          value={`${summary.withoutSalCount} senza SAL · ${summary.draftCount} bozze · ${summary.inReviewCount} revisioni`}
+        />
+      </div>
+    </Panel>
   );
 }
 
 export function TimelineGantt({
+  bars,
+  projects,
+  operationalByProjectId,
+  onOpen,
+  onDelete,
+}: {
+  bars: GanttBar[];
+  projects: PortfolioProject[];
+  operationalByProjectId: Map<
+    string,
+    { approvedAmount: number; committedAmount: number; progressPercent: number }
+  >;
+  onOpen: (project: PortfolioProject) => void;
+  onDelete: (projectId: string) => void;
+}) {
+  const today = useMemo(() => new Date(), []);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [focus, setFocus] = useState<"all" | "risk" | "active">("all");
+  const [density, setDensity] = useState<"compact" | "comfortable" | "wide">("comfortable");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+
+  const visibleBars = useMemo(() => {
+    const filtered = bars.filter((bar) => {
+      if (focus === "risk") return bar.tone !== "success";
+      if (focus === "active") return bar.salAmount > 0 || bar.physicalProgress > 0;
+      return true;
+    });
+    const toneWeight = { danger: 0, warning: 1, success: 2 } as Record<StatusTone, number>;
+    return filtered.toSorted((a, b) => {
+      const toneDiff = toneWeight[a.tone] - toneWeight[b.tone];
+      return toneDiff !== 0 ? toneDiff : a.endDate.getTime() - b.endDate.getTime();
+    });
+  }, [bars, focus]);
+
+  let minTime = today.getTime();
+  let maxTime = today.getTime();
+  for (const bar of visibleBars.length > 0 ? visibleBars : bars) {
+    minTime = Math.min(minTime, bar.startDate.getTime());
+    maxTime = Math.max(maxTime, bar.endDate.getTime());
+  }
+
+  const minDate = startOfMonth(new Date(minTime));
+  const maxDate = endOfMonth(new Date(maxTime));
+  const monthTicks = useMemo(() => buildMonthTicks(minDate, maxDate), [minDate, maxDate]);
+  const monthWidth = density === "compact" ? 74 : density === "wide" ? 132 : 96;
+  const rowHeight = density === "compact" ? 86 : density === "wide" ? 116 : 104;
+  const leftColumnWidth = density === "compact" ? 380 : 430;
+  const timelineWidth = useMemo(
+    () => Math.max(monthTicks.length * monthWidth + 80, 620),
+    [monthTicks.length, monthWidth],
+  );
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      el.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const xScale = useMemo(() => {
+    const tMin = minDate.getTime();
+    const tRange = maxDate.getTime() - tMin || 1;
+    return (d: Date) => ((d.getTime() - tMin) / tRange) * 100;
+  }, [minDate, maxDate]);
+
+  function barStyle(bar: GanttBar) {
+    const left = Math.max(xScale(bar.startDate), 0);
+    const right = Math.min(xScale(bar.endDate), 100);
+    return { left: `${left}%`, width: `${Math.max(right - left, 0.7)}%` };
+  }
+
+  const toneTotals = [
+    {
+      color: "var(--success-base)",
+      count: visibleBars.filter((b) => b.tone === "success").length,
+      label: "In linea",
+    },
+    {
+      color: "var(--warning-base)",
+      count: visibleBars.filter((b) => b.tone === "warning").length,
+      label: "Attenzione",
+    },
+    {
+      color: "var(--danger-base)",
+      count: visibleBars.filter((b) => b.tone === "danger").length,
+      label: "Critico",
+    },
+  ];
+  const avgProgress =
+    visibleBars.length > 0
+      ? Math.round(
+          visibleBars.reduce((sum, bar) => sum + bar.financialProgress, 0) / visibleBars.length,
+        )
+      : 0;
+  const totalSalAmount = visibleBars.reduce((sum, bar) => sum + bar.salAmount, 0);
+  const nextMilestone = visibleBars.toSorted(
+    (a, b) => a.endDate.getTime() - b.endDate.getTime(),
+  )[0];
+
+  if (bars.length === 0) return null;
+
+  return (
+    <Panel className="overflow-hidden" padding="none">
+      <div className="border-b border-[var(--border-subtle)]/60 p-4 lg:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+              <HardHat className="size-3.5" />
+              <span>Gantt operativo</span>
+            </div>
+            <h2 className="mt-2 text-18px font-semibold leading-tight text-[var(--text-primary)]">
+              Pianificazione cantieri e SAL
+            </h2>
+            <p className="mt-1 max-w-[780px] text-12px font-medium leading-5 text-[var(--text-secondary)]">
+              Avanzamento fisico, esposizione SAL, rischio e fine prevista nella stessa riga.
+            </p>
+          </div>
+
+          <div className="grid min-w-[min(100%,520px)] grid-cols-2 gap-2 sm:grid-cols-4">
+            <GanttStat icon={HardHat} label="Cantieri" value={String(visibleBars.length)} />
+            <GanttStat icon={TrendingUp} label="Av. medio" value={`${avgProgress}%`} />
+            <GanttStat
+              icon={CircleDollarSign}
+              label="SAL"
+              value={formatCompactMoney(totalSalAmount)}
+            />
+            <GanttStat
+              icon={Target}
+              label="Prossima fine"
+              value={nextMilestone ? formatShortDate(nextMilestone.endDate) : "N.D."}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            <SegmentedButton active={focus === "all"} onClick={() => setFocus("all")}>
+              Tutti
+            </SegmentedButton>
+            <SegmentedButton active={focus === "risk"} onClick={() => setFocus("risk")}>
+              Rischio
+            </SegmentedButton>
+            <SegmentedButton active={focus === "active"} onClick={() => setFocus("active")}>
+              Con SAL
+            </SegmentedButton>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-11px font-semibold text-[var(--text-secondary)]">Zoom</span>
+            <SegmentedButton active={density === "compact"} onClick={() => setDensity("compact")}>
+              S
+            </SegmentedButton>
+            <SegmentedButton
+              active={density === "comfortable"}
+              onClick={() => setDensity("comfortable")}
+            >
+              M
+            </SegmentedButton>
+            <SegmentedButton active={density === "wide"} onClick={() => setDensity("wide")}>
+              L
+            </SegmentedButton>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex overflow-hidden bg-[var(--surface-base)]">
+        <div
+          className="sticky left-0 z-20 shrink-0 border-r border-[var(--border-subtle)]/65 bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)]"
+          style={{ width: leftColumnWidth }}
+        >
+          <div className="grid h-12 grid-cols-[1fr_86px_72px] items-center gap-3 border-b border-[var(--border-subtle)]/65 px-4 text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            <span>Cantiere</span>
+            <span>SAL</span>
+            <span>Stato</span>
+          </div>
+          {visibleBars.length === 0 ? (
+            <div className="p-4 text-12px font-medium text-[var(--text-secondary)]">
+              Nessun cantiere nel filtro selezionato.
+            </div>
+          ) : null}
+          {visibleBars.map((bar) => {
+            const operational = operationalByProjectId.get(bar.id);
+            return (
+              <div
+                className={cn(
+                  "group relative grid grid-cols-[1fr_86px_72px] items-center gap-3 border-b border-[var(--border-subtle)]/45 px-4 py-3 transition-colors duration-[var(--duration-fast)]",
+                  hoveredId === bar.id && "bg-[var(--bg-muted)]/45",
+                )}
+                key={bar.id}
+                style={{ height: rowHeight }}
+              >
+                <button
+                  className="min-w-0 text-left"
+                  onClick={() => {
+                    const project = projectById.get(bar.id);
+                    if (project) onOpen(project);
+                  }}
+                  onMouseEnter={() => setHoveredId(bar.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  type="button"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      className={cn(
+                        "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[12px]",
+                        bar.tone === "danger"
+                          ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                          : bar.tone === "warning"
+                            ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                            : "bg-[var(--success-soft)] text-[var(--success-base)]",
+                      )}
+                    >
+                      <FolderKanban className="size-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-13px font-semibold leading-tight text-[var(--text-primary)]">
+                          {bar.label}
+                        </span>
+                        <span className="shrink-0 rounded-[8px] bg-[var(--bg-muted)] px-1.5 py-0.5 text-9px font-bold text-[var(--text-secondary)]">
+                          {bar.lot || "lotto"}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex min-w-0 items-center gap-1.5 text-11px font-medium text-[var(--text-secondary)]">
+                        <MapPin className="size-3 shrink-0" />
+                        <span className="truncate">
+                          {bar.contractor} · {bar.location || "Sede non indicata"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-10px font-semibold text-[var(--text-tertiary)]">
+                        <span className="inline-flex items-center gap-1 rounded-[8px] bg-[var(--surface-base)] px-1.5 py-0.5 ring-1 ring-[var(--border-subtle)]/55">
+                          <Route className="size-3" />
+                          {bar.phase || "fase non indicata"}
+                        </span>
+                        <span className="inline-flex min-w-0 items-center gap-1 rounded-[8px] bg-[var(--surface-base)] px-1.5 py-0.5 ring-1 ring-[var(--border-subtle)]/55">
+                          <UserRound className="size-3 shrink-0" />
+                          <span className="truncate">{bar.manager || "PM non assegnato"}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+
+                <div className="min-w-0">
+                  <div className="text-13px font-bold tabular-nums text-[var(--text-primary)]">
+                    {bar.financialProgress.toFixed(0)}%
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]">
+                    <div
+                      className={cn(
+                        "h-full rounded-full",
+                        bar.tone === "danger"
+                          ? "bg-[var(--danger-base)]"
+                          : bar.tone === "warning"
+                            ? "bg-[var(--warning-base)]"
+                            : "bg-[var(--accent-primary)]",
+                      )}
+                      style={{ width: `${clampPercent(bar.financialProgress)}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 truncate text-10px font-semibold text-[var(--text-tertiary)]">
+                    {formatCompactMoney(operational?.committedAmount ?? bar.salAmount)}
+                  </div>
+                </div>
+
+                <div className="min-w-0">
+                  <div
+                    className={cn(
+                      "inline-flex max-w-full items-center rounded-[9px] px-2 py-1 text-10px font-bold",
+                      bar.tone === "danger"
+                        ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                        : bar.tone === "warning"
+                          ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+                          : "bg-[var(--success-soft)] text-[var(--success-base)]",
+                    )}
+                  >
+                    <span className="truncate">{getToneLabel(bar.tone)}</span>
+                  </div>
+                  <div className="mt-1 text-10px font-semibold tabular-nums text-[var(--text-tertiary)]">
+                    fisico {bar.physicalProgress.toFixed(0)}%
+                  </div>
+                </div>
+                <button
+                  aria-label={`Elimina ${bar.label}`}
+                  className="absolute right-2 top-2 rounded-[10px] bg-[var(--danger-soft)]/45 p-1.5 text-[var(--danger-base)] opacity-0 transition-[background-color,opacity,transform] duration-[var(--duration-fast)] hover:bg-[var(--danger-soft)] active:scale-[0.94] group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteTargetId(bar.id);
+                  }}
+                  type="button"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="min-w-0 flex-1 overflow-x-auto" ref={scrollRef}>
+          <div className="relative" style={{ width: "100%", minWidth: timelineWidth }}>
+            <div className="sticky top-0 z-10 h-12 border-b border-[var(--border-subtle)]/65 bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)]">
+              {monthTicks.map((tick, index) => {
+                const next = monthTicks[index + 1] ?? addMonths(tick, 1);
+                const left = xScale(tick);
+                const width = Math.max(4, xScale(next) - left);
+                const isNewYear =
+                  index === 0 || tick.getFullYear() !== monthTicks[index - 1]?.getFullYear();
+                return (
+                  <div
+                    className={cn(
+                      "absolute flex h-full items-center justify-center border-l border-[var(--border-subtle)]/45 px-2",
+                      index % 2 === 1 && "bg-[color-mix(in_srgb,var(--bg-muted)_34%,transparent)]",
+                    )}
+                    key={tick.getTime()}
+                    style={{ left: `${left}%`, width: `${width}%` }}
+                  >
+                    <span
+                      className={cn(
+                        "truncate text-10px font-bold uppercase",
+                        isNewYear ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)]",
+                      )}
+                    >
+                      {tick.toLocaleDateString("it-IT", { month: "short" })}
+                      {isNewYear ? ` ${tick.getFullYear()}` : ""}
+                    </span>
+                  </div>
+                );
+              })}
+              <div
+                className="absolute top-0 flex h-full -translate-x-1/2 items-center"
+                style={{ left: `${xScale(today)}%` }}
+              >
+                <span className="rounded-full bg-[var(--accent-primary)] px-2 py-0.5 text-9px font-bold text-[var(--accent-contrast)] shadow-soft">
+                  Oggi
+                </span>
+              </div>
+            </div>
+
+            <div className="relative">
+              {visibleBars.map((bar) => {
+                const isHovered = hoveredId === bar.id;
+                const bs = barStyle(bar);
+                const physicalProgress = clampPercent(bar.physicalProgress);
+                const financialProgress = clampPercent(bar.financialProgress);
+                const visibleFinancialProgress =
+                  financialProgress > 0 ? Math.max(4, financialProgress) : 0;
+                const isTodayInside =
+                  today.getTime() >= bar.startDate.getTime() &&
+                  today.getTime() <= bar.endDate.getTime();
+                const project = projectById.get(bar.id);
+
+                return (
+                  <button
+                    className={cn(
+                      "relative block w-full cursor-pointer border-b border-[var(--border-subtle)]/45 text-left transition-colors duration-[var(--duration-fast)]",
+                      isHovered
+                        ? "bg-[var(--bg-muted)]/34"
+                        : "bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--bg-muted)_22%,transparent))]",
+                    )}
+                    key={bar.id}
+                    onClick={() => {
+                      if (project) onOpen(project);
+                    }}
+                    onMouseEnter={() => setHoveredId(bar.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    style={{ height: rowHeight }}
+                    type="button"
+                  >
+                    {monthTicks.map((tick) => (
+                      <span
+                        className="pointer-events-none absolute top-0 bottom-0 w-px border-l border-dashed border-[var(--border-subtle)]/38"
+                        key={`${bar.id}-${tick.getTime()}`}
+                        style={{ left: `${xScale(tick)}%` }}
+                      />
+                    ))}
+
+                    <span className="absolute left-4 top-3 flex flex-wrap items-center gap-2 text-10px font-semibold text-[var(--text-tertiary)]">
+                      <span className="inline-flex items-center gap-1 rounded-[8px] bg-[color-mix(in_srgb,var(--surface-base)_88%,transparent)] px-1.5 py-0.5 ring-1 ring-[var(--border-subtle)]/50">
+                        <CalendarDays className="size-3" />
+                        {formatShortDate(bar.startDate)} - {formatShortDate(bar.endDate)}
+                      </span>
+                      <span className="rounded-[8px] bg-[color-mix(in_srgb,var(--surface-base)_88%,transparent)] px-1.5 py-0.5 ring-1 ring-[var(--border-subtle)]/50">
+                        {bar.days}g
+                      </span>
+                      {bar.forecastDeltaDays !== 0 ? (
+                        <span
+                          className={cn(
+                            "rounded-[8px] px-1.5 py-0.5",
+                            bar.forecastDeltaDays > 0
+                              ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                              : "bg-[var(--success-soft)] text-[var(--success-base)]",
+                          )}
+                        >
+                          {bar.forecastDeltaDays > 0 ? "+" : ""}
+                          {bar.forecastDeltaDays}g forecast
+                        </span>
+                      ) : null}
+                    </span>
+
+                    <span
+                      className="absolute top-[54%] h-7 -translate-y-1/2 rounded-[12px] border shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_70%,transparent)] transition-[height,box-shadow,transform] duration-[var(--duration-base)] ease-standard"
+                      style={{
+                        ...bs,
+                        background: `linear-gradient(90deg, color-mix(in srgb, ${bar.color} 16%, var(--surface-base)), color-mix(in srgb, ${bar.color} 7%, var(--surface-base)))`,
+                        borderColor: `color-mix(in srgb, ${bar.color} 36%, var(--border-subtle))`,
+                        boxShadow: isHovered
+                          ? `0 14px 34px color-mix(in srgb, ${bar.color} 18%, transparent)`
+                          : undefined,
+                      }}
+                    >
+                      <span
+                        className="absolute inset-y-0 left-0 rounded-[13px]"
+                        style={{
+                          width: `${visibleFinancialProgress}%`,
+                          background: `linear-gradient(90deg, ${bar.color}, color-mix(in srgb, ${bar.color} 78%, var(--surface-base)))`,
+                        }}
+                      />
+                      <span
+                        className="absolute -bottom-2 left-0 h-px border-t-2 border-dashed border-[var(--accent-primary)]/75"
+                        style={{ width: `${physicalProgress}%` }}
+                      />
+                      {financialProgress >= 10 ? (
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-10px font-bold tabular-nums text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.32)]">
+                          SAL {financialProgress.toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span
+                          className="absolute top-1/2 -translate-y-1/2 rounded-[8px] bg-[color-mix(in_srgb,var(--surface-base)_94%,transparent)] px-1.5 py-0.5 text-9px font-bold tabular-nums text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/65"
+                          style={{ left: 8 }}
+                        >
+                          SAL {financialProgress.toFixed(0)}%
+                        </span>
+                      )}
+                      <span className="absolute -left-1 top-1/2 size-3 -translate-y-1/2 rounded-full border-2 border-[var(--surface-base)] bg-[var(--text-secondary)]" />
+                      <span
+                        className="absolute -right-1 top-1/2 size-3 -translate-y-1/2 rounded-full border-2 border-[var(--surface-base)]"
+                        style={{ backgroundColor: bar.color }}
+                      />
+                    </span>
+
+                    {isTodayInside ? (
+                      <span
+                        className="absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+                        style={{ left: `${xScale(today)}%` }}
+                      >
+                        <span className="size-2.5 rounded-full bg-[var(--accent-primary)] ring-2 ring-[var(--surface-base)]" />
+                        <span className="rounded-[8px] bg-[var(--accent-soft)] px-1.5 py-0.5 text-9px font-bold text-[var(--accent-primary)]">
+                          live
+                        </span>
+                      </span>
+                    ) : null}
+
+                    <span
+                      className="absolute bottom-3 flex max-w-[220px] -translate-x-1/2 items-center gap-1.5 rounded-[10px] border border-[var(--border-subtle)]/55 bg-[color-mix(in_srgb,var(--surface-base)_94%,transparent)] px-2 py-1 text-10px font-semibold text-[var(--text-secondary)] shadow-soft"
+                      style={{ left: `${Math.min(92, Math.max(8, xScale(bar.endDate)))}%` }}
+                    >
+                      <Target className="size-3 shrink-0 text-[var(--accent-primary)]" />
+                      <span className="truncate">
+                        {bar.milestone || bar.phase || "Fine prevista"}
+                      </span>
+                      <span className="shrink-0 text-[var(--text-primary)]">
+                        {formatShortDate(bar.endDate)}
+                      </span>
+                    </span>
+
+                    <span className="absolute right-4 top-3 flex items-center gap-2 text-10px font-semibold text-[var(--text-tertiary)]">
+                      <span>fisico {physicalProgress.toFixed(0)}%</span>
+                      <span>budget {formatCompactMoney(bar.budgetAmount)}</span>
+                    </span>
+                  </button>
+                );
+              })}
+
+              <div
+                className="pointer-events-none absolute top-0 bottom-0 z-10"
+                style={{ left: `${xScale(today)}%` }}
+              >
+                <div className="h-full w-px bg-[var(--accent-primary)] opacity-70" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)]/45 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3 text-10px font-semibold text-[var(--text-secondary)]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-8 rounded-full bg-[var(--accent-primary)]" />
+            SAL maturati
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-px w-8 border-t border-dashed border-[var(--text-secondary)]" />
+            avanzamento fisico
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-[var(--accent-primary)]" />
+            oggi
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {toneTotals
+            .filter((t) => t.count > 0)
+            .map((t) => (
+              <span
+                className="flex items-center gap-1.5 text-10px font-semibold text-[var(--text-secondary)]"
+                key={t.label}
+              >
+                <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
+                {t.label}
+                <span className="font-bold text-[var(--text-primary)]">{t.count}</span>
+              </span>
+            ))}
+        </div>
+      </div>
+
+      <ConfirmDialog
+        confirmLabel="Elimina"
+        isOpen={deleteTargetId !== null}
+        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={() => {
+          if (deleteTargetId) onDelete(deleteTargetId);
+          setDeleteTargetId(null);
+        }}
+        title="Eliminare questo progetto?"
+        tone="danger"
+      >
+        Il progetto verrà rimosso definitivamente insieme a tutte le SAL collegate.
+      </ConfirmDialog>
+    </Panel>
+  );
+}
+
+export function TimelineGanttLegacy({
   bars,
   projects,
   operationalByProjectId,
@@ -410,6 +1108,80 @@ function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+function addMonths(date: Date, months: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
+}
+
+function formatShortDate(date: Date): string {
+  return date.toLocaleDateString("it-IT", { day: "2-digit", month: "short" }).replace(".", "");
+}
+
+function formatCompactMoney(amount: number): string {
+  return new Intl.NumberFormat("it-IT", {
+    currency: "EUR",
+    maximumFractionDigits: 1,
+    notation: "compact",
+    style: "currency",
+  }).format(amount);
+}
+
+function getToneLabel(tone: StatusTone): string {
+  if (tone === "danger") return "critico";
+  if (tone === "warning") return "attenzione";
+  return "in linea";
+}
+
+function SegmentedButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={cn(
+        "h-8 rounded-[10px] border px-3 text-12px font-semibold transition-[background-color,border-color,color,transform] duration-[var(--duration-fast)] active:scale-[0.97]",
+        active
+          ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+          : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)]",
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function GanttStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_86%,var(--bg-muted)_14%)] px-3 py-2">
+      <div className="flex items-center gap-1.5 text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+        <Icon className="size-3.5" />
+        <span className="truncate">{label}</span>
+      </div>
+      <div className="mt-1 truncate text-15px font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function endOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0);
 }
@@ -495,15 +1267,11 @@ export function OperationalSites({
       </ConfirmDialog>
 
       {projects.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-22px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] p-10 text-center shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--surface-highlight)_48%,transparent)]">
-          <HardHat className="size-8 text-[var(--text-secondary)]" />
-          <p className="text-13px font-medium text-[var(--text-secondary)]">
-            Nessun cantiere nel portafoglio.
-          </p>
-          <p className="text-12px text-[var(--text-secondary)]">
-            Crea un progetto per iniziare a monitorare i lavori.
-          </p>
-        </div>
+        <EmptyState
+          icon={HardHat}
+          title="Nessun cantiere nel portafoglio."
+          description="Crea un progetto per iniziare a monitorare i lavori."
+        />
       ) : null}
 
       {canShowMore ? (
@@ -530,12 +1298,7 @@ function ProjectRow({
 }) {
   const salApprovedAmount = operational?.approvedAmount ?? project.salValue.amount;
   const progressPercent = operational?.progressPercent ?? project.progress;
-  const toneClass =
-    project.tone === "danger"
-      ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-      : project.tone === "warning"
-        ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-        : "bg-[var(--success-soft)] text-[var(--success-base)]";
+  const toneClass = statusToneStyles[project.tone];
 
   return (
     <m.article
@@ -644,7 +1407,7 @@ export function RightRail({
 }) {
   return (
     <aside className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <BezelSurface innerClassName="p-5">
+      <Panel padding="lg">
         <div className="mb-4 flex items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
             01
@@ -666,9 +1429,9 @@ export function RightRail({
             Nessun progetto nel portafoglio.
           </p>
         )}
-      </BezelSurface>
+      </Panel>
 
-      <BezelSurface innerClassName="p-5 xl:col-span-2">
+      <Panel padding="lg" className="xl:col-span-2">
         <div className="mb-4 flex items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
             02
@@ -697,9 +1460,9 @@ export function RightRail({
             Nessuna attivita recente.
           </p>
         )}
-      </BezelSurface>
+      </Panel>
 
-      <BezelSurface innerClassName="p-5">
+      <Panel padding="lg">
         <div className="mb-4 flex items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
             03
@@ -713,7 +1476,7 @@ export function RightRail({
           <ActionButton icon={Upload} label="Importa tariffario" />
           <ActionButton icon={Plus} label="Crea progetto" />
         </div>
-      </BezelSurface>
+      </Panel>
     </aside>
   );
 }
@@ -730,6 +1493,107 @@ function ActionButton({ icon: Icon, label }: { icon: React.ElementType; label: s
       {label}
       <ChevronRight className="ml-auto size-4 text-[var(--text-secondary)]" />
     </button>
+  );
+}
+
+function RealityBlock({
+  children,
+  detail,
+  eyebrow,
+  icon: Icon,
+  title,
+}: {
+  children: React.ReactNode;
+  detail: string;
+  eyebrow: string;
+  icon: React.ElementType;
+  title: string;
+}) {
+  return (
+    <div className="bg-[var(--surface-base)] p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-13px bg-[var(--info-soft)] text-[var(--info-base)]">
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            {eyebrow}
+          </div>
+          <div className="mt-1 truncate text-20px font-bold leading-none text-[var(--text-primary)]">
+            {title}
+          </div>
+          <div className="mt-1 text-12px font-medium leading-4 text-[var(--text-secondary)]">
+            {detail}
+          </div>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: "info" | "success" | "warning";
+  value: string;
+}) {
+  return (
+    <div className="rounded-12px bg-[var(--bg-muted)]/72 p-2">
+      <div
+        className={cn(
+          "text-14px font-bold leading-none",
+          tone === "success" && "text-[var(--success-base)]",
+          tone === "warning" && "text-[var(--warning-base)]",
+          tone === "info" && "text-[var(--info-base)]",
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-1 truncate text-10px font-semibold text-[var(--text-secondary)]">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function AmountLine({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-12px">
+      <span className="font-semibold text-[var(--text-secondary)]">{label}</span>
+      <span className="font-bold tabular-nums text-[var(--text-primary)]">
+        {formatMoney({ amount: value, currency: "EUR" })}
+      </span>
+    </div>
+  );
+}
+
+function RealityFooterItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-14px bg-[var(--bg-muted)]/62 px-3 py-2.5">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-10px bg-[var(--surface-base)] text-[var(--info-base)] ring-1 ring-[var(--border-subtle)]/55">
+        <Icon className="size-3.5" />
+      </span>
+      <div className="min-w-0">
+        <div className="text-10px font-bold uppercase tracking-0_12em text-[var(--text-secondary)]">
+          {label}
+        </div>
+        <div className="mt-0.5 truncate text-12px font-semibold text-[var(--text-primary)]">
+          {value}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -751,41 +1615,121 @@ function buildSegments(
 // Data builders (pure functions)
 // ---------------------------------------------------------------------------
 
-export function buildOverviewMetrics(projects: PortfolioProject[]) {
+function salTime(view: { date: string; closedAt?: string }) {
+  return new Date(view.closedAt || view.date).getTime();
+}
+
+export function buildOverviewMetrics(
+  projects: PortfolioProject[],
+  summary: DashboardRealitySummary,
+) {
   const totalBudget = projects.reduce((total, project) => total + project.budget.amount, 0);
-  const escalationCount = projects.filter((project) => project.tone === "danger").length;
-  const salCount = projects.filter((project) => project.salDays <= 7).length;
+  const escalationCount = summary.budgetOverrunCount;
+  const openSalCount = summary.draftCount + summary.inReviewCount;
 
   return [
     {
-      caption: "Budget complessivo dei lotti attivi",
+      badge: `${summary.progressPercent.toFixed(1)}% SAL`,
+      caption: `${formatMoney({ amount: summary.committedAmount, currency: "EUR" })} maturati`,
       icon: Building2,
       label: "Budget portafoglio",
       tone: "blue" as const,
       value: formatMoney({ amount: totalBudget, currency: "EUR" }),
     },
     {
-      caption: "Cantieri con SAL attivi",
+      badge: `${summary.withoutSalCount} senza SAL`,
+      caption: `${summary.salCount} SAL reali su ${projects.length} cantieri`,
       icon: HardHat,
       label: "Lotti attivi",
       tone: "success" as const,
       value: String(projects.length),
     },
     {
-      caption: "SAL da configurare o in corso",
+      caption: `${summary.approvedCount} approvati · ${openSalCount} aperti`,
       icon: TrendingUp,
-      label: "SAL in corso",
-      tone: "warning" as const,
-      value: String(salCount),
+      label: "SAL registrati",
+      tone: openSalCount > 0 ? ("warning" as const) : ("info" as const),
+      value: String(summary.salCount),
     },
     {
-      caption: "Elementi critici da risolvere",
+      caption:
+        summary.budgetOverrunAmount > 0
+          ? `${formatMoney({ amount: summary.budgetOverrunAmount, currency: "EUR" })} oltre budget`
+          : "Nessun superamento budget dai SAL",
       icon: FolderKanban,
-      label: "Criticita / Escalation",
+      label: "Criticita budget",
       tone: escalationCount > 0 ? ("danger" as const) : ("success" as const),
       value: String(escalationCount),
     },
   ];
+}
+
+export function buildDashboardRealitySummary(
+  projects: PortfolioProject[],
+  views: DashboardSalView[],
+  operationalByProjectId: Map<string, DashboardOperationalTotal>,
+): DashboardRealitySummary {
+  const totalBudget = projects.reduce((total, project) => total + project.budget.amount, 0);
+  let approvedAmount = 0;
+  let approvedCount = 0;
+  let committedAmount = 0;
+  let draftAmount = 0;
+  let draftCount = 0;
+  let inReviewAmount = 0;
+  let inReviewCount = 0;
+  let budgetOverrunAmount = 0;
+  let budgetOverrunCount = 0;
+  let withoutSalCount = 0;
+
+  for (const project of projects) {
+    const operational = operationalByProjectId.get(project.id);
+    if (!operational || operational.salCount === 0) {
+      withoutSalCount++;
+      continue;
+    }
+
+    approvedAmount += operational.approvedAmount;
+    approvedCount += operational.approvedCount;
+    committedAmount += operational.committedAmount;
+    draftAmount += operational.draftAmount;
+    draftCount += operational.draftCount;
+    inReviewAmount += operational.inReviewAmount;
+    inReviewCount += operational.inReviewCount;
+
+    const overrun = operational.committedAmount - project.budget.amount;
+    if (overrun > 0) {
+      budgetOverrunAmount += overrun;
+      budgetOverrunCount++;
+    }
+  }
+
+  const titleByProjectId = new Map(projects.map((project) => [project.id, project.title]));
+  const lastView = [...views].sort((left, right) => salTime(right) - salTime(left))[0];
+
+  return {
+    approvedAmount,
+    approvedCount,
+    budgetOverrunAmount,
+    budgetOverrunCount,
+    committedAmount,
+    draftAmount,
+    draftCount,
+    inReviewAmount,
+    inReviewCount,
+    lastSal: lastView
+      ? {
+          amount: lastView.total,
+          date: lastView.closedAt || lastView.date,
+          projectTitle: titleByProjectId.get(lastView.projectId) ?? "Progetto",
+          status: lastView.status,
+        }
+      : null,
+    progressPercent: totalBudget > 0 ? (committedAmount / totalBudget) * 100 : 0,
+    residualAmount: totalBudget - committedAmount,
+    salCount: views.length,
+    totalBudget,
+    withoutSalCount,
+  };
 }
 
 export function buildFocusRows(projects: PortfolioProject[]) {
@@ -948,15 +1892,28 @@ export function buildGanttBars(
           : 0;
 
       return {
+        budgetAmount,
+        contractor: project.contractor,
+        financialProgress: progress,
+        forecastDeltaDays: project.forecastDeltaDays,
+        healthLabel: project.healthLabel,
         id: project.id,
         label: project.title,
-        subtitle: project.contractor ?? "",
+        location: project.location,
+        lot: project.lot,
+        manager: project.manager,
+        milestone: project.nextMilestone,
+        phase: project.phase,
+        physicalProgress: project.progress,
         startDate,
         endDate,
         days,
         color,
         tone: project.tone,
         progress,
+        salAmount: timeline?.totalSalAmount ?? 0,
+        salState: project.salState,
+        subtitle: project.contractor ?? "",
       };
     })
     .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());

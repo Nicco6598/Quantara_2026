@@ -21,40 +21,42 @@ import {
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { DetailList, DetailRow } from "@/components/shared/DetailList";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { MOTION_VARIANTS } from "@/motion";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
+import { Panel } from "@/components/shared/Panel";
 import { QuickAction } from "@/components/shared/QuickAction";
 import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import { SeverityBar } from "@/components/shared/SeverityBar";
-import { useDataChangedListener } from "@/hooks/useDataChangedListener";
-import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
-import { BezelSurface } from "@/components/shared/ui-primitives";
+import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import {
-  type DesktopMaterial,
   createDesktopMaterial,
+  type DesktopMaterial,
   deleteDesktopMaterial,
   listDesktopMaterials,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { reportUserActionError } from "@/lib/user-action-error";
 import { cn } from "@/lib/utils";
+import { MOTION_VARIANTS } from "@/motion";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
 import { AddMaterialModal } from "./components/AddMaterialModal";
 import {
   CATEGORIES,
   type CategoryTone,
-  type StockTone,
   categoryColorMap,
   categoryToneLabel,
   formatQuantity,
+  type StockTone,
   screenReducer,
   toneForQuantity,
 } from "./materials-screen-state";
@@ -333,13 +335,10 @@ export function MaterialsScreen() {
         <MetricsGrid metrics={metrics} />
       </ScreenHero>
 
-      <section className="mt-8 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
+      <section className="operational-panel-grid mt-8 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="space-y-4 xl:self-start">
-          <Panel>
-            <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-              Azioni rapide
-            </span>
-            <div className="mt-4 space-y-3">
+          <Panel eyebrow="Azioni rapide">
+            <div className="space-y-3">
               <QuickAction
                 detail="Crea un ordine per i materiali selezionati"
                 icon={ShoppingCart}
@@ -366,72 +365,71 @@ export function MaterialsScreen() {
           {selectedMaterial ? (
             <MaterialDetail material={selectedMaterial} />
           ) : (
-            <Panel>
-              <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-                Dettaglio materiale
-              </span>
-              <div className="mt-6 text-center text-13px font-medium text-[var(--text-secondary)]">
+            <Panel eyebrow="Dettaglio materiale">
+              <div className="text-center text-13px font-medium text-[var(--text-secondary)]">
                 Seleziona un materiale per vedere dettagli e movimenti
               </div>
             </Panel>
           )}
         </aside>
 
-        <Panel className="min-w-0 overflow-visible p-0">
-          <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] p-3 lg:p-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <FilterSelect
-                label="Categoria"
-                onChange={(cat) =>
-                  dispatch({
-                    type: "SET_SELECTED_CATEGORY",
-                    payload: cat === "all" ? null : cat,
-                  })
-                }
-                options={["all", ...CATEGORIES]}
-                value={state.selectedCategory ?? "all"}
-                displayMap={
-                  new Map([
-                    ["all", "Tutte le categorie"],
-                    ...CATEGORIES.map((c) => [c, c] as const),
-                  ])
-                }
-              />
-              <FilterSearch
-                onChange={(q) => dispatch({ type: "SET_SEARCH_QUERY", payload: q })}
-                placeholder="Cerca materiale..."
-                value={state.searchQuery}
-              />
-              {state.searchQuery || state.selectedCategory ? (
-                <ClearFiltersButton
-                  onClick={() => {
-                    dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
-                    dispatch({ type: "SET_SELECTED_CATEGORY", payload: null });
-                  }}
+        <Panel className="min-w-0 overflow-visible" padding="none">
+          <div className="border-b border-[var(--border-subtle)] p-3 lg:p-4">
+            <div className="operational-toolbar">
+              <div className="operational-toolbar-group">
+                <FilterSelect
+                  label="Categoria"
+                  onChange={(cat) =>
+                    dispatch({
+                      type: "SET_SELECTED_CATEGORY",
+                      payload: cat === "all" ? null : cat,
+                    })
+                  }
+                  options={["all", ...CATEGORIES]}
+                  value={state.selectedCategory ?? "all"}
+                  displayMap={
+                    new Map([
+                      ["all", "Tutte le categorie"],
+                      ...CATEGORIES.map((c) => [c, c] as const),
+                    ])
+                  }
                 />
-              ) : null}
-            </div>
-            <div className="flex items-center gap-3">
-              <FilterTemplatePicker
-                scope="materials"
-                currentFilters={{
-                  selectedCategory: state.selectedCategory,
-                  searchQuery: state.searchQuery,
-                }}
-                onApplyFilters={applyTemplateFilters}
-              />
-              <Button
-                icon={Plus}
-                onClick={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
-                variant="primary"
-              >
-                Nuovo materiale
-              </Button>
-              <MultiSelectToggle
-                isEnabled={multiSelect.isEnabled}
-                onToggle={multiSelect.toggleEnable}
-                count={multiSelect.count}
-              />
+                <FilterSearch
+                  onChange={(q) => dispatch({ type: "SET_SEARCH_QUERY", payload: q })}
+                  placeholder="Cerca materiale..."
+                  value={state.searchQuery}
+                />
+                {state.searchQuery || state.selectedCategory ? (
+                  <ClearFiltersButton
+                    onClick={() => {
+                      dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
+                      dispatch({ type: "SET_SELECTED_CATEGORY", payload: null });
+                    }}
+                  />
+                ) : null}
+              </div>
+              <div className="operational-toolbar-actions">
+                <FilterTemplatePicker
+                  scope="materials"
+                  currentFilters={{
+                    selectedCategory: state.selectedCategory,
+                    searchQuery: state.searchQuery,
+                  }}
+                  onApplyFilters={applyTemplateFilters}
+                />
+                <Button
+                  icon={Plus}
+                  onClick={() => dispatch({ type: "SET_CREATE_MODAL", payload: true })}
+                  variant="primary"
+                >
+                  Nuovo materiale
+                </Button>
+                <MultiSelectToggle
+                  isEnabled={multiSelect.isEnabled}
+                  onToggle={multiSelect.toggleEnable}
+                  count={multiSelect.count}
+                />
+              </div>
             </div>
           </div>
 
@@ -452,8 +450,8 @@ export function MaterialsScreen() {
                 selectedItemNames={multiSelect.selectedItems.map((m) => m.description)}
                 someSelected={multiSelect.someSelected}
               >
-                <button
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--bg-muted)] px-3.5 text-12px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] hover:bg-[var(--bg-muted-strong)]"
+                <Button
+                  icon={Download}
                   onClick={() =>
                     notify({
                       message: "Export materiali disponibile in un prossimo aggiornamento.",
@@ -461,11 +459,11 @@ export function MaterialsScreen() {
                       tone: "info",
                     })
                   }
-                  type="button"
+                  variant="outline"
+                  size="sm"
                 >
-                  <Download className="size-4" />
                   Esporta
-                </button>
+                </Button>
               </MultiSelectBulkDeleteBar>
             </div>
           )}
@@ -597,10 +595,10 @@ function MaterialCard({
   return (
     <m.article
       className={cn(
-        "relative rounded-14px border p-3 text-left transition-colors duration-[var(--duration-fast)]",
+        "operational-card-hover relative rounded-[18px] border p-3 text-left",
         checked
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
-          : "border-[var(--border-subtle)]/70 bg-[var(--surface-base)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-muted)]/40",
+          : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
       )}
       initial={MOTION_VARIANTS.row.initial}
       transition={MOTION_VARIANTS.row.transition}
@@ -779,18 +777,18 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
           </StatusPill>
         </div>
 
-        <dl className="mt-5 divide-y divide-[var(--border-subtle)]">
-          <DetailLine label="Categoria" value={material.category} />
-          <DetailLine label="Unità di misura" value={material.unit} />
-          <DetailLine
+        <DetailList className="mt-5">
+          <DetailRow label="Categoria" value={material.category} />
+          <DetailRow label="Unità di misura" value={material.unit} />
+          <DetailRow
             label="Stock attuale"
             value={formatQuantity(material.quantity, material.unit)}
           />
-          <DetailLine
+          <DetailRow
             label="Soglia minima"
             value={formatQuantity(material.minQuantity, material.unit)}
           />
-        </dl>
+        </DetailList>
 
         <div className="mt-3">
           <div className="flex items-center justify-between text-12px text-[var(--text-secondary)]">
@@ -877,16 +875,16 @@ function MaterialDetail({ material }: { material: DesktopMaterial }) {
                 </div>
               ))}
               <div className="border-t border-[var(--border-subtle)]/40 pt-2">
-                <DetailLine
+                <DetailRow
                   label="Disponibile (lordo)"
                   value={formatQuantity(material.quantity, material.unit)}
                 />
-                <DetailLine
+                <DetailRow
                   label="Impegnato"
                   value={`- ${formatQuantity(committed, material.unit)}`}
                   className="text-[var(--warning-base)]"
                 />
-                <DetailLine
+                <DetailRow
                   label="Effettivo disponibile"
                   value={formatQuantity(effectiveStock, material.unit)}
                   className={cn(
@@ -920,7 +918,7 @@ function MetricsGrid({
   };
 }) {
   return (
-    <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="operational-card-grid grid-flow-dense sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard
         caption="Quantità totale in magazzino"
         icon={Warehouse}
@@ -977,7 +975,7 @@ function MaterialListSection({
 
   return (
     <>
-      <div className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="operational-card-grid p-4 md:grid-cols-2 2xl:grid-cols-3">
         {filteredMaterials.length > 0 ? (
           filteredMaterials.map((mat) => (
             <MaterialCard
@@ -991,23 +989,17 @@ function MaterialListSection({
             />
           ))
         ) : (
-          <div className="col-span-full rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-muted)]/35 p-8 text-center">
-            <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <Package className="size-4" />
-            </div>
-            <div className="mt-3 text-14px font-bold text-[var(--text-primary)]">
-              Nessun materiale trovato
-            </div>
-            <p className="mx-auto mt-1 max-w-[320px] text-12px font-medium text-[var(--text-secondary)]">
-              Modifica i filtri o{" "}
-              <button
-                className="font-semibold text-[var(--accent-primary)] underline underline-offset-2 hover:no-underline"
-                onClick={onCreateMaterial}
-                type="button"
-              >
-                crea un nuovo materiale
-              </button>
-            </p>
+          <div className="col-span-full">
+            <EmptyState
+              icon={Package}
+              title="Nessun materiale trovato"
+              description="Modifica i filtri o crea un nuovo materiale."
+              action={{
+                label: "Crea nuovo materiale",
+                onClick: onCreateMaterial,
+                variant: "secondary",
+              }}
+            />
           </div>
         )}
       </div>
@@ -1041,10 +1033,6 @@ function MaterialListSection({
   );
 }
 
-function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <BezelSurface innerClassName={cn("p-4", className)}>{children}</BezelSurface>;
-}
-
 function MaterialIcon({ tone }: { tone: CategoryTone }) {
   return (
     <span
@@ -1060,23 +1048,4 @@ function MaterialIcon({ tone }: { tone: CategoryTone }) {
 
 function CoverageBar({ coverage, tone }: { coverage: number; tone: StockTone }) {
   return <SeverityBar percentage={coverage} tone={tone} />;
-}
-
-function DetailLine({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-2.5">
-      <dt className="text-13px font-medium text-[var(--text-secondary)]">{label}</dt>
-      <dd className={cn("text-right text-13px font-bold text-[var(--text-primary)]", className)}>
-        {value}
-      </dd>
-    </div>
-  );
 }

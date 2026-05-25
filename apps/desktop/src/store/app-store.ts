@@ -143,9 +143,81 @@ type PreferenceSlice = {
   showReleaseNotesAfterUpdate: boolean;
 };
 
-export type AppStore = NavigationSlice & PreferenceSlice & ThemeSlice;
+export type WorkspaceMemberRole =
+  | "owner"
+  | "admin"
+  | "project_manager"
+  | "engineer"
+  | "accountant"
+  | "viewer";
+
+export type WorkspaceMemberStatus = "active" | "invited" | "disabled";
+
+export type WorkspaceMember = {
+  id: string;
+  name: string;
+  email: string;
+  role: WorkspaceMemberRole;
+  status: WorkspaceMemberStatus;
+  lastAccessAt?: string;
+  avatar?: string;
+};
+
+export type TeamSlice = {
+  members: WorkspaceMember[];
+  loading: boolean;
+  setMembers: (members: WorkspaceMember[]) => void;
+  addMember: (member: WorkspaceMember) => void;
+  updateMember: (id: string, updates: Partial<WorkspaceMember>) => void;
+  removeMember: (id: string) => void;
+};
+
+export type AppStore = NavigationSlice & PreferenceSlice & ThemeSlice & TeamSlice;
 
 const initialRouteHistory: NavEntry[] = [{ route: "dashboard" }];
+
+const seedMembers: WorkspaceMember[] = [
+  {
+    id: "1",
+    name: "Marco Bianchi",
+    email: "marco.bianchi@azienda.it",
+    role: "owner",
+    status: "active",
+    lastAccessAt: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    name: "Laura Rossi",
+    email: "laura.rossi@azienda.it",
+    role: "admin",
+    status: "active",
+    lastAccessAt: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    id: "3",
+    name: "Giuseppe Verdi",
+    email: "giuseppe.verdi@azienda.it",
+    role: "project_manager",
+    status: "active",
+    lastAccessAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: "4",
+    name: "Anna Neri",
+    email: "anna.neri@azienda.it",
+    role: "engineer",
+    status: "active",
+    lastAccessAt: new Date(Date.now() - 172800000).toISOString(),
+  },
+  {
+    id: "5",
+    name: "Paolo Gialli",
+    email: "paolo.gialli@azienda.it",
+    role: "accountant",
+    status: "active",
+    lastAccessAt: new Date(Date.now() - 259200000).toISOString(),
+  },
+];
 
 function createNavigationState(routeHistory: NavEntry[], routeHistoryIndex: number) {
   const entry = routeHistory[routeHistoryIndex];
@@ -240,6 +312,18 @@ export const useAppStore = create<AppStore>()(
         reviewedVoiceCount: 0,
         totalVoices: 0,
       },
+      members: seedMembers,
+      loading: false,
+      setMembers: (members) => set({ members }),
+      addMember: (member) => set((state) => ({ members: [...state.members, member] })),
+      updateMember: (id, updates) =>
+        set((state) => ({
+          members: state.members.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+        })),
+      removeMember: (id) =>
+        set((state) => ({
+          members: state.members.filter((m) => m.id !== id),
+        })),
       setActiveRoute: (route, context, replace) =>
         set((state) => {
           const currentEntry = state.routeHistory[state.routeHistoryIndex];
@@ -490,6 +574,19 @@ export function useProjectsNavigationState() {
       activeContext: state.activeContext,
       activeRoute: state.activeRoute,
       navigateBack: state.navigateBack,
+    })),
+  );
+}
+
+export function useTeamState() {
+  return useAppStore(
+    useShallow((state) => ({
+      members: state.members,
+      loading: state.loading,
+      setMembers: state.setMembers,
+      addMember: state.addMember,
+      updateMember: state.updateMember,
+      removeMember: state.removeMember,
     })),
   );
 }
