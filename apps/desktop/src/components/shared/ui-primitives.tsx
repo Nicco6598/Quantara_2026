@@ -15,17 +15,15 @@ export function BezelSurface({
   return (
     <m.section
       className={cn(
-        "min-w-0 rounded-[18px] border border-[color-mix(in_srgb,var(--border-subtle)_64%,transparent)] bg-[var(--surface-base)] shadow-[0_1px_2px_color-mix(in_srgb,var(--text-primary)_4%,transparent)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--surface-highlight)_24%,transparent)]",
+        "min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
         className,
       )}
-      initial={{ opacity: 0, y: 18, scale: 0.992 }}
+      initial={{ opacity: 0, y: 8, scale: 0.998 }}
       transition={{ duration: MOTION_DURATION.reveal, ease: SPRING_EASE }}
       viewport={{ amount: 0.18, once: true }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
     >
-      <div className={cn("h-full rounded-[17px] bg-[var(--surface-base)]", innerClassName)}>
-        {children}
-      </div>
+      <div className={cn("h-full rounded-[15px] bg-transparent", innerClassName)}>{children}</div>
     </m.section>
   );
 }
@@ -44,7 +42,7 @@ export function FocusChip({
   return (
     <m.button
       className={cn(
-        "micro-interact inline-flex items-center gap-2 rounded-full border px-4 py-2 text-13px font-medium outline-none transition-all duration-slow ease-standard",
+        "micro-interact inline-flex items-center gap-2 rounded-md border px-3 py-2 text-13px font-medium outline-none transition-all duration-base ease-standard",
         active
           ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-none"
           : "border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/24 hover:bg-[var(--bg-muted)]",
@@ -80,7 +78,7 @@ export function CompactRail({
     <BezelSurface innerClassName="p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-12px font-semibold text-[var(--text-primary)]">{title}</h3>
-        <span className="rounded-md bg-[var(--bg-muted-strong)] px-2 py-1 text-11px font-semibold text-[var(--text-secondary)]">
+        <span className="rounded-md bg-[var(--bg-muted-strong)] px-2 py-1 text-11px font-semibold tabular-nums text-[var(--text-secondary)]">
           {value}
         </span>
       </div>

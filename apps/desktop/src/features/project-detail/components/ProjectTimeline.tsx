@@ -2,12 +2,10 @@ import { m } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { useMemo } from "react";
 import { Currency } from "@/components/shared/Currency";
-import { MOTION_VARIANTS } from "@/motion";
 import type { PortfolioProject } from "@/features/projects/types";
-
 import type { SalDocument } from "@/features/sal/domain/sal-workflow";
-
 import { cn } from "@/lib/utils";
+import { MOTION_VARIANTS } from "@/motion";
 
 import { buildProjectTimeline, type TimelineEvent } from "../domain/project-timeline";
 
@@ -26,18 +24,21 @@ export function ProjectTimeline({ project, salDocuments }: ProjectTimelineProps)
 
   if (events.length === 0) {
     return (
-      <div className="rounded-lg bg-[var(--surface-base)] p-5 text-center text-13px text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]/60">
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 text-center text-13px text-[var(--text-secondary)] shadow-[var(--shadow-soft)]">
         Nessun evento disponibile per questo progetto.
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg bg-[var(--surface-base)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-      <div className="text-11px font-semibold uppercase tracking-widest text-[var(--text-secondary)]">
-        Timeline progetto
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-[var(--shadow-soft)]">
+      <div className="min-w-0">
+        <p className="text-11px font-medium text-[var(--text-tertiary)]">Pianificazione</p>
+        <h3 className="mt-0.5 text-15px font-semibold text-[var(--text-primary)]">
+          Timeline progetto
+        </h3>
       </div>
-      <div className="relative mt-4 ml-2">
+      <div className="relative ml-2 mt-4">
         {/* Vertical line */}
         <div className="absolute bottom-0 left-[11px] top-0 w-0.5 bg-[var(--border-subtle)]/50" />
 

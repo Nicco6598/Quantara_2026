@@ -1,46 +1,46 @@
 :root {
   color-scheme: light;
 
-  --color-neutral-0: #f8f9fc;
-  --color-neutral-25: #f2f4f8;
-  --color-neutral-50: #eaedf3;
-  --color-neutral-100: #dfe2ea;
-  --color-neutral-200: #cdd1dc;
-  --color-neutral-300: #b0b5c3;
-  --color-neutral-500: #626a7a;
-  --color-neutral-700: #232936;
-  --color-neutral-800: #181c26;
-  --color-neutral-900: #0e121c;
-  --color-brand-500: #3b7dd8;
-  --color-brand-600: #2d6dc8;
-  --color-brand-700: #1f5db8;
-  --color-rail-500: #5a8ab5;
-  --color-track-500: #2e8e8e;
-  --color-copper-500: #7a7aaa;
-  --color-danger-500: #c94a4a;
-  --color-warning-500: #b98a38;
-  --color-success-500: #2a8a6a;
-  --color-info-500: #3b7dd8;
+  --color-neutral-0: #ffffff;
+  --color-neutral-25: #f7f9fc;
+  --color-neutral-50: #f1f4f9;
+  --color-neutral-100: #e6ebf2;
+  --color-neutral-200: #d5dde8;
+  --color-neutral-300: #aeb8c8;
+  --color-neutral-500: #657184;
+  --color-neutral-700: #273142;
+  --color-neutral-800: #172033;
+  --color-neutral-900: #0b1220;
+  --color-brand-500: #2f6fed;
+  --color-brand-600: #255ed4;
+  --color-brand-700: #1d4fb8;
+  --color-rail-500: #55708f;
+  --color-track-500: #25806f;
+  --color-copper-500: #6f6c90;
+  --color-danger-500: #c33d4a;
+  --color-warning-500: #a86f22;
+  --color-success-500: #21875d;
+  --color-info-500: #2f6fed;
   --chart-6: #d4904a;
   --chart-7: #6a94c8;
   --chart-8: #9a7ac8;
   --chart-9: #4ab09a;
   --chart-10: #c07070;
 
-  --bg-app: #eef1f7;
+  --bg-app: #f5f7fb;
   --bg-panel: var(--color-neutral-0);
-  --bg-muted: #e2e6ee;
-  --bg-muted-strong: var(--color-neutral-100);
+  --bg-muted: #edf1f7;
+  --bg-muted-strong: #e3e9f2;
   --surface-base: var(--color-neutral-0);
   --surface-raised: #ffffff;
   --surface-inset: var(--color-neutral-25);
-  --surface-highlight: rgb(255 255 255 / 0.78);
+  --surface-highlight: rgb(255 255 255 / 0.84);
   --text-primary: var(--color-neutral-900);
-  --text-secondary: #4a5565;
-  --text-tertiary: #707888;
+  --text-secondary: #4f5d70;
+  --text-tertiary: #7b8798;
   --text-inverse: #fafbfc;
-  --border-subtle: #ccd1dc;
-  --border-strong: var(--color-neutral-200);
+  --border-subtle: #d7deea;
+  --border-strong: #c5cfde;
   --ring-focus: color-mix(in srgb, var(--color-brand-500) 45%, transparent);
   --accent-primary: var(--color-brand-500);
   --accent-primary-hover: var(--color-brand-600);
@@ -59,16 +59,16 @@
   --chart-4: var(--color-copper-500);
   --chart-5: var(--color-neutral-300);
 
-  --sidebar-bg: var(--surface-base);
-  --sidebar-active-bg: #dce3f0;
+  --sidebar-bg: #eef3fa;
+  --sidebar-active-bg: #dbe7fb;
   --sidebar-active-text: var(--accent-primary);
-  --topbar-bg: color-mix(in srgb, var(--bg-app) 82%, var(--surface-base));
+  --topbar-bg: color-mix(in srgb, var(--bg-app) 88%, var(--surface-base));
   --kpi-card-bg: var(--surface-raised);
-  --table-row-hover: #e8ecf4;
+  --table-row-hover: #f0f4fa;
   --detail-panel-bg: var(--surface-base);
   --bg-app-accent: color-mix(in srgb, var(--sidebar-bg) 92%, #3d5c8c 8%);
   --neutral-base: #7a7f8f;
-  --neutral-soft: #eef0f4;
+  --neutral-soft: #edf1f6;
   --accent-tertiary: var(--color-copper-500);
   --severity-1: var(--color-success-500);
   --severity-2: #7a9a30;
@@ -81,8 +81,9 @@
   --selection-text: var(--color-neutral-900);
   --overlay-bg: rgb(0 0 0 / 0.45);
 
-  --shadow-soft: 0 1px 2px rgb(31 38 49 / 6%);
-  --shadow-panel: 0 6px 18px rgb(31 38 49 / 8%);
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 5%);
+  --shadow-panel: 0 12px 28px rgb(15 23 42 / 8%);
+  --shadow-popover: 0 18px 44px rgb(15 23 42 / 14%);
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -144,13 +145,13 @@
   --z-command-palette: 200;
 
   /* ── Button gradient tokens (primary) ── */
-  --button-primary-start: color-mix(in srgb, var(--accent-primary) 70%, white 30%);
+  --button-primary-start: var(--accent-primary);
   --button-primary-mid: var(--accent-primary);
-  --button-primary-end: color-mix(in srgb, var(--accent-primary) 80%, black 20%);
-  --button-primary-border: color-mix(in srgb, var(--accent-primary) 85%, white 15%);
-  --button-primary-shadow-outer: color-mix(in srgb, var(--accent-primary) 22%, transparent);
-  --button-primary-shadow-inner: color-mix(in srgb, var(--accent-primary) 18%, transparent);
-  --button-primary-glow: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  --button-primary-end: var(--accent-primary-hover);
+  --button-primary-border: color-mix(in srgb, var(--accent-primary) 82%, #0b1220 18%);
+  --button-primary-shadow-outer: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  --button-primary-shadow-inner: transparent;
+  --button-primary-glow: transparent;
 
   /* ── Button gradient tokens (primary hover) ── */
   --button-primary-hover-start: color-mix(in srgb, var(--accent-primary) 75%, white 25%);
@@ -219,7 +220,7 @@
   --button-destructive-hover-end: color-mix(in srgb, var(--danger-base) 75%, black 25%);
 
   --font-sans:
-    Geist, "Proxima Nova", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Geist, "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
   --font-heading:
     Geist, "Proxima Nova", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -230,18 +231,18 @@
   --radius-2xs: 2px;
   --radius-xl: 16px;
   --radius-2xl: 20px;
-  --radius-3xl: 10px;
-  --radius-4xl: 12px;
-  --radius-5xl: 12px;
+  --radius-3xl: 12px;
+  --radius-4xl: 14px;
+  --radius-5xl: 16px;
   --radius-5px: 5px;
   --radius-10px: 10px;
   --radius-11px: 11px;
   --radius-13px: 13px;
   --radius-14px: 14px;
-  --radius-17px: 8px;
-  --radius-18px: 8px;
-  --radius-22px: 8px;
-  --radius-26px: 10px;
+  --radius-17px: 12px;
+  --radius-18px: 12px;
+  --radius-22px: 14px;
+  --radius-26px: 16px;
   --radius-full: 999px;
 
   /* ── Font weights ── */
@@ -256,13 +257,13 @@
   --font-weight-black: 900;
 
   /* ── Fluid font scale ── */
-  --text-xs: clamp(0.75rem, 0.4vw + 0.65rem, 0.8125rem);
-  --text-sm: clamp(0.8125rem, 0.5vw + 0.7rem, 0.875rem);
-  --text-base: clamp(0.875rem, 0.5vw + 0.75rem, 0.9375rem);
-  --text-lg: clamp(1rem, 0.8vw + 0.8rem, 1.125rem);
-  --text-xl: clamp(1.25rem, 1.2vw + 0.9rem, 1.5rem);
-  --text-2xl: clamp(1.5rem, 1.8vw + 1rem, 1.875rem);
-  --text-3xl: clamp(1.75rem, 2.5vw + 1rem, 2.5rem);
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
 
   /* ── Pixel font sizes (UI chrome) ── */
   --text-6px: 6px;

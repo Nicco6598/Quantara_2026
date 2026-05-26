@@ -14,15 +14,9 @@ import { Button } from "@/components/shared/Button";
 import { Currency } from "@/components/shared/Currency";
 import { StatusChip } from "@/components/shared/StatusChip";
 import { cn } from "@/lib/utils";
-import { SalInspector } from "./components/SalInspector";
 import type { SalWorkflowPhase } from "./state/workflow";
 import { getPhaseIndex } from "./state/workflow";
-import type {
-  SalEconomicRules,
-  SalEconomicSummary,
-  SalLineView,
-  SalVerificationCheck,
-} from "./types";
+import type { SalEconomicSummary, SalLineView } from "./types";
 
 const PHASES: { id: Exclude<SalWorkflowPhase, "completed">; label: string }[] = [
   { id: "project", label: "Progetto" },
@@ -53,11 +47,7 @@ type SalWorkspaceProps = {
   onSaveDraft: () => void;
   onExportPdf?: () => void;
   onExportExcel?: () => void;
-  selectedLineId: string | null;
-  onSelectLine: (lineId: string | null) => void;
   lineViews: SalLineView[];
-  economicRules: SalEconomicRules;
-  checks: SalVerificationCheck[];
   children: ReactNode;
 };
 
@@ -76,11 +66,7 @@ export function SalWorkspace({
   onSaveDraft,
   onExportPdf,
   onExportExcel,
-  selectedLineId,
-  onSelectLine,
   lineViews,
-  economicRules,
-  checks,
   children,
 }: SalWorkspaceProps) {
   const displayTitle = salTitle.trim() || suggestedSalTitle;
@@ -92,10 +78,6 @@ export function SalWorkspace({
     phase === "completed"
       ? "Completato"
       : PRIMARY_LABELS[phase as Exclude<SalWorkflowPhase, "completed">];
-
-  const selectedLine = selectedLineId
-    ? (lineViews.find((l) => l.id === selectedLineId) ?? null)
-    : null;
 
   const grossTotal = summary.grossAmount;
   const discountTotal = summary.discountAmount;
@@ -290,25 +272,8 @@ export function SalWorkspace({
         )}
       </header>
 
-      {/* ─── Body: content + right inspector ─── */}
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Phase content */}
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>
-        </div>
-
-        {/* ─── Right inspector (conditional, 320px) ─── */}
-        {selectedLine !== null && (
-          <aside className="hidden w-[320px] shrink-0 border-l border-[var(--border-subtle)]/40 bg-[var(--surface-base)]/30 p-3 xl:block">
-            <SalInspector
-              checks={checks}
-              economicRules={economicRules}
-              line={selectedLine}
-              onClose={() => onSelectLine(null)}
-            />
-          </aside>
-        )}
-      </div>
+      {/* ─── Body: content ─── */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>
 
       {/* ─── Bottom bar (sticky) ─── */}
       <footer className="sticky bottom-0 z-20 border-t-2 border-[var(--border-subtle)]/40 bg-[var(--surface-base)] shadow-[0_-2px_0_var(--surface-base)]">

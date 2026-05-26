@@ -5,18 +5,18 @@ import {
   Copy,
   Database,
   FileText,
+  Plus,
   Save,
-  Sparkles,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
+import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FilterChip } from "@/components/shared/FilterChip";
-import { MetricCard } from "@/components/shared/MetricCard";
 import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { Panel } from "@/components/shared/Panel";
-import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
@@ -44,6 +44,7 @@ import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
 import { type PendingWorkflowAction, useAppStore } from "@/store/app-store";
 
+import { AddVoiceDialog } from "./components/AddVoiceDialog";
 import { QuickAction } from "./components/QuickAction";
 import { TariffImportLoadingModal } from "./components/TariffImportLoadingModal";
 import type { TariffImportPreviewResult } from "./components/TariffImportPreviewModal";
@@ -88,6 +89,8 @@ function yieldToBrowser(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
+const TARIFF_PAGE_SIZE = 12;
+
 function formatImportError(error: unknown): string {
   if (!(error instanceof Error)) {
     return String(error);
@@ -100,6 +103,28 @@ function formatImportError(error: unknown): string {
     .find(Boolean);
 
   return stackLine ? `${error.message} (${stackLine})` : error.message;
+}
+
+function TariffHeaderStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 text-11px font-medium text-[var(--text-secondary)]">{label}</span>
+        <Icon className="size-3.5 shrink-0 text-[var(--text-tertiary)]" />
+      </div>
+      <div className="mt-1 text-17px font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
 }
 
 export function TariffsScreen() {
@@ -150,8 +175,10 @@ export function TariffsScreen() {
     return [];
   });
   const [activeCatalogTab, setActiveCatalogTab] = useState<"all" | "favorites">("all");
+  const [visibleTariffLimit, setVisibleTariffLimit] = useState(TARIFF_PAGE_SIZE);
   const [voiceCountByBookId, setVoiceCountByBookId] = useState<Record<string, number>>({});
   const [isVoicesExplorerOpen, setIsVoicesExplorerOpen] = useState(false);
+  const [isAddVoiceOpen, setIsAddVoiceOpen] = useState(false);
   const { previewIndex: importPreviewIndex } = importMeta;
   const previewValidationCanConfirm = useRef(false);
   const [reviewedFiles, setReviewedFiles] = useState<Set<number>>(() => new Set());
@@ -308,6 +335,14 @@ export function TariffsScreen() {
         : baseFilteredTariffBooks,
     [activeCatalogTab, baseFilteredTariffBooks, favoriteBookIdSet],
   );
+  const displayedTariffBooks = useMemo(
+    () => visibleTariffBooks.slice(0, visibleTariffLimit),
+    [visibleTariffBooks, visibleTariffLimit],
+  );
+  const remainingTariffCount = Math.max(visibleTariffBooks.length - displayedTariffBooks.length, 0);
+  const resetVisibleTariffs = useCallback(() => {
+    setVisibleTariffLimit(TARIFF_PAGE_SIZE);
+  }, []);
 
   const deleteSelect = useMultiSelectDelete(visibleTariffBooks);
 
@@ -486,6 +521,102 @@ export function TariffsScreen() {
       notify({
         message: error instanceof Error ? error.message : String(error),
         title: "Impossibile caricare le bozze",
+        tone: "danger",
+      });
+    }
+  }
+
+  async function handleAddVoiceSave(result: import("./components/AddVoiceDialog").AddVoiceResult) {
+    const updatedBookIds = new Set<string>();
+    let newTariffBookId: string | null = null;
+
+    try {
+      // 1. Create new book if requested
+      if (result.newBook) {
+        const tariffBookId = createTariffBookId({
+          name: result.newBook.name,
+          year: result.newBook.year,
+        });
+        const fullVoice: DesktopTariffVoice = {
+          ...result.voiceData,
+          id: `voice_${tariffBookId}_${sanitizeIdentifier(result.voiceData.officialCode)}`,
+          tariffBookId,
+        };
+        const savedBook = await createDesktopTariffBook({
+          id: tariffBookId,
+          name: result.newBook.name,
+          sourceName: result.newBook.sourceName,
+          status: "active",
+          year: result.newBook.year,
+          voices: [fullVoice],
+        });
+
+        savedVoiceMap.current.set(tariffBookId, [fullVoice]);
+        setTariffBooksState((current) => ({
+          data: [savedBook, ...current.data],
+          ...(current.source === "fallback"
+            ? { message: "Runtime browser: nuovo tariffario creato.", source: "fallback" }
+            : { source: "desktop" }),
+        }));
+        setVoiceCountByBookId((current) => ({
+          ...current,
+          [tariffBookId]: 1,
+        }));
+        updatedBookIds.add(tariffBookId);
+        newTariffBookId = tariffBookId;
+      }
+
+      // 2. Add voice to existing books
+      for (const bookId of result.existingBookIds) {
+        const existingResult = await listDesktopTariffVoices(bookId, fallbackTariffVoices);
+        const fullVoice: DesktopTariffVoice = {
+          ...result.voiceData,
+          id: `voice_${bookId}_${sanitizeIdentifier(result.voiceData.officialCode)}`,
+          tariffBookId: bookId,
+        };
+        const allVoices = [...existingResult.data, fullVoice];
+        const existingBook = tariffBooksState.data.find((b) => b.id === bookId);
+        if (!existingBook) continue;
+
+        await updateDesktopTariffBook(bookId, {
+          name: existingBook.name,
+          sourceName: existingBook.sourceName,
+          status: existingBook.status,
+          year: existingBook.year,
+          voices: allVoices,
+        });
+
+        savedVoiceMap.current.set(bookId, allVoices);
+        setVoiceCountByBookId((current) => ({
+          ...current,
+          [bookId]: (current[bookId] ?? 0) + 1,
+        }));
+
+        if (selectedTariffBookId === bookId) {
+          setVoicesState({ data: allVoices, source: "desktop" });
+        }
+        updatedBookIds.add(bookId);
+      }
+
+      dispatchDataChanged();
+      setIsAddVoiceOpen(false);
+
+      const targetLabel =
+        updatedBookIds.size === 1
+          ? updatedBookIds.has(newTariffBookId ?? "")
+            ? "nuovo tariffario"
+            : "1 tariffario"
+          : `${updatedBookIds.size} tariffari`;
+
+      notify({
+        message: `Voce ${result.voiceData.officialCode} aggiunta a ${targetLabel}.`,
+        title: "Voce salvata",
+        tone: "success",
+      });
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Salvataggio voce non riuscito",
         tone: "danger",
       });
     }
@@ -1000,81 +1131,54 @@ export function TariffsScreen() {
         />
       ) : (
         <>
-          <ScreenHero
-            badge="Catalogo prezzi"
-            title="Catalogo tariffari"
-            description="Gestisci tariffari per ente, anno e coerenza con i progetti, mantenendo import, filtri e dettaglio nello stesso piano operativo."
-            sidePanel={
-              <div>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                      Voci nel catalogo
-                    </div>
-                    <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-                      {voicesState.data.length.toLocaleString("it-IT")}
-                    </div>
-                  </div>
-                  <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                    <Database className="size-6" />
-                  </span>
-                </div>
-                <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
-                  {tariffMetrics.tariffCount} tariffari su {tariffMetrics.sourceCount} enti.
+          <section className="border-b border-[var(--border-subtle)] pb-5">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+              <div className="min-w-0">
+                <p className="text-12px font-medium text-[var(--text-tertiary)]">Catalogo prezzi</p>
+                <h2 className="mt-1 text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-32px">
+                  Tariffari
+                </h2>
+                <p className="mt-2 max-w-2xl text-14px leading-6 text-[var(--text-secondary)]">
+                  Import, filtri e manutenzione dei prezzari in una lista compatta.
                 </p>
-                <div className="mt-4 flex items-center gap-3">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success-base)]">
-                    <CheckCircle2 className="size-5" />
-                  </span>
-                  <div className="text-12px font-semibold text-[var(--text-primary)]">
-                    {tariffMetrics.activeCount} aggiornati
-                  </div>
-                </div>
               </div>
-            }
-          >
-            <div className="operational-card-grid grid-flow-dense sm:grid-cols-2 xl:grid-cols-5">
-              <MetricCard
-                caption="Totali nel catalogo"
-                icon={Database}
-                label="Tariffari"
-                value={String(tariffMetrics.tariffCount)}
-              />
-              <MetricCard
-                caption="Enti gestiti"
-                icon={Building2}
-                label="Enti"
-                tone="success"
-                value={String(tariffMetrics.sourceCount)}
-              />
-              <MetricCard
-                caption={availableYears.slice(0, 3).join(", ")}
-                icon={CalendarDays}
-                label="Anni attivi"
-                tone="warning"
-                value={String(availableYears.length)}
-              />
-              <MetricCard
-                caption="Nel catalogo"
-                icon={Sparkles}
-                label="Voci totali"
-                tone="info"
-                value={voicesState.data.length.toLocaleString("it-IT")}
-              />
-              <MetricCard
-                caption="Attivi o validati"
-                icon={CheckCircle2}
-                label="Aggiornati"
-                tone="success"
-                value={String(tariffMetrics.activeCount)}
-              />
-            </div>
-          </ScreenHero>
 
-          <section className="operational-panel-grid mt-8 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[560px]">
+                <TariffHeaderStat
+                  icon={Database}
+                  label="Tariffari"
+                  value={String(tariffMetrics.tariffCount)}
+                />
+                <TariffHeaderStat
+                  icon={Building2}
+                  label="Enti"
+                  value={String(tariffMetrics.sourceCount)}
+                />
+                <TariffHeaderStat
+                  icon={CalendarDays}
+                  label="Anni"
+                  value={String(availableYears.length)}
+                />
+                <TariffHeaderStat
+                  icon={CheckCircle2}
+                  label="Attivi"
+                  value={String(tariffMetrics.activeCount)}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="operational-panel-grid mt-6 lg:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
             <div className="space-y-4 xl:self-start">
               <Panel eyebrow="Azioni rapide">
                 <div className="space-y-3">
+                  <QuickAction
+                    detail="Aggiungi una voce a un tariffario esistente o nuovo"
+                    icon={Plus}
+                    label="Aggiungi voce"
+                    onClick={() => setIsAddVoiceOpen(true)}
+                    tone="info"
+                  />
                   <QuickAction
                     detail="Carica un tariffario da PDF o JSON parser"
                     icon={FileText}
@@ -1112,20 +1216,26 @@ export function TariffsScreen() {
             </div>
 
             <Panel className="min-w-0 overflow-visible" padding="none">
-              <div className="border-b border-[var(--border-subtle)] p-3 lg:p-4">
+              <div className="border-b border-[var(--border-subtle)] p-4">
                 <div className="operational-toolbar">
                   <div className="operational-toolbar-group">
                     <FilterChip
                       active={activeCatalogTab === "all"}
                       count={baseFilteredTariffBooks.length}
-                      onClick={() => setActiveCatalogTab("all")}
+                      onClick={() => {
+                        setActiveCatalogTab("all");
+                        resetVisibleTariffs();
+                      }}
                     >
                       Tutti i tariffari
                     </FilterChip>
                     <FilterChip
                       active={activeCatalogTab === "favorites"}
                       count={favoriteCount}
-                      onClick={() => setActiveCatalogTab("favorites")}
+                      onClick={() => {
+                        setActiveCatalogTab("favorites");
+                        resetVisibleTariffs();
+                      }}
                     >
                       I miei preferiti
                     </FilterChip>
@@ -1134,7 +1244,10 @@ export function TariffsScreen() {
                   <div className="operational-toolbar-actions">
                     <FilterSelect
                       label="Anno"
-                      onChange={setYearFilter}
+                      onChange={(value) => {
+                        setYearFilter(value);
+                        resetVisibleTariffs();
+                      }}
                       options={["all", ...availableYears.map(String)]}
                       value={yearFilter}
                       displayMap={
@@ -1146,7 +1259,10 @@ export function TariffsScreen() {
                     />
                     <FilterSelect
                       label="Progetto"
-                      onChange={setProjectFilter}
+                      onChange={(value) => {
+                        setProjectFilter(value);
+                        resetVisibleTariffs();
+                      }}
                       options={["all", ...realContracts.map((c) => c.id)]}
                       value={projectFilter}
                       displayMap={
@@ -1161,13 +1277,19 @@ export function TariffsScreen() {
                     />
                     <FilterSelect
                       label="Stato"
-                      onChange={setStatusFilter}
+                      onChange={(value) => {
+                        setStatusFilter(value);
+                        resetVisibleTariffs();
+                      }}
                       options={statusOptions}
                       value={statusFilter}
                       displayMap={statusDisplayMap}
                     />
                     <FilterSearch
-                      onChange={setQuery}
+                      onChange={(value) => {
+                        setQuery(value);
+                        resetVisibleTariffs();
+                      }}
                       placeholder="Cerca per nome, ente o ID..."
                       value={query}
                     />
@@ -1181,6 +1303,7 @@ export function TariffsScreen() {
                           setProjectFilter("all");
                           setStatusFilter("all");
                           setQuery("");
+                          resetVisibleTariffs();
                         }}
                       />
                     ) : null}
@@ -1214,9 +1337,9 @@ export function TariffsScreen() {
               )}
 
               <div ref={catalogRef}>
-                <div className="operational-card-grid p-3 md:grid-cols-2 2xl:grid-cols-3">
+                <div className="space-y-2 p-3">
                   {visibleTariffBooks.length > 0 ? (
-                    visibleTariffBooks.map((book) => (
+                    displayedTariffBooks.map((book) => (
                       <TariffBookPreviewCard
                         key={book.id}
                         book={book}
@@ -1240,7 +1363,7 @@ export function TariffsScreen() {
                       />
                     ))
                   ) : (
-                    <div className="col-span-full">
+                    <div>
                       <EmptyState
                         icon={Database}
                         title="Nessun tariffario trovato"
@@ -1253,11 +1376,31 @@ export function TariffsScreen() {
                     </div>
                   )}
                 </div>
+                {remainingTariffCount > 0 ? (
+                  <div className="border-t border-[var(--border-subtle)] px-3 py-4 text-center">
+                    <Button
+                      onClick={() => setVisibleTariffLimit((current) => current + TARIFF_PAGE_SIZE)}
+                      type="button"
+                      variant="secondary"
+                    >
+                      Carica altri {Math.min(TARIFF_PAGE_SIZE, remainingTariffCount)} tariffari
+                    </Button>
+                    <p className="mt-2 text-11px font-medium text-[var(--text-secondary)]">
+                      {displayedTariffBooks.length} di {visibleTariffBooks.length} visibili
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </Panel>
           </section>
         </>
       )}
+      <AddVoiceDialog
+        isOpen={isAddVoiceOpen}
+        onClose={() => setIsAddVoiceOpen(false)}
+        tariffBooks={tariffBooksState.data}
+        onSave={handleAddVoiceSave}
+      />
       {importPhase === "loading" ? <TariffImportLoadingModal files={importFiles} /> : null}
       {isVoicesExplorerOpen ? (
         <TariffVoicesExplorerModal

@@ -1,14 +1,17 @@
 import { m } from "framer-motion";
 import {
+  Activity,
   AlertTriangle,
   Building2,
   CalendarDays,
+  CheckCircle2,
   ChevronRight,
   CircleDollarSign,
   FileText,
   FolderKanban,
   HardHat,
   MapPin,
+  PieChart,
   Plus,
   Route,
   Target,
@@ -16,6 +19,7 @@ import {
   TrendingUp,
   Upload,
   UserRound,
+  Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
@@ -106,53 +110,63 @@ export type DashboardRealitySummary = {
 };
 
 export function PriorityActions({ items }: { items: PortfolioProject[] }) {
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl bg-[var(--success-soft)]/35 px-3 py-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-base)]">
+          <CheckCircle2 className="size-4" />
+        </span>
+        <div>
+          <p className="text-13px font-semibold text-[var(--text-primary)]">Nessuna criticità</p>
+          <p className="text-12px text-[var(--text-secondary)]">Tutti i cantieri sono in linea.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Panel>
-      <div className="space-y-3">
-        {items.slice(0, 4).map((project, index) => (
-          <m.div
-            className="flex items-start gap-3 rounded-18px p-3 transition-colors duration-[var(--duration-base)] ease-standard hover:bg-[var(--bg-muted)]"
-            initial={MOTION_VARIANTS.listItem.initial}
-            key={project.id}
-            transition={{
-              ...MOTION_VARIANTS.listItem.transition,
-              delay: Math.min(0.12, index * 0.03),
-            }}
-            viewport={MOTION_VARIANTS.row.viewport}
-            whileInView={MOTION_VARIANTS.listItem.animate}
+    <div className="space-y-2">
+      {items.slice(0, 4).map((project, index) => (
+        <m.div
+          className="flex items-start gap-3 rounded-14px border border-[color-mix(in_srgb,var(--border-subtle)_50%,transparent)] bg-[var(--surface-base)] p-3 transition-colors duration-[var(--duration-base)] ease-standard hover:bg-[var(--bg-muted)]"
+          initial={MOTION_VARIANTS.listItem.initial}
+          key={project.id}
+          transition={{
+            ...MOTION_VARIANTS.listItem.transition,
+            delay: Math.min(0.12, index * 0.03),
+          }}
+          viewport={MOTION_VARIANTS.row.viewport}
+          whileInView={MOTION_VARIANTS.listItem.animate}
+        >
+          <span
+            className={cn(
+              "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-10px",
+              project.tone === "danger"
+                ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
+            )}
           >
-            <span
-              className={cn(
-                "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-10px",
-                project.tone === "danger"
-                  ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-                  : "bg-[var(--warning-soft)] text-[var(--warning-base)]",
-              )}
-            >
-              <AlertTriangle className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-13px font-semibold text-[var(--text-primary)]">
-                {project.title}
-              </div>
-              <div className="mt-0.5 text-12px font-medium text-[var(--text-secondary)]">
-                {project.healthLabel} · {project.contractor}
-              </div>
+            <AlertTriangle className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-13px font-semibold text-[var(--text-primary)]">
+              {project.title}
             </div>
-            <span className="shrink-0 text-11px font-semibold text-[var(--text-secondary)]">
-              {project.progress.toFixed(0)}%
-            </span>
-          </m.div>
-        ))}
-      </div>
+            <div className="mt-0.5 text-12px font-medium text-[var(--text-secondary)]">
+              {project.healthLabel} · {project.contractor}
+            </div>
+          </div>
+          <span className="shrink-0 text-11px font-semibold text-[var(--text-secondary)]">
+            {project.progress.toFixed(0)}%
+          </span>
+        </m.div>
+      ))}
       {items.length > 4 ? (
         <div className="mt-2 text-center text-11px font-medium text-[var(--text-secondary)]">
           +{items.length - 4} altri element{items.length - 4 === 1 ? "o" : "i"}
         </div>
       ) : null}
-    </Panel>
+    </div>
   );
 }
 
@@ -169,43 +183,43 @@ export function PortfolioRealityPanel({
   const activeCount = summary.draftCount + summary.inReviewCount;
 
   return (
-    <Panel className="overflow-hidden" padding="none">
-      <div className="grid gap-px bg-[var(--border-subtle)]/55 md:grid-cols-[1.2fr_1fr_1fr]">
-        <RealityBlock
-          icon={FileText}
-          eyebrow="SAL reali"
-          title={`${summary.salCount} document${summary.salCount === 1 ? "o" : "i"}`}
-          detail={`${summary.approvedCount} approvat${summary.approvedCount === 1 ? "o" : "i"} · ${activeCount} apert${activeCount === 1 ? "o" : "i"}`}
-        >
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <MiniStat label="Approvati" value={String(summary.approvedCount)} tone="success" />
-            <MiniStat label="Revisione" value={String(summary.inReviewCount)} tone="info" />
-            <MiniStat label="Bozze" value={String(summary.draftCount)} tone="warning" />
-          </div>
-        </RealityBlock>
+    <div className="grid gap-5 md:grid-cols-3">
+      <RealityBlock
+        icon={FileText}
+        eyebrow="SAL reali"
+        title={`${summary.salCount} document${summary.salCount === 1 ? "o" : "i"}`}
+        detail={`${summary.approvedCount} approvat${summary.approvedCount === 1 ? "o" : "i"} · ${activeCount} apert${activeCount === 1 ? "o" : "i"}`}
+      >
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          <MiniStat label="Approvati" value={String(summary.approvedCount)} tone="success" />
+          <MiniStat label="Revisione" value={String(summary.inReviewCount)} tone="info" />
+          <MiniStat label="Bozze" value={String(summary.draftCount)} tone="warning" />
+        </div>
+      </RealityBlock>
 
-        <RealityBlock
-          icon={CircleDollarSign}
-          eyebrow="Importi"
-          title={formatCompactMoney(summary.committedAmount)}
-          detail={`Residuo ${formatCompactMoney(summary.residualAmount)}`}
-        >
-          <div className="mt-4 space-y-2">
-            <AmountLine label="Approvato" value={summary.approvedAmount} />
-            <AmountLine label="Aperto" value={activeAmount} />
-          </div>
-        </RealityBlock>
+      <RealityBlock
+        icon={CircleDollarSign}
+        eyebrow="Importi"
+        title={formatCompactMoney(summary.committedAmount)}
+        detail={`Residuo ${formatCompactMoney(summary.residualAmount)}`}
+      >
+        <div className="mt-5 space-y-3">
+          <AmountLine label="Approvato" value={summary.approvedAmount} />
+          <AmountLine label="Aperto" value={activeAmount} />
+        </div>
+      </RealityBlock>
 
-        <RealityBlock
-          icon={Target}
-          eyebrow="Copertura budget"
-          title={`${summary.progressPercent.toFixed(1)}%`}
-          detail={`${summary.withoutSalCount} cantier${summary.withoutSalCount === 1 ? "e" : "i"} senza SAL`}
-        >
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+      <RealityBlock
+        icon={Target}
+        eyebrow="Copertura budget"
+        title={`${summary.progressPercent.toFixed(1)}%`}
+        detail={`${summary.withoutSalCount} cantier${summary.withoutSalCount === 1 ? "e" : "i"} senza SAL`}
+      >
+        <div className="mt-5">
+          <div className="h-2.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]">
             <div
               className={cn(
-                "h-full rounded-full",
+                "h-full rounded-full transition-all duration-500",
                 summary.budgetOverrunAmount > 0
                   ? "bg-[var(--danger-base)]"
                   : "bg-[var(--accent-primary)]",
@@ -213,40 +227,14 @@ export function PortfolioRealityPanel({
               style={{ width: `${clampPercent(summary.progressPercent)}%` }}
             />
           </div>
-          <div className="mt-2 text-11px font-semibold text-[var(--text-secondary)]">
+          <div className="mt-2.5 text-12px font-medium text-[var(--text-secondary)]">
             {summary.budgetOverrunCount > 0
               ? `${summary.budgetOverrunCount} budget superat${summary.budgetOverrunCount === 1 ? "o" : "i"}`
               : "Budget nei limiti sui dati SAL"}
           </div>
-        </RealityBlock>
-      </div>
-
-      <div className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_1.2fr]">
-        <RealityFooterItem
-          icon={CalendarDays}
-          label="Ultimo SAL"
-          value={
-            summary.lastSal
-              ? `${formatShortDate(new Date(summary.lastSal.date))} · ${summary.lastSal.projectTitle}`
-              : "Nessun SAL registrato"
-          }
-        />
-        <RealityFooterItem
-          icon={TrendingUp}
-          label="Ultimo importo"
-          value={
-            summary.lastSal
-              ? formatMoney({ amount: summary.lastSal.amount, currency: "EUR" })
-              : "0,00 €"
-          }
-        />
-        <RealityFooterItem
-          icon={AlertTriangle}
-          label="Segnali da guardare"
-          value={`${summary.withoutSalCount} senza SAL · ${summary.draftCount} bozze · ${summary.inReviewCount} revisioni`}
-        />
-      </div>
-    </Panel>
+        </div>
+      </RealityBlock>
+    </div>
   );
 }
 
@@ -360,7 +348,7 @@ export function TimelineGantt({
   if (bars.length === 0) return null;
 
   return (
-    <Panel className="overflow-hidden" padding="none">
+    <div className="overflow-hidden">
       <div className="border-b border-[var(--border-subtle)]/60 p-4 lg:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
@@ -785,7 +773,7 @@ export function TimelineGantt({
       >
         Il progetto verrà rimosso definitivamente insieme a tutte le SAL collegate.
       </ConfirmDialog>
-    </Panel>
+    </div>
   );
 }
 
@@ -1409,8 +1397,8 @@ export function RightRail({
     <aside className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <Panel padding="lg">
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
-            01
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+            <PieChart className="size-4" />
           </span>
           <h3 className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
             Distribuzione stato
@@ -1431,10 +1419,26 @@ export function RightRail({
         )}
       </Panel>
 
-      <Panel padding="lg" className="xl:col-span-2">
+      <Panel padding="lg">
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
-            02
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+            <Zap className="size-4" />
+          </span>
+          <h3 className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
+            Azioni rapide
+          </h3>
+        </div>
+        <div className="space-y-2">
+          <ActionButton icon={FileText} label="Nuova SAL" />
+          <ActionButton icon={Upload} label="Importa tariffario" />
+          <ActionButton icon={Plus} label="Crea progetto" />
+        </div>
+      </Panel>
+
+      <Panel padding="lg" className="sm:col-span-2 xl:col-span-1">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
+            <Activity className="size-4" />
           </span>
           <h3 className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
             Attivita recenti
@@ -1460,22 +1464,6 @@ export function RightRail({
             Nessuna attivita recente.
           </p>
         )}
-      </Panel>
-
-      <Panel padding="lg">
-        <div className="mb-4 flex items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--info-soft)] text-11px font-bold text-[var(--info-base)]">
-            03
-          </span>
-          <h3 className="text-11px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)]">
-            Azioni rapide
-          </h3>
-        </div>
-        <div className="space-y-2">
-          <ActionButton icon={FileText} label="Nuova SAL" />
-          <ActionButton icon={Upload} label="Importa tariffario" />
-          <ActionButton icon={Plus} label="Crea progetto" />
-        </div>
       </Panel>
     </aside>
   );
@@ -1510,16 +1498,16 @@ function RealityBlock({
   title: string;
 }) {
   return (
-    <div className="bg-[var(--surface-base)] p-4">
+    <div className="rounded-14px bg-[var(--bg-muted)]/50 p-5">
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-13px bg-[var(--info-soft)] text-[var(--info-base)]">
-          <Icon className="size-4" />
+          <Icon className="size-5" />
         </span>
         <div className="min-w-0">
           <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
             {eyebrow}
           </div>
-          <div className="mt-1 truncate text-20px font-bold leading-none text-[var(--text-primary)]">
+          <div className="mt-1 truncate text-22px font-bold leading-none text-[var(--text-primary)]">
             {title}
           </div>
           <div className="mt-1 text-12px font-medium leading-4 text-[var(--text-secondary)]">
@@ -1542,10 +1530,10 @@ function MiniStat({
   value: string;
 }) {
   return (
-    <div className="rounded-12px bg-[var(--bg-muted)]/72 p-2">
+    <div className="rounded-12px bg-[var(--surface-base)] p-3">
       <div
         className={cn(
-          "text-14px font-bold leading-none",
+          "text-16px font-bold leading-none",
           tone === "success" && "text-[var(--success-base)]",
           tone === "warning" && "text-[var(--warning-base)]",
           tone === "info" && "text-[var(--info-base)]",
@@ -1562,37 +1550,11 @@ function MiniStat({
 
 function AmountLine({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-12px">
-      <span className="font-semibold text-[var(--text-secondary)]">{label}</span>
+    <div className="flex items-center justify-between gap-3 text-13px">
+      <span className="font-medium text-[var(--text-secondary)]">{label}</span>
       <span className="font-bold tabular-nums text-[var(--text-primary)]">
         {formatMoney({ amount: value, currency: "EUR" })}
       </span>
-    </div>
-  );
-}
-
-function RealityFooterItem({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-3 rounded-14px bg-[var(--bg-muted)]/62 px-3 py-2.5">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-10px bg-[var(--surface-base)] text-[var(--info-base)] ring-1 ring-[var(--border-subtle)]/55">
-        <Icon className="size-3.5" />
-      </span>
-      <div className="min-w-0">
-        <div className="text-10px font-bold uppercase tracking-0_12em text-[var(--text-secondary)]">
-          {label}
-        </div>
-        <div className="mt-0.5 truncate text-12px font-semibold text-[var(--text-primary)]">
-          {value}
-        </div>
-      </div>
     </div>
   );
 }

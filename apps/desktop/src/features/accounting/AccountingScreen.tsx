@@ -8,6 +8,7 @@ import {
   ReceiptText,
   ShieldCheck,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClearFiltersButton,
@@ -22,7 +23,6 @@ import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDel
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { Panel } from "@/components/shared/Panel";
 import { SavedViewSelector } from "@/components/shared/SavedViewSelector";
-import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SeverityBar, severityToneForPercentage } from "@/components/shared/SeverityBar";
 import { SortIndicator } from "@/components/shared/SortIndicator";
@@ -43,6 +43,28 @@ import { useUndoStore } from "@/store/undo-store";
 
 const STATUS_OPTIONS = ["Tutti", "Bozza", "In revisione", "Approvata", "Chiuso"] as const;
 
+function AccountingHeaderStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number | string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-11px font-medium text-[var(--text-secondary)]">{label}</span>
+        <Icon className="size-3.5 shrink-0 text-[var(--text-tertiary)]" />
+      </div>
+      <div className="mt-1 truncate text-17px font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function AccountingScreen() {
   const { notify } = useToast();
   const [contracts, setContracts] = useState<
@@ -58,6 +80,7 @@ export function AccountingScreen() {
   const [filterQuery, setFilterQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [includeDraftsInReport] = useState(false);
 
   const loadContracts = useCallback(() => {
     let active = true;
@@ -286,6 +309,26 @@ export function AccountingScreen() {
     return { total, budget, draftCount, closedCount, count: selection.length };
   }, [selection, contracts]);
 
+  const reportSelection = useMemo(
+    () =>
+      includeDraftsInReport
+        ? selection
+        : selection.filter(({ doc }) => doc.status === "closed" || doc.status === "approved"),
+    [includeDraftsInReport, selection],
+  );
+
+  const reportMetrics = useMemo(() => {
+    const total = reportSelection.reduce((sum, { view }) => sum + (view?.total ?? 0), 0);
+    const projectIds = new Set(reportSelection.map(({ doc }) => doc.projectId));
+    const excludedDraftCount = includeDraftsInReport ? 0 : metrics.draftCount;
+    return {
+      count: reportSelection.length,
+      excludedDraftCount,
+      projectCount: projectIds.size,
+      total,
+    };
+  }, [includeDraftsInReport, metrics.draftCount, reportSelection]);
+
   const clearFilters = useCallback(() => {
     setFilterProject("all");
     setFilterContractor("Tutti");
@@ -315,34 +358,41 @@ export function AccountingScreen() {
   return (
     <ScreenLayout gradient="success-info">
       <section className="animate-entry">
-        <ScreenHero
-          badge="Contabilità"
-          title="Report contabile"
-          description="Seleziona i SAL da includere nel report, applica i filtri per periodo / appaltatore / progetto e genera il documento contabile."
-          sidePanel={
-            <div>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                    {multiSelect.count > 0
-                      ? `${multiSelect.count} selezionati`
-                      : `${selection.length} nel filtro`}
-                  </div>
-                  <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-                    {formatMoney({ amount: metrics.total, currency: "EUR" })}
-                  </div>
-                </div>
-                <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                  <Calculator className="size-6" />
-                </span>
-              </div>
-              <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
-                {metrics.closedCount} chiusi · {metrics.draftCount} bozze · su {contracts.length}{" "}
-                contratti
+        <div className="border-b border-[var(--border-subtle)] pb-5">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(460px,640px)] xl:items-end">
+            <div className="min-w-0">
+              <p className="text-12px font-medium text-[var(--text-tertiary)]">Contabilità</p>
+              <h2 className="mt-1 text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-32px">
+                Contabilità e report
+              </h2>
+              <p className="mt-2 max-w-2xl text-14px leading-6 text-[var(--text-secondary)]">
+                Prepara certificati, registri e riepiloghi partendo dai SAL filtrati.
               </p>
             </div>
-          }
-        />
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              <AccountingHeaderStat
+                icon={Calculator}
+                label={multiSelect.count > 0 ? "Selezionati" : "SAL filtrati"}
+                value={metrics.count}
+              />
+              <AccountingHeaderStat
+                icon={Coins}
+                label="Totale report"
+                value={formatMoney({ amount: reportMetrics.total, currency: "EUR" })}
+              />
+              <AccountingHeaderStat
+                icon={CheckCircle2}
+                label="Nel report"
+                value={reportMetrics.count}
+              />
+              <AccountingHeaderStat
+                icon={ReceiptText}
+                label="Bozze escluse"
+                value={reportMetrics.excludedDraftCount}
+              />
+            </div>
+          </div>
+        </div>
 
         <div className="mt-5 operational-toolbar">
           <div className="operational-toolbar-group">
@@ -415,10 +465,10 @@ export function AccountingScreen() {
         </div>
       </section>
 
-      <section className="operational-panel-grid mt-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="mt-6 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="min-w-0 space-y-5">
           <Panel padding="none">
-            <div className="grid gap-4 p-4 2xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="p-4">
               <div className="min-w-0">
                 <div className="flex items-center justify-between px-2 pt-2">
                   <div className="flex items-center gap-3">
@@ -598,49 +648,6 @@ export function AccountingScreen() {
                     Nessun SAL corrisponde ai filtri attivi.
                   </div>
                 )}
-              </div>
-
-              <div className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden rounded-22px bg-[var(--info-soft)]/35 p-5 text-center 2xl:min-h-[420px] 2xl:p-7">
-                <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                  {multiSelect.count > 0 ? "Totale selezionato" : "Nessuna selezione"}
-                </div>
-                <div className="mt-5 text-38px font-bold leading-none tracking-tight text-[var(--text-primary)] 2xl:mt-7 2xl:text-50px">
-                  {formatMoney({ amount: metrics.total, currency: "EUR" })}
-                </div>
-                {multiSelect.count > 0 ? (
-                  <>
-                    <div className="mt-9 h-px w-64 max-w-full bg-[var(--border-subtle)]" />
-                    <div className="mt-7 flex size-16 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                      <FileBadge className="size-8" />
-                    </div>
-                    <p className="mt-7 max-w-[260px] text-14px font-medium leading-6 text-[var(--text-secondary)]">
-                      {multiSelect.count} SAL pront{multiSelect.count === 1 ? "o" : "i"} per il
-                      report contabile.
-                    </p>
-                    <Button
-                      className="mt-5 h-12 w-full justify-between"
-                      icon={Download}
-                      onClick={() =>
-                        notify({
-                          message:
-                            "Il generatore report contabile sara disponibile in un prossimo aggiornamento.",
-                          title: "In arrivo",
-                          tone: "info",
-                        })
-                      }
-                      variant="primary"
-                    >
-                      Genera report contabile
-                      <ChevronRight className="ml-auto size-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <p className="mt-6 max-w-[260px] text-14px font-medium leading-6 text-[var(--text-secondary)]">
-                    Seleziona i SAL da includere nel report per generare il documento contabile.
-                  </p>
-                )}
-                <div className="pointer-events-none absolute -bottom-20 left-0 right-0 h-48 rounded-[50%] border-t border-[var(--info-base)]/10" />
-                <div className="pointer-events-none absolute -bottom-28 left-8 right-8 h-56 rounded-[50%] border-t border-[var(--info-base)]/10" />
               </div>
             </div>
           </Panel>

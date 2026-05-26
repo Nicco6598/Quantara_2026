@@ -11,6 +11,7 @@ import {
   Trash2,
   Warehouse,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   ClearFiltersButton,
@@ -29,7 +30,6 @@ import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDel
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { Panel } from "@/components/shared/Panel";
 import { QuickAction } from "@/components/shared/QuickAction";
-import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import { SeverityBar } from "@/components/shared/SeverityBar";
@@ -60,6 +60,28 @@ import {
   screenReducer,
   toneForQuantity,
 } from "./materials-screen-state";
+
+function MaterialHeaderStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number | string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-11px font-medium text-[var(--text-secondary)]">{label}</span>
+        <Icon className="size-3.5 shrink-0 text-[var(--text-tertiary)]" />
+      </div>
+      <div className="mt-1 truncate text-17px font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
 
 export function MaterialsScreen() {
   const { notify } = useToast();
@@ -294,48 +316,39 @@ export function MaterialsScreen() {
 
   return (
     <ScreenLayout gradient="success-info">
-      <ScreenHero
-        badge="Supply control"
-        title="Materiali e coperture"
-        description={`${materials.length} materiali registrati. Gestisci stock, impegni e soglie minime.`}
-        sidePanel={
-          <div>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                  Stock totale
-                </div>
-                <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-                  {metrics.totalStock.toLocaleString("it-IT")}
-                </div>
-              </div>
-              <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-                <Package className="size-6" />
-              </span>
-            </div>
-            <div className="mt-4 flex items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--danger-soft)] text-[var(--danger-base)]">
-                <AlertTriangle className="size-5" />
-              </span>
-              <div className="text-12px font-semibold text-[var(--text-primary)]">
-                {metrics.critical} sotto soglia
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--warning-soft)] text-[var(--warning-base)]">
-                <Package className="size-5" />
-              </span>
-              <div className="text-12px font-semibold text-[var(--text-primary)]">
-                {metrics.zero} esauriti
-              </div>
-            </div>
+      <section className="border-b border-[var(--border-subtle)] pb-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,560px)] xl:items-end">
+          <div className="min-w-0">
+            <p className="text-12px font-medium text-[var(--text-tertiary)]">Supply control</p>
+            <h2 className="mt-1 text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-32px">
+              Materiali e coperture
+            </h2>
+            <p className="mt-2 max-w-2xl text-14px leading-6 text-[var(--text-secondary)]">
+              {materials.length} materiali registrati. Stock, impegni e soglie minime.
+            </p>
           </div>
-        }
-      >
-        <MetricsGrid metrics={metrics} />
-      </ScreenHero>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <MaterialHeaderStat
+              icon={Package}
+              label="Stock"
+              value={metrics.totalStock.toLocaleString("it-IT")}
+            />
+            <MaterialHeaderStat
+              icon={AlertTriangle}
+              label="Sotto soglia"
+              value={metrics.critical}
+            />
+            <MaterialHeaderStat icon={Package} label="Esauriti" value={metrics.zero} />
+            <MaterialHeaderStat icon={Warehouse} label="Categorie" value={CATEGORIES.length} />
+          </div>
+        </div>
+      </section>
 
-      <section className="operational-panel-grid mt-8 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="mt-5">
+        <MetricsGrid metrics={metrics} />
+      </div>
+
+      <section className="operational-panel-grid mt-6 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="space-y-4 xl:self-start">
           <Panel eyebrow="Azioni rapide">
             <div className="space-y-3">
@@ -595,9 +608,9 @@ function MaterialCard({
   return (
     <m.article
       className={cn(
-        "operational-card-hover relative rounded-[18px] border p-3 text-left",
+        "operational-card-hover relative rounded-lg border px-3 py-2 text-left",
         checked
-          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
+          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_7%,var(--surface-base)_93%)]"
           : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
       )}
       initial={MOTION_VARIANTS.row.initial}
@@ -606,10 +619,10 @@ function MaterialCard({
       whileInView={MOTION_VARIANTS.row.whileInView}
     >
       <div className="flex h-full flex-col">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             {showCheckbox && (
-              <span className="mt-0.5">
+              <span>
                 <SelectionCheckbox
                   checked={checked}
                   id={material.id}
@@ -618,81 +631,79 @@ function MaterialCard({
               </span>
             )}
             <button
-              className="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+              className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] md:grid-cols-[minmax(0,1fr)_110px_120px_120px]"
               onClick={(e) => {
                 e.stopPropagation();
                 onCardClick(material.id);
               }}
               type="button"
             >
-              <div className="relative flex h-[76px] w-[58px] shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--text-tertiary)] shadow-[0_12px_22px_-18px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]">
-                <Package className="size-6" />
-                <span
-                  className={cn(
-                    "absolute -right-1.5 -top-1.5 size-4 rounded-full border-2 border-[var(--surface-base)]",
-                    effTone === "danger"
-                      ? "bg-[var(--danger-base)]"
-                      : effTone === "warning"
-                        ? "bg-[var(--warning-base)]"
-                        : "bg-[var(--success-base)]",
-                  )}
-                />
-              </div>
-              <div className="min-w-0 flex-1 pt-0.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant={
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="relative flex size-9 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] text-[var(--text-tertiary)]">
+                  <Package className="size-4" />
+                  <span
+                    className={cn(
+                      "absolute -right-1 -top-1 size-3 rounded-full border-2 border-[var(--surface-base)]",
                       effTone === "danger"
-                        ? "danger"
+                        ? "bg-[var(--danger-base)]"
                         : effTone === "warning"
-                          ? "warning"
-                          : "success"
-                    }
-                  >
-                    {effTone === "danger" ? "Critico" : effTone === "warning" ? "Attenzione" : "OK"}
-                  </Badge>
-                  <span className="rounded-sm bg-[var(--bg-muted)] px-1.5 py-0.5 text-10px font-bold text-[var(--text-secondary)]">
-                    {material.category}
-                  </span>
+                          ? "bg-[var(--warning-base)]"
+                          : "bg-[var(--success-base)]",
+                    )}
+                  />
                 </div>
-                <h3 className="mt-2 truncate text-14px font-semibold leading-tight text-[var(--text-primary)]">
-                  {material.code}
-                </h3>
-                <p className="mt-1 truncate text-12px font-medium text-[var(--text-secondary)]">
-                  {material.description}
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-x-3 text-11px font-medium text-[var(--text-secondary)]">
-                  <span>
-                    Stock:{" "}
-                    <span
-                      className={cn(
-                        "font-semibold",
-                        effTone === "danger"
-                          ? "text-[var(--danger-base)]"
-                          : effTone === "warning"
-                            ? "text-[var(--warning-base)]"
-                            : "text-[var(--text-primary)]",
-                      )}
-                    >
-                      {formatQuantity(material.quantity, material.unit)}
-                    </span>
-                  </span>
-                  {material.minQuantity > 0 && (
-                    <span>
-                      Soglia:{" "}
-                      <span className="font-semibold text-[var(--text-primary)]">
-                        {formatQuantity(material.minQuantity, material.unit)}
-                      </span>
-                    </span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-13px font-semibold leading-tight text-[var(--text-primary)]">
+                    {material.code}
+                  </h3>
+                  <p className="mt-0.5 truncate text-12px font-medium text-[var(--text-secondary)]">
+                    {material.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="hidden min-w-0 md:block">
+                <Badge
+                  variant={
+                    effTone === "danger" ? "danger" : effTone === "warning" ? "warning" : "success"
+                  }
+                >
+                  {effTone === "danger" ? "Critico" : effTone === "warning" ? "Attenzione" : "OK"}
+                </Badge>
+                <div className="mt-0.5 truncate text-10px font-medium text-[var(--text-secondary)]">
+                  {material.category}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-10px font-medium text-[var(--text-secondary)]">Stock</div>
+                <div
+                  className={cn(
+                    "mt-0.5 truncate text-12px font-semibold tabular-nums",
+                    effTone === "danger"
+                      ? "text-[var(--danger-base)]"
+                      : effTone === "warning"
+                        ? "text-[var(--warning-base)]"
+                        : "text-[var(--text-primary)]",
                   )}
-                  {committed > 0 && (
-                    <span>
-                      Impegnato:{" "}
-                      <span className="font-semibold text-[var(--text-primary)]">
-                        {committed.toLocaleString("it-IT")}
-                      </span>
-                    </span>
-                  )}
+                >
+                  {formatQuantity(material.quantity, material.unit)}
+                </div>
+              </div>
+
+              <div className="hidden md:block">
+                <div className="text-10px font-medium text-[var(--text-secondary)]">Soglia</div>
+                <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--text-primary)]">
+                  {material.minQuantity > 0
+                    ? formatQuantity(material.minQuantity, material.unit)
+                    : "—"}
+                </div>
+              </div>
+
+              <div className="hidden md:block">
+                <div className="text-10px font-medium text-[var(--text-secondary)]">Impegnato</div>
+                <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--text-primary)]">
+                  {committed > 0 ? committed.toLocaleString("it-IT") : "—"}
                 </div>
               </div>
             </button>
@@ -918,7 +929,7 @@ function MetricsGrid({
   };
 }) {
   return (
-    <div className="operational-card-grid grid-flow-dense sm:grid-cols-2 xl:grid-cols-4">
+    <div className="animate-entry grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard
         caption="Quantità totale in magazzino"
         icon={Warehouse}
@@ -975,7 +986,7 @@ function MaterialListSection({
 
   return (
     <>
-      <div className="operational-card-grid p-4 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="space-y-2 p-3">
         {filteredMaterials.length > 0 ? (
           filteredMaterials.map((mat) => (
             <MaterialCard
@@ -989,7 +1000,7 @@ function MaterialListSection({
             />
           ))
         ) : (
-          <div className="col-span-full">
+          <div>
             <EmptyState
               icon={Package}
               title="Nessun materiale trovato"

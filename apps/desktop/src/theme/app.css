@@ -2323,6 +2323,128 @@ body {
   backdrop-filter: blur(18px) saturate(1.08);
 }
 
+/* Stripe-like operational pass: keep global shell styling sober and data-first. */
+.app-window-frame::before {
+  background: color-mix(in srgb, var(--surface-base) 90%, transparent);
+}
+
+.main-content-shell {
+  background: var(--surface-base);
+  box-shadow: none;
+}
+
+.sidebar-rail {
+  background: color-mix(in srgb, var(--bg-app-accent) 72%, transparent);
+  border-right: 0;
+  backdrop-filter: none;
+}
+
+.top-toolbar-shell {
+  background: color-mix(in srgb, var(--surface-base) 92%, transparent);
+  border-bottom: 1px solid var(--border-subtle);
+  backdrop-filter: blur(14px);
+}
+
+.top-toolbar-divider,
+.top-toolbar-history-wrap::after {
+  background: var(--border-subtle);
+}
+
+.top-toolbar-history-button,
+.top-toolbar-action-outline,
+.top-toolbar-icon-button {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+  box-shadow: 0 1px 1px color-mix(in srgb, var(--text-primary) 4%, transparent);
+  backdrop-filter: none;
+}
+
+.top-toolbar-history-button:not(:disabled):hover,
+.top-toolbar-action-outline:hover,
+.top-toolbar-icon-button:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 24%, var(--border-subtle));
+  background: var(--bg-muted);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 5%, transparent);
+  transform: translate3d(0, -1px, 0);
+}
+
+.top-toolbar-action-primary,
+.quantara-button-primary,
+.projects-control-button-primary {
+  border-color: var(--button-primary-border);
+  background: var(--accent-primary);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+}
+
+.top-toolbar-action-primary:hover,
+.quantara-button-primary:hover,
+.projects-control-button-primary:hover {
+  background: var(--accent-primary-hover);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+}
+
+.quantara-button::before,
+.quantara-button::after,
+.projects-control-button::before,
+.projects-control-button::after {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .window-titlebar-brand,
+  .window-titlebar-route-section,
+  .window-titlebar-command span,
+  .window-titlebar-command kbd,
+  .top-toolbar-history-wrap::after,
+  .top-toolbar-divider {
+    display: none;
+  }
+
+  .window-titlebar-left {
+    gap: 4px;
+  }
+
+  .window-titlebar-center {
+    left: 50%;
+    max-width: calc(100vw - 132px);
+  }
+
+  .window-titlebar-route-trigger {
+    max-width: 116px;
+  }
+
+  .top-toolbar-shell {
+    padding-inline: 8px;
+  }
+
+  .top-toolbar-shell > div {
+    min-height: 48px;
+    gap: 8px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .top-toolbar-shell h1 {
+    max-width: 38vw;
+    font-size: var(--text-16px);
+  }
+
+  .top-toolbar-action {
+    width: 34px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .top-toolbar-action > span:not(.top-toolbar-action-mark),
+  .top-toolbar-action > svg {
+    display: none;
+  }
+
+  .main-content-shell {
+    border-radius: 18px 0 0 0;
+  }
+}
+
 /* Scrollbar slim personalizzata */
 ::-webkit-scrollbar {
   width: 6px;

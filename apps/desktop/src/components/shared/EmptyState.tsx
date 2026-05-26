@@ -27,12 +27,12 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "min-w-0 rounded-22px border border-dashed border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_72%,var(--surface-base)_28%)] p-8 text-center shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--surface-highlight)_48%,transparent)] sm:p-10",
+        "min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-muted)_58%,var(--surface-base)_42%)] p-8 text-center sm:p-10",
         className,
       )}
     >
       {Icon ? (
-        <div className="mx-auto flex size-12 shrink-0 items-center justify-center rounded-22px bg-[var(--info-soft)] text-[var(--info-base)]">
+        <div className="mx-auto flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--info-soft)] text-[var(--info-base)]">
           <Icon className="size-5" strokeWidth={1.8} />
         </div>
       ) : null}

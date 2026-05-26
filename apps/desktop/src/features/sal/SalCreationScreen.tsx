@@ -278,7 +278,6 @@ export function SalCreationScreen() {
     [data.selectedTariffBooks],
   );
 
-  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [compareLines, setCompareLines] = useState<SalLineView[] | null>(null);
@@ -990,11 +989,7 @@ export function SalCreationScreen() {
         onSaveDraft={handleSaveDraft}
         onExportPdf={handleExportSalPdf}
         onExportExcel={handleExportSalExcel}
-        selectedLineId={selectedLineId}
-        onSelectLine={setSelectedLineId}
         lineViews={lineViews}
-        economicRules={economicRules}
-        checks={checks}
       >
         {/* Project phase */}
         {phase === "project" && (
@@ -1046,8 +1041,6 @@ export function SalCreationScreen() {
                 onNotesChange={setNotes}
                 onSurcharge={setSurcharge}
                 onPasteLine={handlePasteLine}
-                selectedLineId={selectedLineId}
-                onSelectLine={setSelectedLineId}
                 onSearchSelectVoice={(voice) => {
                   const exists = lines.some((l) => l.voice.id === voice.id);
                   if (exists) addVoiceAsNewLine(voice);

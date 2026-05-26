@@ -5,7 +5,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "quantara-button inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition-all duration-fast motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-[background,border-color,color,box-shadow,transform] duration-fast motion-safe:hover:-translate-y-px motion-safe:active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] disabled:pointer-events-none disabled:opacity-50",
   {
     defaultVariants: {
       size: "default",
@@ -13,19 +13,23 @@ const buttonVariants = cva(
     },
     variants: {
       size: {
-        default: "h-10 px-4",
-        icon: "size-10",
-        sm: "h-9 px-3",
-        toolbar: "h-9 px-3",
+        default: "h-9 px-3.5",
+        icon: "size-9",
+        sm: "h-8 px-3 text-12px",
+        toolbar: "h-8 px-3 text-12px",
       },
       variant: {
-        primary: "quantara-button-primary text-[var(--text-inverse)]",
-        secondary: "quantara-button-soft text-[var(--accent-primary)]",
-        destructive: "quantara-button-destructive text-[var(--text-inverse)]",
+        primary:
+          "border border-[var(--button-primary-border)] bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-[0_1px_2px_color-mix(in_srgb,var(--accent-primary)_22%,transparent)] hover:bg-[var(--accent-primary-hover)]",
+        secondary:
+          "border border-[color-mix(in_srgb,var(--accent-primary)_18%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base))] text-[var(--accent-primary)] hover:bg-[color-mix(in_srgb,var(--accent-primary)_12%,var(--surface-base))]",
+        destructive:
+          "border border-[color-mix(in_srgb,var(--danger-base)_32%,var(--border-subtle))] bg-[var(--danger-base)] text-[var(--text-inverse)] shadow-[0_1px_2px_color-mix(in_srgb,var(--danger-base)_18%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger-base)_90%,black_10%)]",
         ghost:
-          "quantara-button-ghost text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-        outline: "quantara-button-neutral text-[var(--text-primary)]",
-        icon: "quantara-button-neutral text-[var(--text-secondary)]",
+          "border border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+        outline:
+          "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] shadow-[0_1px_1px_color-mix(in_srgb,var(--text-primary)_4%,transparent)] hover:bg-[var(--bg-muted)]",
+        icon: "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
       },
     },
   },

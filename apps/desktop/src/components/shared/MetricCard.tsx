@@ -35,20 +35,18 @@ export function MetricCard({
     <BezelSurface
       {...(className ? { className } : {})}
       innerClassName={cn(
-        "group flex min-w-0 p-4 2xl:gap-4",
-        isVertical
-          ? "flex-col items-center gap-3 text-center"
-          : "items-center gap-3 min-h-[104px] 2xl:min-h-[116px]",
+        "group flex min-w-0 p-4",
+        isVertical ? "flex-col items-center gap-3 text-center" : "items-start gap-3 min-h-[96px]",
         isCompact && !isVertical && "min-h-0 gap-2 p-3",
-        tone === "blue" ? "bg-[var(--info-soft)]/20" : "",
+        tone === "blue" ? "bg-[color-mix(in_srgb,var(--info-soft)_30%,var(--surface-base))]" : "",
         innerClassName,
       )}
     >
       <div
         className={cn(
-          "flex shrink-0 items-center justify-center rounded-full",
-          isVertical ? "size-10 2xl:size-11" : "size-11 2xl:size-12",
-          isCompact && !isVertical && "size-10",
+          "flex shrink-0 items-center justify-center rounded-lg",
+          isVertical ? "size-9" : "size-9",
+          isCompact && !isVertical && "size-8",
           (!tone || tone === "blue" || tone === "info") &&
             "bg-[var(--info-soft)] text-[var(--info-base)]",
           tone === "success" && "bg-[var(--success-soft)] text-[var(--success-base)]",
@@ -61,8 +59,8 @@ export function MetricCard({
       <div className={cn("min-w-0", isVertical ? "" : "flex-1")}>
         <div
           className={cn(
-            "font-semibold uppercase leading-tight tracking-0_14em text-[var(--text-secondary)]",
-            isVertical ? "text-11px" : "text-10px",
+            "font-semibold leading-tight text-[var(--text-secondary)]",
+            isVertical ? "text-12px" : "text-11px",
           )}
         >
           {label}
@@ -70,8 +68,8 @@ export function MetricCard({
         <div
           className={cn(
             "min-w-0 break-words font-bold leading-none tabular-nums",
-            isVertical ? "mt-1 text-22px 2xl:text-[26px]" : "mt-2 text-19px 2xl:text-21px",
-            isCompact && !isVertical && "mt-1 text-16px 2xl:text-18px",
+            isVertical ? "mt-1 text-22px" : "mt-2 text-20px",
+            isCompact && !isVertical && "mt-1 text-17px",
             (!tone || tone === "blue" || tone === "info") && "text-[var(--info-base)]",
             tone === "success" && "text-[var(--success-base)]",
             tone === "warning" && "text-[var(--warning-base)]",
@@ -90,7 +88,7 @@ export function MetricCard({
             {caption}
           </span>
           {badge ? (
-            <span className="max-w-[45%] shrink-0 truncate rounded-full bg-[var(--bg-muted-strong)] px-2 py-0.5 text-10px font-semibold text-[var(--text-secondary)]">
+            <span className="max-w-[45%] shrink-0 truncate rounded-md bg-[var(--bg-muted-strong)] px-1.5 py-0.5 text-10px font-semibold text-[var(--text-secondary)]">
               {badge}
             </span>
           ) : null}

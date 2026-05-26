@@ -21,7 +21,7 @@ type AutocompleteInputProps = {
 };
 
 const RESULTS_MAX_HEIGHT = 520;
-const ITEM_HEIGHT = 92;
+const ITEM_HEIGHT = 96;
 
 type DropdownPos = { left: number; top: number; width: number };
 
@@ -158,14 +158,14 @@ export function AutocompleteInput({
 
   return (
     <div ref={containerRef} className="w-full">
-      <div className="autocomplete-input-field relative flex h-10 w-full items-center rounded-full border border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/65">
-        <Search className="ml-3 size-4 shrink-0 text-[var(--text-secondary)]" />
+      <div className="autocomplete-input-field relative flex h-11 w-full items-center rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--bg-muted)]/65 shadow-sm">
+        <Search className="ml-3.5 size-[18px] shrink-0 text-[var(--text-secondary)]" />
         <input
           ref={inputRef}
           aria-autocomplete="list"
           aria-label={placeholder}
           autoComplete="off"
-          className="h-full min-w-0 flex-1 bg-transparent px-3 text-13px outline-none"
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-14px font-medium text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none"
           onBlur={() => setTimeout(() => setIsOpen(false), 180)}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -230,9 +230,9 @@ export function AutocompleteInput({
                     <button
                       ref={rowVirtualizer.measureElement}
                       className={cn(
-                        "flex min-h-[84px] w-full items-start gap-3 border-b border-[var(--border-subtle)]/55 px-3 py-3 text-left text-13px transition-colors duration-[var(--duration-fast)] first:rounded-t-18px last:rounded-b-18px last:border-b-0",
+                        "flex min-h-[92px] w-full items-start gap-3 border-b border-[var(--border-subtle)]/55 px-4 py-3 text-left text-13px transition-colors duration-[var(--duration-fast)] first:rounded-t-18px last:rounded-b-18px last:border-b-0",
                         virtualRow.index === activeIndex
-                          ? "bg-[var(--bg-muted)]"
+                          ? "bg-[var(--accent-primary)]/[0.06]"
                           : "hover:bg-[var(--bg-muted)]",
                       )}
                       aria-selected={virtualRow.index === activeIndex}
@@ -251,20 +251,20 @@ export function AutocompleteInput({
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
                     >
-                      <span className="flex w-20 self-stretch shrink-0 items-center justify-center rounded-10px bg-[var(--bg-muted-strong)] px-2 text-center font-mono text-10px font-bold leading-tight text-[var(--accent-primary)]">
+                      <span className="flex w-[72px] self-stretch shrink-0 items-center justify-center rounded-lg bg-[var(--accent-primary)]/10 px-2 text-center font-mono text-11px font-bold leading-tight text-[var(--accent-primary)]">
                         <span className="line-clamp-2 break-all">{option.value}</span>
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="grid min-w-0 gap-1">
-                          <span className="font-mono text-11px font-bold text-[var(--accent-primary)]">
+                        <span className="grid min-w-0 gap-0.5">
+                          <span className="font-mono text-12px font-bold text-[var(--accent-primary)]">
                             {option.value}
                           </span>
-                          <span className="line-clamp-2 break-words font-semibold leading-snug text-[var(--text-primary)]">
+                          <span className="line-clamp-2 break-words text-14px font-semibold leading-snug text-[var(--text-primary)]">
                             {option.label}
                           </span>
                         </span>
                         {option.metadata && (
-                          <span className="mt-1 line-clamp-2 break-words text-11px leading-snug text-[var(--text-secondary)]">
+                          <span className="mt-1 line-clamp-2 break-words text-12px leading-snug text-[var(--text-secondary)]">
                             {option.metadata}
                           </span>
                         )}

@@ -17,18 +17,17 @@ type PanelProps = {
 
 const variantStyles: Record<PanelVariant, string> = {
   default:
-    "rounded-[18px] border border-[color-mix(in_srgb,var(--border-subtle)_64%,transparent)] bg-[var(--surface-base)] shadow-[0_1px_2px_color-mix(in_srgb,var(--text-primary)_4%,transparent)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--surface-highlight)_24%,transparent)]",
-  sal: "rounded-[18px] border border-[color-mix(in_srgb,var(--border-subtle)_64%,transparent)] bg-[radial-gradient(circle_at_90%_0%,color-mix(in_srgb,var(--accent-primary)_4%,transparent),transparent_34%),linear-gradient(180deg,color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%),var(--surface-base))] shadow-[0_1px_2px_color-mix(in_srgb,var(--text-primary)_4%,transparent)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--surface-highlight)_24%,transparent)]",
+    "rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
+  sal: "rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] shadow-[var(--shadow-soft)]",
   premium:
-    "rounded-[18px] border border-[color-mix(in_srgb,var(--border-subtle)_66%,transparent)] bg-[radial-gradient(circle_at_86%_0%,color-mix(in_srgb,var(--accent-primary)_6%,transparent),transparent_34%),linear-gradient(180deg,color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%),var(--surface-base))] shadow-[0_4px_14px_color-mix(in_srgb,var(--text-primary)_5%,transparent)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--surface-highlight)_28%,transparent)]",
-  muted:
-    "rounded-[18px] border border-[color-mix(in_srgb,var(--border-subtle)_56%,transparent)] bg-[var(--bg-muted)] shadow-none",
+    "rounded-2xl border border-[color-mix(in_srgb,var(--accent-primary)_18%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[var(--shadow-panel)]",
+  muted: "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-muted)] shadow-none",
   danger:
-    "rounded-[18px] border border-[var(--danger-soft)] bg-[var(--danger-soft)]/40 shadow-none",
+    "rounded-2xl border border-[color-mix(in_srgb,var(--danger-base)_18%,var(--danger-soft))] bg-[var(--danger-soft)]/40 shadow-none",
   success:
-    "rounded-[18px] border border-[var(--success-soft)] bg-[var(--success-soft)]/40 shadow-none",
+    "rounded-2xl border border-[color-mix(in_srgb,var(--success-base)_16%,var(--success-soft))] bg-[var(--success-soft)]/40 shadow-none",
   inspector:
-    "rounded-[18px] border border-[color-mix(in_srgb,var(--border-subtle)_64%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_96%,var(--accent-primary)_4%)] shadow-[0_1px_2px_color-mix(in_srgb,var(--text-primary)_4%,transparent)]",
+    "rounded-2xl border border-[color-mix(in_srgb,var(--accent-primary)_18%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-base)_96%,var(--accent-primary)_4%)] shadow-[var(--shadow-soft)]",
 };
 
 const paddingStyles: Record<string, string> = {
@@ -53,14 +52,12 @@ export function PanelHeader({
     <div className="mb-4 flex items-center justify-between gap-3">
       <div className="min-w-0">
         {eyebrow ? (
-          <p className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-            {eyebrow}
-          </p>
+          <p className="text-11px font-semibold text-[var(--text-tertiary)]">{eyebrow}</p>
         ) : null}
         {title ? (
-          <div className="flex items-center gap-2">
-            {Icon ? <Icon className="size-4 shrink-0 text-[var(--info-base)]" /> : null}
-            <h3 className="truncate text-15px font-bold text-[var(--text-primary)]">{title}</h3>
+          <div className={cn("flex items-center gap-2", eyebrow && "mt-0.5")}>
+            {Icon ? <Icon className="size-4 shrink-0 text-[var(--accent-primary)]" /> : null}
+            <h3 className="truncate text-15px font-semibold text-[var(--text-primary)]">{title}</h3>
           </div>
         ) : null}
       </div>

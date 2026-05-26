@@ -6,11 +6,10 @@ import {
   Layers3,
   TrendingUp,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { FilterSearch } from "@/components/filters";
 import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { MetricCard } from "@/components/shared/MetricCard";
-import { Panel } from "@/components/shared/Panel";
 import type {
   ActivityItem,
   ApprovalItem,
@@ -58,6 +57,28 @@ type ContractorDetailViewProps = {
   visibleQueue: PriorityItem[];
 };
 
+function ContractorDetailStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-11px font-medium text-[var(--text-secondary)]">{label}</span>
+        <Icon className="size-3.5 shrink-0 text-[var(--text-tertiary)]" />
+      </div>
+      <div className="mt-1 truncate text-15px font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function ContractorDetailView({
   averageProgress,
   contractor,
@@ -90,94 +111,67 @@ export function ContractorDetailView({
 
   return (
     <div className="w-full">
-      <section className="grid gap-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-end">
-        <div className="min-w-0">
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-            Cartella operativa
-          </span>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-md border border-[var(--success-base)]/20 bg-[var(--success-soft)] px-2.5 py-1 text-11px font-semibold text-[var(--success-base)]">
-              <span className="size-1.5 rounded-full bg-current" />
-              Operativo
-            </span>
-            {isPending ? (
-              <span className="rounded-md bg-[var(--warning-soft)] px-2.5 py-1 text-11px font-semibold text-[var(--warning-base)]">
-                Filtri in aggiornamento
+      <section className="border-b border-[var(--border-subtle)] pb-5">
+        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div className="min-w-0">
+            <p className="text-12px font-medium text-[var(--text-tertiary)]">Cartella operativa</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-md border border-[var(--success-base)]/20 bg-[var(--success-soft)] px-2.5 py-1 text-11px font-semibold text-[var(--success-base)]">
+                <span className="size-1.5 rounded-full bg-current" />
+                Operativo
               </span>
-            ) : null}
+              {isPending ? (
+                <span className="rounded-md bg-[var(--warning-soft)] px-2.5 py-1 text-11px font-semibold text-[var(--warning-base)]">
+                  Filtri in aggiornamento
+                </span>
+              ) : null}
+            </div>
+            <h2 className="mt-2 max-w-4xl text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-32px">
+              {contractor.contractor}
+            </h2>
+            <p className="mt-2 max-w-2xl text-14px leading-6 text-[var(--text-secondary)]">
+              Portfolio, SAL e criticità nel perimetro attivo.
+            </p>
           </div>
-          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight text-[var(--text-primary)] md:text-56px">
-            {contractor.contractor}
-          </h2>
-          <p className="mt-4 max-w-2xl text-15px leading-6 text-[var(--text-secondary)]">
-            Cartella operativa dell'appaltatore. Monitoraggio del portfolio e dei contratti nel
-            perimetro attivo.
-          </p>
 
-          <div className="mt-7 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricCard
-              caption="Totale dei progetti nel perimetro corrente"
+          <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-5 xl:min-w-[760px]">
+            <ContractorDetailStat
               icon={Layers3}
-              label="Valore contratti"
-              tone="info"
+              label="Contratti"
               value={formatMoney({ amount: totalBudget, currency: "EUR" })}
             />
-            <MetricCard
-              caption="Elementi agganciati alla cartella"
-              icon={FolderOpen}
-              label="Progetti / contratti"
-              tone="success"
-              value={`${projects.length}`}
-            />
-            <MetricCard
-              caption={`${salWindowCount} lotti tra emissioni, firme e dossier`}
+            <ContractorDetailStat icon={FolderOpen} label="Progetti" value={`${projects.length}`} />
+            <ContractorDetailStat
               icon={ClipboardList}
               label="SAL in corso"
-              tone={salWindowCount > 0 ? "warning" : "success"}
               value={formatMoney({ amount: salExposure, currency: "EUR" })}
             />
-            <MetricCard
-              caption="Cantieri con forecast e documentazione fuori soglia"
+            <ContractorDetailStat
               icon={AlertTriangle}
-              label="Escalation"
-              tone={criticalCount > 0 ? "danger" : "success"}
-              value={`${criticalCount}`}
+              label="Criticità"
+              value={`${criticalCount} / ${salWindowCount}`}
             />
-            <MetricCard
-              caption="Media ponderata sul portfolio visibile"
+            <ContractorDetailStat
               icon={TrendingUp}
-              label="Avanzamento medio"
+              label="Avanzamento"
               value={formatPercent(averageProgress)}
             />
           </div>
         </div>
-
-        <Panel className="self-start md:translate-y-2" padding="lg">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                {contractor.contractor}
-              </div>
-              <div className="mt-2 text-24px font-semibold leading-none text-[var(--text-primary)]">
-                {projects.length} progetti
-              </div>
-            </div>
-            <span className="flex size-12 items-center justify-center rounded-full bg-[var(--info-soft)] text-[var(--info-base)]">
-              <FolderOpen className="size-6" />
-            </span>
-          </div>
-          <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
-            {formatMoney({ amount: totalBudget, currency: "EUR" })} di contratti attivi.
-          </p>
-          <div className="mt-4 flex items-center gap-3">
-            <Button className="text-12px" icon={ArrowLeft} onClick={onBack} variant="secondary">
-              Appaltatori
-            </Button>
-          </div>
-        </Panel>
+        <div className="mt-4 flex items-center gap-2">
+          <Button
+            className="text-12px"
+            icon={ArrowLeft}
+            onClick={onBack}
+            size="sm"
+            variant="secondary"
+          >
+            Appaltatori
+          </Button>
+        </div>
       </section>
 
-      <section className="mt-3 grid gap-4 2xl:grid-cols-[3fr_1fr]">
+      <section className="mt-5 grid gap-4 2xl:grid-cols-[3fr_1fr]">
         <section className="min-w-0">
           <ProjectsWorkbench
             onCreateProject={onCreateProject}

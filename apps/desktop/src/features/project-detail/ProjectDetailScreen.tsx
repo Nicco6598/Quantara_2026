@@ -1,21 +1,19 @@
 import { m } from "framer-motion";
 import {
-  Activity,
-  ChevronRight,
+  ArrowLeft,
   Clock3,
   Download,
   FileText,
   Layers3,
   Plus,
   Radio,
-  ReceiptText,
   TrendingUp,
-  UsersRound,
   WalletCards,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { SalHistoryBars, SpendingTrend } from "@/components/shared/charts";
+import { DetailList, DetailRow } from "@/components/shared/DetailList";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
@@ -26,7 +24,6 @@ import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
-
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useTableSort } from "@/hooks/use-table-sort";
@@ -52,23 +49,16 @@ import { MOTION_VARIANTS } from "@/motion";
 import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
-import { DetailList, DetailRow } from "@/components/shared/DetailList";
 
 import {
   DeleteConfirmDialog,
   InfoBlock,
-  MilestoneItem,
   PerformanceIndexBar,
   SalCard,
   TariffPanelDialog,
 } from "./components/ProjectDetailPanels";
 import { ProjectTimeline } from "./components/ProjectTimeline";
-import {
-  buildMilestoneRows,
-  buildProjectDetail,
-  buildProjectTeam,
-  buildRecentActivities,
-} from "./domain/project-detail-model";
+import { buildProjectDetail } from "./domain/project-detail-model";
 import { projectReducer, readSelectedProjectId } from "./state/project-detail-state";
 
 export function ProjectDetailScreen() {
@@ -335,19 +325,6 @@ export function ProjectDetailScreen() {
         : null,
     [financials, salRows, selectedProject],
   );
-  const milestoneRows = useMemo(
-    () => (selectedProject ? buildMilestoneRows(selectedProject, salRows.length) : []),
-    [salRows.length, selectedProject],
-  );
-  const projectTeam = useMemo(
-    () => (selectedProject ? buildProjectTeam(selectedProject) : []),
-    [selectedProject],
-  );
-  const recentActivities = useMemo(
-    () => (selectedProject ? buildRecentActivities(selectedProject, salRows) : []),
-    [salRows, selectedProject],
-  );
-
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const deleteSal = useSalWorkflowStore((state) => state.deleteSal);
   const setSalStatus = useSalWorkflowStore((state) => state.setSalStatus);
@@ -623,215 +600,150 @@ export function ProjectDetailScreen() {
   ];
 
   return (
-    <ScreenLayout>
-      <section className="animate-entry grid gap-5 md:grid-cols-[minmax(0,1fr)_340px] md:items-start">
+    <ScreenLayout gradient="dashboard-hero">
+      <section className="animate-entry flex min-w-0 flex-col gap-4 border-b border-[var(--border-subtle)] pb-5 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
-          <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_76%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-uppercase-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-            Dossier {detail.lot}
-          </span>
-          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight text-[var(--text-primary)] md:text-56px">
-            {detail.name}
-          </h2>
-          <p className="mt-4 max-w-2xl text-15px leading-6 text-[var(--text-secondary)]">
-            {detail.lot} &middot; {detail.location}
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button icon={ArrowLeft} onClick={() => navigate("projects")} size="sm" variant="ghost">
+              Progetti
+            </Button>
+            <span className="inline-flex items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2.5 py-1 text-11px font-medium text-[var(--text-secondary)]">
+              Dossier {detail.lot}
+            </span>
             <StatusPill tone={detail.healthTone}>{detail.health}</StatusPill>
             <StatusPill tone="info">{String(detail.sal.current)}</StatusPill>
           </div>
+          <h2 className="mt-4 max-w-4xl text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-34px">
+            {detail.name}
+          </h2>
+          <p className="mt-2 max-w-2xl text-14px leading-6 text-[var(--text-secondary)]">
+            {detail.lot} · {detail.location}
+          </p>
         </div>
 
-        <div className="space-y-3">
-          <div className="rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-4 ring-1 ring-[var(--border-subtle)]/60">
-            <div className="flex items-center justify-between">
-              <span className="text-10px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-                Avanzamento finanziario
-              </span>
-              <span className="text-22px font-semibold tabular-nums text-[var(--text-primary)]">
-                {detail.progress}%
-              </span>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-              <m.div
-                className="h-full rounded-full bg-[var(--accent-primary)]"
-                animate={{ scaleX: detail.progress / 100 }}
-                initial={MOTION_VARIANTS.progress.initial}
-                style={{ originX: 0 }}
-                transition={MOTION_VARIANTS.progress.transition}
-              />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-11px">
-              <div>
-                <span className="text-[var(--text-tertiary)]">Budget</span>
-                <span className="ml-1.5 font-semibold text-[var(--text-primary)]">
-                  {formatMoney({ amount: financials.contractual, currency: "EUR" })}
-                </span>
-              </div>
-              <div>
-                <span className="text-[var(--text-tertiary)]">Residuo</span>
-                <span
-                  className={cn(
-                    "ml-1.5 font-semibold",
-                    financials.residual >= 0
-                      ? "text-[var(--success-base)]"
-                      : "text-[var(--danger-base)]",
-                  )}
-                >
-                  {formatMoney({ amount: Math.abs(financials.residual), currency: "EUR" })}
-                </span>
-              </div>
-              <div className="col-span-2 mt-1 grid grid-cols-2 gap-4 rounded-lg bg-[var(--bg-muted)]/40 px-3 py-2">
-                <div>
-                  <span className="text-[var(--success-base)]">●</span>
-                  <span className="ml-1 text-[var(--text-tertiary)]">Approvato</span>
-                  <span className="ml-1.5 font-semibold text-[var(--text-primary)]">
-                    {formatMoney({ amount: financials.approvedAmount, currency: "EUR" })}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[var(--warning-base)]">●</span>
-                  <span className="ml-1 text-[var(--text-tertiary)]">In bozza</span>
-                  <span className="ml-1.5 font-semibold text-[var(--text-primary)]">
-                    {formatMoney({ amount: financials.draftAmount, currency: "EUR" })}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-3 ring-1 ring-[var(--border-subtle)]/60">
-              <span className="text-10px font-medium text-[var(--text-tertiary)]">Ultima SAL</span>
-              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-                {salRows[0]?.progressiveLabel ?? "—"}
-              </div>
-              <div className="mt-0.5 text-11px text-[var(--text-tertiary)]">
-                {salRows[0]?.date ?? "Nessuna SAL"}
-              </div>
-            </div>
-            <div className="rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-3 ring-1 ring-[var(--border-subtle)]/60">
-              <span className="text-10px font-medium text-[var(--text-tertiary)]">
-                Responsabile
-              </span>
-              <div className="mt-1 truncate text-13px font-semibold text-[var(--text-primary)]">
-                {detail.manager}
-              </div>
-              <div className="mt-0.5 text-11px text-[var(--text-tertiary)]">{detail.startDate}</div>
-            </div>
-          </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button
+            icon={FileText}
+            onClick={() => {
+              setPendingTariffIds([...projectTariffBookIds]);
+              setIsTariffPanelOpen(true);
+            }}
+            variant="outline"
+          >
+            Tariffari
+          </Button>
+          <Button icon={Plus} onClick={handleCreateSal}>
+            Nuova SAL
+          </Button>
         </div>
       </section>
 
-      <section className="mt-8 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-6 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpiCards.map((metric) => (
           <MetricCard key={metric.label} {...metric} />
         ))}
       </section>
 
-      {draftRows.length > 0 ? (
-        <m.section
-          className="mt-8"
-          initial={MOTION_VARIANTS.card.initial}
-          whileInView={MOTION_VARIANTS.card.whileInView}
-          viewport={MOTION_VARIANTS.card.viewport}
-          transition={MOTION_VARIANTS.card.transition}
-        >
-          <div className="mb-3 flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--warning-base)]">
-            <FileText className="size-4" />
-            Riprendi bozza
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {draftRows.slice(0, 4).map((row, index) => (
-              <m.div
-                key={row.id}
-                className="rounded-xl bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-4 ring-1 ring-[var(--border-subtle)]/60"
-                initial={MOTION_VARIANTS.row.initial}
-                whileInView={MOTION_VARIANTS.row.whileInView}
-                viewport={MOTION_VARIANTS.row.viewport}
-                transition={{
-                  ...MOTION_VARIANTS.row.transition,
-                  delay: index * 0.035,
-                }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-13px font-semibold text-[var(--text-primary)]">
-                    {row.sal}
-                  </span>
-                  <span className="shrink-0 text-12px font-semibold tabular-nums text-[var(--text-primary)]">
-                    {formatMoney({ amount: row.amount, currency: "EUR" })}
-                  </span>
-                </div>
-                <div className="mt-1 text-11px text-[var(--text-tertiary)]">{row.date}</div>
-                <Button
-                  className="mt-3 w-full"
-                  onClick={() => {
-                    try {
-                      window.sessionStorage.setItem(
-                        SESSION_STORAGE_KEYS.selectedProjectDetail,
-                        JSON.stringify(selectedProject),
-                      );
-                      window.sessionStorage.setItem(SESSION_STORAGE_KEYS.salResumeDraft, row.id);
-                    } catch {
-                      /* no-op */
-                    }
-                    navigate("sal-create");
-                  }}
-                  size="sm"
-                  variant="secondary"
-                >
-                  Continua
-                </Button>
-              </m.div>
-            ))}
-          </div>
-          {draftRows.length > 4 && (
-            <p className="mt-2 text-center text-11px text-[var(--text-tertiary)]">
-              +{draftRows.length - 4} bozze nel registro completo qui sotto
-            </p>
-          )}
-        </m.section>
-      ) : null}
+      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-6">
+          {draftRows.length > 0 ? (
+            <m.section
+              className="order-2"
+              initial={MOTION_VARIANTS.card.initial}
+              whileInView={MOTION_VARIANTS.card.whileInView}
+              viewport={MOTION_VARIANTS.card.viewport}
+              transition={MOTION_VARIANTS.card.transition}
+            >
+              <div className="mb-3 min-w-0">
+                <p className="text-11px font-medium text-[var(--text-tertiary)]">Lavorazione</p>
+                <h3 className="mt-0.5 text-16px font-semibold leading-tight text-[var(--text-primary)]">
+                  Bozze SAL da riprendere
+                </h3>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {draftRows.slice(0, 4).map((row, index) => (
+                  <m.div
+                    key={row.id}
+                    className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-[var(--shadow-soft)]"
+                    initial={MOTION_VARIANTS.row.initial}
+                    whileInView={MOTION_VARIANTS.row.whileInView}
+                    viewport={MOTION_VARIANTS.row.viewport}
+                    transition={{
+                      ...MOTION_VARIANTS.row.transition,
+                      delay: index * 0.035,
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-13px font-semibold text-[var(--text-primary)]">
+                        {row.sal}
+                      </span>
+                      <span className="shrink-0 text-12px font-semibold tabular-nums text-[var(--text-primary)]">
+                        {formatMoney({ amount: row.amount, currency: "EUR" })}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-11px text-[var(--text-tertiary)]">{row.date}</div>
+                    <Button
+                      className="mt-3 w-full"
+                      onClick={() => {
+                        try {
+                          window.sessionStorage.setItem(
+                            SESSION_STORAGE_KEYS.selectedProjectDetail,
+                            JSON.stringify(selectedProject),
+                          );
+                          window.sessionStorage.setItem(
+                            SESSION_STORAGE_KEYS.salResumeDraft,
+                            row.id,
+                          );
+                        } catch {
+                          /* no-op */
+                        }
+                        navigate("sal-create");
+                      }}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      Continua
+                    </Button>
+                  </m.div>
+                ))}
+              </div>
+              {draftRows.length > 4 && (
+                <p className="mt-2 text-center text-11px text-[var(--text-tertiary)]">
+                  +{draftRows.length - 4} bozze nel registro completo qui sotto
+                </p>
+              )}
+            </m.section>
+          ) : null}
 
-      {salViews.length > 0 ? (
-        <m.section
-          className="mt-8"
-          initial={MOTION_VARIANTS.card.initial}
-          whileInView={MOTION_VARIANTS.card.whileInView}
-          viewport={MOTION_VARIANTS.card.viewport}
-          transition={MOTION_VARIANTS.card.transition}
-        >
-          <div className="mb-4 flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--info-base)]">
-            <TrendingUp className="size-4" />
-            Andamento spesa
-          </div>
-          <SpendingTrend contractualAmount={financials.contractual} views={salChartViews} />
-        </m.section>
-      ) : null}
+          {salViews.length > 0 ? (
+            <m.section
+              className="order-3"
+              initial={MOTION_VARIANTS.card.initial}
+              whileInView={MOTION_VARIANTS.card.whileInView}
+              viewport={MOTION_VARIANTS.card.viewport}
+              transition={MOTION_VARIANTS.card.transition}
+            >
+              <div className="mb-3 min-w-0">
+                <p className="text-11px font-medium text-[var(--text-tertiary)]">Andamento</p>
+                <h3 className="mt-0.5 text-16px font-semibold leading-tight text-[var(--text-primary)]">
+                  Cumulato SAL nel tempo
+                </h3>
+              </div>
+              <Panel padding="lg" variant="premium">
+                <SpendingTrend contractualAmount={financials.contractual} views={salChartViews} />
+              </Panel>
+            </m.section>
+          ) : null}
 
-      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-5">
-          <Panel>
-            <h3 className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-              Milestone
-            </h3>
-            <div className="mt-4 grid gap-3 lg:grid-cols-4">
-              {milestoneRows.map((row, index) => (
-                <MilestoneItem
-                  isLast={index === milestoneRows.length - 1}
-                  key={row.label}
-                  row={row}
-                />
-              ))}
+          <Panel className="order-4" padding="lg">
+            <div className="mb-4 min-w-0">
+              <p className="text-11px font-medium text-[var(--text-tertiary)]">Controllo</p>
+              <h3 className="mt-0.5 text-16px font-semibold leading-tight text-[var(--text-primary)]">
+                Economico ed esecuzione
+              </h3>
             </div>
-          </Panel>
-
-          <Panel>
-            <h3 className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-              Economico ed esecuzione
-            </h3>
-            <div className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <div className="rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4">
+            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+              <div className="rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4">
                 <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                   Quadro economico
                 </div>
@@ -851,7 +763,7 @@ export function ProjectDetailScreen() {
                 </DetailList>
               </div>
 
-              <div className="grid rounded-18px bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4 md:grid-cols-2">
+              <div className="grid rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-4 md:grid-cols-2">
                 <div className="border-b border-[var(--border-subtle)]/70 pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-4">
                   <div className="text-11px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
                     Forecast
@@ -875,11 +787,14 @@ export function ProjectDetailScreen() {
             </div>
           </Panel>
 
-          <Panel>
+          <Panel className="order-1" padding="lg" variant="premium">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
-                <FileText className="size-4 text-[var(--info-base)]" />
-                Registro SAL
+              <div className="min-w-0">
+                <p className="text-11px font-medium text-[var(--text-tertiary)]">SAL operative</p>
+                <h3 className="mt-0.5 flex items-center gap-2 text-18px font-semibold leading-tight text-[var(--text-primary)]">
+                  <FileText className="size-4 text-[var(--info-base)]" />
+                  Registro SAL
+                </h3>
               </div>
               <div className="flex items-center gap-2">
                 <MultiSelectToggle
@@ -929,7 +844,6 @@ export function ProjectDetailScreen() {
             )}
 
             <div className="mt-4 space-y-2">
-              {/* Status filter tabs */}
               <div className="flex flex-wrap items-center gap-1.5 px-1 pt-3">
                 {["Tutti", "Bozza", "In revisione", "Approvata"].map((s) => (
                   <button
@@ -1063,9 +977,9 @@ export function ProjectDetailScreen() {
           </Panel>
         </div>
 
-        <aside className="min-w-0 space-y-4">
+        <aside className="min-w-0 space-y-4 xl:sticky xl:top-4">
           <ProjectTimeline project={selectedProject} salDocuments={salDocuments} />
-          <Panel icon={Radio} title="Presidio rapido">
+          <Panel icon={Radio} padding="lg" title="Presidio rapido">
             <DetailList>
               <DetailRow label="Inizio" value={detail.startDate} />
               <DetailRow label="Fine prevista" value={detail.endDate} />
@@ -1083,6 +997,7 @@ export function ProjectDetailScreen() {
 
           <Panel
             icon={FileText}
+            padding="lg"
             title="Tariffari associati"
             action={
               projectTariffBookIds.length > 0 ? (
@@ -1187,61 +1102,6 @@ export function ProjectDetailScreen() {
             onSearchQueryChange={setTariffSearchQuery}
             tariffBooks={tariffBooks}
           />
-
-          <Panel icon={UsersRound} title="Team progetto">
-            <div className="space-y-2.5">
-              {projectTeam.map((member) => (
-                <div
-                  className="flex items-center gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-2.5"
-                  key={member.initials}
-                >
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-13px bg-[var(--accent-primary)] text-12px font-bold text-[var(--text-inverse)]">
-                    {member.initials}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
-                      {member.name}
-                    </div>
-                    <div className="truncate text-12px font-medium text-[var(--text-secondary)]">
-                      {member.role}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel icon={Activity} title="Attivita recenti">
-            <div className="space-y-3">
-              {recentActivities.slice(0, 1).map((activity) => (
-                <div
-                  className="flex items-start gap-3 rounded-xl bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] px-3 py-3"
-                  key={activity.text}
-                >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-base)] text-[var(--text-secondary)]">
-                    <ReceiptText className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
-                      {activity.text}
-                    </div>
-                    <div className="mt-0.5 text-12px font-medium text-[var(--text-secondary)]">
-                      Operazione in attesa
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right text-12px font-medium text-[var(--text-secondary)]">
-                    Oggi
-                    <br />
-                    17:40
-                  </div>
-                </div>
-              ))}
-              <Button className="mt-1 w-full justify-between px-3" variant="secondary">
-                Vedi tutte le attivita
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </Panel>
         </aside>
       </section>
 

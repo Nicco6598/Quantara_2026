@@ -890,6 +890,21 @@ function AppShell() {
   const toggleSidebar = useCallback(() => setIsSidebarCollapsed((current) => !current), []);
   const windowFrameVariant = detectWindowFrameVariant();
 
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+
+    const media = window.matchMedia("(max-width: 899px)");
+    const syncSidebarForViewport = () => {
+      if (media.matches) {
+        setIsSidebarCollapsed(true);
+      }
+    };
+
+    syncSidebarForViewport();
+    media.addEventListener("change", syncSidebarForViewport);
+    return () => media.removeEventListener("change", syncSidebarForViewport);
+  }, []);
+
   return (
     <div
       className="app-window-frame relative flex h-screen overflow-hidden bg-[var(--bg-app-accent)] [font-family:var(--font-sans)] text-[var(--text-primary)]"
@@ -947,7 +962,7 @@ function AppShell() {
           <div className="flex min-w-0 flex-1 flex-col">
             <TopToolbar onPageAction={handleTopbarAction} />
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 md:px-8">
               <RouteRenderer activeRoute={activeRoute} />
             </div>
           </div>

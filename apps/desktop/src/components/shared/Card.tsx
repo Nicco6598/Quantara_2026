@@ -25,17 +25,14 @@ export function Card({
   return (
     <section
       className={cn(
-        "min-w-0 rounded-22px border border-[color-mix(in_srgb,var(--border-subtle)_60%,transparent)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
-        hover && "transition-shadow duration-slow ease-standard hover:shadow-[var(--shadow-panel)]",
+        "min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-[var(--shadow-soft)]",
+        hover &&
+          "transition-[background,border-color,box-shadow] duration-base ease-standard hover:border-[color-mix(in_srgb,var(--accent-primary)_24%,var(--border-subtle))] hover:bg-[color-mix(in_srgb,var(--surface-base)_88%,var(--bg-muted)_12%)] hover:shadow-[var(--shadow-panel)]",
         className,
       )}
     >
       <div
-        className={cn(
-          "h-full rounded-22px bg-[var(--surface-base)]",
-          paddingMap[padding],
-          innerClassName,
-        )}
+        className={cn("h-full rounded-[15px] bg-transparent", paddingMap[padding], innerClassName)}
       >
         {children}
       </div>

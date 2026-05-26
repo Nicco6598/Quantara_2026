@@ -1,15 +1,13 @@
 import { Search, Trash2, UserPlus, Users } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SearchField } from "@/components/shared/form/SearchField";
 import { SelectField } from "@/components/shared/form/SelectField";
-import { MetricCard } from "@/components/shared/MetricCard";
 import { Panel } from "@/components/shared/Panel";
-import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { StatusChip } from "@/components/shared/StatusChip";
-import { useToast } from "@/components/shared/ToastProvider";
 import { type Column, DataTable } from "@/components/shared/table/DataTable";
 import type { WorkspaceMember } from "@/store/app-store";
 import { useTeamState } from "@/store/app-store";
@@ -51,9 +49,30 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
+function TeamHeaderStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number | string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-11px font-medium text-[var(--text-secondary)]">{label}</span>
+        <Icon className="size-3.5 shrink-0 text-[var(--text-tertiary)]" />
+      </div>
+      <div className="mt-1 text-17px font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function TeamScreen() {
   const { members, updateMember, removeMember } = useTeamState();
-  const { notify } = useToast();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
 
@@ -138,68 +157,28 @@ export function TeamScreen() {
 
   return (
     <ScreenLayout gradient="accent-success">
-      <ScreenHero
-        badge="Workspace"
-        title="Team e permessi"
-        description="Membri, inviti e ruoli operativi del workspace con visibilit\u00e0 immediata su accessi e assegnazioni."
-        sidePanel={
-          <div>
-            <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-              Membri attivi
-            </div>
-            <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-              {activeCount} / {members.length}
-            </div>
-            <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
-              {invitedCount > 0
-                ? `${invitedCount} invito${invitedCount === 1 ? "" : "i"} in attesa di conferma.`
-                : "Nessun invito in attesa."}
+      <section className="border-b border-[var(--border-subtle)] pb-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-end">
+          <div className="min-w-0">
+            <p className="text-12px font-medium text-[var(--text-tertiary)]">Workspace</p>
+            <h2 className="mt-1 text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-32px">
+              Team e permessi
+            </h2>
+            <p className="mt-2 max-w-2xl text-14px leading-6 text-[var(--text-secondary)]">
+              Membri, inviti e ruoli operativi con controlli rapidi sugli accessi.
             </p>
-            <Button
-              className="mt-5 w-full"
-              icon={UserPlus}
-              onClick={() =>
-                notify({
-                  message:
-                    "L'invito dei membri sar\u00e0 disponibile in un prossimo aggiornamento.",
-                  title: "In arrivo",
-                  tone: "info",
-                })
-              }
-              variant="secondary"
-            >
-              Invita membro
-            </Button>
           </div>
-        }
-      />
-
-      <section className="operational-card-grid mt-8 sm:grid-cols-3">
-        <MetricCard
-          caption="Utenti nel workspace"
-          icon={Users}
-          label="Membri totali"
-          value={members.length}
-        />
-        <MetricCard
-          caption="Utenti attivi"
-          icon={Users}
-          label="Membri attivi"
-          tone="success"
-          value={activeCount}
-        />
-        <MetricCard
-          caption="Inviti in attesa"
-          icon={Users}
-          label="Inviti pendenti"
-          tone="warning"
-          value={invitedCount}
-        />
+          <div className="grid grid-cols-3 gap-2">
+            <TeamHeaderStat icon={Users} label="Totali" value={members.length} />
+            <TeamHeaderStat icon={Users} label="Attivi" value={activeCount} />
+            <TeamHeaderStat icon={UserPlus} label="Inviti" value={invitedCount} />
+          </div>
+        </div>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-6">
         <Panel className="mb-4" padding="none">
-          <div className="p-3 lg:p-4">
+          <div className="p-4">
             <div className="operational-toolbar">
               <div className="operational-toolbar-group">
                 <h2 className="mr-2 text-13px font-semibold text-[var(--text-primary)]">

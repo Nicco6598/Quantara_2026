@@ -439,7 +439,7 @@ export function ProjectCreateScreen() {
   const osIvaTotal = hasOsIva && Number.isFinite(osParsed) ? osParsed + osIvaAmount : 0;
 
   return (
-    <main className="relative mx-auto w-full max-w-5xl px-4 pb-10 pt-6 md:px-6">
+    <main className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-5 md:px-6">
       {showRestoreDialog && (
         <ConfirmDialog
           confirmLabel="Ripristina"
@@ -451,12 +451,12 @@ export function ProjectCreateScreen() {
           {`È stata trovata una bozza salvata "${restoredDraftRef.current?.title}". Vuoi ripristinarla?`}
         </ConfirmDialog>
       )}
-      <div className="flex items-start justify-between gap-5">
+      <div className="flex items-start justify-between gap-5 border-b border-[var(--border-subtle)] pb-5">
         <div>
-          <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
+          <div className="text-12px font-medium text-[var(--text-tertiary)]">
             {initialValues ? "Modifica progetto" : "Nuovo progetto"}
           </div>
-          <h2 className="mt-2 max-w-3xl text-30px font-semibold leading-1_05 text-[var(--text-primary)] md:text-38px">
+          <h2 className="mt-1 max-w-3xl text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-32px">
             {step === 1 ? "Dati contratto e perimetro" : "Importo e perimetro economico"}
           </h2>
           <p className="mt-2 max-w-2xl text-13px font-medium leading-5 text-[var(--text-secondary)]">
@@ -469,7 +469,7 @@ export function ProjectCreateScreen() {
 
       <nav
         aria-label="Avanzamento creazione progetto"
-        className="mt-6 rounded-22px bg-[var(--surface-base)]/80 p-4 ring-1 ring-[var(--border-subtle)]/70"
+        className="mt-5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"
       >
         <div className="flex items-center gap-3">
           <ProjectStepButton
@@ -500,7 +500,7 @@ export function ProjectCreateScreen() {
         </div>
       </nav>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_350px]">
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_350px]">
         <Panel padding="lg" className="min-w-0 md:p-6">
           {step === 1 ? (
             <section>

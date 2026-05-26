@@ -23,7 +23,6 @@ import { AlertBanner } from "@/components/shared/AlertBanner";
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { Panel } from "@/components/shared/Panel";
-import { ScreenHero } from "@/components/shared/ScreenHero";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
 import { APP_VERSION } from "@/generated/appVersion";
@@ -825,6 +824,28 @@ function AuditLogCard() {
 
 // ── Main component ───────────────────────────────────────
 
+function SettingsHeaderStat({
+  icon: IconComponent,
+  label,
+  value,
+}: {
+  icon: Icon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-11px font-medium text-[var(--text-secondary)]">{label}</span>
+        <IconComponent className="size-3.5 shrink-0 text-[var(--text-tertiary)]" weight="bold" />
+      </div>
+      <div className="mt-1 truncate text-17px font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsScreen() {
   const { notify } = useToast();
   const { showReleaseNotesAfterUpdate } = usePreferenceState();
@@ -985,40 +1006,34 @@ export function SettingsScreen() {
 
   return (
     <ScreenLayout gradient="success-info">
-      <ScreenHero
-        badge="Impostazioni"
-        title="Configurazione applicazione"
-        description="Preferenze operative, stato updater e identita della build. Le modifiche vengono applicate immediatamente."
-        sidePanel={
-          <div>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-11px font-semibold uppercase tracking-0_2em text-[var(--text-secondary)]">
-                  Build attiva
-                </div>
-                <div className="mt-2 text-28px font-semibold leading-none text-[var(--text-primary)]">
-                  v{APP_VERSION}
-                </div>
-              </div>
-              <span
-                className={cn(
-                  "flex size-12 items-center justify-center rounded-full",
-                  updaterReady
-                    ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-                    : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-                )}
-              >
-                <DesktopTower className="size-6" weight="light" />
-              </span>
-            </div>
-            <p className="mt-5 text-12px font-medium leading-5 text-[var(--text-secondary)]">
-              Build {updaterReady ? "pronta per aggiornamenti" : "in sviluppo"} · Canale Stable
+      <section className="border-b border-[var(--border-subtle)] pb-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,560px)] xl:items-end">
+          <div className="min-w-0">
+            <p className="text-12px font-medium text-[var(--text-tertiary)]">Impostazioni</p>
+            <h2 className="mt-1 text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-32px">
+              Configurazione applicazione
+            </h2>
+            <p className="mt-2 max-w-2xl text-14px leading-6 text-[var(--text-secondary)]">
+              Preferenze operative, backup, aggiornamenti e informazioni build.
             </p>
           </div>
-        }
-      />
+          <div className="grid grid-cols-3 gap-2">
+            <SettingsHeaderStat icon={DesktopTower} label="Build" value={`v${APP_VERSION}`} />
+            <SettingsHeaderStat
+              icon={ArrowsClockwise}
+              label="Updater"
+              value={updaterReady ? "Stable" : "Dev"}
+            />
+            <SettingsHeaderStat
+              icon={ShieldCheck}
+              label="Database"
+              value={dbInfo?.exists ? "Locale" : "Non trovato"}
+            />
+          </div>
+        </div>
+      </section>
 
-      <div className="operational-card-grid mt-8 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="operational-card-grid mt-6 lg:grid-cols-2 xl:grid-cols-3">
         <ThemeCard />
         <MotionCard />
         <UpdateCheckCard

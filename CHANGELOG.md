@@ -2,6 +2,31 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.4.32 — 2026-05-26
+
+### UI generale — più coerenza tra schermate e componenti
+
+- **Layout applicativo più uniforme** — riallineate molte schermate allo stesso linguaggio visivo: header più puliti, metriche compatte, pannelli coerenti, toolbar operative e spaziature più regolari.
+- **Componenti condivisi più solidi** — ritoccati bottoni, card, panel, stati vuoti, metriche e primitive UI per ridurre differenze tra sezioni e rendere l'interfaccia più prevedibile.
+- **Token e superfici più ordinati** — rivisti colori, bordi, ombre e stati soft per avere una resa più consistente nei diversi temi dell'app.
+
+### Dashboard e progetto — viste operative più leggibili
+
+- **Dashboard più orientata al controllo** — riorganizzate priorità, stato portafoglio, timeline, grafici e azioni rapide con una struttura più chiara per leggere subito cantieri, SAL e rischi.
+- **Dettaglio progetto più coerente** — ridisegnata la vista progetto con header più sobrio, metriche in evidenza, registro SAL più centrale e pannelli laterali più utili.
+- **Timeline progetto più pulita** — resa più simile agli altri pannelli operativi, con gerarchia tipografica e contenitori allineati al resto dell'app.
+
+### Tariffari, SAL e materiali — flussi più ordinati
+
+- **Tariffari più gestibili** — migliorata la schermata tariffari e aggiunto un flusso dedicato per inserire nuove voci, mantenendo i controlli più vicini al contesto di lavoro.
+- **SAL più leggera** — alleggeriti pannelli e passaggi del flusso SAL, con una tabella misure più ordinata e meno elementi ridondanti intorno al registro.
+- **Materiali e anagrafiche più coerenti** — ritoccate liste, schede e dettagli per avvicinare materiali, appaltatori, team e contabilità allo stesso sistema visivo.
+
+### Impostazioni e manutenzione
+
+- **Impostazioni riallineate** — la schermata impostazioni torna nel formato operativo dell'app, con header e card coerenti con Team, Materiali e Dashboard.
+- **Pulizia generale del codice UI** — rimossi elementi duplicati o poco utili, semplificate alcune strutture e resi più omogenei gli stati interattivi.
+
 ## 0.4.31 — 2026-05-25
 
 ### Vari Fix di ottimizzazione e bug - Fix di performance e bug 

@@ -72,9 +72,9 @@ export function TariffBookPreviewCard({
   return (
     <m.article
       className={cn(
-        "operational-card-hover relative rounded-[18px] border p-3 text-left",
+        "operational-card-hover relative rounded-lg border px-3 py-2 text-left",
         isSelected
-          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_18px_40px_-28px_var(--accent-primary)]"
+          ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_7%,var(--surface-base)_93%)]"
           : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
       )}
       initial={MOTION_VARIANTS.row.initial}
@@ -83,9 +83,9 @@ export function TariffBookPreviewCard({
       whileInView={MOTION_VARIANTS.row.whileInView}
     >
       <div className="flex h-full flex-col">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           {showCheckbox ? (
-            <span className="mt-0.5 shrink-0">
+            <span className="shrink-0">
               <SelectionCheckbox
                 checked={isSelected ?? false}
                 id={book.id}
@@ -94,24 +94,26 @@ export function TariffBookPreviewCard({
             </span>
           ) : null}
           <button
-            className="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+            className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] md:grid-cols-[minmax(0,1fr)_92px_92px_86px]"
             onClick={showCheckbox ? () => onToggleSelect?.(book.id) : onShowDetails}
             type="button"
           >
-            <div className="relative flex h-[76px] w-[58px] shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-10px font-bold uppercase leading-tight shadow-[0_12px_22px_-18px_color-mix(in_srgb,var(--text-primary)_14%,transparent)]">
-              <span className="absolute left-[-6px] top-2 rounded-xs bg-[var(--danger-base)] px-1.5 py-1 text-9px font-black text-[var(--text-inverse)]">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] text-10px font-bold text-[var(--text-tertiary)]">
                 PDF
               </span>
-              <div className="space-y-1.5 text-[var(--text-tertiary)]">
-                <div className="h-1 w-9 rounded bg-current" />
-                <div className="h-1 w-7 rounded bg-current" />
-                <div className="h-1 w-10 rounded bg-current" />
-                <div className="mt-4 h-1 w-8 rounded bg-current" />
-                <div className="h-1 w-11 rounded bg-current" />
+              <div className="min-w-0">
+                <h3 className="truncate text-13px font-semibold leading-tight text-[var(--text-primary)]">
+                  {book.name}
+                </h3>
+                <p className="mt-0.5 truncate text-12px text-[var(--text-secondary)]">
+                  {book.sourceName}
+                </p>
               </div>
             </div>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <div className="flex flex-wrap items-center gap-2">
+
+            <div className="hidden min-w-0 md:block">
+              <div className="flex flex-wrap items-center justify-end gap-1.5 md:justify-start">
                 <Badge
                   variant={
                     book.status === "draft"
@@ -127,20 +129,19 @@ export function TariffBookPreviewCard({
                       ? "Validato"
                       : "Attivo"}
                 </Badge>
-                <span className="text-12px font-semibold text-[var(--text-secondary)]">
-                  Anno {book.year}
-                </span>
               </div>
-              <h3 className="mt-2 truncate text-14px font-semibold leading-tight text-[var(--text-primary)]">
-                {book.name}
-              </h3>
-              <p className="mt-1 truncate text-12px text-[var(--text-secondary)]">
-                {book.sourceName}
-              </p>
-              <div className="mt-1.5 flex flex-wrap gap-x-2 text-11px font-medium text-[var(--text-secondary)]">
-                <span>{displayVoiceCount} voci</span>
-                <span>{linkedProjectCount} progetti</span>
-              </div>
+            </div>
+
+            <div className="hidden text-12px font-semibold tabular-nums text-[var(--text-primary)] md:block">
+              {displayVoiceCount} voci
+            </div>
+
+            <div className="text-right text-12px font-semibold tabular-nums text-[var(--text-primary)]">
+              <span className="block md:hidden">{book.year}</span>
+              <span className="hidden md:block">{book.year}</span>
+              <span className="mt-0.5 block text-10px font-medium text-[var(--text-secondary)]">
+                {linkedProjectCount} progetti
+              </span>
             </div>
           </button>
 
@@ -148,7 +149,7 @@ export function TariffBookPreviewCard({
             <button
               aria-label={isFavorite ? "Rimuovi dai preferiti" : "Segna come preferito"}
               className={cn(
-                "flex size-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[var(--warning-soft)] hover:text-[var(--warning-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
+                "flex size-8 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--warning-soft)] hover:text-[var(--warning-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
                 isFavorite && "bg-[var(--warning-soft)] text-[var(--warning-base)]",
               )}
               onClick={onToggleFavorite}
@@ -205,7 +206,7 @@ export function TariffBookPreviewCard({
         </div>
 
         {editing ? (
-          <div className="mt-4 space-y-3 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3">
+          <div className="mt-3 space-y-3 rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3">
             <TariffEditField
               label="Nome"
               onChange={(value) => onEditFormChange((form) => ({ ...form, name: value }))}
@@ -260,7 +261,7 @@ export function TariffBookPreviewCard({
           </div>
         ) : showDetails ? (
           <m.div
-            className="mt-4 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/40 p-3"
+            className="mt-3 rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/40 p-3"
             animate={MOTION_VARIANTS.viewSwap.animate}
             exit={MOTION_VARIANTS.viewSwap.exit}
             initial={MOTION_VARIANTS.viewSwap.initial}

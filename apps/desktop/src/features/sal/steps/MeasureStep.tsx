@@ -30,8 +30,6 @@ export const MeasureStep = memo(function MeasureStep({
   onNotesChange,
   onSurcharge,
   onPasteLine,
-  selectedLineId,
-  onSelectLine,
   onSearchSelectVoice,
   onApplyTemplate,
   onOpenTemplateDialog,
@@ -56,8 +54,6 @@ export const MeasureStep = memo(function MeasureStep({
   onNotesChange: (lineId: string, notes: string) => void;
   onSurcharge: (lineId: string, p: number) => void;
   onPasteLine: (d: SalLineDraft) => void;
-  selectedLineId?: string | null | undefined;
-  onSelectLine?: ((lineId: string | null) => void) | undefined;
   onSearchSelectVoice?: (voice: SalVoiceDraft) => void;
   onApplyTemplate?: (template: SalTemplate) => void;
   onOpenTemplateDialog?: () => void;
@@ -171,7 +167,6 @@ export const MeasureStep = memo(function MeasureStep({
           lines={lineViews}
           availableVoices={voices}
           copiedVoiceId={copiedLine?.id ?? null}
-          selectedLineId={selectedLineId}
           onAllocateMg={onAllocateMg}
           onAddMgVoice={onAddMgVoice}
           onCopyLine={handleCopyLine}
@@ -181,7 +176,6 @@ export const MeasureStep = memo(function MeasureStep({
           onRemove={onRemove}
           onRemoveMeasurementRow={onRemoveMeasurementRow}
           onSurcharge={onSurcharge}
-          onSelectLine={onSelectLine}
           onUpdateMeasurementRow={onUpdateMeasurementRow}
           {...(searchConfig ? { search: searchConfig } : {})}
         />

@@ -2,12 +2,10 @@ import { AnimatePresence, m } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
-  AlertTriangle,
   Building2,
   CheckCircle2,
   ClipboardList,
   FolderKanban,
-  HardHat,
   Layers3,
   ListTree,
   MoreVertical,
@@ -22,7 +20,6 @@ import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { MetricCard } from "@/components/shared/MetricCard";
 import { Panel } from "@/components/shared/Panel";
 import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";
@@ -70,70 +67,59 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
   const watchedFolders = folders.length - stableFolders;
 
   return (
-    <div className="space-y-8">
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
+    <div className="space-y-6">
+      <section className="border-b border-[var(--border-subtle)] pb-5">
         <div className="min-w-0">
-          <div className="flex items-center justify-between gap-4">
-            <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,transparent)] px-3 py-1 text-10px font-semibold uppercase tracking-0_18em text-[var(--text-secondary)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)]">
-              Appaltatori
-            </span>
-            {onSwitchToTreeView && (
-              <button
-                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_80%,var(--bg-muted)_20%)] px-4 py-1.5 text-11px font-semibold text-[var(--text-primary)] transition-all duration-[var(--duration-fast)] ease-standard"
-                onClick={onSwitchToTreeView}
-                type="button"
-              >
-                <ListTree className="size-3.5" />
-                Vista albero
-              </button>
-            )}
-          </div>
-          <h2 className="mt-5 max-w-4xl text-38px font-semibold leading-tight tracking-neg-0_03em text-[var(--text-primary)] md:text-56px">
-            Cockpit appaltatori
-          </h2>
-          <p className="mt-4 max-w-2xl text-15px leading-6 text-[var(--text-secondary)]">
-            Cartelle operative con budget, SAL, alert e stato di presidio leggibili al primo
-            sguardo.
-          </p>
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+            <div>
+              <p className="text-12px font-medium text-[var(--text-tertiary)]">Portafoglio</p>
+              <h2 className="mt-1 text-28px font-semibold leading-tight text-[var(--text-primary)] md:text-32px">
+                Appaltatori
+              </h2>
+              <p className="mt-2 max-w-2xl text-14px leading-6 text-[var(--text-secondary)]">
+                Cartelle, SAL e criticità in una vista compatta da lavoro.
+              </p>
+            </div>
 
-          <div className="mt-7 grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              caption="Cartelle operative"
-              icon={HardHat}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button icon={Upload} onClick={onImport} size="sm" variant="secondary">
+                Importa
+              </Button>
+              <Button icon={Plus} onClick={onOpenCreateContractor} size="sm">
+                Nuovo
+              </Button>
+              {onSwitchToTreeView ? (
+                <Button icon={ListTree} onClick={onSwitchToTreeView} size="sm" variant="outline">
+                  Vista albero
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            <ContractorHeaderStat
+              icon={FolderKanban}
               label="Appaltatori"
-              tone="info"
               value={`${folders.length}`}
             />
-            <MetricCard
-              caption="Cantieri nel perimetro"
+            <ContractorHeaderStat
               icon={Layers3}
-              label="Progetti"
-              tone="success"
+              label="Cantieri"
               value={`${activeProjectsCount}`}
             />
-            <MetricCard
-              caption="Ultime attivita SAL"
+            <ContractorHeaderStat
               icon={ClipboardList}
               label="SAL recenti"
-              tone={recentSalsCount > 0 ? "warning" : "success"}
               value={`${recentSalsCount}`}
             />
-            <MetricCard
-              caption="Contratti attivi"
+            <ContractorHeaderStat icon={ShieldCheck} label="Presidio" value={`${watchedFolders}`} />
+            <ContractorHeaderStat
               icon={Building2}
               label="Portfolio"
               value={formatMoney({ amount: totalPortfolioValue, currency: "EUR" })}
             />
           </div>
         </div>
-
-        <PortfolioSnapshot
-          activeProjectsCount={activeProjectsCount}
-          foldersCount={folders.length}
-          stableFolders={stableFolders}
-          totalPortfolioValue={totalPortfolioValue}
-          watchedFolders={watchedFolders}
-        />
       </section>
 
       <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -146,6 +132,14 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
         />
 
         <aside className="grid gap-4 lg:grid-cols-2 2xl:block 2xl:space-y-4">
+          <PortfolioSnapshot
+            activeProjectsCount={activeProjectsCount}
+            foldersCount={folders.length}
+            stableFolders={stableFolders}
+            totalPortfolioValue={totalPortfolioValue}
+            watchedFolders={watchedFolders}
+          />
+
           <WorkspaceRailCard icon={Activity} title="Attivita recenti" tone="success">
             <div className="flex min-h-[150px] flex-col items-center justify-center text-center">
               <div className="flex size-12 items-center justify-center rounded-22px bg-[var(--success-soft)] text-[var(--success-base)]">
@@ -198,6 +192,28 @@ export const ContractorsWorkspace = memo(function ContractorsWorkspace({
     </div>
   );
 });
+
+function ContractorHeaderStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 text-11px font-medium text-[var(--text-secondary)]">{label}</span>
+        <Icon className="size-3.5 shrink-0 text-[var(--text-tertiary)]" />
+      </div>
+      <div className="mt-1 truncate text-17px font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+}
 
 function PortfolioSnapshot({
   activeProjectsCount,
@@ -379,18 +395,18 @@ function ContractorFoldersPanel({
 
   return (
     <Panel padding="none">
-      <div className="flex flex-col gap-4 border-b border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] p-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-col gap-3 border-b border-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)] p-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-11px font-semibold uppercase tracking-0_14em text-[var(--text-secondary)]">
+            <span className="text-12px font-semibold text-[var(--text-primary)]">
               Cartelle operative
             </span>
-            <span className="rounded-full bg-[var(--bg-muted-strong)] px-2 py-0.5 text-11px font-semibold text-[var(--text-secondary)]">
+            <span className="rounded-md bg-[var(--bg-muted-strong)] px-2 py-0.5 text-11px font-semibold text-[var(--text-secondary)]">
               {filteredFolders.length}/{folders.length}
             </span>
           </div>
-          <div className="mt-1 text-12px font-medium text-[var(--text-secondary)]">
-            Vista cockpit per budget, SAL, alert e priorita appaltatore.
+          <div className="mt-0.5 text-12px font-medium text-[var(--text-secondary)]">
+            Budget, SAL e priorità appaltatore.
           </div>
         </div>
 
@@ -434,7 +450,7 @@ function ContractorFoldersPanel({
           description={`Nessun appaltatore corrisponde a "${query}".`}
         />
       ) : (
-        <m.div layout className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
+        <m.div layout className="space-y-2 p-3">
           <AnimatePresence initial={false}>
             {filteredFolders.map((folder) => (
               <ContractorCard
@@ -492,157 +508,107 @@ function ContractorCard({
   const budgetLabel = formatMoney({ amount: folder.budget, currency: "EUR" });
 
   return (
-    <div className="group relative rounded-[18px] border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-[0_1px_2px_color-mix(in_srgb,var(--text-primary)_4%,transparent)] transition-[border-color,background-color,box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-safe:hover:-translate-y-1 motion-safe:hover:border-[color-mix(in_srgb,var(--accent-primary)_26%,var(--border-subtle))] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] motion-safe:hover:shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_7%,transparent)] motion-safe:active:translate-y-0 motion-safe:active:scale-[0.995]">
+    <div className="group relative rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] transition-[border-color,background-color] duration-fast hover:border-[color-mix(in_srgb,var(--accent-primary)_24%,var(--border-subtle))] hover:bg-[var(--bg-muted)]/35">
       <m.article
         layout
         animate={MOTION_VARIANTS.card.whileInView}
-        className="relative overflow-hidden rounded-[17px] ring-1 ring-inset ring-[color-mix(in_srgb,var(--surface-highlight)_34%,transparent)]"
+        className="relative rounded-lg"
         exit={{ opacity: 0, scale: 0.994, y: 10 }}
         initial={MOTION_VARIANTS.card.initial}
         transition={MOTION_VARIANTS.card.transition}
       >
-        <div className="absolute right-3 top-3 z-20">
+        <div className="absolute right-2 top-2 z-20">
           <ContractorMenu folder={folder} onDeleteContractor={onDeleteContractor} />
         </div>
 
         <button
           aria-label={`Apri ${folder.contractor}`}
-          className="relative z-10 flex w-full flex-col p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+          className="relative z-10 grid w-full gap-3 p-3 pr-12 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] md:grid-cols-[minmax(0,1.35fr)_88px_110px_112px_minmax(150px,0.9fr)] md:items-center"
           onClick={() => onOpenFolder(folder.id)}
           type="button"
         >
-          <div className="flex min-w-0 items-start justify-between gap-3 pr-12">
-            <div className="flex min-w-0 items-start gap-3.5">
-              <ContractorAvatar initials={initials} tone={health.tone} />
-              <div className="min-w-0 flex-1 pt-1">
-                <h3 className="text-20px font-semibold leading-[1.1] tracking-[-0.015em] text-[var(--text-primary)] line-clamp-1">
-                  {folder.contractor}
-                </h3>
-                <div className="mt-1.5 flex items-center gap-2 text-12px font-medium text-[var(--text-secondary)]">
-                  <span className="tabular-nums">{folder.projectCount} progetti</span>
-                  <span className="size-1 rounded-full bg-[var(--text-tertiary)]/30" />
-                  <span className="tabular-nums">{folder.salCount} SAL</span>
-                  <span className="size-1 rounded-full bg-[var(--text-tertiary)]/30" />
-                  <span className="tabular-nums">{budgetLabel}</span>
-                </div>
+          <div className="flex min-w-0 items-center gap-3">
+            <ContractorAvatar initials={initials} tone={health.tone} />
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-14px font-semibold leading-tight text-[var(--text-primary)]">
+                {folder.contractor}
+              </h3>
+              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-11px font-medium text-[var(--text-secondary)]">
+                <span className="tabular-nums">{folder.projectCount} progetti</span>
+                <span className="tabular-nums">{folder.salCount} SAL</span>
               </div>
             </div>
-            <span
+          </div>
+
+          <span
+            className={cn(
+              "inline-flex w-fit items-center rounded-md px-2 py-1 text-11px font-semibold",
+              statusToneStyles[health.tone],
+            )}
+          >
+            {health.label}
+          </span>
+
+          <div>
+            <div className="text-10px font-medium text-[var(--text-secondary)]">Budget</div>
+            <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--text-primary)]">
+              {budgetLabel}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-10px font-medium text-[var(--text-secondary)]">SAL aperti</div>
+            <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--accent-primary)]">
+              {exposureLabel}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-10px font-medium text-[var(--text-secondary)]">Criticità</div>
+            <div
               className={cn(
-                "mt-1 shrink-0 rounded-full px-2.5 py-0.5 text-10px font-semibold tracking-[-0.01em]",
-                statusToneStyles[health.tone],
+                "mt-0.5 text-12px font-semibold tabular-nums",
+                folder.criticalCount > 0
+                  ? "text-[var(--warning-base)]"
+                  : "text-[var(--text-primary)]",
               )}
             >
-              {health.label}
-            </span>
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <ContractorMetricTile icon={TrendingUp} label="Budget" value={budgetLabel} />
-            <ContractorMetricTile
-              icon={Layers3}
-              label="Progetti"
-              value={`${folder.projectCount}`}
-            />
-            <ContractorMetricTile
-              icon={folder.criticalCount > 0 ? AlertTriangle : ShieldCheck}
-              label="Criticità"
-              tone={folder.criticalCount > 0 ? "warning" : "info"}
-              value={`${folder.criticalCount}`}
-            />
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="min-w-0 rounded-10px border border-[color-mix(in_srgb,var(--border-subtle)_52%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_46%,transparent)] p-3">
-              <div className="grid gap-1">
-                <dt className="text-[10px] font-semibold leading-tight text-[var(--text-secondary)]">
-                  Esposizione SAL
-                </dt>
-                <span className="text-14px font-semibold leading-tight tabular-nums text-[var(--accent-primary)]">
-                  {exposureLabel}
-                </span>
-              </div>
-            </div>
-            <div className="min-w-0 rounded-10px border border-[color-mix(in_srgb,var(--border-subtle)_52%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_46%,transparent)] p-3">
-              <div className="grid gap-1">
-                <dt className="text-[10px] font-semibold leading-tight text-[var(--text-secondary)]">
-                  Finestre SAL
-                </dt>
-                <span className="text-14px font-semibold leading-tight tabular-nums text-[var(--text-primary)]">
-                  {folder.salWindowCount}
-                </span>
-              </div>
+              {folder.criticalCount} · {folder.salWindowCount} finestre
             </div>
           </div>
 
-          {folder.recentSal && (
-            <div className="mt-3 rounded-10px bg-[color-mix(in_srgb,var(--bg-muted)_50%,transparent)] px-3.5 py-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)]/12">
-                  <div className="size-1.5 rounded-full bg-[var(--accent-primary)]" />
+          <div className="min-w-0">
+            {folder.recentSal ? (
+              <div>
+                <div className="flex min-w-0 items-center gap-1.5 text-11px leading-tight">
+                  <span className="truncate font-medium text-[var(--text-primary)]">
+                    {folder.recentSal.title}
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 font-medium",
+                      statusToneStyles[
+                        SAL_STATUS_TONE_KEYS[folder.recentSal.status] ?? "neutral"
+                      ] || "text-[var(--text-tertiary)]",
+                    )}
+                  >
+                    {SAL_STATUS_LABELS[folder.recentSal.status] || folder.recentSal.status}
+                  </span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-11px leading-tight">
-                    <span className="font-medium text-[var(--text-primary)] truncate">
-                      {folder.recentSal.title}
-                    </span>
-                    <span
-                      className={cn(
-                        "shrink-0 font-medium",
-                        statusToneStyles[
-                          SAL_STATUS_TONE_KEYS[folder.recentSal.status] ?? "neutral"
-                        ] || "text-[var(--text-tertiary)]",
-                      )}
-                    >
-                      {SAL_STATUS_LABELS[folder.recentSal.status] || folder.recentSal.status}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-10px font-medium text-[var(--text-tertiary)]">
-                    <span className="truncate">{folder.recentSal.projectName}</span>
-                    <span className="size-0.5 rounded-full bg-[var(--text-tertiary)]/40" />
-                    <span className="shrink-0">{formatRecentDate(folder.recentSal.date)}</span>
-                  </div>
+                <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-10px font-medium text-[var(--text-tertiary)]">
+                  <span className="truncate">{folder.recentSal.projectName}</span>
+                  <span className="size-0.5 shrink-0 rounded-full bg-[var(--text-tertiary)]/40" />
+                  <span className="shrink-0">{formatRecentDate(folder.recentSal.date)}</span>
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <span className="text-11px font-medium text-[var(--text-tertiary)]">
+                Nessun SAL recente
+              </span>
+            )}
+          </div>
         </button>
       </m.article>
-    </div>
-  );
-}
-
-function ContractorMetricTile({
-  icon: Icon,
-  label,
-  tone = "info",
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  tone?: "info" | "warning";
-  value: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-10px border border-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_76%,var(--bg-muted)_24%)] p-2.5">
-      <div className="flex items-center gap-1.5">
-        <span
-          className={cn(
-            "flex size-5 shrink-0 items-center justify-center rounded-8px",
-            tone === "warning"
-              ? "bg-[var(--warning-soft)] text-[var(--warning-base)]"
-              : "bg-[var(--info-soft)] text-[var(--info-base)]",
-          )}
-        >
-          <Icon className="size-3" />
-        </span>
-        <span className="min-w-0 text-10px font-semibold leading-tight text-[var(--text-secondary)]">
-          {label}
-        </span>
-      </div>
-      <div className="mt-2 break-words text-13px font-semibold leading-tight tabular-nums text-[var(--text-primary)]">
-        {value}
-      </div>
     </div>
   );
 }
