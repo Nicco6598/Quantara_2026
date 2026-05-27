@@ -34,6 +34,7 @@ import type {
   PortfolioProject,
 } from "@/features/projects/types";
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
   type DesktopContract,
@@ -44,7 +45,9 @@ import {
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
+import { isContractorMigrationComplete, resolveContractorName } from "@/lib/contractor-resolve";
+import { selectProjectForWorkflow } from "@/lib/workflow-navigation";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import {
   type PendingWorkflowAction,
   useAppStore,
@@ -130,7 +133,10 @@ export function ProjectsScreen() {
     () =>
       contractsState.source === "desktop" || contractsState.data.length > 0
         ? contractsState.data.map((contract) => {
-            const baseProject = mapContractToProject(contract, projectContractors[contract.id]);
+            const baseProject = mapContractToProject(
+              contract,
+              resolveContractorName(contract, projectContractors),
+            );
             return enrichProjectWithRealSalData(baseProject, salDocuments, tariffVoices);
           })
         : [],
@@ -177,31 +183,33 @@ export function ProjectsScreen() {
     [activeProjects],
   );
 
-  useEffect(() => {
-    let active = true;
-
-    Promise.all([
+  const reloadPortfolio = useCallback(() => {
+    return Promise.all([
       listDesktopContracts([]),
       listDesktopTariffBooks([fallbackProjectTariffBook]),
     ]).then(([contracts, tariffBooks]) => {
-      if (active) {
-        setContractsState(contracts);
-        setTariffBooksState(tariffBooks.data);
-        setSelectedContractId(contracts.data[0]?.id ?? "");
-      }
+      setContractsState(contracts);
+      setTariffBooksState(tariffBooks.data);
+      setSelectedContractId((current) => current || contracts.data[0]?.id || "");
     });
-
-    return () => {
-      active = false;
-    };
   }, []);
+
+  useEffect(() => {
+    void reloadPortfolio();
+  }, [reloadPortfolio]);
+
+  useDataChangedListener(() => {
+    void reloadPortfolio();
+  });
 
   useEffect(() => {
     writeJson(contractorRegistryStorageKey, contractorRegistry);
   }, [contractorRegistry]);
 
   useEffect(() => {
-    writeJson(projectContractorStorageKey, projectContractors);
+    if (!isContractorMigrationComplete()) {
+      writeJson(projectContractorStorageKey, projectContractors);
+    }
   }, [projectContractors]);
 
   const processPendingWorkflowAction = useCallback(
@@ -251,15 +259,7 @@ export function ProjectsScreen() {
   }, [activeRoute, activeContext]);
 
   function handleOpenProject(project: PortfolioProject) {
-    try {
-      window.sessionStorage.setItem(
-        SESSION_STORAGE_KEYS.selectedProjectDetail,
-        JSON.stringify(project),
-      );
-    } catch {
-      // Detail still opens with fallback content if storage is unavailable.
-    }
-
+    selectProjectForWorkflow(project.id);
     navigate("project-detail");
   }
 

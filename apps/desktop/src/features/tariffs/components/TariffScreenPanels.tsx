@@ -14,7 +14,10 @@ import { useRef, useState } from "react";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { DetailList, DetailRow } from "@/components/shared/DetailList";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildTariffBookContextMenuEntries } from "@/lib/context-menu-presets";
 import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import type { DesktopTariffBook, TariffPdfMetadata } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
@@ -67,6 +70,7 @@ export function TariffBookPreviewCard({
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const contextMenu = useContextMenu<void>();
   const displayVoiceCount = voiceCount == null ? "..." : voiceCount.toLocaleString("it-IT");
 
   return (
@@ -77,6 +81,11 @@ export function TariffBookPreviewCard({
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_7%,var(--surface-base)_93%)]"
           : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
       )}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        contextMenu.open(event, undefined);
+      }}
       initial={MOTION_VARIANTS.row.initial}
       transition={MOTION_VARIANTS.row.transition}
       viewport={MOTION_VARIANTS.row.viewport}
@@ -277,6 +286,22 @@ export function TariffBookPreviewCard({
           </m.div>
         ) : null}
       </div>
+
+      {contextMenu.state ? (
+        <AppContextMenu
+          entries={buildTariffBookContextMenuEntries({
+            isFavorite,
+            onShowDetails,
+            onEdit,
+            onOpenVoices,
+            onToggleFavorite,
+            onDelete,
+          })}
+          header={{ title: book.name, subtitle: book.sourceName }}
+          onClose={contextMenu.close}
+          position={{ x: contextMenu.state.x, y: contextMenu.state.y }}
+        />
+      ) : null}
     </m.article>
   );
 }

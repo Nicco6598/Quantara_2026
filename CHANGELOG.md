@@ -2,6 +2,112 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.5.0 — 2026-05-27
+
+### SAL — copia, incolla e duplica come in un foglio di lavoro
+
+- **Copia e incolla voci e misure** — nel registro misure puoi copiare un'intera voce o solo le righe di misura (fattori, quantità, note) e incollarle su un'altra riga o come nuova voce. Funziona con **tasto destro** sul registro, con **Ctrl+C / Ctrl+V** quando sei sulla riga, oppure incollando da un altro documento se Quantara riconosce il formato.
+- **Duplica voce o riga misura** — dal menu contestuale puoi duplicare una voce già inserita (utile quando la stessa voce tariffaria compare più volte nel SAL con quantità diverse) oppure duplicare una singola riga misura sopra o sotto quella selezionata.
+- **Aggiungi voce dalla ricerca col tasto destro** — nei risultati della barra di ricerca, clic destro → **Aggiungi al SAL** oppure **Copia codice**, senza uscire dalla ricerca.
+- **La bozza salva subito ciò che incolli** — dopo incolla o duplica, la bozza locale viene aggiornata immediatamente. Non serve più uscire dal SAL o aspettare un salvataggio manuale per ritrovare la voce copiata riaprendo la bozza.
+- **Indicatore di salvataggio in testata** — mentre compili il SAL vedi **Salvataggio…** / **Salvato** accanto al titolo, così sai quando la bozza è scritta su disco (oltre al salvataggio immediato dopo incolla).
+
+**Come usarlo in pratica**
+
+1. Vai allo step **Misure**.
+2. Clic destro su una voce → **Copia voce**, poi clic destro su un'altra area del registro → **Incolla voce** (oppure **Ctrl+V** con la riga attiva).
+3. Per le sole righe di misura: espandi la voce, clic destro sulla riga → **Copia riga** / **Incolla sopra** / **Incolla sotto**.
+4. Controlla l'indicatore in alto: quando compare **Salvato**, puoi chiudere l'app senza perdere il lavoro.
+
+### SAL — ricerca voci più precisa (anche per codice)
+
+- **Ricerca per tratta di codice** — nella barra di ricerca puoi digitare il prefisso di una voce come la scrivi sul tariffario (es. `SS.AC.F.2` o `FA.PM.A.2001`): Quantara filtra per segmenti del codice, non solo per testo libero nella descrizione.
+- **Ricerca più veloce su cataloghi grandi** — l'elenco delle voci tariffarie viene preparato in anticipo quando selezioni i tariffari nello step Progetto, così la ricerca nello step Misure resta scattante anche con decine di migliaia di voci.
+- **Filtro per tariffario nella ricerca** — puoi restringere i risultati al solo tariffario che ti interessa (come nelle versioni precedenti, ma con indice più leggero e risposta più rapida).
+
+**Suggerimento** — per trovare una voce lunga, inizia dal codice (es. `MO.AI.F.31`) e aggiungi parole della descrizione solo se serve restringere.
+
+### SAL — maggiorazioni MG corrette sulle voci duplicate
+
+- **MG solo sulle righe che scegli tu** — se hai due o più istanze della stessa voce tariffaria (stesso codice, righe diverse nel registro), la maggiorazione MG si applica **solo alle righe spuntate** nel pannello di assegnazione, non a tutte le copie insieme.
+- **Righe duplicate più riconoscibili** — nel dialog di assegnazione MG compaiono il numero di riga (**#2**, **#3**…) e l'etichetta **Istanza duplicata**, così capisci quale riga stai collegando alla maggiorazione.
+- **Importi MG più fedeli al tariffario** — il calcolo della maggiorazione tiene conto della **quota manodopera** della voce (non solo del lordo intero), sia nel registro sia nella **ricevuta contabile** dello step Verifica/Riepilogo.
+- **Clic destro sulla voce MG** — sulla chip o sulla riga MG in testata: **Assegna voci destinatarie**, **Disattiva maggiorazione** o **Rimuovi voce MG**.
+
+**Come assegnare la MG su una sola copia**
+
+1. Inserisci la voce MG (o usane una suggerita in testata).
+2. Clic **Assegna voci** / **Modifica voci destinatarie**.
+3. Spunta **solo** le righe che devono ricevere la maggiorazione (guarda il **#** se il codice è ripetuto).
+4. Conferma con **Applica a N voci**.
+
+### SAL — registro misure più comodo e più veloce
+
+- **Intestazione colonne fissa** — scorrendo un SAL lungo, la riga con i titoli delle colonne (codice, descrizione, quantità, importi…) resta visibile in alto; non perdi il riferimento mentre compili le misure in basso.
+- **Step Misure più reattivo** — con molte voci tariffarie il passaggio allo step Misure è sensibilmente più rapido: l'indice di ricerca si prepara già nello step Progetto e il registro non ricalcola tutto due volte all'ingresso.
+- **Righe espanse senza sovrapposizioni** — aprendo il dettaglio misure di una voce, la riga sottostante non si sovrappone più al contenuto espanso sopra.
+- **Espandi / comprimi tutto** — pulsante **Espandi** / **Comprimi** in testata al registro (scorciatoia **Ctrl+Shift+E**) per aprire o chiudere tutte le voci in un colpo solo.
+- **Maggiorazioni in testata, registro a tutta larghezza** — le MG restano compatte sopra il foglio; il libretto misure usa tutta la larghezza utile dello schermo.
+
+### SAL — bozze, ripresa e step Verifica
+
+- **Riprendi la bozza con tutte le righe** — se avevi duplicato la stessa voce più volte, riaprendo la bozza le ritrovi tutte (non viene tenuta solo l'ultima occorrenza).
+- **Regole MG e voci allineate al salvataggio** — salvataggio bozza e ripresa tengono insieme voci, misure e assegnazioni MG in modo coerente, anche dopo molte modifiche o un cambio tariffario sul progetto.
+- **Materiali nello step Verifica sempre aggiornati** — se modifichi le giacenze in Magazzino mentre hai un SAL aperto, la lista materiali in Verifica si aggiorna senza dover ricaricare l'app.
+- **Clic destro sui materiali in Verifica** — **Copia codice** o **Azzera quantità usata** sulla riga del materiale collegato al SAL.
+
+### Dettaglio progetto e Dashboard — SAL e navigazione
+
+- **Clic destro sulle card SAL** — nel dossier progetto: **Continua bozza**, **Invia in revisione** / **Approva** (a seconda dello stato) o **Elimina SAL**, senza aprire prima il menu a tre puntini.
+- **Elenco SAL allineato al database** — bozze, SAL in revisione e confermati nel progetto e in Dashboard si aggiornano quando salvi o elimini un documento, senza restare su conteggi obsoleti.
+- **Ripresa bozza più stabile** — il SAL che stavi riprendendo viene ricordato in modo più affidabile quando passi tra schermate (meno dipendenza da dati temporanei del browser).
+- **Appaltatori sui progetti vecchi** — in Dashboard i nomi appaltatore sui cantieri importati o creati in passato vengono mostrati correttamente anche se erano salvati in un formato precedente.
+
+### Menu contestuale — azioni rapide ovunque serve un clic destro
+
+- **Progetti** — **Apri dossier**, **Modifica progetto**, **Elimina progetto**.
+- **Tariffari** — **Mostra scheda**, **Segna / Rimuovi preferito**, **Modifica dettagli**, **Modifica voci**, **Elimina tariffario**; sulle singole voci: **Copia codice voce**, **Elimina voce**.
+- **Materiali** — **Copia codice**, **Modifica**, **Elimina materiale**.
+- **Team** — **Copia email**, **Rimuovi membro**.
+- **Contabilità** — su ogni SAL in elenco: **Copia titolo**, **Apri progetto**.
+- **SAL (registro misure)** — voci, righe misura, MG e risultati ricerca (vedi sezioni sopra).
+
+**Suggerimento** — se un'azione è disabilitata (es. incolla senza nulla in memoria), passa il mouse sulla voce: spesso compare un suggerimento sul perché.
+
+### Registro attività — cronologia reale dal database
+
+- **Attività salvate sul disco** — creazioni, modifiche, conferme SAL, scarichi magazzino e altre operazioni importanti finiscono in un registro persistente (non solo in memoria fino al riavvio).
+- **Dashboard e Impostazioni** — il pannello **Attività recenti** mostra ora azioni etichettate in italiano (es. *Salvataggio · SAL*, *Creazione · Materiale*) con orario, ricaricandosi quando qualcosa cambia nel database locale.
+
+### Tariffari — import PDF più accurato
+
+- **Codici voce con spazi corretti** — nell'import da PDF RFI, voci come `SS.AC.F.2 01.A` non vengono più compresse in codici illeggibili (`SS.AC.F.201.A`): il parser ripristina lo spazio nel numero voce quando il PDF lo perde in estrazione.
+- **Parser sempre aggiornato in sviluppo** — se ricompili il parser tariffario, l'app desktop rileva il nuovo eseguibile e lo riavvia senza dover chiudere Quantara manualmente.
+
+### Backup, ripristino e dati locali
+
+- **Backup include anche le bozze di import tariffario** — un export/backup del database locale porta con sé anche le anteprime di import tariffari ancora in sospeso, utili se reinstalli o sposti il PC.
+- **Dati di navigazione più coerenti** — progetto selezionato, bozza SAL da riprendere e sessioni di modifica progetto sono gestiti in modo uniforme, con migrazione automatica dai vecchi salvataggi nel browser.
+
+### Dati sempre aggiornati tra una schermata e l'altra
+
+- **Le liste si aggiornano da sole** — dopo aver creato o modificato progetti, SAL, materiali, tariffari o appaltatori, tornando alla Dashboard, al dettaglio progetto, alla sidebar o alle liste non resti bloccato su dati vecchi finché non riavvii l'app.
+
+### Temi e interfaccia — cambio aspetto più fluido
+
+- **Cambio tema più immediato** — passare da chiaro a scuro (o tra le palette Ambra, Foresta, Midnight…) non blocca più l'interfaccia né il registro SAL; le transizioni visive sono state alleggerite.
+- **Impostazioni tema semplificate** — dalla schermata Impostazioni il cambio tema è diretto, senza ricaricamenti doppi inutili.
+
+### Export e documenti (richiamo utile)
+
+- **PDF e Excel dal SAL** — nello step **Conferma** restano disponibili export PDF (report, libretto, stampa contabile) e, dove previsto, export Excel. Usa i pulsanti in testata quando il SAL è pronto per la chiusura.
+
+### Correzioni importanti
+
+- **Niente più errore "Maximum update depth"** — incollando o inserendo voci non compare più il blocco dell'interfaccia che obbligava a ricaricare.
+- **MG e bozza allineati alle righe reali** — risolti i casi in cui la spunta MG sembrava applicarsi a tutte le copie della stessa voce, o in cui la voce incollata non compariva riaprendo la bozza.
+- **Importi MG in ricevuta** — allineati al nuovo calcolo sulla quota manodopera, coerenti con il registro misure.
+
 ## 0.4.32 — 2026-05-26
 
 ### UI generale — più coerenza tra schermate e componenti

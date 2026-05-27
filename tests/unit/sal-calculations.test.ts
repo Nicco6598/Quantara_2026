@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildLineViews,
   buildVerificationChecks,
+  computeMgOnLaborPortion,
   defaultSalEconomicRules,
+  getMgAssignableTargetLines,
   summarizeSalLines,
 } from "../../apps/desktop/src/features/sal/domain/sal-calculations";
 import { isSafetyVoice } from "../../apps/desktop/src/features/sal/domain/sal-safety";
@@ -439,5 +441,199 @@ describe("SAL edge cases - regression tests", () => {
     const views = buildLineViews([line], defaultSalEconomicRules);
     expect(views[0]?.linkedCharges).toHaveLength(1);
     expect(views[0]?.linkedCharges[0]?.total).toBe(0);
+  });
+
+  it("lists all non-MG SAL lines as MG assignable targets regardless of gross amount", () => {
+    const zeroGrossLine: SalLineDraft = {
+      id: "line-zero",
+      measurementRows: [],
+      notes: "",
+      sourceType: "voice",
+      surchargePercent: 0,
+      voice: {
+        category: "Opere",
+        code: "FA.01.001",
+        description: "Senza misure",
+        id: "voice-zero",
+        isSafetyCost: false,
+        laborPercentage: 0,
+        unit: "m",
+        unitPrice: 50,
+      },
+    };
+    const mgLine: SalLineDraft = {
+      id: "line-mg",
+      measurementRows: [],
+      notes: "",
+      sourceType: "voice",
+      surchargePercent: 0,
+      voice: {
+        category: "Maggiorazioni",
+        code: "FA.MG.01",
+        description: "MG 10%",
+        id: "voice-mg",
+        isSafetyCost: false,
+        laborPercentage: 0,
+        unit: "%",
+        unitPrice: 10,
+        source: { isMaggiorazione: true },
+      },
+    };
+    const views = buildLineViews([zeroGrossLine, mgLine], {
+      ...defaultSalEconomicRules,
+      mgManualAllocations: { "line-mg": ["line-zero"] },
+    });
+    const assignable = getMgAssignableTargetLines(views);
+
+    expect(assignable.map((line) => line.id)).toEqual(["line-zero"]);
+    expect(views.find((line) => line.id === "line-mg")?.grossAmount).toBe(0);
+  });
+
+  it("applies manual MG on labor portion of gross (lordo × %MG × %manodopera)", () => {
+    const targetLine: SalLineDraft = {
+      id: "line-target",
+      measurementRows: [row({ factor1: 10, factor2: 1, factor3: 1 })],
+      notes: "",
+      sourceType: "voice",
+      surchargePercent: 0,
+      voice: {
+        category: "Opere",
+        code: "FA.01.100",
+        description: "Voce con manodopera",
+        id: "voice-target",
+        isSafetyCost: false,
+        laborPercentage: 40,
+        unit: "m",
+        unitPrice: 100,
+      },
+    };
+    const mgLine: SalLineDraft = {
+      id: "line-mg",
+      measurementRows: [],
+      notes: "",
+      sourceType: "voice",
+      surchargePercent: 0,
+      voice: {
+        category: "Maggiorazioni",
+        code: "FA.MG.01",
+        description: "MG 10%",
+        id: "voice-mg",
+        isSafetyCost: false,
+        laborPercentage: 0,
+        unit: "%",
+        unitPrice: 10,
+        source: { isMaggiorazione: true },
+      },
+    };
+    const views = buildLineViews([targetLine, mgLine], {
+      ...defaultSalEconomicRules,
+      discountEnabled: false,
+      mgManualAllocations: { "line-mg": ["line-target"] },
+    });
+    const target = views.find((line) => line.id === "line-target");
+    const mgCharge = target?.linkedCharges.find((charge) => charge.code.startsWith("MG."));
+
+    expect(target?.grossAmount).toBe(1000);
+    expect(mgCharge?.total).toBe(40);
+    expect(target?.netAmount).toBe(1040);
+  });
+
+  it("applies manual MG with 100% manodopera as full MG% on lordo", () => {
+    const targetLine: SalLineDraft = {
+      id: "line-target",
+      measurementRows: [row({ factor1: 7, factor2: 1, factor3: 1 })],
+      notes: "",
+      sourceType: "voice",
+      surchargePercent: 0,
+      voice: {
+        category: "Opere",
+        code: "ad.al.a.2102.c",
+        description: "Voce piena manodopera",
+        id: "voice-target",
+        isSafetyCost: false,
+        laborPercentage: 100,
+        unit: "m",
+        unitPrice: 472.52,
+      },
+    };
+    const mgLine: SalLineDraft = {
+      id: "line-mg",
+      measurementRows: [],
+      notes: "",
+      sourceType: "voice",
+      surchargePercent: 0,
+      voice: {
+        category: "Maggiorazioni",
+        code: "AS.MG.B.0101.F",
+        description: "MG 11%",
+        id: "voice-mg",
+        isSafetyCost: false,
+        laborPercentage: 0,
+        unit: "%",
+        unitPrice: 11,
+        source: { isMaggiorazione: true },
+      },
+    };
+    const views = buildLineViews([targetLine, mgLine], {
+      ...defaultSalEconomicRules,
+      discountEnabled: false,
+      mgManualAllocations: { "line-mg": ["line-target"] },
+    });
+    const target = views.find((line) => line.id === "line-target");
+    const mgCharge = target?.linkedCharges.find((charge) => charge.code.startsWith("MG."));
+
+    expect(target?.grossAmount).toBeCloseTo(3307.64, 2);
+    expect(mgCharge?.total).toBeCloseTo(363.84, 2);
+  });
+
+  it("applies manual MG on BA-style voice (14% × 77,9% × lordo)", () => {
+    const _gross = 42.5 * 18.67;
+    const targetLine: SalLineDraft = {
+      id: "line-ba",
+      measurementRows: [row({ factor1: 42.5, factor2: 1, factor3: 1 })],
+      notes: "",
+      sourceType: "voice",
+      surchargePercent: 0,
+      voice: {
+        category: "Opere",
+        code: "BA.cz.c.2104.b",
+        description: "Posa cunicolo",
+        id: "voice-ba",
+        isSafetyCost: false,
+        laborPercentage: 77.9,
+        unit: "m",
+        unitPrice: 18.67,
+      },
+    };
+    const mgLine: SalLineDraft = {
+      id: "line-mg-ba",
+      measurementRows: [],
+      notes: "",
+      sourceType: "voice",
+      surchargePercent: 0,
+      voice: {
+        category: "Maggiorazioni",
+        code: "BA.MG.01",
+        description: "MG 14%",
+        id: "voice-mg-ba",
+        isSafetyCost: false,
+        laborPercentage: 0,
+        unit: "%",
+        unitPrice: 14,
+        source: { isMaggiorazione: true },
+      },
+    };
+    const views = buildLineViews([targetLine, mgLine], {
+      ...defaultSalEconomicRules,
+      discountEnabled: false,
+      mgManualAllocations: { "line-mg-ba": ["line-ba"] },
+    });
+    const target = views.find((line) => line.id === "line-ba");
+    const mgCharge = target?.linkedCharges.find((charge) => charge.code.startsWith("MG."));
+
+    expect(target?.grossAmount).toBeGreaterThan(0);
+    expect(mgCharge?.total).toBe(computeMgOnLaborPortion(target?.grossAmount ?? 0, 14, 77.9));
+    expect(mgCharge?.total).toBeGreaterThan(86);
+    expect(mgCharge?.total).toBeLessThan(87);
   });
 });

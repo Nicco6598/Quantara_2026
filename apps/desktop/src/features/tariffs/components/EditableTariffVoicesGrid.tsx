@@ -1,6 +1,12 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AlertTriangle, Info, Link2, MapPin, Plus, Trash2, WandSparkles, X } from "lucide-react";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import {
+  buildTariffVoiceContextMenuEntries,
+  copyTextToClipboard,
+} from "@/lib/context-menu-presets";
 import {
   forwardRef,
   memo,
@@ -427,91 +433,114 @@ const VoiceRow = memo(function VoiceRow({
   const isHighlighted = (field: keyof DesktopTariffVoice) => highlightedField === field;
   const getDraftValue = (field: keyof DesktopTariffVoice) =>
     draftByCellRef.current.get(getDraftKey(index, field));
+  const contextMenu = useContextMenu<void>();
+  const voiceCode = voice.officialCode || voice.id;
 
   return (
-    <div
-      className={`${GRID_COLS} min-w-[980px] items-start rounded-xl border [contain:layout_style] [content-visibility:auto] [contain-intrinsic-size:auto_58px] ${
-        isDuplicate
-          ? "border-[var(--warning-base)]/28 bg-[var(--warning-soft)]/22"
-          : "border-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_46%,transparent)]"
-      } ${
-        index % 2 === 0 && !isDuplicate
-          ? "bg-[color-mix(in_srgb,var(--surface-base)_62%,transparent)]"
-          : ""
-      } ${
-        isInvalid && !isDuplicate
-          ? "border-l-[var(--warning-base)] shadow-[inset_3px_0_0_var(--warning-base)]"
-          : ""
-      }`}
-      data-voice-id={voice.id}
-    >
-      <div className="min-w-0">
-        <ImportCell
-          draftValue={getDraftValue("officialCode")}
-          field="officialCode"
-          highlighted={isHighlighted("officialCode")}
-          index={index}
-          onDraftChange={onDraftChange}
-          onDraftDiscard={onDraftDiscard}
-          value={voice.officialCode}
-          warnings={voice.warnings}
-        />
-        <VoiceAuditPills voice={voice} />
-      </div>
-      <div className="min-w-0">
-        <DescriptionCell
-          draftValue={getDraftValue("description")}
-          field="description"
-          highlighted={isHighlighted("description")}
-          index={index}
-          onDraftChange={onDraftChange}
-          onDraftDiscard={onDraftDiscard}
-          value={voice.description}
-        />
-        <VoiceContextLine voice={voice} />
-      </div>
-      <ImportCell
-        draftValue={getDraftValue("unitOfMeasure")}
-        field="unitOfMeasure"
-        highlighted={isHighlighted("unitOfMeasure")}
-        index={index}
-        onDraftChange={onDraftChange}
-        onDraftDiscard={onDraftDiscard}
-        value={voice.unitOfMeasure}
-        warnings={undefined}
-      />
-      <ImportCell
-        align="right"
-        draftValue={getDraftValue("laborPercentage")}
-        field="laborPercentage"
-        highlighted={isHighlighted("laborPercentage")}
-        index={index}
-        onDraftChange={onDraftChange}
-        onDraftDiscard={onDraftDiscard}
-        value={formatEditablePercent(voice.laborPercentage)}
-        warnings={undefined}
-      />
-      <ImportCell
-        align="right"
-        draftValue={getDraftValue("unitPrice")}
-        field="unitPrice"
-        highlighted={isHighlighted("unitPrice")}
-        index={index}
-        onDraftChange={onDraftChange}
-        onDraftDiscard={onDraftDiscard}
-        value={Number.isFinite(voice.unitPrice) ? String(voice.unitPrice).replace(".", ",") : ""}
-        warnings={undefined}
-      />
-      <button
-        aria-label={`Elimina voce ${voice.officialCode || index + 1}`}
-        className="flex size-9 items-center justify-center rounded-10px text-[var(--danger-base,var(--warning-base))] transition-colors hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-        onClick={() => onDelete(index)}
-        title="Elimina voce"
-        type="button"
+    <>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: tariff voice row exposes a context menu on right-click */}
+      <div
+        className={`${GRID_COLS} min-w-[980px] items-start rounded-xl border [contain:layout_style] [content-visibility:auto] [contain-intrinsic-size:auto_58px] ${
+          isDuplicate
+            ? "border-[var(--warning-base)]/28 bg-[var(--warning-soft)]/22"
+            : "border-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_46%,transparent)]"
+        } ${
+          index % 2 === 0 && !isDuplicate
+            ? "bg-[color-mix(in_srgb,var(--surface-base)_62%,transparent)]"
+            : ""
+        } ${
+          isInvalid && !isDuplicate
+            ? "border-l-[var(--warning-base)] shadow-[inset_3px_0_0_var(--warning-base)]"
+            : ""
+        }`}
+        data-voice-id={voice.id}
+        onContextMenu={(event) => {
+          if ((event.target as HTMLElement).closest("input, textarea, button, select")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          contextMenu.open(event, undefined);
+        }}
       >
-        <Trash2 className="size-4" />
-      </button>
-    </div>
+        <div className="min-w-0">
+          <ImportCell
+            draftValue={getDraftValue("officialCode")}
+            field="officialCode"
+            highlighted={isHighlighted("officialCode")}
+            index={index}
+            onDraftChange={onDraftChange}
+            onDraftDiscard={onDraftDiscard}
+            value={voice.officialCode}
+            warnings={voice.warnings}
+          />
+          <VoiceAuditPills voice={voice} />
+        </div>
+        <div className="min-w-0">
+          <DescriptionCell
+            draftValue={getDraftValue("description")}
+            field="description"
+            highlighted={isHighlighted("description")}
+            index={index}
+            onDraftChange={onDraftChange}
+            onDraftDiscard={onDraftDiscard}
+            value={voice.description}
+          />
+          <VoiceContextLine voice={voice} />
+        </div>
+        <ImportCell
+          draftValue={getDraftValue("unitOfMeasure")}
+          field="unitOfMeasure"
+          highlighted={isHighlighted("unitOfMeasure")}
+          index={index}
+          onDraftChange={onDraftChange}
+          onDraftDiscard={onDraftDiscard}
+          value={voice.unitOfMeasure}
+          warnings={undefined}
+        />
+        <ImportCell
+          align="right"
+          draftValue={getDraftValue("laborPercentage")}
+          field="laborPercentage"
+          highlighted={isHighlighted("laborPercentage")}
+          index={index}
+          onDraftChange={onDraftChange}
+          onDraftDiscard={onDraftDiscard}
+          value={formatEditablePercent(voice.laborPercentage)}
+          warnings={undefined}
+        />
+        <ImportCell
+          align="right"
+          draftValue={getDraftValue("unitPrice")}
+          field="unitPrice"
+          highlighted={isHighlighted("unitPrice")}
+          index={index}
+          onDraftChange={onDraftChange}
+          onDraftDiscard={onDraftDiscard}
+          value={Number.isFinite(voice.unitPrice) ? String(voice.unitPrice).replace(".", ",") : ""}
+          warnings={undefined}
+        />
+        <button
+          aria-label={`Elimina voce ${voice.officialCode || index + 1}`}
+          className="flex size-9 items-center justify-center rounded-10px text-[var(--danger-base,var(--warning-base))] transition-colors hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+          onClick={() => onDelete(index)}
+          title="Elimina voce"
+          type="button"
+        >
+          <Trash2 className="size-4" />
+        </button>
+
+        {contextMenu.state ? (
+          <AppContextMenu
+            entries={buildTariffVoiceContextMenuEntries({
+              onCopyCode: () => void copyTextToClipboard(voiceCode),
+              onDelete: () => onDelete(index),
+            })}
+            header={{ title: voiceCode, subtitle: voice.description }}
+            onClose={contextMenu.close}
+            position={{ x: contextMenu.state.x, y: contextMenu.state.y }}
+          />
+        ) : null}
+      </div>
+    </>
   );
 }, areVoiceRowsEqual);
 

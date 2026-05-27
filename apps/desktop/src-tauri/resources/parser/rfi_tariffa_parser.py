@@ -1,24 +1,4 @@
 #!/usr/bin/env python3
-"""
-rfi_tariffa_parser.py — v11.0-audit-production
-Parser robusto per tariffari RFI (FA, MO, BA, SB, AC, ...) in formato PDF.
-
-Novità v11 — audit layer, source mapping, confidence score, validation report e regole maggiorazioni:
-  - Pass 1: parsing normale (records + maggiorazioni + raccolta raw avvertenze)
-  - Pass 2: post-processing avvertenze con scope detection e applicazione gerarchica
-  - Pass 3: audit post-process con source page, confidence, issues, warning type e maggiorazioni rules
-
-Scope supportati (dal più specifico al più generale):
-  sottovoce  → "Avvertenza alla sottovoce FA.PM.A.2001.A"
-  voce       → "Avvertenza alla voce FA.PM.A.2000" / "Avvertenza n°1 alla voce MO.AI.F.3137"
-  gruppo     → "Avvertenza al gruppo FA.PM.B"
-  categoria  → "Avvertenza n°1 alla categoria MO.AC" / "Avvertenza alla categoria CT"
-  tariffa    → "Avvertenza Generale n°1 alla tariffa MO" / "Avvertenza generale alla Tariffa FA"
-  generico   → qualsiasi avvertenza senza codice esplicito → associata al contesto corrente
-
-Ogni record riceve nel campo "warnings" solo le avvertenze che lo riguardano,
-ordinate dal più specifico al più generale.
-"""
 
 import json
 import os
@@ -166,7 +146,39 @@ def _parse_warning_scope(title: str) -> tuple:
     return scope, ref_code
 
 def _normalize_ref_code(value: str) -> str:
-    return clean(value).upper().replace(" ", "")
+    # Normalizza spazi multipli ma preserva lo spazio interno al numero voce
+    # es. "SS.AC.F.2  01.A" -> "SS.AC.F.2 01.A", "FA.PM.A.2001" -> "FA.PM.A.2001"
+    return re.sub(r"\s+", " ", clean(value)).upper().strip()
+
+def _restore_voce_space_in_code(code: str, voce: str) -> str:
+    """Ripristina lo spazio nel segmento voce quando il PDF lo perde in estrazione.
+
+    Esempio: riga PDF ``SS.AC.F.201.A`` ma contesto ``VOCE 2 01`` -> ``SS.AC.F.2 01.A``.
+    """
+    voce_norm = re.sub(r"\s+", " ", (voce or "").strip()).upper()
+    if not voce_norm or " " not in voce_norm:
+        return code
+    parts = code.split(".")
+    if len(parts) < 4:
+        return code
+    segment = parts[3]
+    if segment.replace(" ", "").upper() != voce_norm.replace(" ", ""):
+        return code
+    if segment != voce_norm:
+        parts[3] = voce_norm
+        return ".".join(parts)
+    return code
+
+def restore_voce_spaces_in_records(records: list) -> None:
+    """Post-process: allinea ``codice`` al campo ``voce`` quando il PDF ha unito le cifre."""
+    for rec in records:
+        voce = rec.get("voce", "")
+        code = rec.get("codice", "")
+        if not code:
+            continue
+        restored = _restore_voce_space_in_code(code, voce)
+        if restored != code:
+            rec["codice"] = restored
 
 def _join_context(*parts: str) -> str:
     return ".".join(p for p in (_normalize_ref_code(x) for x in parts) if p)
@@ -607,8 +619,9 @@ class RfiParser:
             self._reset_sottovoce(); return
 
         m = self._match_code(self.cur_code)
-        code_clean = (m.group(1) if m else self.cur_code).replace(" ", "")
-        parts = code_clean.replace(" ", "").split(".")
+        code_clean = re.sub(r"\s+", " ", m.group(1) if m else self.cur_code).strip()
+        code_clean = _restore_voce_space_in_code(code_clean, self.ctx.voce)
+        parts = code_clean.split(".")
         ctx = self.ctx
 
         vw = ctx.voce_warnings
@@ -703,7 +716,7 @@ class RfiParser:
                 m = self._match_code(s)
                 extracted = m.group(1) if m else s.split()[0]
                 rest = s[len(extracted):].strip()
-                normalized_extracted = extracted.replace(" ", "")
+                normalized_extracted = re.sub(r"\s+", " ", extracted).strip()
                 if "." in normalized_extracted:
                     self.ctx.tariffa = normalized_extracted.split(".", 1)[0]
                 if (bool(self.cur_code) and rest in _CITATION_PUNCT
@@ -914,7 +927,7 @@ def _warnings_for_record(record: dict, idx: dict) -> list:
       categoria → FA.MG
       tariffa   → FA
     """
-    code = record["codice"].replace(" ", "")
+    code = record["codice"]
     parts = code.split(".")
     # costruisce i livelli dal più specifico
     lookups = []
@@ -930,9 +943,16 @@ def _warnings_for_record(record: dict, idx: dict) -> list:
         lookups.append(".".join(parts[:2]))
         lookups.append(parts[0])
 
+    # Aggiunge variante senza spazio per ogni lookup (retrocompatibilità avvertenze)
+    lookups_extended = []
+    for lk in lookups:
+        lookups_extended.append(lk)
+        no_space = lk.replace(" ", "")
+        if no_space != lk:
+            lookups_extended.append(no_space)
     seen_ids = set()
     result = []
-    for lk in lookups:
+    for lk in lookups_extended:
         for w in idx.get(lk.upper(), []):
             if w["id"] not in seen_ids:
                 seen_ids.add(w["id"])
@@ -1032,7 +1052,7 @@ def _extract_code_source_index(pages: list, code_patterns: list, pdf_name: str) 
             if not m:
                 continue
             raw_code = m.group(1)
-            code = _normalize_ref_code(raw_code)
+            code = re.sub(r"\s+", " ", raw_code).strip().upper()
             if not code or code in source:
                 continue
             source[code] = {
@@ -1196,7 +1216,7 @@ def _build_maggiorazione_rules(warnings: list) -> list:
 
 
 def _validate_code_shape(code: str) -> bool:
-    return bool(re.match(r"^[A-Z]{2}\.[A-Z]{2,3}\.[A-Z]\.[0-9]{3,4}\.[A-Z]+$", code or ""))
+    return bool(re.match(r"^[A-Z]{2}\.[A-Z]{2,3}\.[A-Z]\.[0-9][ ]?[0-9]{2,3}\.[A-Z]+$", code or ""))
 
 
 def _record_confidence_and_issues(rec: dict, source_index: dict, mag_codes: set) -> tuple:
@@ -1354,6 +1374,8 @@ def parse_pdf(input_path: str, debug: bool = False, embed_record_warnings: bool 
 
     records = merge_duplicate_records(parser.records)
     maggiorazioni = merge_duplicate_records(parser.maggiorazioni)
+    restore_voce_spaces_in_records(records)
+    restore_voce_spaces_in_records(maggiorazioni)
 
     # Pass 2: applica avvertenze gerarchiche compatte
     apply_warnings(records, maggiorazioni, parser.all_warnings, embed_record_warnings=embed_record_warnings)

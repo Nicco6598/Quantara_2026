@@ -12,7 +12,11 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
-import { extractMgTariffPrefix, isMgCode } from "../domain/sal-calculations";
+import {
+  computeMgOnLaborPortion,
+  extractMgTariffPrefix,
+  isMgCode,
+} from "../domain/sal-calculations";
 import type {
   SalEconomicRules,
   SalEconomicSummary,
@@ -885,7 +889,7 @@ function buildMgAllocations(baseLines: SalLineView[], mgLines: SalLineView[]) {
         lineId: line.id,
         mgCode: mgLine.voice.code,
         percent,
-        total: roundCurrency(line.grossAmount * (percent / 100)),
+        total: computeMgOnLaborPortion(line.grossAmount, percent, line.voice.laborPercentage ?? 0),
       }))
       .filter((allocation) => allocation.total > 0);
 
@@ -902,10 +906,6 @@ function buildMgAllocations(baseLines: SalLineView[], mgLines: SalLineView[]) {
 
 function Currency({ value }: { value: number }) {
   return <>{formatCurrencyValue(value)}</>;
-}
-
-function roundCurrency(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function formatCurrencyValue(value: number) {

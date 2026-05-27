@@ -1,10 +1,15 @@
 import { Loader2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/shared/Button";
 import { useToast } from "@/components/shared/ToastProvider";
 import { reportUserActionError } from "@/lib/user-action-error";
 import type { SalTemplate } from "@/store/template-store";
 import { SelectedVoicesPanel } from "../components/SalCreationTables";
+import {
+  parseSalClipboardText,
+  serializeSalMeasurementsClipboard,
+  serializeSalVoiceClipboard,
+} from "../domain/sal-clipboard";
+import type { SalVoiceSearchIndex } from "../hooks/useSalVoiceSearchIndex";
 import type {
   SalEconomicRules,
   SalLineDraft,
@@ -14,10 +19,16 @@ import type {
 } from "../types";
 import { createMeasurementId } from "../types";
 
+function isTypingTarget(target: EventTarget | null) {
+  const el = target as HTMLElement | null;
+  return el?.tagName === "INPUT" || el?.tagName === "TEXTAREA" || el?.isContentEditable === true;
+}
+
 export const MeasureStep = memo(function MeasureStep({
   economicRules,
   lineViews,
-  voices,
+  mgAvailableVoices,
+  voiceSearchIndex,
   isLoading = false,
   isActive = false,
   onAddMeasurementRow,
@@ -28,16 +39,20 @@ export const MeasureStep = memo(function MeasureStep({
   onUpdateMeasurementRow,
   onRemove,
   onNotesChange,
-  onSurcharge,
   onPasteLine,
+  onPasteMeasurementRows,
+  onPasteMeasurementRowsAt,
   onSearchSelectVoice,
+  onScrollToLineHandled,
+  scrollToLineId,
   onApplyTemplate,
   onOpenTemplateDialog,
   tariffBookIds,
 }: {
   economicRules: SalEconomicRules;
   lineViews: SalLineView[];
-  voices: SalVoiceDraft[];
+  mgAvailableVoices: SalVoiceDraft[];
+  voiceSearchIndex: SalVoiceSearchIndex;
   isLoading?: boolean;
   isActive?: boolean;
   onAddMeasurementRow: (lineId: string) => void;
@@ -54,27 +69,56 @@ export const MeasureStep = memo(function MeasureStep({
   onNotesChange: (lineId: string, notes: string) => void;
   onSurcharge: (lineId: string, p: number) => void;
   onPasteLine: (d: SalLineDraft) => void;
+  onPasteMeasurementRows: (lineId: string, rows: SalMeasurementRowDraft[]) => string | null;
+  onPasteMeasurementRowsAt: (
+    lineId: string,
+    rows: SalMeasurementRowDraft[],
+    insertIndex: number,
+  ) => string | null;
   onSearchSelectVoice?: (voice: SalVoiceDraft) => void;
+  onScrollToLineHandled?: () => void;
+  scrollToLineId?: string | null;
   onApplyTemplate?: (template: SalTemplate) => void;
   onOpenTemplateDialog?: () => void;
   tariffBookIds?: string[];
 }) {
   const { notify } = useToast();
   const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
+  const [copiedMeasurements, setCopiedMeasurements] = useState<SalMeasurementRowDraft[] | null>(
+    null,
+  );
+  const [activeLineId, setActiveLineId] = useState<string | null>(null);
+  const [selectedMeasurementRow, setSelectedMeasurementRow] = useState<{
+    lineId: string;
+    rowIndex: number;
+  } | null>(null);
   const lastInteractedRef = useRef<string | null>(null);
+
+  const handleSelectMeasurementRow = useCallback((lineId: string, rowIndex: number) => {
+    setSelectedMeasurementRow({ lineId, rowIndex });
+  }, []);
+
   const searchConfig = useMemo(
     () =>
       onSearchSelectVoice && onApplyTemplate && tariffBookIds
         ? {
-            voices,
-            tariffBookIds,
             isLoading,
             onSelectVoice: onSearchSelectVoice,
             onApplyTemplate,
             onOpenTemplateDialog: onOpenTemplateDialog ?? (() => {}),
+            searchIndex: voiceSearchIndex,
+            tariffBookIds,
+            voicesCount: voiceSearchIndex.voiceById.size,
           }
         : undefined,
-    [voices, tariffBookIds, isLoading, onSearchSelectVoice, onApplyTemplate, onOpenTemplateDialog],
+    [
+      isLoading,
+      onApplyTemplate,
+      onOpenTemplateDialog,
+      onSearchSelectVoice,
+      tariffBookIds,
+      voiceSearchIndex,
+    ],
   );
 
   const handleCopyLine = useCallback(
@@ -82,7 +126,7 @@ export const MeasureStep = memo(function MeasureStep({
       const line = lineViews.find((l) => l.id === lineId);
       if (!line) return;
       const draft: SalLineDraft = {
-        id: line.id,
+        id: `__sal-clip__${line.id}`,
         measurementRows: line.measurementRows.map((r) => ({ ...r, id: createMeasurementId() })),
         notes: "",
         sourceType: line.sourceType,
@@ -90,6 +134,8 @@ export const MeasureStep = memo(function MeasureStep({
         voice: line.voice,
       };
       setCopiedLine(draft);
+      setActiveLineId(lineId);
+      lastInteractedRef.current = lineId;
       if (!navigator.clipboard?.writeText) {
         notify({
           message:
@@ -99,7 +145,7 @@ export const MeasureStep = memo(function MeasureStep({
         });
         return;
       }
-      navigator.clipboard.writeText(JSON.stringify({ __salDraft: true, ...draft })).catch((error) =>
+      navigator.clipboard.writeText(serializeSalVoiceClipboard(draft)).catch((error) =>
         reportUserActionError(error, {
           action: "copy-line",
           area: "sal",
@@ -112,75 +158,296 @@ export const MeasureStep = memo(function MeasureStep({
     [lineViews, notify],
   );
 
+  const handleCopyMeasurementRow = useCallback(
+    (lineId: string, rowIndex: number) => {
+      const line = lineViews.find((l) => l.id === lineId);
+      const row = line?.measurementRows[rowIndex];
+      if (!line || !row) return;
+      const rows = [{ ...row }];
+      setCopiedMeasurements(rows);
+      setCopiedLine(null);
+      setSelectedMeasurementRow({ lineId, rowIndex });
+      setActiveLineId(lineId);
+      lastInteractedRef.current = lineId;
+      if (!navigator.clipboard?.writeText) return;
+      navigator.clipboard
+        .writeText(serializeSalMeasurementsClipboard(rows, line.voice.code))
+        .catch(() => {});
+    },
+    [lineViews],
+  );
+
+  const handleCopyMeasurements = useCallback(
+    (lineId: string) => {
+      const line = lineViews.find((l) => l.id === lineId);
+      if (!line || line.measurementRows.length === 0) return;
+      const rows = line.measurementRows.map((row) => ({ ...row }));
+      setCopiedMeasurements(rows);
+      setCopiedLine(null);
+      setActiveLineId(lineId);
+      lastInteractedRef.current = lineId;
+      if (!navigator.clipboard?.writeText) {
+        notify({
+          message: "Righe copiate in memoria. Incolla su un'altra voce dal menu contestuale.",
+          title: "Copia righe misura",
+          tone: "info",
+        });
+        return;
+      }
+      navigator.clipboard
+        .writeText(serializeSalMeasurementsClipboard(rows, line.voice.code))
+        .catch((error) =>
+          reportUserActionError(error, {
+            action: "copy-measurements",
+            area: "sal",
+            notify,
+            title: "Copia non riuscita",
+            userMessage: "Non sono riuscito a copiare le righe misura.",
+          }),
+        );
+    },
+    [lineViews, notify],
+  );
+
+  const handlePasteMeasurementRowAt = useCallback(
+    (lineId: string, insertIndex: number) => {
+      if (!copiedMeasurements || copiedMeasurements.length === 0) return;
+      onPasteMeasurementRowsAt(lineId, copiedMeasurements, insertIndex);
+    },
+    [copiedMeasurements, onPasteMeasurementRowsAt],
+  );
+
+  const handlePasteMeasurements = useCallback(
+    (lineId: string) => {
+      const insertIndex =
+        selectedMeasurementRow?.lineId === lineId ? selectedMeasurementRow.rowIndex + 1 : undefined;
+      if (copiedMeasurements && copiedMeasurements.length > 0) {
+        if (insertIndex != null) {
+          onPasteMeasurementRowsAt(lineId, copiedMeasurements, insertIndex);
+        } else {
+          onPasteMeasurementRows(lineId, copiedMeasurements);
+        }
+        return;
+      }
+      if (!navigator.clipboard?.readText) {
+        notify({
+          message: "Nessuna riga misura in memoria.",
+          title: "Incolla righe",
+          tone: "warning",
+        });
+        return;
+      }
+      navigator.clipboard
+        .readText()
+        .then((text) => {
+          const parsed = parseSalClipboardText(text);
+          if (parsed?.kind === "measurements") {
+            setCopiedMeasurements(parsed.rows);
+            onPasteMeasurementRows(lineId, parsed.rows);
+          }
+        })
+        .catch((error) =>
+          reportUserActionError(error, {
+            action: "paste-measurements",
+            area: "sal",
+            notify,
+            title: "Incolla non riuscito",
+            userMessage: "Non sono riuscito a incollare le righe misura.",
+          }),
+        );
+    },
+    [
+      copiedMeasurements,
+      notify,
+      onPasteMeasurementRows,
+      onPasteMeasurementRowsAt,
+      selectedMeasurementRow,
+    ],
+  );
+
+  const getVoiceClipboardText = useCallback(
+    (lineId: string) => {
+      const line = lineViews.find((l) => l.id === lineId);
+      if (!line) return null;
+      const draft: SalLineDraft = {
+        id: `__sal-clip__${line.id}`,
+        measurementRows: line.measurementRows.map((r) => ({ ...r, id: createMeasurementId() })),
+        notes: "",
+        sourceType: line.sourceType,
+        surchargePercent: line.surchargePercent,
+        voice: line.voice,
+      };
+      return serializeSalVoiceClipboard(draft);
+    },
+    [lineViews],
+  );
+
+  const getMeasurementsClipboardText = useCallback(
+    (lineId: string) => {
+      const line = lineViews.find((l) => l.id === lineId);
+      if (!line || line.measurementRows.length === 0) return null;
+      return serializeSalMeasurementsClipboard(
+        line.measurementRows.map((row) => ({ ...row })),
+        line.voice.code,
+      );
+    },
+    [lineViews],
+  );
+
+  const handlePasteClipboardText = useCallback(
+    (lineId: string, text: string) => {
+      const parsed = parseSalClipboardText(text);
+      if (!parsed) {
+        if (copiedLine) {
+          onPasteLine(copiedLine);
+          return;
+        }
+        if (copiedMeasurements && copiedMeasurements.length > 0) {
+          onPasteMeasurementRows(lineId, copiedMeasurements);
+        }
+        return;
+      }
+      if (parsed.kind === "voice") {
+        setCopiedLine(parsed.draft);
+        setCopiedMeasurements(null);
+        onPasteLine(parsed.draft);
+        return;
+      }
+      setCopiedMeasurements(parsed.rows);
+      setCopiedLine(null);
+      onPasteMeasurementRows(lineId, parsed.rows);
+    },
+    [copiedLine, copiedMeasurements, onPasteLine, onPasteMeasurementRows],
+  );
+
+  const handlePasteVoice = useCallback(() => {
+    if (copiedLine) {
+      onPasteLine(copiedLine);
+      return;
+    }
+    if (!navigator.clipboard?.readText) {
+      notify({
+        message: "Clipboard di sistema non disponibile.",
+        title: "Incolla non disponibile",
+        tone: "warning",
+      });
+      return;
+    }
+    navigator.clipboard
+      .readText()
+      .then((text) =>
+        handlePasteClipboardText(activeLineId ?? lastInteractedRef.current ?? "", text),
+      )
+      .catch((error) =>
+        reportUserActionError(error, {
+          action: "paste-line",
+          area: "sal",
+          notify,
+          title: "Incolla non riuscito",
+          userMessage: "Non sono riuscito a leggere gli appunti.",
+        }),
+      );
+  }, [activeLineId, copiedLine, handlePasteClipboardText, notify, onPasteLine]);
+
   useEffect(() => {
     if (!isActive) return;
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
-        if (!navigator.clipboard?.readText) {
-          notify({
-            message: "Clipboard di sistema non disponibile.",
-            title: "Incolla non disponibile",
-            tone: "warning",
-          });
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (isTypingTarget(e.target)) return;
+
+      const key = e.key.toLowerCase();
+
+      if (key === "c") {
+        const lineId = activeLineId ?? lastInteractedRef.current;
+        if (!lineId) return;
+        e.preventDefault();
+        if (
+          selectedMeasurementRow?.lineId === lineId &&
+          lineViews.find((line) => line.id === lineId)?.measurementRows[
+            selectedMeasurementRow.rowIndex
+          ]
+        ) {
+          handleCopyMeasurementRow(lineId, selectedMeasurementRow.rowIndex);
           return;
         }
-        navigator.clipboard
-          .readText()
-          .then((text) => {
-            try {
-              const data = JSON.parse(text);
-              if (data.__salDraft) {
-                onPasteLine(data);
-              }
-            } catch {
-              /* not our clipboard format */
-            }
-          })
-          .catch((error) =>
-            reportUserActionError(error, {
-              action: "paste-line",
-              area: "sal",
-              notify,
-              title: "Incolla non riuscito",
-              userMessage: "Non sono riuscito a leggere gli appunti.",
-            }),
-          );
+        handleCopyLine(lineId);
+        return;
+      }
+
+      if (key === "v") {
+        e.preventDefault();
+        const lineId = activeLineId ?? lastInteractedRef.current;
+        if (!lineId) return;
+        if (copiedMeasurements && copiedMeasurements.length > 0) {
+          handlePasteMeasurements(lineId);
+          return;
+        }
+        handlePasteVoice();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [isActive, notify, onPasteLine]);
+  }, [
+    activeLineId,
+    copiedMeasurements,
+    handleCopyLine,
+    handleCopyMeasurementRow,
+    handlePasteMeasurements,
+    handlePasteVoice,
+    isActive,
+    lineViews,
+    selectedMeasurementRow,
+  ]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div
-        className="min-h-0 min-w-0 flex-1"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         role="none"
         onClick={(e) => {
           const row = (e.target as HTMLElement).closest("[data-line-id]");
-          if (row) lastInteractedRef.current = row.getAttribute("data-line-id");
+          const lineId = row?.getAttribute("data-line-id") ?? null;
+          if (lineId) {
+            lastInteractedRef.current = lineId;
+            setActiveLineId(lineId);
+          }
         }}
         onKeyDown={() => {}}
       >
         <SelectedVoicesPanel
           economicRules={economicRules}
           lines={lineViews}
-          availableVoices={voices}
+          availableVoices={mgAvailableVoices}
+          activeLineId={activeLineId}
           copiedVoiceId={copiedLine?.id ?? null}
           onAllocateMg={onAllocateMg}
           onAddMgVoice={onAddMgVoice}
+          onActiveLineChange={setActiveLineId}
+          canPasteMeasurements={(copiedMeasurements?.length ?? 0) > 0}
+          canPasteVoice={!!copiedLine}
           onCopyLine={handleCopyLine}
+          onCopyMeasurements={handleCopyMeasurements}
+          onCopyMeasurementRow={handleCopyMeasurementRow}
+          onPasteMeasurementRowAt={handlePasteMeasurementRowAt}
+          selectedMeasurementRow={selectedMeasurementRow}
+          onSelectMeasurementRow={handleSelectMeasurementRow}
+          onPasteVoice={handlePasteVoice}
+          onPasteMeasurements={handlePasteMeasurements}
+          getVoiceClipboardText={getVoiceClipboardText}
+          getMeasurementsClipboardText={getMeasurementsClipboardText}
+          onPasteClipboardText={handlePasteClipboardText}
+          {...(onScrollToLineHandled ? { onScrollToLineHandled } : {})}
+          scrollToLineId={scrollToLineId ?? null}
           onAddMeasurementRow={onAddMeasurementRow}
           onDuplicateMeasurementRow={onDuplicateMeasurementRow}
           onNotesChange={onNotesChange}
           onRemove={onRemove}
           onRemoveMeasurementRow={onRemoveMeasurementRow}
-          onSurcharge={onSurcharge}
           onUpdateMeasurementRow={onUpdateMeasurementRow}
           {...(searchConfig ? { search: searchConfig } : {})}
         />
 
-        {isLoading && (
+        {isLoading && lineViews.length === 0 && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[var(--surface-base)]/75">
             <span className="inline-flex items-center gap-2 rounded-lg bg-[var(--surface-base)] px-4 py-2 text-13px font-bold text-[var(--text-tertiary)] shadow-sm ring-1 ring-[var(--border-subtle)]">
               <Loader2 className="size-4 animate-spin" />
@@ -189,19 +456,6 @@ export const MeasureStep = memo(function MeasureStep({
           </div>
         )}
       </div>
-
-      <aside className="shrink-0 px-4 lg:px-6">
-        {copiedLine ? (
-          <Button
-            className="w-full justify-between sm:w-auto"
-            onClick={() => onPasteLine(copiedLine)}
-            type="button"
-            variant="secondary"
-          >
-            Incolla voce copiata
-          </Button>
-        ) : null}
-      </aside>
     </div>
   );
 });

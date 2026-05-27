@@ -14,7 +14,7 @@ import type {
   SalTariffVoice,
 } from "@/features/sal/types";
 
-type CreateSalInput = {
+export type CreateSalInput = {
   projectId: string;
   date: string;
   closedAt?: string;
@@ -40,6 +40,10 @@ type SalWorkflowStore = {
     projs: SalProject[],
     voices: SalTariffVoice[],
   ) => void;
+  /** Full replace after backend reload (no merge with stale in-memory rows). */
+  replaceFromBackend: (docs: SalDocument[], projs: SalProject[]) => void;
+  /** Replace SAL rows for one project after backend reload. */
+  patchProjectSalFromBackend: (projectId: string, docs: SalDocument[], projs: SalProject[]) => void;
   createProject: (input: Omit<SalProject, "id"> & { id?: string }) => SalProject;
   createSal: (input: CreateSalInput) => SalDocument;
   updateSalDraft: (id: string, input: Partial<CreateSalInput>) => SalDocument | null;
@@ -91,6 +95,22 @@ export const useSalWorkflowStore = create<SalWorkflowStore>()(
           tariffVoices: mergedVoices,
         });
       },
+
+      replaceFromBackend: (docs, projs) =>
+        set((state) => ({
+          salDocuments: docs,
+          projects: projs,
+          tariffVoices: state.tariffVoices,
+        })),
+
+      patchProjectSalFromBackend: (projectId, docs, projs) =>
+        set((state) => ({
+          salDocuments: [
+            ...state.salDocuments.filter((document) => document.projectId !== projectId),
+            ...docs,
+          ],
+          projects: [...state.projects.filter((project) => project.id !== projectId), ...projs],
+        })),
 
       createProject: (input) => {
         const project: SalProject = input.id

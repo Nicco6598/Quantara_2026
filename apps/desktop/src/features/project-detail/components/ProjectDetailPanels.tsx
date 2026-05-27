@@ -17,7 +17,10 @@ import type { Dispatch, SetStateAction } from "react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildSalCardContextMenuEntries } from "@/lib/context-menu-presets";
 import type { DesktopTariffBook } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
 
@@ -205,6 +208,7 @@ export function SalCard({
   const isFinal = isClosed || isApproved;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLDivElement>(null);
+  const contextMenu = useContextMenu<void>();
 
   const isSelectable = onSelect !== undefined;
   const springEase = [0.22, 1, 0.36, 1] as const;
@@ -219,6 +223,11 @@ export function SalCard({
           : "ring-[var(--border-subtle)]/60 hover:ring-[var(--border-subtle)]",
       )}
       layout="position"
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        contextMenu.open(event, undefined);
+      }}
       transition={{ duration: 0.25, ease: springEase }}
     >
       {isSelectable && (
@@ -457,6 +466,21 @@ export function SalCard({
           </div>
         </div>
       </div>
+
+      {contextMenu.state ? (
+        <AppContextMenu
+          entries={buildSalCardContextMenuEntries({
+            isDraft,
+            isReview,
+            ...(onContinue ? { onContinue } : {}),
+            onWorkflow: onClose,
+            onDelete,
+          })}
+          header={{ title: sal, subtitle: status }}
+          onClose={contextMenu.close}
+          position={{ x: contextMenu.state.x, y: contextMenu.state.y }}
+        />
+      ) : null}
     </m.article>
   );
 }
@@ -765,7 +789,12 @@ export function DeleteConfirmDialog({
         </Button>
         <Button
           icon={Trash2}
-          onClick={() => deleteTargetId && onConfirm(deleteTargetId)}
+          onClick={() => {
+            if (deleteTargetId) {
+              onConfirm(deleteTargetId);
+            }
+            onClose();
+          }}
           variant="destructive"
         >
           Elimina

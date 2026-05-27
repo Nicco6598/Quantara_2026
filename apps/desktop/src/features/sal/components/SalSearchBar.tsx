@@ -16,8 +16,9 @@ export type SalAutocompleteOption = {
   metadata?: string;
 };
 
-type IndexedVoiceOption = {
+export type IndexedVoiceOption = {
   code: string;
+  codeSegments: string[];
   haystack: string;
   option: SalAutocompleteOption;
   tariffBookId: string;
@@ -54,25 +55,75 @@ function normalizeVoiceCode(value: string) {
     .replace(/[^a-z0-9]+/g, "");
 }
 
+export function splitVoiceCodeSegments(code: string): string[] {
+  return code
+    .split(".")
+    .map((segment) =>
+      segment
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase(),
+    )
+    .filter(Boolean);
+}
+
+export function parseCodePathQuery(query: string): string[] {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  return trimmed
+    .split(/[.\s]+/)
+    .map((part) =>
+      part
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase(),
+    )
+    .filter(Boolean);
+}
+
+export function matchesCodePathSegments(voiceSegments: string[], querySegments: string[]): boolean {
+  for (let index = 0; index < querySegments.length; index++) {
+    const querySegment = querySegments[index];
+    if (!querySegment) return false;
+    const voiceSegment = voiceSegments[index];
+    if (voiceSegment == null) return false;
+    if (index === querySegments.length - 1) {
+      if (!voiceSegment.startsWith(querySegment)) return false;
+    } else if (voiceSegment !== querySegment) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function looksLikeVoicePrefix(part: string) {
   return /^[a-z]{1,4}\d*$/.test(part);
 }
 
-function buildVoiceOption(voice: SalVoiceDraft): SalAutocompleteOption {
+function shouldUseCodePathSearch(query: string, codePathParts: string[]): boolean {
+  if (codePathParts.length === 0) return false;
+  if (query.includes(".")) return true;
+  const first = codePathParts[0];
+  return first != null && looksLikeVoicePrefix(first);
+}
+
+/** Lighter option for bulk index build (no per-voice currency formatting). */
+function buildVoiceOptionForIndex(voice: SalVoiceDraft): SalAutocompleteOption {
   return {
     id: voice.id,
     label: voice.description,
-    metadata: `${voice.tariffBookName} · ${voice.category} · ${voice.unit} · ${voice.unitPrice.toLocaleString("it-IT", { currency: "EUR", style: "currency", minimumFractionDigits: 2 })}`,
+    metadata: `${voice.tariffBookName} · ${voice.category} · ${voice.unit}`,
     value: voice.code,
     keywords: `${voice.code} ${voice.description} ${voice.category} ${voice.tariffBookName} ${voice.tariffBookId}`,
   };
 }
 
-export function buildIndexedVoiceOptions(voices: SalVoiceDraft[]): IndexedVoiceOption[] {
+export function buildIndexedVoiceOptions(voices: readonly SalVoiceDraft[]): IndexedVoiceOption[] {
   return voices.map((voice) => {
-    const option = buildVoiceOption(voice);
+    const option = buildVoiceOptionForIndex(voice);
     return {
       code: normalizeVoiceCode(voice.code),
+      codeSegments: splitVoiceCodeSegments(voice.code),
       haystack: normalizeSalSearch(
         `${voice.code} ${voice.description} ${voice.category} ${voice.tariffBookName} ${voice.tariffBookId}`,
       ),
@@ -99,18 +150,22 @@ export function filterIndexedVoiceOptions({
   const normalizedQuery = normalizeSalSearch(query);
   if (!normalizedQuery) return [];
   const queryParts = normalizedQuery.split(" ").filter(Boolean);
+  const codePathParts = parseCodePathQuery(query);
 
-  const prefix = queryParts[0] ?? "";
-  if (looksLikeVoicePrefix(prefix)) {
-    const prefixMatches = index.filter((item) => item.code.startsWith(prefix));
-    if (prefixMatches.length > 0) {
-      const remainingQuery = queryParts.slice(1).join(" ");
-      const remainingParts = queryParts.slice(1);
-      const matches = remainingQuery
-        ? prefixMatches.filter((item) =>
-            remainingParts.every((part) => item.haystack.includes(part)),
-          )
-        : prefixMatches;
+  if (shouldUseCodePathSearch(query, codePathParts)) {
+    const pathMatches = index.filter((item) =>
+      matchesCodePathSegments(item.codeSegments, codePathParts),
+    );
+    if (pathMatches.length > 0) {
+      const remainingParts = query.includes(".")
+        ? []
+        : queryParts.filter((part) => !codePathParts.includes(part));
+      const matches =
+        remainingParts.length > 0
+          ? pathMatches.filter((item) =>
+              remainingParts.every((part) => item.haystack.includes(part)),
+            )
+          : pathMatches;
       return limitResults(
         matches.sort((left, right) => left.option.value.localeCompare(right.option.value, "it-IT")),
       );

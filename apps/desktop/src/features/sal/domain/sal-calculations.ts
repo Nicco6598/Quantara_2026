@@ -24,9 +24,35 @@ export function isMgCode(code: string): boolean {
   return code.split(".")[1]?.toUpperCase() === MG_SEGMENT;
 }
 
+/** Tariff MG flag or codice con segmento `.MG.` (es. `FA.MG.01` o varianti import). */
+export function isMgVoice(voice: {
+  code: string;
+  source?: { isMaggiorazione?: boolean };
+}): boolean {
+  if (voice.source?.isMaggiorazione === true) return true;
+  if (voice.code.toUpperCase().includes(".MG.")) return true;
+  return isMgCode(voice.code);
+}
+
 export function extractMgTariffPrefix(code: string): string | null {
   const first = code.split(".")[0];
   return first && first.toUpperCase() !== MG_SEGMENT ? first : null;
+}
+
+/** Maggiorazione su quota manodopera: lordo × %MG × %manodopera (es. 14% × 77,9% × lordo). */
+export function computeMgOnLaborPortion(
+  grossAmount: number,
+  percent: number,
+  laborPercentage: number,
+): number {
+  if (grossAmount <= 0 || percent <= 0) return 0;
+  const laborRate = Math.max(0, laborPercentage) / 100;
+  return roundCurrency(grossAmount * (percent / 100) * laborRate);
+}
+
+/** Voci operative del SAL assegnabili a una riga MG (indipendenti da importi/misure). */
+export function getMgAssignableTargetLines(lines: readonly SalLineView[]): SalLineView[] {
+  return lines.filter((line) => !isMgVoice(line.voice));
 }
 
 export function buildLineViews(
@@ -36,7 +62,7 @@ export function buildLineViews(
   // Phase 1 — build every line; MG lines get zero gross
   const mgIndexes: number[] = [];
   const views: SalLineView[] = lines.map((line, index) => {
-    const isMg = isMgCode(line.voice.code);
+    const isMg = isMgVoice(line.voice);
     if (isMg) mgIndexes.push(index);
 
     const rawQty = isMg ? 0 : computeQuantityFromRows(line.measurementRows);
@@ -68,13 +94,13 @@ export function buildLineViews(
   const nonMgIndexes: number[] = [];
   const indexesByPrefix = new Map<string, number[]>();
   const grossByPrefix = new Map<string, number>();
-  let totalNonMgGross = 0;
+  let _totalNonMgGross = 0;
   for (let index = 0; index < views.length; index++) {
     if (mgIndexSet.has(index)) continue;
     const view = views[index];
     if (!view) continue;
     nonMgIndexes.push(index);
-    totalNonMgGross += view.grossAmount;
+    _totalNonMgGross += view.grossAmount;
     const prefix = view.voice.code.split(".")[0] ?? "";
     if (prefix) {
       const indexes = indexesByPrefix.get(prefix) ?? [];
@@ -92,35 +118,25 @@ export function buildLineViews(
     if (!mgPercent || mgPercent <= 0) continue;
 
     const tariffPrefix = extractMgTariffPrefix(mgView.voice.code);
-    const mgRate = mgPercent / 100;
 
-    // Manual allocation: undefined → auto by prefix, [ ] → disabled, [ids] → specific voices
+    // Manual allocation: missing or [] → not applied; [ids] → apply only to selected voices
     const hasManualAlloc =
       rules.mgManualAllocations != null && mgView.id in rules.mgManualAllocations;
     const manualAlloc = hasManualAlloc ? rules.mgManualAllocations?.[mgView.id] : undefined;
-    let eligibleIndexes: number[];
-    let eligibleGross: number;
-    if (hasManualAlloc) {
-      if (manualAlloc && manualAlloc.length > 0) {
-        const manualSet = new Set(manualAlloc);
-        eligibleIndexes = [];
-        let gross = 0;
-        for (let i = 0; i < views.length; i++) {
-          if (mgIndexSet.has(i)) continue;
-          const v = views[i];
-          if (v && manualSet.has(v.id)) {
-            eligibleIndexes.push(i);
-            gross += v.grossAmount;
-          }
-        }
-        eligibleGross = gross;
-      } else {
-        // Empty array = manually disabled → skip this MG entirely
-        continue;
+    if (!hasManualAlloc || !manualAlloc || manualAlloc.length === 0) {
+      continue;
+    }
+
+    const manualSet = new Set(manualAlloc);
+    const eligibleIndexes: number[] = [];
+    let eligibleGross = 0;
+    for (let i = 0; i < views.length; i++) {
+      if (mgIndexSet.has(i)) continue;
+      const v = views[i];
+      if (v && manualSet.has(v.id)) {
+        eligibleIndexes.push(i);
+        eligibleGross += v.grossAmount;
       }
-    } else {
-      eligibleIndexes = tariffPrefix ? (indexesByPrefix.get(tariffPrefix) ?? []) : nonMgIndexes;
-      eligibleGross = tariffPrefix ? (grossByPrefix.get(tariffPrefix) ?? 0) : totalNonMgGross;
     }
     if (eligibleGross <= 0) continue;
     let totalDistributedMg = 0;
@@ -131,7 +147,8 @@ export function buildLineViews(
       if (!ev) continue;
       if (ev.grossAmount <= 0) continue;
 
-      const mgShare = roundCurrency(ev.grossAmount * mgRate);
+      const laborPct = ev.voice.laborPercentage ?? 0;
+      const mgShare = computeMgOnLaborPortion(ev.grossAmount, mgPercent, laborPct);
       if (mgShare <= 0) continue;
       totalDistributedMg += mgShare;
 
@@ -140,9 +157,7 @@ export function buildLineViews(
       ev.linkedCharges.push({
         baseAmount: ev.grossAmount,
         code: `MG.${tariffPrefix ?? "ALL"}`,
-        description: tariffPrefix
-          ? `Maggiorazione MG ${mgPercent}% su voci ${tariffPrefix}`
-          : `Maggiorazione MG ${mgPercent}% su tutte le voci`,
+        description: `Maggiorazione MG ${mgPercent}% × Manodopera ${laborPct}%`,
         id: `${mgView.id}-mg-${ev.id}`,
         percent: mgPercent,
         total: mgShare,
@@ -187,7 +202,7 @@ export function summarizeSalLines(
   const summary = lineViews.reduce(
     (current, line) => {
       // Skip MG lines — their amounts are already distributed to eligible voices
-      if (isMgCode(line.voice.code)) return current;
+      if (isMgVoice(line.voice)) return current;
 
       const linkedChargeAmount = line.linkedCharges.reduce((sum, charge) => sum + charge.total, 0);
       const hasDiscountableAmount = line.discountableAmount > 0;
@@ -247,7 +262,7 @@ export function buildVerificationChecks(
   let safetyLines = 0;
   let linkedLines = 0;
   const hasBudgetOverflow = summary.budgetResidual < 0;
-  const measurableLines = lineViews.filter((line) => !isMgCode(line.voice.code));
+  const measurableLines = lineViews.filter((line) => !isMgVoice(line.voice));
   const zeroQtyLines: SalLineView[] = [];
   const zeroPriceLines: SalLineView[] = [];
   const highSurchargeLines: SalLineView[] = [];
@@ -324,7 +339,7 @@ export function buildVerificationChecks(
   // Rows without date
   const rowsWithoutDate: string[] = [];
   for (const line of lineViews) {
-    if (isMgCode(line.voice.code)) continue;
+    if (isMgVoice(line.voice)) continue;
     const empty = line.measurementRows.filter((r) => !r.date);
     if (empty.length > 0) rowsWithoutDate.push(line.voice.code);
   }
@@ -341,7 +356,7 @@ export function buildVerificationChecks(
   // Rows with zero partial but non-zero factors (likely incomplete)
   const rowsPartialZero: string[] = [];
   for (const line of lineViews) {
-    if (isMgCode(line.voice.code)) continue;
+    if (isMgVoice(line.voice)) continue;
     const suspect = line.measurementRows.filter(
       (r) => r.partialQuantity <= 0 && (r.factor1 > 0 || r.factor2 > 0 || r.factor3 > 0),
     );
@@ -360,7 +375,7 @@ export function buildVerificationChecks(
   // Rows with negative factors
   const rowsNegative: string[] = [];
   for (const line of lineViews) {
-    if (isMgCode(line.voice.code)) continue;
+    if (isMgVoice(line.voice)) continue;
     const neg = line.measurementRows.filter((r) => r.factor1 < 0 || r.factor2 < 0 || r.factor3 < 0);
     if (neg.length > 0) rowsNegative.push(line.voice.code);
   }
@@ -377,7 +392,7 @@ export function buildVerificationChecks(
   // Duplicate suspect rows (same voice + date + station + factors)
   const duplicateSuspects: string[] = [];
   for (const line of lineViews) {
-    if (isMgCode(line.voice.code)) continue;
+    if (isMgVoice(line.voice)) continue;
     const seen = new Map<string, number>();
     for (const r of line.measurementRows) {
       const key = `${r.date}|${r.station ?? ""}|${r.factor1}|${r.factor2}|${r.factor3}`;
@@ -536,10 +551,8 @@ function buildLinkedCharges(line: SalLineDraft, grossAmount: number): SalLinkedC
     return [];
   }
 
-  const laborPct = (line.voice.laborPercentage ?? 0) / 100;
-  const surchargePct = line.surchargePercent / 100;
-  const effectiveRate = surchargePct * laborPct;
-  const total = roundCurrency(grossAmount * effectiveRate);
+  const laborPct = line.voice.laborPercentage ?? 0;
+  const total = computeMgOnLaborPortion(grossAmount, line.surchargePercent, laborPct);
   return [
     {
       baseAmount: grossAmount,

@@ -4,6 +4,12 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import type { DesktopMaterial } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import {
+  buildSalMaterialContextMenuEntries,
+  copyTextToClipboard,
+} from "@/lib/context-menu-presets";
 import { SalComparisonView } from "../components/SalComparisonView";
 import { SalReceipt } from "../components/SalReceipt";
 import type {
@@ -78,6 +84,7 @@ export function VerifyStep({
   }, [materials, materialSearch]);
 
   const displayMaterials = materialExpanded ? filteredMaterials : filteredMaterials.slice(0, 6);
+  const materialContextMenu = useContextMenu<DesktopMaterial>();
   const hasMoreMaterials = filteredMaterials.length > 6;
   const usageCount = Object.values(materialUsage).filter((q) => q > 0).length;
   const usageTotalQty = Object.values(materialUsage).reduce((a, b) => a + b, 0);
@@ -199,116 +206,120 @@ export function VerifyStep({
                       : "success";
 
                   return (
-                    <div
-                      key={mat.id}
-                      className="flex items-center gap-3 border-b border-[var(--border-subtle)]/30 px-4 py-3 last:border-b-0"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="truncate text-12px font-medium text-[var(--text-primary)]">
-                            {mat.description}
-                          </span>
-                          <span className="shrink-0 text-10px text-[var(--text-tertiary)]">
-                            {mat.code}
-                          </span>
-                          {exceeds && (
-                            <span className="shrink-0 rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-9px font-bold text-[var(--danger-base)]">
-                              Eccesso
+                    <>
+                      {/* biome-ignore lint/a11y/noStaticElementInteractions: material row exposes a context menu on right-click */}
+                      <div
+                        key={mat.id}
+                        className="flex items-center gap-3 border-b border-[var(--border-subtle)]/30 px-4 py-3 last:border-b-0"
+                        onContextMenu={(event) => materialContextMenu.open(event, mat)}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="truncate text-12px font-medium text-[var(--text-primary)]">
+                              {mat.description}
                             </span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-10px text-[var(--text-tertiary)]">
-                          <StockBar
-                            coverage={
-                              available > 0
-                                ? Math.min(100, Math.round((remaining / available) * 100))
-                                : 0
-                            }
-                            tone={stockTone}
-                          />
-                          <span>{mat.category}</span>
-                          <span>
-                            disp.{" "}
-                            <span className="font-semibold tabular-nums text-[var(--text-primary)]">
-                              {available.toLocaleString("it-IT")}
-                            </span>{" "}
-                            {mat.unit}
-                          </span>
-                          {minQ > 0 && (
+                            <span className="shrink-0 text-10px text-[var(--text-tertiary)]">
+                              {mat.code}
+                            </span>
+                            {exceeds && (
+                              <span className="shrink-0 rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-9px font-bold text-[var(--danger-base)]">
+                                Eccesso
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-10px text-[var(--text-tertiary)]">
+                            <StockBar
+                              coverage={
+                                available > 0
+                                  ? Math.min(100, Math.round((remaining / available) * 100))
+                                  : 0
+                              }
+                              tone={stockTone}
+                            />
+                            <span>{mat.category}</span>
                             <span>
-                              soglia{" "}
+                              disp.{" "}
                               <span className="font-semibold tabular-nums text-[var(--text-primary)]">
-                                {minQ.toLocaleString("it-IT")}
-                              </span>
+                                {available.toLocaleString("it-IT")}
+                              </span>{" "}
+                              {mat.unit}
                             </span>
-                          )}
-                          {used > 0 && (
-                            <>
+                            {minQ > 0 && (
                               <span>
-                                usati{" "}
-                                <span className="font-semibold tabular-nums text-[var(--accent-primary)]">
-                                  {used.toLocaleString("it-IT")}
+                                soglia{" "}
+                                <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+                                  {minQ.toLocaleString("it-IT")}
                                 </span>
                               </span>
-                              <span>
-                                restano{" "}
-                                <span
-                                  className={cn(
-                                    "font-semibold tabular-nums",
-                                    remaining < minQ
-                                      ? "text-[var(--danger-base)]"
-                                      : remaining <= minQ * 1.5
-                                        ? "text-[var(--warning-base)]"
-                                        : "text-[var(--success-base)]",
-                                  )}
-                                >
-                                  {remaining.toLocaleString("it-IT")}
+                            )}
+                            {used > 0 && (
+                              <>
+                                <span>
+                                  usati{" "}
+                                  <span className="font-semibold tabular-nums text-[var(--accent-primary)]">
+                                    {used.toLocaleString("it-IT")}
+                                  </span>
                                 </span>
-                              </span>
-                            </>
-                          )}
+                                <span>
+                                  restano{" "}
+                                  <span
+                                    className={cn(
+                                      "font-semibold tabular-nums",
+                                      remaining < minQ
+                                        ? "text-[var(--danger-base)]"
+                                        : remaining <= minQ * 1.5
+                                          ? "text-[var(--warning-base)]"
+                                          : "text-[var(--success-base)]",
+                                    )}
+                                  >
+                                    {remaining.toLocaleString("it-IT")}
+                                  </span>
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center overflow-hidden rounded-md border border-[var(--border-subtle)]">
+                          <button
+                            className="flex size-7 items-center justify-center text-13px text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)] disabled:opacity-30"
+                            disabled={used <= 0}
+                            onClick={() =>
+                              onMaterialUsageChange({
+                                ...materialUsage,
+                                [mat.id]: Math.max(0, used - 1),
+                              })
+                            }
+                            type="button"
+                          >
+                            −
+                          </button>
+                          <input
+                            className="h-7 w-14 border-x border-[var(--border-subtle)] bg-[var(--surface-base)] px-1 text-center text-11px font-semibold tabular-nums outline-none transition focus:bg-[var(--bg-muted)]"
+                            inputMode="decimal"
+                            onBlur={onAutoSave}
+                            onChange={(e) => {
+                              const qty = Math.max(
+                                0,
+                                Number.parseFloat(e.target.value.replace(",", ".")) || 0,
+                              );
+                              onMaterialUsageChange({ ...materialUsage, [mat.id]: qty });
+                            }}
+                            placeholder="0"
+                            type="text"
+                            value={used || ""}
+                          />
+                          <button
+                            className="flex size-7 items-center justify-center text-13px text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)]"
+                            onClick={() =>
+                              onMaterialUsageChange({ ...materialUsage, [mat.id]: used + 1 })
+                            }
+                            type="button"
+                          >
+                            +
+                          </button>
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center overflow-hidden rounded-md border border-[var(--border-subtle)]">
-                        <button
-                          className="flex size-7 items-center justify-center text-13px text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)] disabled:opacity-30"
-                          disabled={used <= 0}
-                          onClick={() =>
-                            onMaterialUsageChange({
-                              ...materialUsage,
-                              [mat.id]: Math.max(0, used - 1),
-                            })
-                          }
-                          type="button"
-                        >
-                          −
-                        </button>
-                        <input
-                          className="h-7 w-14 border-x border-[var(--border-subtle)] bg-[var(--surface-base)] px-1 text-center text-11px font-semibold tabular-nums outline-none transition focus:bg-[var(--bg-muted)]"
-                          inputMode="decimal"
-                          onBlur={onAutoSave}
-                          onChange={(e) => {
-                            const qty = Math.max(
-                              0,
-                              Number.parseFloat(e.target.value.replace(",", ".")) || 0,
-                            );
-                            onMaterialUsageChange({ ...materialUsage, [mat.id]: qty });
-                          }}
-                          placeholder="0"
-                          type="text"
-                          value={used || ""}
-                        />
-                        <button
-                          className="flex size-7 items-center justify-center text-13px text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-muted)]"
-                          onClick={() =>
-                            onMaterialUsageChange({ ...materialUsage, [mat.id]: used + 1 })
-                          }
-                          type="button"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
+                    </>
                   );
                 })}
               </div>
@@ -342,6 +353,36 @@ export function VerifyStep({
           </div>
         </div>
       </div>
+
+      {materialContextMenu.state ? (
+        <AppContextMenu
+          entries={buildSalMaterialContextMenuEntries({
+            onCopyCode: () => {
+              const state = materialContextMenu.state;
+              if (!state) return;
+              void copyTextToClipboard(state.context.code);
+            },
+            onResetUsage: () => {
+              const state = materialContextMenu.state;
+              if (!state) return;
+              const matId = state.context.id;
+              const next = { ...materialUsage };
+              delete next[matId];
+              onMaterialUsageChange(next);
+              onAutoSave();
+            },
+          })}
+          header={{
+            title: materialContextMenu.state.context.code,
+            subtitle: materialContextMenu.state.context.description,
+          }}
+          onClose={materialContextMenu.close}
+          position={{
+            x: materialContextMenu.state.x,
+            y: materialContextMenu.state.y,
+          }}
+        />
+      ) : null}
     </div>
   );
 }

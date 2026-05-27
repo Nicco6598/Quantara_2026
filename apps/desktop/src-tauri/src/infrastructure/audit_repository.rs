@@ -1,9 +1,54 @@
 use rusqlite::Connection;
+use serde::Serialize;
 use serde_json::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::infrastructure::to_database_error;
 use crate::models::app_error::AppError;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditEventRecord {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub action: String,
+    pub actor_id: Option<String>,
+    pub payload: Option<String>,
+    pub created_at: String,
+}
+
+pub fn list_recent_events(conn: &Connection, limit: usize) -> Result<Vec<AuditEventRecord>, AppError> {
+    let capped = limit.clamp(1, 500);
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, entity_type, entity_id, action, actor_id, payload, created_at
+             FROM audit_events
+             ORDER BY created_at DESC
+             LIMIT ?1",
+        )
+        .map_err(to_database_error)?;
+
+    let rows = stmt
+        .query_map([capped as i64], |row| {
+            Ok(AuditEventRecord {
+                id: row.get(0)?,
+                entity_type: row.get(1)?,
+                entity_id: row.get(2)?,
+                action: row.get(3)?,
+                actor_id: row.get(4)?,
+                payload: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })
+        .map_err(to_database_error)?;
+
+    let mut events = Vec::new();
+    for row in rows {
+        events.push(row.map_err(to_database_error)?);
+    }
+    Ok(events)
+}
 
 pub fn append_event(
     conn: &Connection,
@@ -141,6 +186,19 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM audit_events", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_list_recent_events() {
+        let conn = Connection::open_in_memory().unwrap();
+        setup_schema(&conn);
+        append_event(&conn, "sal", "s1", "create", None, None).unwrap();
+        append_event(&conn, "contract", "c1", "update", None, None).unwrap();
+        let events = list_recent_events(&conn, 10).unwrap();
+        assert_eq!(events.len(), 2);
+        let types: Vec<&str> = events.iter().map(|e| e.entity_type.as_str()).collect();
+        assert!(types.contains(&"sal"));
+        assert!(types.contains(&"contract"));
     }
 
     #[test]

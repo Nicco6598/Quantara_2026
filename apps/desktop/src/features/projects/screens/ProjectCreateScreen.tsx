@@ -31,7 +31,9 @@ import {
 import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { motionDuration, motionEase, motionSpring } from "@/motion";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
+import { isContractorMigrationComplete } from "@/lib/contractor-resolve";
+import { takeProjectEditSession } from "@/lib/workflow-navigation";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { cn } from "@/lib/utils";
@@ -115,18 +117,12 @@ export function ProjectCreateScreen() {
   const [tariffYearFilters, setTariffYearFilters] = useState<number[]>([]);
   const savingRef = useRef(false);
 
+  const editSession = useMemo(() => takeProjectEditSession(), []);
+  const editingContractIdRef = useRef(editSession?.contractId ?? null);
+
   const initialValues = useMemo(() => {
-    try {
-      const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEYS.editingProject);
-      if (raw) {
-        window.sessionStorage.removeItem(SESSION_STORAGE_KEYS.editingProject);
-        return JSON.parse(raw) as ProjectFormState;
-      }
-    } catch {
-      /* no-op */
-    }
-    return null;
-  }, []);
+    return (editSession?.form as ProjectFormState | undefined) ?? null;
+  }, [editSession]);
 
   const [ui, dispatch] = useReducer(projectUIReducer, null, () => ({
     draft: initialValues ?? {
@@ -355,23 +351,21 @@ export function ProjectCreateScreen() {
     setIsSaving(true);
 
     try {
-      const editingContractId = initialValues?.contractorName
-        ? window.sessionStorage.getItem(SESSION_STORAGE_KEYS.editingContractId)
-        : null;
+      const editingContractId = editingContractIdRef.current;
 
       const savedContract = editingContractId
         ? await updateDesktopContract(editingContractId, { ...request, id: editingContractId })
         : await createDesktopContract(request);
 
       if (editingContractId) {
-        window.sessionStorage.removeItem(SESSION_STORAGE_KEYS.editingContractId);
+        editingContractIdRef.current = null;
         notify({ message: "Progetto aggiornato.", title: "Aggiornato", tone: "success" });
       } else {
         notify({ message: "Progetto creato.", title: "Creato", tone: "success" });
       }
 
       const contractorName = sanitizeTextValue(draft.contractorName);
-      if (contractorName) {
+      if (contractorName && !isContractorMigrationComplete()) {
         const contractors = readStringRecord(projectContractorStorageKey);
         writeJson(projectContractorStorageKey, {
           ...contractors,
@@ -396,7 +390,7 @@ export function ProjectCreateScreen() {
       savingRef.current = false;
       setIsSaving(false);
     }
-  }, [amount, draft, initialValues, navigate, notify, parsedDiscount, validation.submitError]);
+  }, [amount, draft, navigate, notify, parsedDiscount, validation.submitError]);
 
   // Keep refs in sync with latest callback/validation
   handleSubmitRef.current = handleSubmit;

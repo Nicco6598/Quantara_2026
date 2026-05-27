@@ -1389,7 +1389,7 @@ export function RightRail({
   distribution,
   projectCount,
 }: {
-  activities: string[];
+  activities: ActivityRow[];
   distribution: Array<{ label: string; tone: StatusTone; value: string }>;
   projectCount: number;
 }) {
@@ -1446,18 +1446,16 @@ export function RightRail({
         </div>
         {activities.length > 0 ? (
           <div className="space-y-3">
-            {activities.slice(0, 5).map((activity) => {
-              const [time, ...rest] = activity.split(" · ");
-              const detail = rest.join(" · ");
-              return (
-                <div className="grid grid-cols-[56px_1fr] gap-2" key={activity}>
-                  <span className="text-10px font-medium text-[var(--text-secondary)]">{time}</span>
-                  <span className="text-12px font-medium leading-4 text-[var(--text-primary)]">
-                    {detail}
-                  </span>
-                </div>
-              );
-            })}
+            {activities.slice(0, 5).map((activity) => (
+              <div className="grid grid-cols-[56px_1fr] gap-2" key={activity.id}>
+                <span className="text-10px font-medium text-[var(--text-secondary)]">
+                  {activity.time}
+                </span>
+                <span className="text-12px font-medium leading-4 text-[var(--text-primary)]">
+                  {activity.detail}
+                </span>
+              </div>
+            ))}
           </div>
         ) : (
           <p className="py-4 text-center text-12px text-[var(--text-secondary)]">
@@ -1706,7 +1704,13 @@ export function buildFocusRows(projects: PortfolioProject[]) {
   ];
 }
 
-export function buildActivityRows(entries: AuditEntry[]): string[] {
+export type ActivityRow = {
+  detail: string;
+  id: string;
+  time: string;
+};
+
+export function buildActivityRows(entries: AuditEntry[]): ActivityRow[] {
   if (entries.length === 0) return [];
 
   return entries.slice(0, 10).map((entry) => {
@@ -1714,7 +1718,11 @@ export function buildActivityRows(entries: AuditEntry[]): string[] {
       hour: "2-digit",
       minute: "2-digit",
     });
-    return `${time} · ${entry.action}: ${entry.details}`;
+    return {
+      detail: `${entry.action}: ${entry.details}`,
+      id: entry.id,
+      time,
+    };
   });
 }
 

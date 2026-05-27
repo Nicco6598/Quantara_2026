@@ -1,7 +1,11 @@
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 
-const DRAFT_VERSION = 1;
-const TARIFF_IMPORT_DRAFTS_INDEX_KEY = "quantara:tariff-import-preview:index";
+// Invalida le bozze salvate con un comportamento di parsing/UI precedente.
+// Serve soprattutto quando cambiano regole di normalizzazione (es. spazi nel codice voce).
+const DRAFT_VERSION = 3;
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
+
+const TARIFF_IMPORT_DRAFTS_INDEX_KEY = STORAGE_KEYS.tariffImportDraftsIndex;
 
 export type ImportDraft = {
   draftedFiles: number[];

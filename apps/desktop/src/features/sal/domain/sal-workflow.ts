@@ -17,6 +17,8 @@ export type {
 
 import { buildLineViews, defaultSalEconomicRules, summarizeSalLines } from "./sal-calculations";
 import { isSafetyVoice } from "./sal-safety";
+import { extractSnapshotVoicesFromSal, resolveVoiceForSalLine } from "./sal-voice-resolve";
+import type { SalVoiceDraft } from "../types";
 
 type SalLineView = SalLine & {
   discountAmount: number;
@@ -50,31 +52,69 @@ export function createId(prefix: string): string {
   return `${prefix}_${randomPart}`;
 }
 
+function tariffVoiceToDraft(voice: SalTariffVoice): SalVoiceDraft {
+  return {
+    category: voice.category,
+    code: voice.code,
+    description: voice.description,
+    id: voice.id,
+    isSafetyCost:
+      voice.isSafetyCost ??
+      isSafetyVoice({
+        category: voice.category,
+        code: voice.code,
+        description: voice.description,
+      }),
+    laborPercentage: voice.laborPercentage ?? 0,
+    source: voice as never,
+    tariffBookId: "",
+    tariffBookName: "",
+    tariffYear: voice.projectYear,
+    unit: voice.unit,
+    unitPrice: voice.unitPrice,
+  };
+}
+
+function buildVoiceCatalogForDocument(
+  document: SalDocument,
+  voices: readonly SalTariffVoice[],
+): SalVoiceDraft[] {
+  const merged = new Map<string, SalVoiceDraft>();
+  for (const voice of voices) {
+    merged.set(voice.id, tariffVoiceToDraft(voice));
+  }
+  for (const snapshotVoice of extractSnapshotVoicesFromSal(document)) {
+    if (!merged.has(snapshotVoice.id)) {
+      merged.set(snapshotVoice.id, snapshotVoice);
+    }
+  }
+  return [...merged.values()];
+}
+
 export function buildSalDocumentView(
   document: SalDocument,
   voices: readonly SalTariffVoice[],
 ): SalDocumentView {
-  const voiceById = new Map(voices.map((voice) => [voice.id, voice]));
-  return buildSalDocumentViewWithVoiceMap(document, voiceById);
+  const catalog = buildVoiceCatalogForDocument(document, voices);
+  return buildSalDocumentViewWithVoiceMap(document, catalog);
 }
 
 export function buildSalDocumentViews(
   documents: readonly SalDocument[],
   voices: readonly SalTariffVoice[],
 ): SalDocumentView[] {
-  const voiceById = new Map(voices.map((voice) => [voice.id, voice]));
-  return documents.map((document) => buildSalDocumentViewWithVoiceMap(document, voiceById));
+  return documents.map((document) => buildSalDocumentView(document, voices));
 }
 
 function buildSalDocumentViewWithVoiceMap(
   document: SalDocument,
-  voiceById: ReadonlyMap<string, SalTariffVoice>,
+  voiceCatalog: readonly SalVoiceDraft[],
 ): SalDocumentView {
   const hasEconomicRules = Boolean(document.economicRules);
 
   if (hasEconomicRules) {
     const draftLines = document.lines.flatMap((line) => {
-      const voice = voiceById.get(line.voiceId);
+      const voice = resolveVoiceForSalLine(line.voiceId, voiceCatalog);
       if (!voice) return [];
 
       // Build measurement rows from persisted data or synthesize from quantity
@@ -136,7 +176,7 @@ function buildSalDocumentViewWithVoiceMap(
           source: voice as never,
           tariffBookId: "",
           tariffBookName: "",
-          tariffYear: voice.projectYear,
+          tariffYear: voice.tariffYear,
           unit: voice.unit,
           unitPrice: voice.unitPrice,
         },
@@ -185,11 +225,20 @@ function buildSalDocumentViewWithVoiceMap(
   }
 
   const lines = document.lines.flatMap((line) => {
-    const voice = voiceById.get(line.voiceId);
+    const resolved = resolveVoiceForSalLine(line.voiceId, voiceCatalog);
+    if (!resolved) return [];
 
-    if (!voice) {
-      return [];
-    }
+    const voice: SalTariffVoice = {
+      category: resolved.category,
+      code: resolved.code,
+      description: resolved.description,
+      id: resolved.id,
+      isSafetyCost: resolved.isSafetyCost,
+      laborPercentage: resolved.laborPercentage,
+      projectYear: resolved.tariffYear,
+      unit: resolved.unit,
+      unitPrice: resolved.unitPrice,
+    };
 
     const surcharge = getSurcharge(line.surcharge);
     const lineTotal = calculateSalLineTotal(line.quantity, voice.unitPrice, surcharge.multiplier);

@@ -17,6 +17,7 @@ import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
 import {
   buildActivityRows,
+  type ActivityRow,
   buildFocusRows,
   buildGanttBars,
   buildDashboardRealitySummary,
@@ -35,18 +36,15 @@ import type { PortfolioProject } from "@/features/projects/types";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { SalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useNavigate } from "@/hooks/useNavigate";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
-import {
-  listDesktopSalDocuments,
-  listDesktopSalProjects,
-  migrateSalLocalStorageToBackend,
-} from "@/lib/sal-data";
-import { readStringRecord } from "@/lib/shared-utils";
+import { syncSalWorkflowFromBackend } from "@/lib/sal-workflow-sync";
+import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
-import { useAuditLogStore } from "@/store/audit-log-store";
+import { selectProjectForWorkflow } from "@/lib/workflow-navigation";
+import { useAuditLogEntries } from "@/hooks/useAuditLogEntries";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 let cachedGreeting: string | null = null;
@@ -294,7 +292,7 @@ function DashboardInsightRail({
   projectCount,
   summary,
 }: {
-  activities: string[];
+  activities: ActivityRow[];
   distribution: ReturnType<typeof buildFocusRows>;
   onCreateProject: () => void;
   onCreateSal: () => void;
@@ -455,24 +453,20 @@ function DashboardQuickAction({
   );
 }
 
-function ActivityPanel({ activities }: { activities: string[] }) {
+function ActivityPanel({ activities }: { activities: ActivityRow[] }) {
   return (
     <Panel eyebrow="Registro" padding="lg" title="Attività recenti">
       <div className="space-y-3">
-        {activities.slice(0, 4).map((activity) => {
-          const [time, ...rest] = activity.split(" · ");
-          const detail = rest.join(" · ");
-          return (
-            <div className="grid grid-cols-[48px_1fr] gap-2" key={activity}>
-              <span className="text-10px font-medium tabular-nums text-[var(--text-secondary)]">
-                {time}
-              </span>
-              <span className="text-12px font-medium leading-4 text-[var(--text-primary)]">
-                {detail}
-              </span>
-            </div>
-          );
-        })}
+        {activities.slice(0, 4).map((activity) => (
+          <div className="grid grid-cols-[48px_1fr] gap-2" key={activity.id}>
+            <span className="text-10px font-medium tabular-nums text-[var(--text-secondary)]">
+              {activity.time}
+            </span>
+            <span className="text-12px font-medium leading-4 text-[var(--text-primary)]">
+              {activity.detail}
+            </span>
+          </div>
+        ))}
       </div>
     </Panel>
   );
@@ -484,59 +478,47 @@ export function DashboardScreen() {
   const [projects, setProjects] = useState<PortfolioProject[]>([]);
   const salDocuments = useSalWorkflowStore((s) => s.salDocuments);
   const tariffVoices = useSalWorkflowStore((s) => s.tariffVoices);
-  const auditEntries = useAuditLogStore((s) => s.entries);
+  const auditEntries = useAuditLogEntries(50);
 
   const handleOpenProject = useCallback(
     (project: PortfolioProject) => {
-      try {
-        window.sessionStorage.setItem(
-          SESSION_STORAGE_KEYS.selectedProjectDetail,
-          JSON.stringify(project),
-        );
-      } catch {
-        /* no-op */
-      }
+      selectProjectForWorkflow(project.id);
       navigate("project-detail");
     },
     [navigate],
   );
 
-  useEffect(() => {
-    const abort = new AbortController();
-
-    Promise.all([
-      listDesktopContracts([]),
-      migrateSalLocalStorageToBackend().then(() =>
-        Promise.all([listDesktopSalDocuments(null), listDesktopSalProjects()]),
+  const loadPortfolio = useCallback(async () => {
+    const contracts = await listDesktopContracts([]);
+    const legacyContractors = readLegacyProjectContractors();
+    setProjects(
+      contracts.data.map((contract) =>
+        mapContractToProject(contract, resolveContractorName(contract, legacyContractors)),
       ),
-    ])
-      .then(([contracts, [salDocs, salProjects]]) => {
-        if (abort.signal.aborted) return;
-        const contractors = readStringRecord(STORAGE_KEYS.projectContractors);
-        setProjects(
-          contracts.data.map((contract) =>
-            mapContractToProject(contract, contractors[contract.id]),
-          ),
-        );
-        useSalWorkflowStore
-          .getState()
-          .initializeFromBackend(
-            salDocs.data,
-            salProjects.data,
-            useSalWorkflowStore.getState().tariffVoices,
-          );
-      })
-      .catch(() => {
-        if (abort.signal.aborted) return;
-        notify({
-          title: "Caricamento fallito",
-          message: "Impossibile caricare i progetti. Verifica la connessione al database locale.",
-          tone: "danger",
-        });
-      });
+    );
+    await syncSalWorkflowFromBackend(null);
+  }, []);
 
-    return () => abort.abort();
-  }, [notify]);
+  useEffect(() => {
+    let active = true;
+
+    loadPortfolio().catch(() => {
+      if (!active) return;
+      notify({
+        title: "Caricamento fallito",
+        message: "Impossibile caricare i progetti. Verifica la connessione al database locale.",
+        tone: "danger",
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [loadPortfolio, notify]);
+
+  useDataChangedListener(() => {
+    void loadPortfolio();
+  });
 
   const views = useMemo(
     () => buildDashboardSalViews(salDocuments, tariffVoices),

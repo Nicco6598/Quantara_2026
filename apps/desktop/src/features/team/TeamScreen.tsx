@@ -1,7 +1,10 @@
 import { Search, Trash2, UserPlus, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Button } from "@/components/shared/Button";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildTeamMemberContextMenuEntries, copyTextToClipboard } from "@/lib/context-menu-presets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SearchField } from "@/components/shared/form/SearchField";
 import { SelectField } from "@/components/shared/form/SelectField";
@@ -73,6 +76,7 @@ function TeamHeaderStat({
 
 export function TeamScreen() {
   const { members, updateMember, removeMember } = useTeamState();
+  const memberContextMenu = useContextMenu<WorkspaceMember>();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
 
@@ -208,6 +212,7 @@ export function TeamScreen() {
           columns={columns}
           data={filtered}
           keyExtractor={(m) => m.id}
+          onRowContextMenu={(member, event) => memberContextMenu.open(event, member)}
           emptyState={
             <EmptyState
               description="Nessun membro corrisponde ai criteri di ricerca."
@@ -225,6 +230,32 @@ export function TeamScreen() {
             </Button>
           )}
         />
+
+        {memberContextMenu.state ? (
+          <AppContextMenu
+            entries={buildTeamMemberContextMenuEntries({
+              onRemove: () => {
+                const state = memberContextMenu.state;
+                if (!state) return;
+                removeMember(state.context.id);
+              },
+              onCopyEmail: () => {
+                const state = memberContextMenu.state;
+                if (!state) return;
+                void copyTextToClipboard(state.context.email);
+              },
+            })}
+            header={{
+              title: memberContextMenu.state.context.name,
+              subtitle: memberContextMenu.state.context.email,
+            }}
+            onClose={memberContextMenu.close}
+            position={{
+              x: memberContextMenu.state.x,
+              y: memberContextMenu.state.y,
+            }}
+          />
+        ) : null}
       </section>
     </ScreenLayout>
   );

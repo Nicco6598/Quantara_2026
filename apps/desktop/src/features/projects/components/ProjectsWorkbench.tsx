@@ -11,9 +11,12 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { memo, type ReactNode, useRef, useState } from "react";
+import { memo, type MouseEvent, type ReactNode, useRef, useState } from "react";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Button } from "@/components/shared/Button";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildProjectRowContextMenuEntries } from "@/lib/context-menu-presets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Panel } from "@/components/shared/Panel";
 import { statusToneStyles } from "@/components/shared/StatusBadge";
@@ -48,6 +51,7 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   query,
   selectedProjectId,
 }: ProjectsWorkbenchProps) {
+  const projectContextMenu = useContextMenu<PortfolioProject>();
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
 
@@ -127,6 +131,7 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
             <WorkbenchRow
               isSelected={project.id === selectedProjectId}
               key={project.id}
+              onContextMenu={(event) => projectContextMenu.open(event, project)}
               onDeleteProject={onDeleteProject}
               onEditProject={onEditProject}
               onOpenProject={onOpenProject}
@@ -142,18 +147,51 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
           </div>
         )}
       </div>
+
+      {projectContextMenu.state ? (
+        <AppContextMenu
+          entries={buildProjectRowContextMenuEntries({
+            onOpen: () => {
+              const state = projectContextMenu.state;
+              if (!state) return;
+              onOpenProject(state.context);
+            },
+            onEdit: () => {
+              const state = projectContextMenu.state;
+              if (!state) return;
+              onEditProject(state.context);
+            },
+            onDelete: () => {
+              const state = projectContextMenu.state;
+              if (!state) return;
+              onDeleteProject(state.context.id);
+            },
+          })}
+          header={{
+            title: projectContextMenu.state.context.title,
+            subtitle: projectContextMenu.state.context.contractor,
+          }}
+          onClose={projectContextMenu.close}
+          position={{
+            x: projectContextMenu.state.x,
+            y: projectContextMenu.state.y,
+          }}
+        />
+      ) : null}
     </Panel>
   );
 });
 
 function WorkbenchRow({
   isSelected,
+  onContextMenu,
   onDeleteProject,
   onEditProject,
   onOpenProject,
   project,
 }: {
   isSelected: boolean;
+  onContextMenu: (event: MouseEvent) => void;
   onDeleteProject: (projectId: string) => void;
   onEditProject: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
@@ -180,6 +218,7 @@ function WorkbenchRow({
         initial={MOTION_VARIANTS.card.initial}
         layout
         onClick={() => onOpenProject(project)}
+        onContextMenu={onContextMenu}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();

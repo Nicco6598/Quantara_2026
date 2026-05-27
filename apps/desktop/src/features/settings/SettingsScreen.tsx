@@ -35,11 +35,12 @@ import {
   restoreDatabase,
   restoreDatabaseWithPassphrase,
 } from "@/lib/backup";
-import { loadThemeCSS } from "@/lib/theme-loader";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { getErrorMessage, reportUserActionError } from "@/lib/user-action-error";
 import { cn } from "@/lib/utils";
 import { usePreferenceState, useThemeState } from "@/store/app-store";
+import { useAuditLogEntries } from "@/hooks/useAuditLogEntries";
+import { isTauriRuntime } from "@/lib/tauri-wrapper";
 import { useAuditLogStore } from "@/store/audit-log-store";
 
 type UpdateViewState = { kind: "idle" } | UpdateCheckResult;
@@ -179,10 +180,9 @@ function ThemeCard() {
                   : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40",
               )}
               key={t.id}
-              onClick={async () => {
+              onClick={() => {
                 setLightThemePref(t.id);
                 if (themeMode.startsWith("light")) {
-                  await loadThemeCSS(t.id);
                   setThemeMode(t.id);
                 }
               }}
@@ -275,10 +275,9 @@ function ThemeCard() {
                   : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40",
               )}
               key={t.id}
-              onClick={async () => {
+              onClick={() => {
                 setDarkThemePref(t.id);
                 if (themeMode.startsWith("dark")) {
-                  await loadThemeCSS(t.id);
                   setThemeMode(t.id);
                 }
               }}
@@ -762,7 +761,8 @@ function ReleaseRulesCard() {
 }
 
 function AuditLogCard() {
-  const auditEntries = useAuditLogStore((state) => state.entries);
+  const auditEntries = useAuditLogEntries(100);
+  const canClearLocalOnly = !isTauriRuntime();
   return (
     <Panel padding="lg">
       <div className="flex items-center gap-3">
@@ -808,14 +808,14 @@ function AuditLogCard() {
           ))
         )}
       </div>
-      {auditEntries.length > 0 ? (
+      {canClearLocalOnly && auditEntries.length > 0 ? (
         <Button
           className="mt-3"
           onClick={() => useAuditLogStore.getState().clearAll()}
           variant="destructive"
         >
           <Trash className="size-4" />
-          Cancella registro
+          Cancella cache locale
         </Button>
       ) : null}
     </Panel>

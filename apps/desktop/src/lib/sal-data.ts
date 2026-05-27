@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import { invokeForRead, invokeForWrite, isTauriRuntime } from "./tauri-wrapper";
 import type { DesktopDataResult } from "./tauri-wrapper";
 import type { SalDocument, SalProject } from "@/features/sal/types";
@@ -16,10 +17,30 @@ export type SerializableSalDocument = SalDocument & {
   lineCount?: number;
   measurementRowCount?: number;
   totalCents?: number;
+  voices?: Array<{
+    category: string;
+    code: string;
+    description: string;
+    id: string;
+    laborPercentage?: number;
+    projectYear: number;
+    unit: string;
+    unitPrice: number;
+  }>;
 };
 
-export function toSalDocumentPayload(doc: SalDocument): SerializableSalDocument {
-  const payload: SerializableSalDocument = { ...doc };
+export function toSalDocumentPayload(
+  doc: SalDocument,
+  voices?: SerializableSalDocument["voices"],
+): SerializableSalDocument {
+  const payload: SerializableSalDocument = {
+    ...doc,
+    ...(voices && voices.length > 0 ? { voices } : {}),
+  };
+  const existingVoices = (doc as SerializableSalDocument).voices;
+  if (!payload.voices && existingVoices && existingVoices.length > 0) {
+    payload.voices = existingVoices;
+  }
   if (doc.lines) {
     payload.lineCount = doc.lines.length;
     payload.measurementRowCount = doc.lines.reduce(
@@ -145,8 +166,8 @@ export async function confirmSalTransaction(
 
 // Migrazione one-time: sposta i SAL dal vecchio zustand persist key (quantara-sal-workflow)
 // al nuovo backend SQLite. Eseguita solo in Tauri mode e una sola volta.
-const MIGRATION_FLAG_KEY = "quantara-sal-migration-to-sqlite-v1";
-const OLD_ZUSTAND_KEY = "quantara-sal-workflow";
+const MIGRATION_FLAG_KEY = STORAGE_KEYS.salMigrationToSqlite;
+const OLD_ZUSTAND_KEY = STORAGE_KEYS.salWorkflow;
 
 export async function migrateSalLocalStorageToBackend(): Promise<void> {
   if (!isTauriRuntime()) return;

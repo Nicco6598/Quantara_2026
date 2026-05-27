@@ -69,6 +69,7 @@ async function runLegacyContractorMigration(): Promise<void> {
 function markMigrationDone(): void {
   try {
     window.localStorage.setItem(contractorMigrationStorageKey, "done");
+    window.localStorage.removeItem(legacyProjectContractorStorageKey);
   } catch {
     // Persistence is best-effort; a failed write just retries on next launch.
   }

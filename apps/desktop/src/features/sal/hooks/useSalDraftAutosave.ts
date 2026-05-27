@@ -1,136 +1,104 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { saveSalCreationDraft } from "../domain/sal-creation-draft";
-import type { SalEconomicRules, SalLineDraft, SalTariffBookOption } from "../types";
+import { useCallback, useRef } from "react";
+import { useDraftAutosave } from "@/hooks/use-draft-autosave";
+import { persistSalCreationLocalDraft, type StoredSalDraft } from "../domain/sal-creation-draft";
+import type { SalEconomicRules, SalLineDraft } from "../types";
 import type { SalWorkflowPhase } from "../state/workflow";
 
-type AutoSaveStatus = "idle" | "saving" | "saved" | "error" | "unsaved";
-
-type UseSalDraftAutosaveArgs = {
+export type SalDraftAutosaveSnapshot = {
   economicRules: SalEconomicRules;
   lines: SalLineDraft[];
   materialUsage: Record<string, number>;
   phase: SalWorkflowPhase;
   projectId: string;
   salDate: string;
+  salDraftId: string | null;
   salTitle: string;
-  selectedTariffBooks: SalTariffBookOption[];
+  selectedTariffBookIds: string[];
+};
+
+type UseSalDraftAutosaveArgs = {
+  enabled?: boolean;
+  getSnapshot: () => SalDraftAutosaveSnapshot;
+  onBackendAutosave?: () => Promise<void>;
 };
 
 export function useSalDraftAutosave({
-  economicRules,
-  lines,
-  materialUsage,
-  phase,
-  projectId,
-  salDate,
-  salTitle,
-  selectedTariffBooks,
+  enabled = true,
+  getSnapshot,
+  onBackendAutosave,
 }: UseSalDraftAutosaveArgs) {
-  const [status, setStatus] = useState<AutoSaveStatus>("idle");
-  const [lastSaved, setLastSaved] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hasChangesRef = useRef(false);
-  const didMountRef = useRef(false);
+  const getSnapshotRef = useRef(getSnapshot);
+  getSnapshotRef.current = getSnapshot;
 
-  const selectedTariffBookIds = useMemo(
-    () => selectedTariffBooks.map((book) => book.id),
-    [selectedTariffBooks],
-  );
+  const draftSnapshot = getSnapshotRef.current();
 
-  const draftDataRef = useRef({
-    economicRules,
-    lines,
-    materialUsage,
-    phase,
-    projectId,
-    salDate,
-    salTitle,
-    selectedTariffBookIds,
-  });
-
-  useEffect(() => {
-    draftDataRef.current = {
-      economicRules,
-      lines,
-      materialUsage,
-      phase,
-      projectId,
-      salDate,
-      salTitle,
-      selectedTariffBookIds,
+  const toStoredDraft = useCallback((snapshot: SalDraftAutosaveSnapshot): StoredSalDraft => {
+    return {
+      economicRules: snapshot.economicRules,
+      lines: snapshot.lines,
+      materialUsage: snapshot.materialUsage,
+      phase: snapshot.phase,
+      salDate: snapshot.salDate,
+      salTitle: snapshot.salTitle,
+      selectedTariffBookIds: snapshot.selectedTariffBookIds,
     };
-  }, [
-    economicRules,
-    lines,
-    materialUsage,
-    phase,
-    projectId,
-    salDate,
-    salTitle,
-    selectedTariffBookIds,
-  ]);
-
-  const persistDraftSilent = useCallback(() => {
-    const draft = draftDataRef.current;
-    if (!draft.projectId) return;
-    setStatus("saving");
-    try {
-      saveSalCreationDraft(draft.projectId, {
-        economicRules: draft.economicRules,
-        lines: draft.lines,
-        materialUsage: draft.materialUsage,
-        phase: draft.phase,
-        salDate: draft.salDate,
-        salTitle: draft.salTitle,
-        selectedTariffBookIds: draft.selectedTariffBookIds,
-      });
-      hasChangesRef.current = false;
-      setLastSaved(new Date().toISOString());
-      setStatus("saved");
-    } catch {
-      setStatus("error");
-    }
   }, []);
 
-  const markChanged = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    hasChangesRef.current = true;
-    debounceRef.current = setTimeout(persistDraftSilent, 800);
-  }, [persistDraftSilent]);
+  const persistLocalDraft = useCallback(
+    (snapshot?: SalDraftAutosaveSnapshot) => {
+      const current = snapshot ?? getSnapshotRef.current();
+      if (!current.projectId) return;
+      persistSalCreationLocalDraft({
+        draft: toStoredDraft(current),
+        projectId: current.projectId,
+        salId: current.salDraftId,
+      });
+    },
+    [toStoredDraft],
+  );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: props trigger re-render, needed for change detection
-  useEffect(() => {
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      return;
+  const onPersist = useCallback(async () => {
+    const current = getSnapshotRef.current();
+    if (!current.projectId) return;
+
+    persistLocalDraft(current);
+
+    if (current.salDraftId && onBackendAutosave) {
+      await onBackendAutosave();
     }
-    markChanged();
-  }, [
-    economicRules,
-    lines,
-    materialUsage,
-    phase,
-    salDate,
-    salTitle,
-    selectedTariffBookIds,
-    markChanged,
-  ]);
+  }, [onBackendAutosave, persistLocalDraft]);
 
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      if (hasChangesRef.current) persistDraftSilent();
-    }, 30000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [persistDraftSilent]);
+  const { lastSaved, persistNow, status } = useDraftAutosave({
+    data: draftSnapshot,
+    debounceMs: 800,
+    enabled: enabled && Boolean(draftSnapshot.projectId),
+    flushOnUnmount: true,
+    intervalMs: 30000,
+    onPersist,
+  });
+
+  const flushDraft = useCallback(async () => {
+    await persistNow({ force: true });
+  }, [persistNow]);
+
+  /** Persist immediately with an explicit snapshot (avoids React state timing). */
+  const flushDraftSnapshot = useCallback(
+    async (snapshot: SalDraftAutosaveSnapshot) => {
+      persistLocalDraft(snapshot);
+      if (snapshot.salDraftId && onBackendAutosave) {
+        await onBackendAutosave();
+      }
+    },
+    [onBackendAutosave, persistLocalDraft],
+  );
 
   return {
+    flushDraft,
+    flushDraftSnapshot,
     lastSaved,
-    markChanged,
-    persistDraftSilent,
+    markChanged: persistNow,
+    persistDraftSilent: persistNow,
+    persistLocalDraft,
     status,
   };
 }

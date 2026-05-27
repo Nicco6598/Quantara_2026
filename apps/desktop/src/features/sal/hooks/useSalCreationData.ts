@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import {
   type DesktopContract,
   type DesktopTariffBook,
@@ -6,8 +7,8 @@ import {
   listDesktopTariffBooks,
   listDesktopTariffVoices,
 } from "@/lib/desktopData";
-import { readStringRecord } from "@/lib/shared-utils";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
+import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
+import { getWorkflowProjectId, selectProjectForWorkflow } from "@/lib/workflow-navigation";
 import {
   mapContractToSalProject,
   mapTariffBooksForContract,
@@ -18,7 +19,8 @@ import type { SalProjectContext, SalTariffBookOption, SalVoiceDraft } from "../t
 type LoadState = {
   contracts: DesktopContract[];
   error: string | null;
-  isLoading: boolean;
+  isBootstrapping: boolean;
+  isVoicesLoading: boolean;
   selectedContractId: string;
   selectedTariffBookIds: string[];
   tariffBooks: DesktopTariffBook[];
@@ -28,102 +30,145 @@ type LoadState = {
 const initialLoadState: LoadState = {
   contracts: [],
   error: null,
-  isLoading: true,
+  isBootstrapping: true,
+  isVoicesLoading: false,
   selectedContractId: "",
   selectedTariffBookIds: [],
   tariffBooks: [],
   voices: [],
 };
 
-const projectContractorStorageKey = STORAGE_KEYS.projectContractors;
-
-function readSelectedProjectId(): string | null {
-  try {
-    const rawValue = window.sessionStorage.getItem(SESSION_STORAGE_KEYS.selectedProjectDetail);
-    if (!rawValue) return null;
-    const parsed = JSON.parse(rawValue) as { id?: unknown };
-    return typeof parsed.id === "string" ? parsed.id : null;
-  } catch {
-    return null;
-  }
+function sameIdSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((id) => rightSet.has(id));
 }
 
-function writeSelectedProjectId(id: string) {
-  try {
-    window.sessionStorage.setItem(
-      SESSION_STORAGE_KEYS.selectedProjectDetail,
-      JSON.stringify({ id }),
-    );
-  } catch {
-    /* no-op */
-  }
+function booksHaveVoicesLoaded(
+  voices: readonly SalVoiceDraft[],
+  bookIds: readonly string[],
+): boolean {
+  if (bookIds.length === 0) return true;
+  const loaded = new Set(voices.map((voice) => voice.tariffBookId));
+  return bookIds.every((id) => loaded.has(id));
 }
 
 export function useSalCreationData() {
   const [state, setState] = useState<LoadState>(initialLoadState);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const mergeVoices = useCallback(
+    (current: SalVoiceDraft[], incoming: SalVoiceDraft[]): SalVoiceDraft[] => {
+      const byId = new Map(current.map((voice) => [voice.id, voice]));
+      for (const voice of incoming) {
+        byId.set(voice.id, voice);
+      }
+      return [...byId.values()];
+    },
+    [],
+  );
+
+  const loadVoicesForMissingBooks = useCallback(
+    async (
+      bookIds: string[],
+      tariffBooks: readonly DesktopTariffBook[],
+      currentVoices: SalVoiceDraft[],
+    ): Promise<SalVoiceDraft[]> => {
+      const missing = bookIds.filter(
+        (bookId) => !currentVoices.some((voice) => voice.tariffBookId === bookId),
+      );
+      if (missing.length === 0) {
+        return currentVoices;
+      }
+      const loaded = await loadVoicesForBooks(missing, tariffBooks);
+      return mergeVoices(currentVoices, loaded);
+    },
+    [mergeVoices],
+  );
+
+  const loadCreationData = useCallback(async () => {
+    const [contractsResult, tariffBooksResult] = await Promise.all([
+      listDesktopContracts([]),
+      listDesktopTariffBooks([]),
+    ]);
+
+    const contracts = contractsResult.data;
+    const tariffBooks = tariffBooksResult.data;
+    const savedId = getWorkflowProjectId();
+    const defaultContract = contracts.find((c) => c.id === savedId) ?? contracts[0] ?? null;
+    const defaultId = defaultContract?.id ?? "";
+    const orderedBooks = mapTariffBooksForContract(tariffBooks, defaultContract);
+    const selectedTariffBookIds = orderedBooks.map((book) => book.id);
+    const voices =
+      selectedTariffBookIds.length > 0
+        ? await loadVoicesForBooks(selectedTariffBookIds, tariffBooks)
+        : [];
+
+    setState({
+      contracts,
+      error: null,
+      isBootstrapping: false,
+      isVoicesLoading: false,
+      selectedContractId: defaultId,
+      selectedTariffBookIds,
+      tariffBooks,
+      voices,
+    });
+  }, []);
+
+  const refreshMetadata = useCallback(async () => {
+    const [contractsResult, tariffBooksResult] = await Promise.all([
+      listDesktopContracts([]),
+      listDesktopTariffBooks([]),
+    ]);
+
+    setState((current) => ({
+      ...current,
+      contracts: contractsResult.data,
+      tariffBooks: tariffBooksResult.data,
+      error: null,
+    }));
+  }, []);
 
   useEffect(() => {
     let active = true;
 
-    async function load() {
-      try {
-        const [contractsResult, tariffBooksResult] = await Promise.all([
-          listDesktopContracts([]),
-          listDesktopTariffBooks([]),
-        ]);
+    loadCreationData().catch((error) => {
+      if (!active) return;
+      setState((current) => ({
+        ...current,
+        error:
+          error instanceof Error ? error.message : "Impossibile caricare contratti e tariffari.",
+        isBootstrapping: false,
+        isVoicesLoading: false,
+      }));
+    });
 
-        if (!active) return;
-
-        const contracts = contractsResult.data;
-        const tariffBooks = tariffBooksResult.data;
-        const savedId = readSelectedProjectId();
-        const defaultContract = contracts.find((c) => c.id === savedId) ?? contracts[0] ?? null;
-        const defaultId = defaultContract?.id ?? "";
-        const orderedBooks = mapTariffBooksForContract(tariffBooks, defaultContract);
-        const defaultSelectedIds = orderedBooks.map((book) => book.id);
-        const selectedTariffBookIds = defaultSelectedIds;
-        const voices = await loadVoicesForBooks(selectedTariffBookIds, tariffBooks);
-
-        if (!active) return;
-
-        setState({
-          contracts,
-          error: null,
-          isLoading: false,
-          selectedContractId: defaultId,
-          selectedTariffBookIds,
-          tariffBooks,
-          voices,
-        });
-      } catch (error) {
-        if (!active) return;
-        setState((current) => ({
-          ...current,
-          error:
-            error instanceof Error ? error.message : "Impossibile caricare contratti e tariffari.",
-          isLoading: false,
-        }));
-      }
-    }
-
-    void load();
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadCreationData]);
+
+  useDataChangedListener(() => {
+    void refreshMetadata();
+  });
 
   const selectedContract = useMemo(
     () =>
       state.contracts.find((c) => c.id === state.selectedContractId) ?? state.contracts[0] ?? null,
     [state.contracts, state.selectedContractId],
   );
-  const projectContractors = useMemo(() => readStringRecord(projectContractorStorageKey), []);
+  const legacyContractors = useMemo(() => readLegacyProjectContractors(), []);
   const project = useMemo<SalProjectContext | null>(
     () =>
       selectedContract
-        ? mapContractToSalProject(selectedContract, projectContractors[selectedContract.id])
+        ? mapContractToSalProject(
+            selectedContract,
+            resolveContractorName(selectedContract, legacyContractors),
+          )
         : null,
-    [projectContractors, selectedContract],
+    [legacyContractors, selectedContract],
   );
   const tariffBookOptions = useMemo<SalTariffBookOption[]>(
     () => mapTariffBooksForContract(state.tariffBooks, selectedContract),
@@ -149,162 +194,215 @@ export function useSalCreationData() {
     [selectedTariffBookIdSet, tariffBookOptions],
   );
 
-  async function restoreTariffBookIds(tariffBookIds: string[]) {
-    const validIds = tariffBookIds.filter((id) => tariffBookOptionIdSet.has(id));
-    if (validIds.length === 0) return;
+  const restoreTariffBookIds = useCallback(
+    async (tariffBookIds: string[]) => {
+      const validIds = tariffBookIds.filter((id) => tariffBookOptionIdSet.has(id));
+      if (validIds.length === 0) return;
 
-    setState((current) => ({
-      ...current,
-      error: null,
-      isLoading: true,
-      selectedTariffBookIds: validIds,
-    }));
-
-    try {
-      const voices = await loadVoicesForBooks(validIds, state.tariffBooks);
-      setState((current) => ({
-        ...current,
-        error: null,
-        isLoading: false,
-        voices,
-      }));
-    } catch (error) {
-      setState((current) => ({
-        ...current,
-        error: error instanceof Error ? error.message : "Impossibile caricare i tariffari.",
-        isLoading: false,
-      }));
-    }
-  }
-
-  async function selectTariffBook(tariffBookId: string) {
-    if (!tariffBookOptionIdSet.has(tariffBookId)) return;
-    const isSelected = selectedTariffBookIdSet.has(tariffBookId);
-    const nextSelectedIds = isSelected
-      ? state.selectedTariffBookIds.filter((id) => id !== tariffBookId)
-      : [...state.selectedTariffBookIds, tariffBookId];
-    if (nextSelectedIds.length === 0) return;
-
-    setState((current) => ({
-      ...current,
-      error: null,
-      isLoading: true,
-      selectedTariffBookIds: nextSelectedIds,
-    }));
-
-    try {
-      let mergedVoices = state.voices;
-
-      if (isSelected) {
-        mergedVoices = mergedVoices.filter((v) => v.tariffBookId !== tariffBookId);
-      } else {
-        const newVoices = await loadVoicesForBooks([tariffBookId], state.tariffBooks);
-        const existingByKey = new Map(mergedVoices.map((v) => [v.id, v]));
-        for (const voice of newVoices) {
-          existingByKey.set(voice.id, voice);
-        }
-        mergedVoices = [...existingByKey.values()];
+      const current = stateRef.current;
+      if (
+        sameIdSet(validIds, current.selectedTariffBookIds) &&
+        booksHaveVoicesLoaded(current.voices, validIds)
+      ) {
+        return;
       }
 
-      setState((current) => ({
-        ...current,
-        error: null,
-        isLoading: false,
-        voices: mergedVoices,
-      }));
-    } catch (error) {
-      setState((current) => ({
-        ...current,
-        error: error instanceof Error ? error.message : "Errore nel cambio tariffario.",
-        isLoading: false,
-      }));
-    }
-  }
+      if (booksHaveVoicesLoaded(current.voices, validIds)) {
+        setState((prev) => ({
+          ...prev,
+          selectedTariffBookIds: validIds,
+        }));
+        return;
+      }
 
-  async function setContract(contractId: string) {
-    const contract = state.contracts.find((c) => c.id === contractId);
+      setState((prev) => ({
+        ...prev,
+        error: null,
+        isVoicesLoading: true,
+        selectedTariffBookIds: validIds,
+      }));
+
+      try {
+        const voices = await loadVoicesForMissingBooks(
+          validIds,
+          current.tariffBooks,
+          current.voices,
+        );
+        setState((prev) => ({
+          ...prev,
+          error: null,
+          isVoicesLoading: false,
+          voices,
+        }));
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          error: error instanceof Error ? error.message : "Impossibile caricare i tariffari.",
+          isVoicesLoading: false,
+        }));
+      }
+    },
+    [loadVoicesForMissingBooks, tariffBookOptionIdSet],
+  );
+
+  const selectTariffBook = useCallback(
+    async (tariffBookId: string) => {
+      if (!tariffBookOptionIdSet.has(tariffBookId)) return;
+      const current = stateRef.current;
+      const isSelected = current.selectedTariffBookIds.includes(tariffBookId);
+      const nextSelectedIds = isSelected
+        ? current.selectedTariffBookIds.filter((id) => id !== tariffBookId)
+        : [...current.selectedTariffBookIds, tariffBookId];
+      if (nextSelectedIds.length === 0) return;
+
+      if (isSelected) {
+        const removedSet = new Set([tariffBookId]);
+        setState((prev) => ({
+          ...prev,
+          selectedTariffBookIds: nextSelectedIds,
+          voices: prev.voices.filter((voice) => !removedSet.has(voice.tariffBookId)),
+        }));
+        return;
+      }
+
+      if (booksHaveVoicesLoaded(current.voices, nextSelectedIds)) {
+        setState((prev) => ({
+          ...prev,
+          selectedTariffBookIds: nextSelectedIds,
+        }));
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        error: null,
+        isVoicesLoading: true,
+        selectedTariffBookIds: nextSelectedIds,
+      }));
+
+      try {
+        const voices = await loadVoicesForMissingBooks(
+          nextSelectedIds,
+          current.tariffBooks,
+          current.voices,
+        );
+        setState((prev) => ({
+          ...prev,
+          error: null,
+          isVoicesLoading: false,
+          voices,
+        }));
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          error: error instanceof Error ? error.message : "Errore nel cambio tariffario.",
+          isVoicesLoading: false,
+        }));
+      }
+    },
+    [loadVoicesForMissingBooks, tariffBookOptionIdSet],
+  );
+
+  const setContract = useCallback(async (contractId: string) => {
+    const current = stateRef.current;
+    const contract = current.contracts.find((c) => c.id === contractId);
     if (!contract) return;
-    writeSelectedProjectId(contractId);
-    const bookIds = mapTariffBooksForContract(state.tariffBooks, contract).map((b) => b.id);
-    setState((current) => ({
-      ...current,
+    selectProjectForWorkflow(contractId);
+    const bookIds = mapTariffBooksForContract(current.tariffBooks, contract).map((b) => b.id);
+
+    setState((prev) => ({
+      ...prev,
       error: null,
-      isLoading: true,
+      isVoicesLoading: bookIds.length > 0,
       selectedContractId: contractId,
       selectedTariffBookIds: bookIds,
     }));
+
     try {
-      const voices = bookIds.length > 0 ? await loadVoicesForBooks(bookIds, state.tariffBooks) : [];
-      setState((current) => ({
-        ...current,
+      const voices =
+        bookIds.length > 0 ? await loadVoicesForBooks(bookIds, current.tariffBooks) : [];
+      setState((prev) => ({
+        ...prev,
         error: null,
-        isLoading: false,
+        isVoicesLoading: false,
         voices,
       }));
     } catch (error) {
-      setState((current) => ({
-        ...current,
+      setState((prev) => ({
+        ...prev,
         error: error instanceof Error ? error.message : "Errore nel cambio progetto.",
-        isLoading: false,
+        isVoicesLoading: false,
       }));
     }
-  }
+  }, []);
 
-  async function setSelectedTariffBookIds(tariffBookIds: string[]) {
-    const validIds = tariffBookIds.filter((id) => tariffBookOptionIdSet.has(id));
-    if (validIds.length === 0) return;
+  const setSelectedTariffBookIds = useCallback(
+    async (tariffBookIds: string[]) => {
+      const validIds = tariffBookIds.filter((id) => tariffBookOptionIdSet.has(id));
+      if (validIds.length === 0) return;
 
-    setState((current) => ({
-      ...current,
-      error: null,
-      isLoading: true,
-      selectedTariffBookIds: validIds,
-    }));
-
-    const currentIds = new Set(state.selectedTariffBookIds);
-    const nextIds = new Set(validIds);
-    const addedIds = validIds.filter((id) => !currentIds.has(id));
-    const removedIds = state.selectedTariffBookIds.filter((id) => !nextIds.has(id));
-    const hasUnchanged = state.selectedTariffBookIds.some((id) => nextIds.has(id));
-
-    try {
-      let mergedVoices = state.voices;
-
-      if (removedIds.length > 0) {
-        const removedSet = new Set(removedIds);
-        mergedVoices = mergedVoices.filter((v) => !removedSet.has(v.tariffBookId));
+      const current = stateRef.current;
+      if (
+        sameIdSet(validIds, current.selectedTariffBookIds) &&
+        booksHaveVoicesLoaded(current.voices, validIds)
+      ) {
+        return;
       }
 
-      if (addedIds.length > 0) {
-        const newVoices = await loadVoicesForBooks(addedIds, state.tariffBooks);
-        const existingByKey = new Map(mergedVoices.map((v) => [v.id, v]));
-        for (const voice of newVoices) {
-          existingByKey.set(voice.id, voice);
+      const nextIds = new Set(validIds);
+      const removedIds = current.selectedTariffBookIds.filter((id) => !nextIds.has(id));
+
+      if (booksHaveVoicesLoaded(current.voices, validIds)) {
+        let voices = current.voices;
+        if (removedIds.length > 0) {
+          const removedSet = new Set(removedIds);
+          voices = voices.filter((voice) => !removedSet.has(voice.tariffBookId));
         }
-        mergedVoices = [...existingByKey.values()];
+        setState((prev) => ({
+          ...prev,
+          selectedTariffBookIds: validIds,
+          voices,
+        }));
+        return;
       }
 
-      if (hasUnchanged || addedIds.length > 0 || removedIds.length > 0) {
-        setState((current) => ({
-          ...current,
+      setState((prev) => ({
+        ...prev,
+        error: null,
+        isVoicesLoading: true,
+        selectedTariffBookIds: validIds,
+      }));
+
+      try {
+        let voices = current.voices;
+        if (removedIds.length > 0) {
+          const removedSet = new Set(removedIds);
+          voices = voices.filter((voice) => !removedSet.has(voice.tariffBookId));
+        }
+        voices = await loadVoicesForMissingBooks(validIds, current.tariffBooks, voices);
+        setState((prev) => ({
+          ...prev,
           error: null,
-          isLoading: false,
-          voices: mergedVoices,
+          isVoicesLoading: false,
+          voices,
+        }));
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          error: error instanceof Error ? error.message : "Errore selezione tariffari.",
+          isVoicesLoading: false,
         }));
       }
-    } catch (error) {
-      setState((current) => ({
-        ...current,
-        error: error instanceof Error ? error.message : "Errore selezione tariffari.",
-        isLoading: false,
-      }));
-    }
-  }
+    },
+    [loadVoicesForMissingBooks, tariffBookOptionIdSet],
+  );
 
   return {
     contracts: state.contracts,
     error: state.error,
-    isLoading: state.isLoading,
+    isBootstrapping: state.isBootstrapping,
+    isLoading: state.isBootstrapping,
+    isVoicesLoading: state.isVoicesLoading,
     project,
     restoreTariffBookIds,
     selectedContractId: state.selectedContractId,

@@ -63,7 +63,10 @@ export type SalEconomicRules = {
   applyDiscountToSafetyCosts: boolean;
   discountEnabled: boolean;
   discountPercent: number;
+  /** mg line id → target line ids (runtime / legacy persist) */
   mgManualAllocations?: Record<string, string[]>;
+  /** mg voice id → target voice ids (stable across resume / line id changes) */
+  mgManualAllocationsByVoiceId?: Record<string, string[]>;
   rounding: "cent";
 };
 

@@ -140,6 +140,27 @@ describe("filterIndexedVoiceOptions", () => {
     expect(result.map((item) => item.value)).toEqual(["LA.001"]);
   });
 
+  it("narrows progressively when typing a dotted voice code path", () => {
+    const voices = [
+      voice({ code: "AC.IR.001.A", id: "ac-ir-1", category: "Impianti IR" }),
+      voice({ code: "AC.IR.002.B", id: "ac-ir-2", category: "Impianti IR" }),
+      voice({ code: "AC.FA.001.A", id: "ac-fa-1", category: "Impianti FA" }),
+      voice({ code: "BA.001.010", id: "ba-1" }),
+    ];
+
+    expect(
+      search(voices, "AC")
+        .map((item) => item.value)
+        .sort(),
+    ).toEqual(["AC.FA.001.A", "AC.IR.001.A", "AC.IR.002.B"]);
+    expect(
+      search(voices, "AC.IR")
+        .map((item) => item.value)
+        .sort(),
+    ).toEqual(["AC.IR.001.A", "AC.IR.002.B"]);
+    expect(search(voices, "AC.IR.001").map((item) => item.value)).toEqual(["AC.IR.001.A"]);
+  });
+
   it("caps large result sets before passing them to the autocomplete", () => {
     const voices = Array.from({ length: 120 }, (_, index) =>
       voice({

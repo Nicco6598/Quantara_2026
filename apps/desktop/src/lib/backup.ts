@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BACKUP_STORAGE_KEYS } from "@/persistence/registry";
+import {
+  collectTariffImportDraftStorage,
+  restoreTariffImportDraftStorage,
+} from "@/persistence/tariff-import-backup";
 
 export type DatabaseInfo = {
   dataDirectory: string;
@@ -31,19 +35,26 @@ function collectLocalStorage(): string {
       lsData[key] = null;
     }
   }
+  Object.assign(lsData, collectTariffImportDraftStorage());
   return JSON.stringify(lsData);
 }
 
 function restoreLocalStorage(json: string): string {
   try {
     const lsData: Record<string, string | null> = JSON.parse(json);
+    const tariffDrafts: Record<string, string | null> = {};
     for (const [key, value] of Object.entries(lsData)) {
+      if (key.includes("tariff-import")) {
+        tariffDrafts[key] = value;
+        continue;
+      }
       if (value === null) {
         localStorage.removeItem(key);
       } else {
         localStorage.setItem(key, value);
       }
     }
+    restoreTariffImportDraftStorage(tariffDrafts);
   } catch {
     return "ripristino database OK, ma dati app non ripristinati";
   }

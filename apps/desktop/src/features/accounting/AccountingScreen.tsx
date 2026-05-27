@@ -17,7 +17,10 @@ import {
   FilterSelect,
   FilterTemplatePicker,
 } from "@/components/filters";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Button } from "@/components/shared/Button";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { useNavigate } from "@/hooks/useNavigate";
 import { DetailList, DetailRow } from "@/components/shared/DetailList";
 import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
@@ -35,9 +38,15 @@ import { useTableSort } from "@/hooks/use-table-sort";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { listDesktopContracts, restoreMaterialsFromSalUsage } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
-import { saveSalDocument } from "@/lib/sal-data";
+import { restoreSalDocument } from "@/repositories/sal-repository";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import {
+  buildAccountingSalContextMenuEntries,
+  copyTextToClipboard,
+} from "@/lib/context-menu-presets";
+import { selectProjectForWorkflow } from "@/lib/workflow-navigation";
 import { cn } from "@/lib/utils";
+import type { SalDocument } from "@quantara/shared-types";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
 
@@ -65,8 +74,15 @@ function AccountingHeaderStat({
   );
 }
 
+type AccountingSalRow = {
+  doc: SalDocument;
+  view: ReturnType<typeof buildSalDocumentView> | null;
+};
+
 export function AccountingScreen() {
   const { notify } = useToast();
+  const navigate = useNavigate();
+  const salRowContextMenu = useContextMenu<AccountingSalRow>();
   const [contracts, setContracts] = useState<
     { id: string; budget: { amount: number }; title: string; contractor: string }[]
   >([]);
@@ -248,22 +264,8 @@ export function AccountingScreen() {
     };
     const undo = async () => {
       for (const doc of deletedSals) {
-        const salInput = {
-          projectId: doc.projectId,
-          date: doc.date,
-          description: doc.description,
-          notes: doc.notes,
-          title: doc.title,
-          lines: doc.lines,
-          voices: [] as never[],
-          status: doc.status,
-          ...(doc.economicRules ? { economicRules: doc.economicRules } : {}),
-          ...(doc.materialUsage ? { materialUsage: doc.materialUsage } : {}),
-          ...(typeof doc.total === "number" ? { total: doc.total } : {}),
-        };
-        useSalWorkflowStore.getState().createSal(salInput);
         try {
-          await saveSalDocument(doc.projectId, doc);
+          await restoreSalDocument(doc);
         } catch (error) {
           notify({
             message: error instanceof Error ? error.message : String(error),
@@ -276,7 +278,6 @@ export function AccountingScreen() {
           await restoreMaterialsFromSalUsage(doc.materialUsage);
         }
       }
-      dispatchDataChanged();
     };
 
     useUndoStore.getState().push({
@@ -593,6 +594,9 @@ export function AccountingScreen() {
                           onClick={() => {
                             if (multiSelect.isEnabled) multiSelect.toggle(doc.id);
                           }}
+                          onContextMenu={(event) => {
+                            salRowContextMenu.open(event, { doc, view });
+                          }}
                           type="button"
                         >
                           <div className="flex items-center gap-3">
@@ -768,6 +772,33 @@ export function AccountingScreen() {
           </Panel>
         </aside>
       </section>
+
+      {salRowContextMenu.state ? (
+        <AppContextMenu
+          entries={buildAccountingSalContextMenuEntries({
+            onCopyTitle: () => {
+              const state = salRowContextMenu.state;
+              if (!state) return;
+              void copyTextToClipboard(state.context.doc.title);
+            },
+            onOpenProject: () => {
+              const state = salRowContextMenu.state;
+              if (!state) return;
+              selectProjectForWorkflow(state.context.doc.projectId);
+              navigate("project-detail");
+            },
+          })}
+          header={{
+            title: salRowContextMenu.state.context.doc.title,
+            subtitle: projectMap.get(salRowContextMenu.state.context.doc.projectId) ?? "Progetto",
+          }}
+          onClose={salRowContextMenu.close}
+          position={{
+            x: salRowContextMenu.state.x,
+            y: salRowContextMenu.state.y,
+          }}
+        />
+      ) : null}
     </ScreenLayout>
   );
 }

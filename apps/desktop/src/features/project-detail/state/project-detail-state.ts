@@ -1,6 +1,6 @@
 import type { PortfolioProject } from "@/features/projects/types";
 import type { DesktopContract, DesktopTariffBook } from "@/lib/desktopData";
-import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
+import { getWorkflowProjectId } from "@/lib/workflow-navigation";
 
 export type ProjectState = {
   contracts: DesktopContract[];
@@ -36,16 +36,5 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
 }
 
 export function readSelectedProjectId(): string | null {
-  try {
-    const rawValue = window.sessionStorage.getItem(SESSION_STORAGE_KEYS.selectedProjectDetail);
-
-    if (!rawValue) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawValue) as { id?: unknown };
-    return typeof parsed.id === "string" ? parsed.id : null;
-  } catch {
-    return null;
-  }
+  return getWorkflowProjectId();
 }

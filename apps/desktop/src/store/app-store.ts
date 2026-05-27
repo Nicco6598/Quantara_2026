@@ -128,8 +128,6 @@ type ThemeSlice = {
 
 type PreferenceSlice = {
   autoCheckUpdatesOnLaunch: boolean;
-  bumpDataVersion: () => void;
-  dataVersion: number;
   hasHydratedPreferences: boolean;
   motionMode: MotionMode;
   salCurrentStep: number;
@@ -141,6 +139,22 @@ type PreferenceSlice = {
   setSelectedProjectId: (projectId: string) => void;
   setShowReleaseNotesAfterUpdate: (enabled: boolean) => void;
   showReleaseNotesAfterUpdate: boolean;
+};
+
+/** In-memory workflow handoff between routes (replaces sessionStorage). */
+type WorkflowNavigationSlice = {
+  resumeSalDraftId: string;
+  salCreatedRedirectPending: boolean;
+  editingProjectForm: unknown | null;
+  editingContractId: string;
+  setResumeSalDraftId: (salId: string) => void;
+  clearResumeSalDraftId: () => void;
+  takeResumeSalDraftId: () => string | null;
+  setSalCreatedRedirectPending: (pending: boolean) => void;
+  consumeSalCreatedRedirect: () => boolean;
+  setEditingProjectForm: (form: unknown | null) => void;
+  setEditingContractId: (contractId: string) => void;
+  takeProjectEditSession: () => { form: unknown; contractId: string } | null;
 };
 
 export type WorkspaceMemberRole =
@@ -172,7 +186,11 @@ export type TeamSlice = {
   removeMember: (id: string) => void;
 };
 
-export type AppStore = NavigationSlice & PreferenceSlice & ThemeSlice & TeamSlice;
+export type AppStore = NavigationSlice &
+  PreferenceSlice &
+  ThemeSlice &
+  TeamSlice &
+  WorkflowNavigationSlice;
 
 const initialRouteHistory: NavEntry[] = [{ route: "dashboard" }];
 
@@ -233,15 +251,44 @@ function createNavigationState(routeHistory: NavEntry[], routeHistoryIndex: numb
 
 export const useAppStore = create<AppStore>()(
   persist(
-    (set) => ({
+    (set): AppStore => ({
       ...createNavigationState(initialRouteHistory, 0),
       autoCheckUpdatesOnLaunch: true,
-      bumpDataVersion: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
-      dataVersion: 0,
       hasHydratedPreferences: false,
       motionMode: "full",
       salCurrentStep: 1,
       selectedProjectId: "",
+      resumeSalDraftId: "",
+      salCreatedRedirectPending: false,
+      editingProjectForm: null as unknown | null,
+      editingContractId: "",
+      setResumeSalDraftId: (resumeSalDraftId) => set({ resumeSalDraftId }),
+      clearResumeSalDraftId: () => set({ resumeSalDraftId: "" }),
+      takeResumeSalDraftId: () => {
+        const salId = useAppStore.getState().resumeSalDraftId;
+        if (!salId) return null;
+        set({ resumeSalDraftId: "" });
+        return salId;
+      },
+      setSalCreatedRedirectPending: (salCreatedRedirectPending) =>
+        set({ salCreatedRedirectPending }),
+      consumeSalCreatedRedirect: () => {
+        const pending = useAppStore.getState().salCreatedRedirectPending;
+        if (pending) {
+          set({ salCreatedRedirectPending: false });
+        }
+        return pending;
+      },
+      setEditingProjectForm: (editingProjectForm) => set({ editingProjectForm }),
+      setEditingContractId: (editingContractId) => set({ editingContractId }),
+      takeProjectEditSession: () => {
+        const { editingProjectForm, editingContractId } = useAppStore.getState();
+        if (!editingProjectForm || !editingContractId) {
+          return null;
+        }
+        set({ editingProjectForm: null, editingContractId: "" });
+        return { form: editingProjectForm, contractId: editingContractId };
+      },
       navigateBack: () =>
         set((state) => {
           if (!state.canGoBack) {
@@ -440,7 +487,6 @@ export const useAppStore = create<AppStore>()(
       },
       partialize: (state) => ({
         autoCheckUpdatesOnLaunch: state.autoCheckUpdatesOnLaunch,
-        dataVersion: state.dataVersion,
         motionMode: state.motionMode,
         salCurrentStep: state.salCurrentStep,
         selectedProjectId: state.selectedProjectId,

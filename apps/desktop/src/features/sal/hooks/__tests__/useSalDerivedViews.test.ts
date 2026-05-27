@@ -152,26 +152,40 @@ describe("MG distribution", () => {
     });
   }
 
-  it("auto-distributes MG by prefix", () => {
+  it("does not apply MG until manual allocation is configured", () => {
     const lines = [
-      makeFaLine("fa1", "FA.001-US", 10), // gross = 1000
-      makeFaLine("fa2", "FA.002-TLS", 5), // gross = 500
-      makeMgLine("FA.MG.01", 2), // MG 2% on FA prefix
+      makeFaLine("fa1", "FA.001-US", 10),
+      makeFaLine("fa2", "FA.002-TLS", 5),
+      makeFaLine("ac1", "AC.001", 4),
+      makeMgLine("FA.MG.01", 2),
     ];
 
     const views = buildLineViews(lines, defaultRules);
-    const fa1 = views.find((v) => v.id === "fa1");
-    const fa2 = views.find((v) => v.id === "fa2");
-    const mg = views.find((v) => v.id === "mg-FA.MG.01");
-    expect(fa1).toBeDefined();
-    expect(fa2).toBeDefined();
-    expect(mg).toBeDefined();
+    expect(views.find((v) => v.id === "fa1")?.netAmount).toBe(1000);
+    expect(views.find((v) => v.id === "fa2")?.netAmount).toBe(500);
+    expect(views.find((v) => v.id === "ac1")?.netAmount).toBe(400);
+    expect(views.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(0);
+  });
 
-    // Both FA voices should get MG: FA.001 gets 1000*0.02 = 20, FA.002 gets 500*0.02 = 10
-    expect(fa1?.netAmount).toBe(1000 + 20);
-    expect(fa2?.netAmount).toBe(500 + 10);
-    // MG line shows total distributed
-    expect(mg?.netAmount).toBe(30);
+  it("applies MG only to manually selected voices", () => {
+    const lines = [
+      makeFaLine("fa1", "FA.001-US", 10),
+      makeFaLine("fa2", "FA.002-TLS", 5),
+      makeFaLine("ac1", "AC.001", 4),
+      makeMgLine("FA.MG.01", 2),
+    ];
+
+    const views = buildLineViews(lines, {
+      ...defaultRules,
+      mgManualAllocations: {
+        "mg-FA.MG.01": ["fa1", "ac1"],
+      },
+    });
+
+    expect(views.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + 20);
+    expect(views.find((v) => v.id === "fa2")?.netAmount).toBe(500);
+    expect(views.find((v) => v.id === "ac1")?.netAmount).toBe(400 + 8);
+    expect(views.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(28);
   });
 
   it("respects mgManualAllocations — limits to selected voices", () => {
@@ -279,7 +293,7 @@ describe("MG distribution", () => {
     expect(mg?.netAmount).toBe(0);
   });
 
-  it("auto-distributes when manual allocation has undefined key", () => {
+  it("skips MG when manual allocation key is missing", () => {
     const lines = [
       makeFaLine("fa1", "FA.001-US", 10), // gross = 1000
       makeFaLine("fa2", "FA.002-TLS", 5), // gross = 500
@@ -298,9 +312,9 @@ describe("MG distribution", () => {
     expect(fa1).toBeDefined();
     expect(fa2).toBeDefined();
 
-    // No entry → auto-distribute by prefix
-    expect(fa1?.netAmount).toBe(1000 + 20);
-    expect(fa2?.netAmount).toBe(500 + 10);
+    // No entry → MG not applied until user assigns targets
+    expect(fa1?.netAmount).toBe(1000);
+    expect(fa2?.netAmount).toBe(500);
   });
 });
 

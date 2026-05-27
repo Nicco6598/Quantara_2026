@@ -176,6 +176,20 @@ export function createEmptyMeasurementRow(unit: string, order: number): SalMeasu
   };
 }
 
+/** Nuova riga misura: data odierna, campi vuoti, solo stazione copiata dalla sorgente. */
+export function cloneMeasurementRowForDuplicate(
+  source: SalMeasurementRowDraft,
+  unit: string,
+  order: number,
+): SalMeasurementRowDraft {
+  const row = createEmptyMeasurementRow(unit, order);
+  const station = source.station?.trim();
+  if (station) {
+    row.station = station;
+  }
+  return row;
+}
+
 export function computeLineQuantity(rows: SalMeasurementRowDraft[]): number {
   return rows.reduce((sum, r) => sum + r.partialQuantity, 0);
 }

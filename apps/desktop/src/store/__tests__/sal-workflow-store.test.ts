@@ -162,4 +162,93 @@ describe("sal-workflow-store", () => {
     expect(project.name).toBe("Project 1");
     expect(useSalWorkflowStore.getState().projects.length).toBe(1);
   });
+
+  it("replaceFromBackend drops stale in-memory SAL rows", () => {
+    useSalWorkflowStore.setState({
+      salDocuments: [
+        {
+          id: "sal_stale",
+          projectId: "proj_1",
+          title: "Stale",
+          status: "draft",
+          date: "2026-01-01",
+          description: "",
+          notes: "",
+          lines: [],
+        },
+      ],
+      projects: [{ id: "proj_old", name: "Old", description: "", client: "", year: 2025 }],
+    });
+
+    useSalWorkflowStore.getState().replaceFromBackend(
+      [
+        {
+          id: "sal_fresh",
+          projectId: "proj_1",
+          title: "Fresh",
+          status: "draft",
+          date: "2026-02-01",
+          description: "",
+          notes: "",
+          lines: [],
+        },
+      ],
+      [{ id: "proj_1", name: "Fresh project", description: "", client: "", year: 2026 }],
+    );
+
+    const state = useSalWorkflowStore.getState();
+    expect(state.salDocuments.map((doc) => doc.id)).toEqual(["sal_fresh"]);
+    expect(state.projects.map((project) => project.id)).toEqual(["proj_1"]);
+  });
+
+  it("patchProjectSalFromBackend updates one project only", () => {
+    useSalWorkflowStore.setState({
+      salDocuments: [
+        {
+          id: "sal_a",
+          projectId: "proj_a",
+          title: "A",
+          status: "draft",
+          date: "2026-01-01",
+          description: "",
+          notes: "",
+          lines: [],
+        },
+        {
+          id: "sal_b_old",
+          projectId: "proj_b",
+          title: "B old",
+          status: "draft",
+          date: "2026-01-01",
+          description: "",
+          notes: "",
+          lines: [],
+        },
+      ],
+      projects: [],
+    });
+
+    useSalWorkflowStore.getState().patchProjectSalFromBackend(
+      "proj_b",
+      [
+        {
+          id: "sal_b_new",
+          projectId: "proj_b",
+          title: "B new",
+          status: "draft",
+          date: "2026-03-01",
+          description: "",
+          notes: "",
+          lines: [],
+        },
+      ],
+      [{ id: "proj_b", name: "B", description: "", client: "", year: 2026 }],
+    );
+
+    const ids = useSalWorkflowStore
+      .getState()
+      .salDocuments.map((doc) => doc.id)
+      .sort();
+    expect(ids).toEqual(["sal_a", "sal_b_new"]);
+  });
 });

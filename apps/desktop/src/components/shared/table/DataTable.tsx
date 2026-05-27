@@ -28,6 +28,7 @@ export type DataTableProps<T> = {
   data: T[];
   keyExtractor: (item: T) => string;
   onRowClick?: (item: T) => void;
+  onRowContextMenu?: (item: T, event: React.MouseEvent) => void;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
   onSelectAll?: () => void;
@@ -47,6 +48,7 @@ export function DataTable<T>({
   data,
   keyExtractor,
   onRowClick,
+  onRowContextMenu,
   selectedIds,
   onToggleSelect,
   onSelectAll,
@@ -195,6 +197,14 @@ export function DataTable<T>({
                     getRowClassName?.(item),
                   )}
                   onClick={() => onRowClick?.(item)}
+                  onContextMenu={
+                    onRowContextMenu
+                      ? (event) => {
+                          event.preventDefault();
+                          onRowContextMenu(item, event);
+                        }
+                      : undefined
+                  }
                 >
                   {hasSelection ? (
                     <td className="px-3 py-2.5">

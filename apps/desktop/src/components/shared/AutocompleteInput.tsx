@@ -15,6 +15,7 @@ type AutocompleteOption = {
 type AutocompleteInputProps = {
   options: AutocompleteOption[];
   onSelect: (option: AutocompleteOption) => void;
+  onOptionContextMenu?: (option: AutocompleteOption, event: React.MouseEvent) => void;
   placeholder?: string;
   filterOptions?: (options: AutocompleteOption[], query: string) => AutocompleteOption[];
   onQueryChange?: (query: string) => void;
@@ -27,6 +28,7 @@ type DropdownPos = { left: number; top: number; width: number };
 
 export function AutocompleteInput({
   filterOptions,
+  onOptionContextMenu,
   options,
   onSelect,
   onQueryChange,
@@ -58,9 +60,10 @@ export function AutocompleteInput({
     count: filtered.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ITEM_HEIGHT,
-    measureElement: (element) => element.getBoundingClientRect().height,
     overscan: 8,
   });
+  const rowVirtualizerRef = useRef(rowVirtualizer);
+  rowVirtualizerRef.current = rowVirtualizer;
 
   useEffect(() => {
     setActiveIndex(0);
@@ -151,8 +154,9 @@ export function AutocompleteInput({
       isFirstRender.current = false;
       return;
     }
-    rowVirtualizer.scrollToIndex(activeIndex, { align: "auto" });
-  }, [activeIndex, rowVirtualizer]);
+    if (filtered.length === 0) return;
+    rowVirtualizerRef.current.scrollToIndex(activeIndex, { align: "auto" });
+  }, [activeIndex, filtered.length]);
 
   const virtualItems = rowVirtualizer.getVirtualItems();
 
@@ -228,7 +232,6 @@ export function AutocompleteInput({
                   if (!option) return null;
                   return (
                     <button
-                      ref={rowVirtualizer.measureElement}
                       className={cn(
                         "flex min-h-[92px] w-full items-start gap-3 border-b border-[var(--border-subtle)]/55 px-4 py-3 text-left text-13px transition-colors duration-[var(--duration-fast)] first:rounded-t-18px last:rounded-b-18px last:border-b-0",
                         virtualRow.index === activeIndex
@@ -239,6 +242,15 @@ export function AutocompleteInput({
                       data-index={virtualRow.index}
                       key={virtualRow.key}
                       onClick={() => handleSelect(option)}
+                      onContextMenu={
+                        onOptionContextMenu
+                          ? (event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onOptionContextMenu(option, event);
+                            }
+                          : undefined
+                      }
                       onMouseEnter={() => setActiveIndex(virtualRow.index)}
                       role="option"
                       title={`${option.value} — ${option.label}${option.metadata ? `\n${option.metadata}` : ""}`}

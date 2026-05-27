@@ -2,9 +2,10 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, BufWriter, Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
     sync::{Mutex, OnceLock},
+    time::SystemTime,
 };
 
 #[cfg(windows)]
@@ -1134,6 +1135,8 @@ fn parse_via_persistent_parser(
     let state = rfi_parser_state();
     let mut guard = state.lock().map_err(|e| e.to_string())?;
 
+    restart_persistent_parser_if_binary_changed(resource_dir, &mut guard)?;
+
     if guard.is_none() {
         *guard = Some(RfiParserClient::start(resource_dir)?);
     }
@@ -1203,20 +1206,64 @@ fn run_parser_command(command: &mut Command) -> Result<std::process::Output, Str
     command.output().map_err(|error| error.to_string())
 }
 
-fn parser_executable_candidates(resource_dir: &Path) -> Vec<std::path::PathBuf> {
+fn parser_executable_candidates(resource_dir: &Path) -> Vec<PathBuf> {
     let executable_name = if cfg!(windows) {
         "rfi_tariffa_parser.exe"
     } else {
         "rfi_tariffa_parser"
     };
 
-    vec![
-        resource_dir.join("parser").join(executable_name),
+    let mut candidates = Vec::new();
+
+    // In dev prefer the source-tree binary rebuilt via `npm run parser:bundle`.
+    #[cfg(debug_assertions)]
+    {
+        candidates.push(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("resources")
+                .join("parser")
+                .join(executable_name),
+        );
+    }
+
+    candidates.push(resource_dir.join("parser").join(executable_name));
+    candidates.push(
         resource_dir
             .join("resources")
             .join("parser")
             .join(executable_name),
-    ]
+    );
+
+    candidates
+}
+
+fn parser_binary_mtime(resource_dir: &Path) -> Option<SystemTime> {
+    parser_executable_candidates(resource_dir)
+        .into_iter()
+        .find(|path| path.is_file())
+        .and_then(|path| std::fs::metadata(path).ok()?.modified().ok())
+}
+
+fn restart_persistent_parser_if_binary_changed(
+    resource_dir: &Path,
+    guard: &mut Option<RfiParserClient>,
+) -> Result<(), String> {
+    let Some(mtime) = parser_binary_mtime(resource_dir) else {
+        return Ok(());
+    };
+
+    static LAST_BINARY_MTIME: OnceLock<Mutex<Option<SystemTime>>> = OnceLock::new();
+    let slot = LAST_BINARY_MTIME.get_or_init(|| Mutex::new(None));
+    let mut last = slot.lock().map_err(|error| error.to_string())?;
+
+    if let Some(previous) = *last {
+        if previous != mtime {
+            drop(guard.take());
+        }
+    }
+
+    *last = Some(mtime);
+    Ok(())
 }
 
 fn rfi_record_to_tariff_voice(

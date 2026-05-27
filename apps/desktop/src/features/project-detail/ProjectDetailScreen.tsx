@@ -24,7 +24,8 @@ import { SortIndicator } from "@/components/shared/SortIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
-import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
+import { getSalDocumentDisplaySummary } from "@/features/sal/domain/sal-document-summary";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { useNavigate } from "@/hooks/useNavigate";
@@ -35,18 +36,17 @@ import {
   updateDesktopContract,
 } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
-import {
-  deleteSalDocument,
-  listDesktopSalDocuments,
-  listDesktopSalProjects,
-  migrateSalLocalStorageToBackend,
-  saveSalDocument,
-} from "@/lib/sal-data";
-import { readStringRecord } from "@/lib/shared-utils";
+import { removeSalDocument, restoreSalDocument } from "@/repositories/sal-repository";
+import { syncSalWorkflowFromBackend } from "@/lib/sal-workflow-sync";
+import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { MOTION_VARIANTS } from "@/motion";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
+import {
+  clearResumeSalDraftId,
+  selectProjectForWorkflow,
+  setResumeSalDraftId,
+} from "@/lib/workflow-navigation";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
 
@@ -74,40 +74,48 @@ export function ProjectDetailScreen() {
   const salDocuments = useSalWorkflowStore((state) => state.salDocuments);
   const tariffVoices = useSalWorkflowStore((state) => state.tariffVoices);
 
+  const loadProjectDetail = useCallback(async () => {
+    const [contractsResult, tariffBooksResult] = await Promise.all([
+      listDesktopContracts([]),
+      listDesktopTariffBooks([]),
+    ]);
+    const legacyContractors = readLegacyProjectContractors();
+    dispatch({
+      type: "INIT",
+      contracts: contractsResult.data,
+      tariffBooks: tariffBooksResult.data,
+      projects: contractsResult.data.map((contract) =>
+        mapContractToProject(contract, resolveContractorName(contract, legacyContractors)),
+      ),
+    });
+    isLoadingRef.current = false;
+  }, []);
+
   useEffect(() => {
     let active = true;
 
-    Promise.all([listDesktopContracts([]), listDesktopTariffBooks([])])
-      .then(([contractsResult, tariffBooksResult]) => {
-        if (!active) {
-          return;
-        }
-
-        const projectContractors = readStringRecord(STORAGE_KEYS.projectContractors);
-        dispatch({
-          type: "INIT",
-          contracts: contractsResult.data,
-          tariffBooks: tariffBooksResult.data,
-          projects: contractsResult.data.map((contract) =>
-            mapContractToProject(contract, projectContractors[contract.id]),
-          ),
-        });
-        isLoadingRef.current = false;
-      })
-      .catch(() => {
-        if (!active) return;
-        notify({
-          message: "Impossibile caricare i dettagli del progetto.",
-          title: "Caricamento fallito",
-          tone: "danger",
-        });
-        isLoadingRef.current = false;
+    loadProjectDetail().catch(() => {
+      if (!active) return;
+      notify({
+        message: "Impossibile caricare i dettagli del progetto.",
+        title: "Caricamento fallito",
+        tone: "danger",
       });
+      isLoadingRef.current = false;
+    });
 
     return () => {
       active = false;
     };
-  }, [notify]);
+  }, [loadProjectDetail, notify]);
+
+  useDataChangedListener(() => {
+    void loadProjectDetail();
+    const projectId = readSelectedProjectId();
+    if (projectId) {
+      void syncSalWorkflowFromBackend(projectId);
+    }
+  });
 
   const selectedProject = useMemo(() => {
     const selectedProjectId = readSelectedProjectId();
@@ -119,32 +127,10 @@ export function ProjectDetailScreen() {
     return projects[0] ?? null;
   }, [projects]);
 
-  // Load SALs from backend (SQLite in Tauri, localStorage fallback in browser)
   useEffect(() => {
-    let active = true;
     const pid = selectedProject?.id;
     if (!pid) return;
-
-    // Migrazione one-time: sposta vecchi dati localStorage → SQLite
-    migrateSalLocalStorageToBackend().then(() => {
-      if (!active) return;
-      Promise.all([listDesktopSalDocuments(pid), listDesktopSalProjects()])
-        .then(([docsResult, projsResult]) => {
-          if (!active) return;
-          useSalWorkflowStore.getState().initializeFromBackend(
-            docsResult.data,
-            projsResult.data.filter((p) => p.id === pid),
-            [],
-          );
-        })
-        .catch(() => {
-          /* silent */
-        });
-    });
-
-    return () => {
-      active = false;
-    };
+    void syncSalWorkflowFromBackend(pid);
   }, [selectedProject?.id]);
 
   const salDocumentById = useMemo(
@@ -178,30 +164,17 @@ export function ProjectDetailScreen() {
     }> = [];
     for (const doc of salDocuments) {
       if (doc.projectId !== selectedProject.id) continue;
-      if (doc.totalCents != null && doc.lineCount != null) {
-        views.push({
-          id: doc.id,
-          total: doc.totalCents / 100,
-          lineCount: doc.lineCount,
-          status: doc.status,
-          title: doc.title,
-          date: doc.date,
-          closedAt: doc.closedAt,
-          description: doc.description,
-        });
-      } else {
-        const view = buildSalDocumentView(doc, tariffVoices);
-        views.push({
-          id: doc.id,
-          total: view.total,
-          lineCount: view.lines.length,
-          status: doc.status,
-          title: doc.title,
-          date: doc.date,
-          closedAt: doc.closedAt,
-          description: doc.description,
-        });
-      }
+      const { total, lineCount } = getSalDocumentDisplaySummary(doc, tariffVoices);
+      views.push({
+        id: doc.id,
+        total,
+        lineCount,
+        status: doc.status,
+        title: doc.title,
+        date: doc.date,
+        closedAt: doc.closedAt,
+        description: doc.description,
+      });
     }
     views.sort((left, right) => {
       const leftDate = left.closedAt ?? left.date;
@@ -326,10 +299,12 @@ export function ProjectDetailScreen() {
     [financials, salRows, selectedProject],
   );
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const deleteSal = useSalWorkflowStore((state) => state.deleteSal);
   const setSalStatus = useSalWorkflowStore((state) => state.setSalStatus);
 
   const handleBulkDelete = useCallback(async () => {
+    const projectId = selectedProject?.id;
+    if (!projectId) return;
+
     const ids = [...salMultiSelect.selectedIds];
     const count = ids.length;
     const deletedSals = ids
@@ -338,12 +313,11 @@ export function ProjectDetailScreen() {
 
     for (const id of ids) {
       const sal = salDocuments.find((d) => d.id === id);
-      if (sal?.materialUsage) {
-        void restoreMaterialsFromSalUsage(sal.materialUsage);
-      }
-      if (sal) useSalWorkflowStore.getState().deleteSal(sal.id);
       try {
-        await deleteSalDocument(id);
+        if (sal?.materialUsage) {
+          await restoreMaterialsFromSalUsage(sal.materialUsage);
+        }
+        await removeSalDocument(id, projectId);
       } catch (error) {
         notify({
           message: error instanceof Error ? error.message : String(error),
@@ -353,37 +327,20 @@ export function ProjectDetailScreen() {
         return;
       }
     }
-    dispatchDataChanged();
 
     const execute = async () => {
       for (const sal of deletedSals) {
-        deleteSal(sal.id);
         try {
-          await deleteSalDocument(sal.id);
+          await removeSalDocument(sal.id, projectId);
         } catch {
           /* best-effort in undo execution */
         }
       }
-      dispatchDataChanged();
     };
     const undo = async () => {
       for (const sal of deletedSals) {
-        const salInput = {
-          projectId: sal.projectId,
-          date: sal.date,
-          description: sal.description,
-          notes: sal.notes,
-          title: sal.title,
-          lines: sal.lines,
-          voices: [] as never[],
-          status: sal.status,
-          ...(sal.economicRules ? { economicRules: sal.economicRules } : {}),
-          ...(sal.materialUsage ? { materialUsage: sal.materialUsage } : {}),
-          ...(typeof sal.total === "number" ? { total: sal.total } : {}),
-        };
-        useSalWorkflowStore.getState().createSal(salInput);
         try {
-          await saveSalDocument(sal.projectId, sal);
+          await restoreSalDocument(sal);
         } catch (error) {
           notify({
             message: error instanceof Error ? error.message : String(error),
@@ -396,7 +353,6 @@ export function ProjectDetailScreen() {
           await restoreMaterialsFromSalUsage(sal.materialUsage);
         }
       }
-      dispatchDataChanged();
     };
 
     useUndoStore.getState().push({
@@ -419,7 +375,7 @@ export function ProjectDetailScreen() {
       tone: "success",
     });
     salMultiSelect.onDeleted();
-  }, [deleteSal, notify, salDocuments, salMultiSelect]);
+  }, [notify, salDocuments, salMultiSelect, selectedProject?.id]);
 
   const [isTariffPanelOpen, setIsTariffPanelOpen] = useState(false);
   const [isExpandedTariffs, setIsExpandedTariffs] = useState(false);
@@ -441,44 +397,36 @@ export function ProjectDetailScreen() {
     if (!selectedProject) {
       return;
     }
-    try {
-      window.sessionStorage.setItem(
-        SESSION_STORAGE_KEYS.selectedProjectDetail,
-        JSON.stringify(selectedProject),
-      );
-      window.sessionStorage.removeItem(SESSION_STORAGE_KEYS.salResumeDraft);
-    } catch {
-      // Continue with navigation even if session storage is unavailable.
-    }
+    selectProjectForWorkflow(selectedProject.id);
+    clearResumeSalDraftId();
     navigate("sal-create");
   }
 
   const handleDeleteSal = useCallback(
     async (salId: string) => {
+      const projectId = selectedProject?.id;
+      if (!projectId) return;
+
       const sal = salDocuments.find((d) => d.id === salId);
-      if (sal?.materialUsage) {
-        await restoreMaterialsFromSalUsage(sal.materialUsage);
-      }
-      deleteSal(salId);
       try {
-        await deleteSalDocument(salId);
+        if (sal?.materialUsage) {
+          await restoreMaterialsFromSalUsage(sal.materialUsage);
+        }
+        await removeSalDocument(salId, projectId);
+        notify({
+          message: `"${sal?.title ?? salId}" eliminata dal registro.`,
+          title: "SAL eliminata",
+          tone: "success",
+        });
       } catch (error) {
         notify({
           message: error instanceof Error ? error.message : String(error),
           title: "Eliminazione SAL non riuscita",
           tone: "danger",
         });
-        return;
       }
-      dispatchDataChanged();
-      setDeleteTargetId(null);
-      notify({
-        message: `"${sal?.title ?? salId}" eliminato dal registro locale.`,
-        title: "SAL eliminata",
-        tone: "success",
-      });
     },
-    [deleteSal, notify, salDocuments],
+    [notify, salDocuments, selectedProject?.id],
   );
 
   const handleSaveTariffBooks = useCallback(
@@ -685,18 +633,8 @@ export function ProjectDetailScreen() {
                     <Button
                       className="mt-3 w-full"
                       onClick={() => {
-                        try {
-                          window.sessionStorage.setItem(
-                            SESSION_STORAGE_KEYS.selectedProjectDetail,
-                            JSON.stringify(selectedProject),
-                          );
-                          window.sessionStorage.setItem(
-                            SESSION_STORAGE_KEYS.salResumeDraft,
-                            row.id,
-                          );
-                        } catch {
-                          /* no-op */
-                        }
+                        selectProjectForWorkflow(selectedProject.id);
+                        setResumeSalDraftId(row.id);
                         navigate("sal-create");
                       }}
                       size="sm"
@@ -938,18 +876,8 @@ export function ProjectDetailScreen() {
                       onContinue={
                         row.isDraft
                           ? () => {
-                              try {
-                                window.sessionStorage.setItem(
-                                  SESSION_STORAGE_KEYS.selectedProjectDetail,
-                                  JSON.stringify(selectedProject),
-                                );
-                                window.sessionStorage.setItem(
-                                  SESSION_STORAGE_KEYS.salResumeDraft,
-                                  row.id,
-                                );
-                              } catch {
-                                /* no-op */
-                              }
+                              selectProjectForWorkflow(selectedProject.id);
+                              setResumeSalDraftId(row.id);
                               navigate("sal-create");
                             }
                           : undefined

@@ -21,6 +21,7 @@ export function useSalDerivedViews({
   economicRules,
   lines,
   project,
+  syncLineViews,
   tariffVoices,
   voices,
 }: {
@@ -28,6 +29,8 @@ export function useSalDerivedViews({
   economicRules: SalEconomicRules;
   lines: SalLineDraft[];
   project: SalProjectContext | null;
+  /** When set (step misura), reuse precomputed views and skip a second buildLineViews pass. */
+  syncLineViews?: SalLineView[];
   tariffVoices: SalTariffVoice[];
   voices: SalVoiceDraft[];
 }) {
@@ -44,12 +47,13 @@ export function useSalDerivedViews({
     [closedProjectSals, tariffVoices],
   );
 
-  // Defer expensive calculations when user is typing in measurement rows
+  // Defer expensive calculations when user is typing in measurement rows (skipped on step misura).
   const deferredLines = useDeferredValue(lines);
-  const lineViews = useMemo(
+  const computedLineViews = useMemo(
     () => buildLineViews(deferredLines, economicRules),
     [deferredLines, economicRules],
   );
+  const lineViews = syncLineViews ?? computedLineViews;
 
   const summary = useMemo(
     () => summarizeSalLines(lineViews, project?.contractAmount ?? 0, previousProgressiveAmount),

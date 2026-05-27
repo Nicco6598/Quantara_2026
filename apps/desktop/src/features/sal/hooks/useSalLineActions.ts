@@ -1,7 +1,12 @@
 import { useCallback, useRef } from "react";
 import { parseMeasurementTarget } from "../domain/sal-measurement-target";
 import type { SalLineDraft, SalMeasurementRowDraft, SalVoiceDraft } from "../types";
-import { createEmptyMeasurementRow, createMeasurementId } from "../types";
+import { remapMeasurementRowsForPaste } from "../domain/sal-clipboard";
+import {
+  cloneMeasurementRowForDuplicate,
+  createEmptyMeasurementRow,
+  createMeasurementId,
+} from "../types";
 
 type Notify = (options: {
   message: string;
@@ -19,37 +24,53 @@ export function useSalLineActions({
   setLines: (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => void;
 }) {
   const idCounter = useRef(0);
+  // Keep a live ref to lines so callbacks below don't have to depend on it.
+  // This avoids re-creating action callbacks on every keystroke, which in turn
+  // prevents memoized children (MeasureStep, SelectedVoicesPanel) from
+  // re-rendering whenever the user types a digit.
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
 
   const upsertLine = useCallback(
-    (voice: SalVoiceDraft) => {
-      const exists = lines.some((line) => line.voice.id === voice.id);
-      setLines((current) => {
-        if (exists) return current.filter((line) => line.voice.id !== voice.id);
-        return [
-          ...current,
-          {
-            id: `draft-${voice.id}`,
-            measurementRows: [createEmptyMeasurementRow(voice.unit, 0)],
-            notes: "",
-            sourceType: "voice",
-            surchargePercent: 0,
-            voice,
-          },
-        ];
-      });
+    (voice: SalVoiceDraft): string | null => {
+      const exists = linesRef.current.some((line) => line.voice.id === voice.id);
+      if (exists) {
+        setLines((current) => current.filter((line) => line.voice.id !== voice.id));
+        notify({
+          message: `${voice.code} rimossa dalla bozza.`,
+          title: "Voce rimossa",
+          tone: "warning",
+        });
+        return null;
+      }
+
+      const lineId = `draft-${voice.id}`;
+      setLines((current) => [
+        ...current,
+        {
+          id: lineId,
+          measurementRows: [createEmptyMeasurementRow(voice.unit, 0)],
+          notes: "",
+          sourceType: "voice",
+          surchargePercent: 0,
+          voice,
+        },
+      ]);
       notify({
-        message: `${voice.code} ${exists ? "rimossa dalla" : "aggiunta alla"} bozza.`,
-        title: exists ? "Voce rimossa" : "Voce aggiunta",
-        tone: exists ? "warning" : "success",
+        message: `${voice.code} aggiunta alla bozza.`,
+        title: "Voce aggiunta",
+        tone: "success",
       });
+      return lineId;
     },
-    [lines, notify, setLines],
+    [notify, setLines],
   );
 
   const addVoiceAsNewLine = useCallback(
-    (voice: SalVoiceDraft) => {
+    (voice: SalVoiceDraft): string => {
+      const lineId = `draft-${voice.id}-${idCounter.current++}`;
       const draft: SalLineDraft = {
-        id: `draft-${voice.id}-${idCounter.current++}`,
+        id: lineId,
         measurementRows: [createEmptyMeasurementRow(voice.unit, 0)],
         notes: "",
         sourceType: "voice",
@@ -62,6 +83,7 @@ export function useSalLineActions({
         title: "Voce aggiunta",
         tone: "success",
       });
+      return lineId;
     },
     [notify, setLines],
   );
@@ -163,7 +185,7 @@ export function useSalLineActions({
             ...line,
             measurementRows: [
               ...line.measurementRows,
-              { ...source, id: createMeasurementId(), order: line.measurementRows.length },
+              cloneMeasurementRowForDuplicate(source, line.voice.unit, line.measurementRows.length),
             ],
           };
         }),
@@ -174,7 +196,7 @@ export function useSalLineActions({
 
   const removeLine = useCallback(
     (lineId: string) => {
-      const line = lines.find((item) => item.id === lineId);
+      const line = linesRef.current.find((item) => item.id === lineId);
       setLines((current) => current.filter((item) => item.id !== lineId));
       if (line) {
         notify({
@@ -184,7 +206,7 @@ export function useSalLineActions({
         });
       }
     },
-    [lines, notify, setLines],
+    [notify, setLines],
   );
 
   const setNotes = useCallback(
@@ -197,8 +219,11 @@ export function useSalLineActions({
   );
 
   const pasteLine = useCallback(
-    (draft: SalLineDraft) => {
-      const newId = `draft-${draft.voice.id}-${idCounter.current++}`;
+    (draft: SalLineDraft): string => {
+      let newId = `draft-${draft.voice.id}-${idCounter.current++}`;
+      while (linesRef.current.some((line) => line.id === newId)) {
+        newId = `draft-${draft.voice.id}-${idCounter.current++}`;
+      }
       const remappedRows = draft.measurementRows.map((row) => ({
         ...row,
         id: createMeasurementId(),
@@ -209,8 +234,54 @@ export function useSalLineActions({
         title: "Voce incollata",
         tone: "success",
       });
+      return newId;
     },
     [notify, setLines],
+  );
+
+  const pasteMeasurementRowsAt = useCallback(
+    (
+      lineId: string,
+      rows: readonly SalMeasurementRowDraft[],
+      insertIndex: number,
+    ): string | null => {
+      if (rows.length === 0) return null;
+      const target = linesRef.current.find((line) => line.id === lineId);
+      if (!target) return null;
+
+      const remapped = remapMeasurementRowsForPaste(rows, target.voice.unit, 0);
+      setLines((current) =>
+        current.map((line) => {
+          if (line.id !== lineId) return line;
+          const nextRows = [...line.measurementRows];
+          const index = Math.min(Math.max(0, insertIndex), nextRows.length);
+          nextRows.splice(index, 0, ...remapped);
+          return {
+            ...line,
+            measurementRows: nextRows.map((row, order) => ({ ...row, order })),
+          };
+        }),
+      );
+      notify({
+        message:
+          remapped.length === 1
+            ? `Riga misura incollata in ${target.voice.code}.`
+            : `${remapped.length} righe misura incollate in ${target.voice.code}.`,
+        title: "Righe incollate",
+        tone: "success",
+      });
+      return lineId;
+    },
+    [notify, setLines],
+  );
+
+  const pasteMeasurementRows = useCallback(
+    (lineId: string, rows: readonly SalMeasurementRowDraft[]): string | null => {
+      const target = linesRef.current.find((line) => line.id === lineId);
+      if (!target) return null;
+      return pasteMeasurementRowsAt(lineId, rows, target.measurementRows.length);
+    },
+    [pasteMeasurementRowsAt],
   );
 
   return {
@@ -218,6 +289,8 @@ export function useSalLineActions({
     addVoiceAsNewLine,
     duplicateMeasurementRow,
     pasteLine,
+    pasteMeasurementRows,
+    pasteMeasurementRowsAt,
     removeLine,
     removeMeasurementRow,
     setNotes,

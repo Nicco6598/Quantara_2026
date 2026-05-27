@@ -30,7 +30,17 @@ import {
   type UpdateInstallState,
 } from "@/lib/appUpdater";
 import { migrateLegacyContractorsToDb } from "@/lib/contractorMigration";
-import { loadThemeCSS, resolveThemeName } from "@/lib/theme-loader";
+import { migrateSalLocalStorageToBackend } from "@/lib/sal-data";
+import { migrateWorkflowNavigationFromSession } from "@/lib/workflow-navigation";
+import {
+  applyThemeAttributes,
+  beginThemeTransition,
+  endThemeTransition,
+  loadThemeCSS,
+  notifyThemeApplied,
+  preloadVariantThemes,
+  resolveThemeName,
+} from "@/lib/theme-loader";
 import { storePendingReleaseNotes, usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
 import { RouteRenderer } from "@/routes/RouteRenderer";
@@ -78,22 +88,20 @@ function ThemeApplier() {
   const isFirst = useRef(true);
 
   useEffect(() => {
+    const resolved = resolveThemeName(themeMode);
+
     if (isFirst.current) {
       isFirst.current = false;
-      const state = useAppStore.getState();
-      const resolved = resolveThemeName(state.themeMode);
-      document.documentElement.dataset.theme = resolved;
-      document.documentElement.style.colorScheme = resolved.startsWith("dark") ? "dark" : "light";
-      void loadThemeCSS(resolved);
+      applyThemeAttributes(resolved);
+      void loadThemeCSS(resolved).then(() => notifyThemeApplied());
+      preloadVariantThemes();
       return;
     }
 
-    const resolved = resolveThemeName(themeMode);
-    const isDark = resolved.startsWith("dark");
-    void loadThemeCSS(resolved).then(() => {
-      document.documentElement.dataset.theme = resolved;
-      document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-    });
+    beginThemeTransition();
+    applyThemeAttributes(resolved);
+    endThemeTransition();
+    void loadThemeCSS(resolved).then(() => notifyThemeApplied());
   }, [themeMode]);
 
   return null;
@@ -101,7 +109,9 @@ function ThemeApplier() {
 
 function StartupMigrations() {
   useEffect(() => {
+    migrateWorkflowNavigationFromSession();
     void migrateLegacyContractorsToDb();
+    void migrateSalLocalStorageToBackend();
   }, []);
 
   return null;
@@ -264,13 +274,8 @@ function WindowTitleBar({
 
         <button
           className="window-titlebar-tool"
-          onClick={async (event) => {
+          onClick={(event) => {
             event.stopPropagation();
-            const state = useAppStore.getState();
-            const nextMode = state.themeMode.startsWith("light")
-              ? state.darkThemePref
-              : state.lightThemePref;
-            await loadThemeCSS(nextMode);
             toggleTheme();
           }}
           onMouseDown={(event) => event.stopPropagation()}
@@ -962,7 +967,13 @@ function AppShell() {
           <div className="flex min-w-0 flex-1 flex-col">
             <TopToolbar onPageAction={handleTopbarAction} />
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 md:px-8">
+            <div
+              className={
+                activeRoute === "sal-create"
+                  ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+                  : "min-h-0 flex-1 overflow-y-auto px-4 pb-8 md:px-8"
+              }
+            >
               <RouteRenderer activeRoute={activeRoute} />
             </div>
           </div>

@@ -49,6 +49,9 @@ import { cn } from "@/lib/utils";
 import { MOTION_VARIANTS } from "@/motion";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildMaterialContextMenuEntries, copyTextToClipboard } from "@/lib/context-menu-presets";
 import { AddMaterialModal } from "./components/AddMaterialModal";
 import {
   CATEGORIES,
@@ -604,6 +607,7 @@ function MaterialCard({
   const effTone = toneForQuantity(effectiveStock, material.minQuantity);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const contextMenu = useContextMenu<void>();
 
   return (
     <m.article
@@ -613,6 +617,11 @@ function MaterialCard({
           ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_7%,var(--surface-base)_93%)]"
           : "border-[var(--border-subtle)] bg-[var(--surface-base)]",
       )}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        contextMenu.open(event, undefined);
+      }}
       initial={MOTION_VARIANTS.row.initial}
       transition={MOTION_VARIANTS.row.transition}
       viewport={MOTION_VARIANTS.row.viewport}
@@ -749,6 +758,19 @@ function MaterialCard({
           </div>
         </div>
       </div>
+
+      {contextMenu.state ? (
+        <AppContextMenu
+          entries={buildMaterialContextMenuEntries({
+            onEdit,
+            onDelete,
+            onCopyCode: () => void copyTextToClipboard(material.code),
+          })}
+          header={{ title: material.code, subtitle: material.description }}
+          onClose={contextMenu.close}
+          position={{ x: contextMenu.state.x, y: contextMenu.state.y }}
+        />
+      ) : null}
     </m.article>
   );
 }

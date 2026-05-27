@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { Button } from "@/components/shared/Button";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { useToast } from "@/components/shared/ToastProvider";
@@ -19,31 +20,41 @@ import {
 import type { SalDocument } from "@/features/sal/types";
 import { useActionHandler } from "@/hooks/useAction";
 import { useNavigate } from "@/hooks/useNavigate";
+import { confirmSalTransaction } from "@/lib/sal-data";
+import { persistSalProjectMetadata, upsertSalDraftDocument } from "@/repositories/sal-repository";
 import {
-  confirmSalTransaction,
-  saveSalDocument,
-  saveSalProject,
-  updateSalDocument as updateBackendSalDocument,
-} from "@/lib/sal-data";
-import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
+  consumeSalCreatedRedirect,
+  markSalCreatedRedirect,
+  selectProjectForWorkflow,
+  clearResumeSalDraftId,
+  getResumeSalDraftId,
+} from "@/lib/workflow-navigation";
 import { useSalWorkflowService } from "@/services/sal-service";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import type { SalTemplate } from "@/store/template-store";
 import { SaveAsTemplateDialog } from "./components/SaveAsTemplateDialog";
-import { defaultSalEconomicRules } from "./domain/sal-calculations";
+import { buildLineViews, defaultSalEconomicRules, isMgVoice } from "./domain/sal-calculations";
+import { buildSalDraftPayload } from "./domain/build-sal-draft-payload";
 import {
+  applyMgManualAllocation,
+  buildSalResumeState,
   clearSalCreationDraft,
   clearSalCreationDraftBySalId,
-  lineDraftsFromStoredSal,
-  loadSalCreationDraftBySalId,
-  saveSalCreationDraft,
-  saveSalCreationDraftBySalId,
+  mgRulesQualityScore,
+  persistSalCreationLocalDraft,
+  prepareEconomicRulesForDraftPersist,
+  syncMgVoiceAllocations,
 } from "./domain/sal-creation-draft";
+import type { SalDraftAutosaveSnapshot } from "./hooks/useSalDraftAutosave";
 import { useSalCreationData } from "./hooks/useSalCreationData";
 import { useSalDerivedViews } from "./hooks/useSalDerivedViews";
 import { useSalDraftAutosave } from "./hooks/useSalDraftAutosave";
 import { useSalLineActions } from "./hooks/useSalLineActions";
+import {
+  scheduleSalVoiceSearchIndexWarmup,
+  useSalVoiceSearchIndex,
+} from "./hooks/useSalVoiceSearchIndex";
 import { SalWorkspace } from "./SalWorkspace";
 import { PHASE_ORDER, salFormReducer, surchargeKindFromPercent } from "./state/sal-form-state";
 import { getNextPhase, type SalWorkflowPhase } from "./state/workflow";
@@ -65,10 +76,14 @@ import type {
 } from "./types";
 import { createMeasurementId } from "./types";
 
-const CREATED_FLAG_KEY = SESSION_STORAGE_KEYS.salCreated;
-
 function buildDefaultSalTitle(existingCount: number) {
   return `SAL ${String(existingCount + 1).padStart(2, "0")} - Periodo corrente`;
+}
+
+function sameTariffBookIds(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((id) => rightSet.has(id));
 }
 
 function mergeResumeVoices(
@@ -106,14 +121,8 @@ export function SalCreationScreen() {
   const { notify } = useToast();
   const navigate = useNavigate();
   const data = useSalCreationData();
-  const {
-    createProject: createSalProject,
-    closeSal,
-    createSal,
-    updateSalDraft,
-    salDocuments,
-    tariffVoices,
-  } = useSalWorkflowService();
+  const { closeSal, createSal, updateSalDraft, salDocuments, tariffVoices } =
+    useSalWorkflowService();
 
   const [formState, dispatch] = useReducer(salFormReducer, {
     lines: [],
@@ -132,7 +141,9 @@ export function SalCreationScreen() {
   const setLines = useCallback(
     (updater: SalLineDraft[] | ((prev: SalLineDraft[]) => SalLineDraft[])) => {
       const prev = formStateRef.current.lines;
-      dispatch({ type: "LINES", lines: typeof updater === "function" ? updater(prev) : updater });
+      const nextLines = typeof updater === "function" ? updater(prev) : updater;
+      formStateRef.current = { ...formStateRef.current, lines: nextLines };
+      dispatch({ type: "LINES", lines: nextLines });
     },
     [],
   );
@@ -167,88 +178,134 @@ export function SalCreationScreen() {
     [],
   );
 
-  const editingDraftSalId = useRef<string | null>(null);
+  const [editingDraftSalId, setEditingDraftSalId] = useState<string | null>(null);
   const resumeMissingVoicesNotified = useRef(false);
+  const resumeAppliedRef = useRef(false);
+  const resumeHydratedSalIdRef = useRef<string | null>(null);
+  const [resumeHydrationReady, setResumeHydrationReady] = useState(() => !getResumeSalDraftId());
+  const flushSalDraftSnapshotRef = useRef<
+    ((snapshot: SalDraftAutosaveSnapshot) => Promise<void>) | null
+  >(null);
+
+  const getSalDraftAutosaveSnapshot = useCallback((): SalDraftAutosaveSnapshot => {
+    const form = formStateRef.current;
+    return {
+      economicRules: form.economicRules,
+      lines: form.lines,
+      materialUsage: form.materialUsage,
+      phase: form.phase,
+      projectId: data.project?.id ?? "",
+      salDate: form.salDate,
+      salDraftId: editingDraftSalId,
+      salTitle: form.salTitle,
+      selectedTariffBookIds: data.selectedTariffBooks.map((book) => book.id),
+    };
+  }, [data.project?.id, data.selectedTariffBooks, editingDraftSalId]);
 
   // Guard: if SAL was already created in this session, redirect to project-detail
   useEffect(() => {
-    if (sessionStorage.getItem(CREATED_FLAG_KEY) === "1") {
-      sessionStorage.removeItem(CREATED_FLAG_KEY);
+    if (consumeSalCreatedRedirect()) {
       navigate("project-detail");
     }
   }, [navigate]);
 
-  // Resume draft from project SAL list
+  // Resume draft from project SAL list (re-run when catalog/sync enriches MG data).
   useEffect(() => {
-    const resumeSalId = sessionStorage.getItem(SESSION_STORAGE_KEYS.salResumeDraft);
+    const resumeSalId = getResumeSalDraftId() ?? editingDraftSalId;
     const project = data.project;
-    if (!resumeSalId || !project) return;
+    if (!resumeSalId || !project) {
+      setResumeHydrationReady(true);
+      return;
+    }
 
     const draftSal = salDocuments.find(
       (sal) => sal.id === resumeSalId && sal.projectId === project.id && sal.status === "draft",
     );
-    const draft = loadSalCreationDraftBySalId(resumeSalId);
-
-    if (!draft && !draftSal) {
-      return;
-    }
-
     const resumeVoices = mergeResumeVoices(data.voices, tariffVoices);
+    const resumeState = buildSalResumeState({
+      draftSal: draftSal ?? null,
+      projectId: project.id,
+      projectSalTitle: project.salTitle,
+      resumeSalId,
+      resumeVoices,
+    });
 
-    if (!draft && draftSal && draftSal.lines.length > 0 && resumeVoices.length === 0) {
-      return;
-    }
-
-    if (draft) {
-      sessionStorage.removeItem(SESSION_STORAGE_KEYS.salResumeDraft);
-      resumeMissingVoicesNotified.current = false;
-      editingDraftSalId.current = resumeSalId;
-      dispatch({
-        type: "ALL",
-        partial: {
-          lines: draft.lines,
-          economicRules: draft.economicRules,
-          materialUsage: draft.materialUsage ?? {},
-          salDate: draft.salDate ?? new Date().toISOString().slice(0, 10),
-          salTitle: draft.salTitle || draftSal?.title || project.salTitle,
-          phase: draft.phase,
-        },
-      });
-      if (draft.selectedTariffBookIds?.length > 0) {
-        data.restoreTariffBookIds(draft.selectedTariffBookIds);
+    if (!resumeState) {
+      if (!draftSal) {
+        setResumeHydrationReady(true);
       }
       return;
     }
 
-    if (draftSal) {
-      const resumedLines = lineDraftsFromStoredSal(draftSal, resumeVoices);
-      if (draftSal.lines.length > 0 && resumedLines.length === 0) {
-        if (!resumeMissingVoicesNotified.current) {
-          notify({
-            message:
-              "La bozza esiste ma le voci tariffarie collegate non sono ancora disponibili. Verifica i tariffari associati al progetto.",
-            title: "Bozza non ripristinata",
-            tone: "warning",
-          });
-          resumeMissingVoicesNotified.current = true;
-        }
-        return;
+    if (
+      draftSal &&
+      draftSal.lines.length > 0 &&
+      resumeState.lines.length === 0 &&
+      resumeVoices.length === 0
+    ) {
+      if (!resumeMissingVoicesNotified.current) {
+        notify({
+          message:
+            "La bozza esiste ma le voci tariffarie collegate non sono ancora disponibili. Verifica i tariffari associati al progetto.",
+          title: "Bozza non ripristinata",
+          tone: "warning",
+        });
+        resumeMissingVoicesNotified.current = true;
       }
-
-      sessionStorage.removeItem(SESSION_STORAGE_KEYS.salResumeDraft);
-      resumeMissingVoicesNotified.current = false;
-      editingDraftSalId.current = resumeSalId;
-      dispatch({
-        type: "ALL",
-        partial: {
-          lines: resumedLines,
-          salDate: draftSal.date ?? new Date().toISOString().slice(0, 10),
-          salTitle: draftSal.title || project.salTitle,
-          phase: draftSal.lines.length > 0 ? "measure" : "project",
-        },
-      });
+      return;
     }
-  }, [data.project, data.voices, data.restoreTariffBookIds, salDocuments, tariffVoices, notify]);
+
+    const incomingMgScore = mgRulesQualityScore(resumeState.economicRules);
+    const currentMgScore = mgRulesQualityScore(formStateRef.current.economicRules);
+    const alreadyHydrated = resumeHydratedSalIdRef.current === resumeSalId;
+
+    if (getResumeSalDraftId()) {
+      clearResumeSalDraftId();
+    }
+
+    if (alreadyHydrated) {
+      if (incomingMgScore > currentMgScore) {
+        const nextRules = resumeState.economicRules;
+        dispatch({ type: "ECONOMIC_RULES", economicRules: nextRules });
+        formStateRef.current = { ...formStateRef.current, economicRules: nextRules };
+      }
+      return;
+    }
+
+    resumeMissingVoicesNotified.current = false;
+    resumeAppliedRef.current = true;
+    resumeHydratedSalIdRef.current = resumeSalId;
+    setEditingDraftSalId(resumeSalId);
+
+    const resumePartial = {
+      lines: resumeState.lines,
+      economicRules: resumeState.economicRules,
+      materialUsage: resumeState.materialUsage ?? {},
+      salDate: resumeState.salDate,
+      salTitle: resumeState.salTitle,
+      phase: resumeState.phase,
+    };
+    dispatch({ type: "ALL", partial: resumePartial });
+    formStateRef.current = { ...formStateRef.current, ...resumePartial };
+
+    if (resumeState.selectedTariffBookIds?.length > 0) {
+      const currentBookIds = data.selectedTariffBooks.map((book) => book.id);
+      if (!sameTariffBookIds(currentBookIds, resumeState.selectedTariffBookIds)) {
+        void data.restoreTariffBookIds(resumeState.selectedTariffBookIds);
+      }
+    }
+
+    setResumeHydrationReady(true);
+  }, [
+    data.project,
+    data.restoreTariffBookIds,
+    data.selectedTariffBooks,
+    editingDraftSalId,
+    salDocuments,
+    tariffVoices,
+    notify,
+    data.voices,
+  ]);
 
   // Subscribe to step navigation from TopToolbar
   useEffect(() => {
@@ -277,30 +334,61 @@ export function SalCreationScreen() {
     () => data.selectedTariffBooks.map((b) => b.id),
     [data.selectedTariffBooks],
   );
+  const voiceSearchIndex = useSalVoiceSearchIndex(data.voices, selectedTariffBookIds);
+  const mgAvailableVoices = useMemo(
+    () => data.voices.filter((voice) => isMgVoice(voice)),
+    [data.voices],
+  );
+
+  useEffect(() => {
+    if (data.voices.length === 0) return;
+    scheduleSalVoiceSearchIndexWarmup(data.voices, selectedTariffBookIds);
+  }, [data.voices, selectedTariffBookIds]);
 
   const [createdSalTitle, setCreatedSalTitle] = useState("SAL 01 - Periodo corrente");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [compareLines, setCompareLines] = useState<SalLineView[] | null>(null);
+  const [scrollToLineId, setScrollToLineId] = useState<string | null>(null);
 
   const suggestedSalTitle = useMemo(() => {
     const projectId = data.project?.id;
     if (!projectId) return buildDefaultSalTitle(0);
-    const existingCount = salDocuments.filter((sal) => sal.projectId === projectId).length;
+    if (editingDraftSalId) {
+      const editing = salDocuments.find((sal) => sal.id === editingDraftSalId);
+      if (editing?.title?.trim()) {
+        return editing.title.trim();
+      }
+    }
+    const existingCount = salDocuments.filter(
+      (sal) =>
+        sal.projectId === projectId && sal.id !== editingDraftSalId && sal.status !== "closed",
+    ).length;
     return buildDefaultSalTitle(existingCount);
-  }, [data.project?.id, salDocuments]);
+  }, [data.project?.id, editingDraftSalId, salDocuments]);
 
-  // Set default discount from project when it loads
+  // Set default discount from project when it loads (after resume hydration).
   useEffect(() => {
     const project = data.project;
-    if (project) {
-      setSalTitle((prev) => prev || suggestedSalTitle);
-      setEconomicRules((prev) => ({
-        ...prev,
-        discountEnabled: project.tenderDiscountPercent > 0,
-        discountPercent: project.tenderDiscountPercent,
-      }));
+    if (!project || !resumeHydrationReady) return;
+
+    const pendingResume = getResumeSalDraftId();
+    if (!resumeAppliedRef.current && !pendingResume && !editingDraftSalId) {
+      setSalTitle((prev) => (prev.trim() ? prev : suggestedSalTitle));
     }
-  }, [data.project, setEconomicRules, setSalTitle, suggestedSalTitle]);
+
+    setEconomicRules((prev) => ({
+      ...prev,
+      discountEnabled: project.tenderDiscountPercent > 0,
+      discountPercent: project.tenderDiscountPercent,
+    }));
+  }, [
+    data.project,
+    editingDraftSalId,
+    resumeHydrationReady,
+    setEconomicRules,
+    setSalTitle,
+    suggestedSalTitle,
+  ]);
 
   const closedProjectSals = useMemo(() => {
     const projectId = data.project?.id;
@@ -310,11 +398,16 @@ export function SalCreationScreen() {
       .sort((a, b) => (b.closedAt ?? b.date).localeCompare(a.closedAt ?? a.date));
   }, [data.project?.id, salDocuments]);
 
+  const measureLineViews = useMemo(
+    () => (phase === "measure" ? buildLineViews(lines, economicRules) : []),
+    [phase, lines, economicRules],
+  );
   const { checks, lineViews, previousSalLines, summary, voicesMap } = useSalDerivedViews({
     closedProjectSals,
     economicRules,
     lines,
     project: data.project,
+    ...(phase === "measure" ? { syncLineViews: measureLineViews } : {}),
     tariffVoices,
     voices: data.voices,
   });
@@ -347,6 +440,8 @@ export function SalCreationScreen() {
     addVoiceAsNewLine,
     duplicateMeasurementRow,
     pasteLine: handlePasteLine,
+    pasteMeasurementRows,
+    pasteMeasurementRowsAt,
     removeLine,
     removeMeasurementRow,
     setNotes,
@@ -357,31 +452,118 @@ export function SalCreationScreen() {
 
   const handleAllocateMg = useCallback(
     (mgLineId: string, targetLineIds: string[]) => {
-      setEconomicRules((prev) => {
-        const nextAlloc = { ...(prev.mgManualAllocations ?? {}) };
-        nextAlloc[mgLineId] = targetLineIds;
-        return { ...prev, mgManualAllocations: nextAlloc };
-      });
+      const form = formStateRef.current;
+      const next = applyMgManualAllocation(form.economicRules, form.lines, mgLineId, targetLineIds);
+      formStateRef.current = { ...form, economicRules: next };
+      dispatch({ type: "ECONOMIC_RULES", economicRules: next });
+      const snapshot: SalDraftAutosaveSnapshot = {
+        ...getSalDraftAutosaveSnapshot(),
+        economicRules: next,
+        lines: form.lines,
+      };
+      void flushSalDraftSnapshotRef.current?.(snapshot);
     },
-    [setEconomicRules],
+    [getSalDraftAutosaveSnapshot],
   );
 
   const handleAddMgVoice = useCallback(
     (voice: SalVoiceDraft) => {
       const exists = formStateRef.current.lines.some((line) => line.voice.id === voice.id);
-      if (exists) {
-        addVoiceAsNewLine(voice);
-      } else {
-        upsertLine(voice);
-      }
+      let lineId: string | null = null;
+      flushSync(() => {
+        lineId = exists ? addVoiceAsNewLine(voice) : upsertLine(voice);
+      });
+      if (!lineId) return;
+
+      const form = formStateRef.current;
+      const nextRules = syncMgVoiceAllocations(form.economicRules, form.lines);
+      formStateRef.current = { ...form, economicRules: nextRules };
+      dispatch({ type: "ECONOMIC_RULES", economicRules: nextRules });
+      queueMicrotask(() => setScrollToLineId(lineId));
+
+      const snapshot: SalDraftAutosaveSnapshot = {
+        ...getSalDraftAutosaveSnapshot(),
+        economicRules: nextRules,
+        lines: formStateRef.current.lines,
+      };
+      void flushSalDraftSnapshotRef.current?.(snapshot);
     },
-    [addVoiceAsNewLine, upsertLine],
+    [addVoiceAsNewLine, getSalDraftAutosaveSnapshot, upsertLine],
+  );
+
+  const persistDraftFromFormRef = useCallback(() => {
+    const form = formStateRef.current;
+    const projectId = data.project?.id ?? "";
+    if (!projectId) return;
+
+    const synced = syncMgVoiceAllocations(form.economicRules, form.lines);
+    const prepared = prepareEconomicRulesForDraftPersist(synced, form.lines);
+    formStateRef.current = { ...form, economicRules: prepared };
+    dispatch({ type: "ECONOMIC_RULES", economicRules: prepared });
+
+    const snapshot: SalDraftAutosaveSnapshot = {
+      economicRules: prepared,
+      lines: form.lines,
+      materialUsage: form.materialUsage,
+      phase: form.phase,
+      projectId,
+      salDate: form.salDate,
+      salDraftId: editingDraftSalId,
+      salTitle: form.salTitle,
+      selectedTariffBookIds: data.selectedTariffBooks.map((book) => book.id),
+    };
+
+    persistSalCreationLocalDraft({
+      projectId,
+      salId: editingDraftSalId,
+      draft: {
+        economicRules: snapshot.economicRules,
+        lines: snapshot.lines,
+        materialUsage: snapshot.materialUsage,
+        phase: snapshot.phase,
+        salDate: snapshot.salDate,
+        salTitle: snapshot.salTitle,
+        selectedTariffBookIds: snapshot.selectedTariffBookIds,
+      },
+    });
+
+    void flushSalDraftSnapshotRef.current?.(snapshot);
+  }, [data.project?.id, data.selectedTariffBooks, editingDraftSalId]);
+
+  const handleSearchSelectVoice = useCallback(
+    (voice: SalVoiceDraft) => {
+      const exists = formStateRef.current.lines.some((line) => line.voice.id === voice.id);
+      let lineId: string | null = null;
+      flushSync(() => {
+        lineId = exists ? addVoiceAsNewLine(voice) : upsertLine(voice);
+      });
+      if (!lineId) return;
+      persistDraftFromFormRef();
+      queueMicrotask(() => setScrollToLineId(lineId));
+    },
+    [addVoiceAsNewLine, persistDraftFromFormRef, upsertLine],
+  );
+
+  const handleScrollToLineHandled = useCallback(() => {
+    setScrollToLineId(null);
+  }, []);
+
+  const handlePasteLineWithScroll = useCallback(
+    (draft: SalLineDraft) => {
+      let lineId = "";
+      flushSync(() => {
+        lineId = handlePasteLine(draft);
+      });
+      persistDraftFromFormRef();
+      queueMicrotask(() => setScrollToLineId(lineId));
+    },
+    [handlePasteLine, persistDraftFromFormRef],
   );
 
   const handleApplyTemplate = useCallback(
     (template: SalTemplate) => {
       const newLines: SalLineDraft[] = [];
-      for (const entry of template.voiceEntries) {
+      for (const [entryIndex, entry] of template.voiceEntries.entries()) {
         const voice = voicesMap.get(entry.voiceId);
         if (!voice) continue;
         const row: SalMeasurementRowDraft = {
@@ -397,7 +579,7 @@ export function SalCreationScreen() {
           unit: voice.unit,
         };
         newLines.push({
-          id: `draft-${entry.voiceId}`,
+          id: `draft-${entry.voiceId}-${entryIndex}`,
           measurementRows: [row],
           notes: "",
           sourceType: "voice",
@@ -458,15 +640,8 @@ export function SalCreationScreen() {
     }
     if (!data.project) return;
 
-    createSalProject({
-      client: data.project.contractor,
-      description: `${data.project.frameworkAgreementCode} - ${data.project.applicationContractCode}`,
-      id: data.project.id,
-      name: data.project.title,
-      year: data.selectedTariffBook?.year ?? 2026,
-    });
     try {
-      saveSalProject({
+      await persistSalProjectMetadata({
         client: data.project.contractor,
         description: `${data.project.frameworkAgreementCode} - ${data.project.applicationContractCode}`,
         id: data.project.id,
@@ -495,10 +670,12 @@ export function SalCreationScreen() {
         };
       });
 
+    const finalLineViews = buildLineViews(lines, economicRules);
     const finalSalPayload = {
       date: salDate,
       description: "Periodo corrente",
-      lines: lineViews.map((l) => ({
+      economicRules: syncMgVoiceAllocations(economicRules, lines),
+      lines: finalLineViews.map((l) => ({
         id: l.id,
         measurementRows: l.measurementRows.map((r) => ({
           id: r.id,
@@ -524,7 +701,7 @@ export function SalCreationScreen() {
       title: salTitle.trim() || suggestedSalTitle,
       total: summary.total,
       ...(materialUsagePayload.length > 0 ? { materialUsage: materialUsagePayload } : {}),
-      voices: lineViews.map((l) => ({
+      voices: finalLineViews.map((l) => ({
         category: l.voice.category,
         code: l.voice.code,
         description: l.voice.description,
@@ -538,12 +715,12 @@ export function SalCreationScreen() {
 
     // Atomic transaction: save SAL + deduct materials + audit
     let salForBackend: SalDocument;
-    if (editingDraftSalId.current) {
-      updateSalDraft(editingDraftSalId.current, finalSalPayload);
-      closeSal(editingDraftSalId.current);
+    if (editingDraftSalId) {
+      updateSalDraft(editingDraftSalId, finalSalPayload);
+      closeSal(editingDraftSalId);
       const updatedDraft = useSalWorkflowStore
         .getState()
-        .salDocuments.find((d) => d.id === editingDraftSalId.current);
+        .salDocuments.find((d) => d.id === editingDraftSalId);
       if (!updatedDraft) {
         notify({
           message: "La bozza aggiornata non e stata trovata nel registro locale.",
@@ -578,10 +755,10 @@ export function SalCreationScreen() {
 
     setCreatedSalTitle(salTitle.trim() || suggestedSalTitle);
     clearSalCreationDraft(data.project.id);
-    if (editingDraftSalId.current) {
-      clearSalCreationDraftBySalId(editingDraftSalId.current);
+    if (editingDraftSalId) {
+      clearSalCreationDraftBySalId(editingDraftSalId);
     }
-    sessionStorage.setItem(CREATED_FLAG_KEY, "1");
+    markSalCreatedRedirect();
     setPhase("completed");
     notify({
       message: `${salTitle.trim() || suggestedSalTitle} confermata.`,
@@ -590,43 +767,87 @@ export function SalCreationScreen() {
     });
   }
 
-  const {
-    lastSaved: salAutoSaveLastSaved,
-    markChanged: handleAutoSave,
-    status: salAutoSaveStatus,
-  } = useSalDraftAutosave({
-    economicRules,
-    lines,
-    materialUsage,
-    phase,
-    projectId: data.project?.id ?? "",
-    salDate,
-    salTitle,
-    selectedTariffBooks: data.selectedTariffBooks,
-  });
+  const buildMaterialUsagePayload = useCallback(() => {
+    return Object.entries(materialUsage)
+      .filter(([_, qty]) => qty > 0)
+      .map(([materialId, qty]) => {
+        const mat = materialById.get(materialId);
+        return {
+          materialId,
+          code: mat?.code ?? materialId,
+          description: mat?.description ?? "",
+          unit: mat?.unit ?? "",
+          quantity: qty,
+        };
+      });
+  }, [materialById, materialUsage]);
 
-  const handleSaveDraft = useCallback(async () => {
+  const persistBackendDraft = useCallback(async () => {
     const project = data.project;
     const pid = project?.id;
-    if (!project || !pid) return;
-    saveSalCreationDraft(pid, {
-      economicRules,
-      lines,
-      materialUsage,
-      phase,
-      salDate,
-      salTitle,
-      selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
-    });
-    createSalProject({
+    const salId = editingDraftSalId;
+    if (!project || !pid || !salId) return;
+
+    const form = formStateRef.current;
+
+    await persistSalProjectMetadata({
       client: project.contractor,
       description: `${project.frameworkAgreementCode} - ${project.applicationContractCode}`,
       id: pid,
       name: project.title,
       year: data.selectedTariffBook?.year ?? 2026,
     });
+
+    const rulesForSave = syncMgVoiceAllocations(form.economicRules, form.lines);
+    const payload = buildSalDraftPayload({
+      economicRules: rulesForSave,
+      lines: form.lines,
+      materialUsageEntries: buildMaterialUsagePayload(),
+      projectId: pid,
+      salDate: form.salDate,
+      salTitle: form.salTitle,
+      suggestedSalTitle,
+      total: summary.total,
+      lineViews: buildLineViews(form.lines, rulesForSave),
+    });
+
+    await upsertSalDraftDocument(pid, salId, payload, {
+      clearLocalDrafts: "project-only",
+      localDraftLines: form.lines,
+      localDraftPhase: form.phase,
+      localDraftSalDate: form.salDate,
+      localDraftSalTitle: form.salTitle,
+      selectedTariffBookIds: data.selectedTariffBooks.map((book) => book.id),
+    });
+  }, [
+    buildMaterialUsagePayload,
+    data.project,
+    data.selectedTariffBook?.year,
+    data.selectedTariffBooks,
+    editingDraftSalId,
+    suggestedSalTitle,
+    summary.total,
+  ]);
+
+  const {
+    flushDraftSnapshot,
+    lastSaved: salAutoSaveLastSaved,
+    markChanged: handleAutoSave,
+    status: salAutoSaveStatus,
+  } = useSalDraftAutosave({
+    enabled: resumeHydrationReady,
+    getSnapshot: getSalDraftAutosaveSnapshot,
+    onBackendAutosave: persistBackendDraft,
+  });
+
+  flushSalDraftSnapshotRef.current = flushDraftSnapshot;
+
+  const handleSaveDraft = useCallback(async () => {
+    const project = data.project;
+    const pid = project?.id;
+    if (!project || !pid) return;
     try {
-      saveSalProject({
+      await persistSalProjectMetadata({
         client: project.contractor,
         description: `${project.frameworkAgreementCode} - ${project.applicationContractCode}`,
         id: pid,
@@ -641,90 +862,51 @@ export function SalCreationScreen() {
       });
       return;
     }
-    const draftMaterialUsage = Object.entries(materialUsage)
-      .filter(([_, qty]) => qty > 0)
-      .map(([mid, qty]) => {
-        const mat = materialById.get(mid);
-        return {
-          materialId: mid,
-          code: mat?.code ?? mid,
-          description: mat?.description ?? "",
-          unit: mat?.unit ?? "",
-          quantity: qty,
-        };
-      });
-    const draftPayload = {
-      date: salDate,
-      description: salTitle.trim() || suggestedSalTitle,
-      lines: lineViews.map((l) => ({
-        id: l.id,
-        measurementRows: l.measurementRows.map((r) => ({
-          id: r.id,
-          voiceId: l.voice.id,
-          date: r.date,
-          station: r.station,
-          section: r.section,
-          description: r.description,
-          factor1: r.factor1,
-          factor2: r.factor2,
-          factor3: r.factor3,
-          partialQuantity: r.partialQuantity,
-          unit: r.unit,
-          notes: r.notes,
-          order: r.order,
-        })),
-        quantity: l.quantity,
-        surcharge: surchargeKindFromPercent(l.surchargePercent),
-        voiceId: l.voice.id,
-      })),
-      notes: "",
+
+    const form = formStateRef.current;
+    const rulesForSave = syncMgVoiceAllocations(form.economicRules, form.lines);
+    const draftPayload = buildSalDraftPayload({
+      economicRules: rulesForSave,
+      lines: form.lines,
+      materialUsageEntries: buildMaterialUsagePayload(),
       projectId: pid,
-      status: "draft" as const,
-      title: salTitle.trim() || suggestedSalTitle,
+      salDate: form.salDate,
+      salTitle: form.salTitle,
+      suggestedSalTitle,
       total: summary.total,
-      ...(draftMaterialUsage.length > 0 ? { materialUsage: draftMaterialUsage } : {}),
-      voices: lineViews.map((l) => ({
-        category: l.voice.category,
-        code: l.voice.code,
-        description: l.voice.description,
-        id: l.voice.id,
-        laborPercentage: l.voice.laborPercentage,
-        projectYear: l.voice.tariffYear,
-        unit: l.voice.unit,
-        unitPrice: l.voice.unitPrice,
-      })),
-    };
-    const draftSal = editingDraftSalId.current
-      ? updateSalDraft(editingDraftSalId.current, draftPayload)
-      : createSal(draftPayload);
-    if (draftSal) {
-      try {
-        if (editingDraftSalId.current) {
-          await updateBackendSalDocument(draftSal.id, draftSal);
-        } else {
-          await saveSalDocument(pid, draftSal);
-        }
-      } catch (error) {
-        notify({
-          message: error instanceof Error ? error.message : String(error),
-          title: "Salvataggio bozza SAL non riuscito",
-          tone: "danger",
-        });
-        return;
-      }
-    }
-    const draftSalId = draftSal?.id ?? editingDraftSalId.current;
-    if (draftSalId) {
-      editingDraftSalId.current = draftSalId;
-      saveSalCreationDraftBySalId(draftSalId, {
-        economicRules,
-        lines,
-        materialUsage,
-        phase,
-        salDate,
-        salTitle: salTitle.trim() || suggestedSalTitle,
-        selectedTariffBookIds: data.selectedTariffBooks.map((b: SalTariffBookOption) => b.id),
+      lineViews: buildLineViews(form.lines, rulesForSave),
+    });
+
+    try {
+      const draftSal = await upsertSalDraftDocument(pid, editingDraftSalId, draftPayload, {
+        clearLocalDrafts: "all",
+        localDraftLines: form.lines,
+        localDraftPhase: form.phase,
+        localDraftSalDate: form.salDate,
+        localDraftSalTitle: form.salTitle,
+        selectedTariffBookIds: data.selectedTariffBooks.map((book) => book.id),
       });
+      persistSalCreationLocalDraft({
+        projectId: pid,
+        salId: draftSal.id,
+        draft: {
+          economicRules: prepareEconomicRulesForDraftPersist(rulesForSave, form.lines),
+          lines: form.lines,
+          materialUsage: form.materialUsage,
+          phase: form.phase,
+          salDate: form.salDate,
+          salTitle: form.salTitle,
+          selectedTariffBookIds: data.selectedTariffBooks.map((book) => book.id),
+        },
+      });
+      setEditingDraftSalId(draftSal.id);
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Salvataggio bozza SAL non riuscito",
+        tone: "danger",
+      });
+      return;
     }
 
     notify({
@@ -732,34 +914,18 @@ export function SalCreationScreen() {
       title: "Bozza salvata",
       tone: "success",
     });
-    try {
-      window.sessionStorage.setItem(
-        SESSION_STORAGE_KEYS.selectedProjectDetail,
-        JSON.stringify({ id: pid }),
-      );
-    } catch {
-      /* no-op */
-    }
+    selectProjectForWorkflow(pid);
     navigate("project-detail", undefined, true);
   }, [
     data.project,
     data.selectedTariffBooks,
     data.selectedTariffBook,
-    economicRules,
-    lines,
-    materialUsage,
-    materialById,
-    salDate,
-    phase,
-    salTitle,
     suggestedSalTitle,
     notify,
-    lineViews,
-    createSalProject,
-    createSal,
-    updateSalDraft,
+    buildMaterialUsagePayload,
     navigate,
     summary.total,
+    editingDraftSalId,
   ]);
 
   const handleExportSalExcel = useCallback(async () => {
@@ -973,7 +1139,7 @@ export function SalCreationScreen() {
   );
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       <SalWorkspace
         phase={phase}
         onPhaseChange={handlePhaseChange}
@@ -985,6 +1151,8 @@ export function SalCreationScreen() {
         summary={summary}
         canContinue={canContinue}
         primaryDisabledReason={currentDisabledReason}
+        autoSaveLastSaved={salAutoSaveLastSaved}
+        autoSaveStatus={salAutoSaveStatus}
         onPrimary={goPrimary}
         onSaveDraft={handleSaveDraft}
         onExportPdf={handleExportSalPdf}
@@ -993,97 +1161,102 @@ export function SalCreationScreen() {
       >
         {/* Project phase */}
         {phase === "project" && (
-          <>
+          <div className="flex h-full min-h-0 flex-col">
             {data.error && (
-              <div className="mb-4 rounded-xl border border-[var(--danger-base)]/20 bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)]">
+              <div className="mb-4 shrink-0 rounded-xl border border-[var(--danger-base)]/20 bg-[var(--danger-soft)] px-4 py-3 text-13px font-medium text-[var(--danger-base)]">
                 {data.error}
               </div>
             )}
-            <ProjectStep
-              contracts={data.contracts}
-              onSelectContract={data.setContract}
-              project={data.project}
-              salDate={salDate}
-              salTitle={salTitle}
-              suggestedSalTitle={suggestedSalTitle}
-              selectedTariffBooks={data.selectedTariffBooks}
-              selectedTariffBook={data.selectedTariffBook}
-              selectTariffBook={data.selectTariffBook}
-              setSelectedTariffBookIds={data.setSelectedTariffBookIds}
-              isLoading={data.isLoading}
-              setSalDate={setSalDate}
-              setSalTitle={setSalTitle}
-              summary={summary}
-              tariffBooks={data.tariffBookOptions}
-              voicesCount={data.voices.length}
-            />
-          </>
-        )}
-
-        {/* Measure phase */}
-        {phase === "measure" && (
-          <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1">
-              <MeasureStep
-                economicRules={economicRules}
-                lineViews={lineViews}
-                voices={data.voices}
-                isLoading={data.isLoading}
-                isActive
-                tariffBookIds={selectedTariffBookIds}
-                onAllocateMg={handleAllocateMg}
-                onAddMgVoice={handleAddMgVoice}
-                onAddMeasurementRow={addMeasurementRow}
-                onDuplicateMeasurementRow={duplicateMeasurementRow}
-                onRemoveMeasurementRow={removeMeasurementRow}
-                onUpdateMeasurementRow={updateMeasurementRow}
-                onRemove={removeLine}
-                onNotesChange={setNotes}
-                onSurcharge={setSurcharge}
-                onPasteLine={handlePasteLine}
-                onSearchSelectVoice={(voice) => {
-                  const exists = lines.some((l) => l.voice.id === voice.id);
-                  if (exists) addVoiceAsNewLine(voice);
-                  else upsertLine(voice);
-                }}
-                onApplyTemplate={handleApplyTemplate}
-                onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
+              <ProjectStep
+                contracts={data.contracts}
+                onSelectContract={data.setContract}
+                project={data.project}
+                salDate={salDate}
+                salTitle={salTitle}
+                suggestedSalTitle={suggestedSalTitle}
+                selectedTariffBooks={data.selectedTariffBooks}
+                selectedTariffBook={data.selectedTariffBook}
+                selectTariffBook={data.selectTariffBook}
+                setSelectedTariffBookIds={data.setSelectedTariffBookIds}
+                isLoading={data.isVoicesLoading}
+                setSalDate={setSalDate}
+                setSalTitle={setSalTitle}
+                summary={summary}
+                tariffBooks={data.tariffBookOptions}
+                voicesCount={data.voices.length}
               />
             </div>
           </div>
         )}
 
+        {/* Measure phase */}
+        {phase === "measure" && (
+          <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+            <MeasureStep
+              economicRules={economicRules}
+              lineViews={measureLineViews}
+              mgAvailableVoices={mgAvailableVoices}
+              voiceSearchIndex={voiceSearchIndex}
+              isLoading={data.isVoicesLoading}
+              isActive
+              tariffBookIds={selectedTariffBookIds}
+              onAllocateMg={handleAllocateMg}
+              onAddMgVoice={handleAddMgVoice}
+              onAddMeasurementRow={addMeasurementRow}
+              onDuplicateMeasurementRow={duplicateMeasurementRow}
+              onRemoveMeasurementRow={removeMeasurementRow}
+              onUpdateMeasurementRow={updateMeasurementRow}
+              onRemove={removeLine}
+              onNotesChange={setNotes}
+              onSurcharge={setSurcharge}
+              onPasteLine={handlePasteLineWithScroll}
+              onPasteMeasurementRows={pasteMeasurementRows}
+              onPasteMeasurementRowsAt={pasteMeasurementRowsAt}
+              onScrollToLineHandled={handleScrollToLineHandled}
+              onSearchSelectVoice={handleSearchSelectVoice}
+              scrollToLineId={scrollToLineId}
+              onApplyTemplate={handleApplyTemplate}
+              onOpenTemplateDialog={() => setIsTemplateDialogOpen(true)}
+            />
+          </div>
+        )}
+
         {/* Verify phase */}
         {phase === "verify" && (
-          <VerifyStep
-            checks={checks}
-            economicRules={economicRules}
-            lineViews={lineViews}
-            materialUsage={materialUsage}
-            materials={materials}
-            onAutoSave={handleAutoSave}
-            onMaterialUsageChange={(usage) =>
-              dispatch({ type: "MATERIAL_USAGE", materialUsage: usage })
-            }
-            onMaterialsChange={(mats) => dispatch({ type: "ALL", partial: { materials: mats } })}
-            summary={summary}
-            previousSalLines={previousSalLines}
-            compareLines={compareLines}
-            onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
-          />
+          <div className="flex h-full min-h-0 flex-col">
+            <VerifyStep
+              checks={checks}
+              economicRules={economicRules}
+              lineViews={lineViews}
+              materialUsage={materialUsage}
+              materials={materials}
+              onAutoSave={handleAutoSave}
+              onMaterialUsageChange={(usage) =>
+                dispatch({ type: "MATERIAL_USAGE", materialUsage: usage })
+              }
+              onMaterialsChange={(mats) => dispatch({ type: "ALL", partial: { materials: mats } })}
+              summary={summary}
+              previousSalLines={previousSalLines}
+              compareLines={compareLines}
+              onToggleCompare={() => setCompareLines(compareLines ? null : previousSalLines)}
+            />
+          </div>
         )}
 
         {/* Confirm phase */}
         {phase === "confirm" && (
-          <ConfirmStep
-            economicRules={economicRules}
-            lineViews={lineViews}
-            onExportExcel={handleExportSalExcel}
-            onExportMeasurementBookPdf={handleExportMeasurementBookPdf}
-            onExportSalPdf={handleExportSalPdf}
-            onPrintAccounting={handlePrintAccounting}
-            summary={summary}
-          />
+          <div className="flex h-full min-h-0 flex-col">
+            <ConfirmStep
+              economicRules={economicRules}
+              lineViews={lineViews}
+              onExportExcel={handleExportSalExcel}
+              onExportMeasurementBookPdf={handleExportMeasurementBookPdf}
+              onExportSalPdf={handleExportSalPdf}
+              onPrintAccounting={handlePrintAccounting}
+              summary={summary}
+            />
+          </div>
         )}
 
         {/* Completed view */}
@@ -1091,13 +1264,8 @@ export function SalCreationScreen() {
           <CompletedView
             createdSalTitle={createdSalTitle}
             onClose={() => {
-              try {
-                window.sessionStorage.setItem(
-                  SESSION_STORAGE_KEYS.selectedProjectDetail,
-                  JSON.stringify({ id: data.project?.id }),
-                );
-              } catch {
-                /* no-op */
+              if (data.project?.id) {
+                selectProjectForWorkflow(data.project.id);
               }
               navigate("project-detail", undefined, true);
             }}
@@ -1127,7 +1295,7 @@ export function SalCreationScreen() {
           })}
         />
       )}
-    </>
+    </div>
   );
 }
 

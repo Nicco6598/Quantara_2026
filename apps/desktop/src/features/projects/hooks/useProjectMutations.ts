@@ -3,7 +3,7 @@ import { useNavigate } from "@/hooks/useNavigate";
 import type { DesktopContract, DesktopDataResult } from "@/lib/desktopData";
 import { deleteDesktopContract } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { SESSION_STORAGE_KEYS } from "@/persistence/storage-keys";
+import { beginProjectEditSession } from "@/lib/workflow-navigation";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 type Notify = (toast: {
@@ -70,13 +70,7 @@ export function useProjectMutations({
       osIvaPercent: "",
     };
 
-    try {
-      window.sessionStorage.setItem(SESSION_STORAGE_KEYS.editingProject, JSON.stringify(values));
-      window.sessionStorage.setItem(SESSION_STORAGE_KEYS.editingContractId, contract.id);
-    } catch {
-      /* no-op */
-    }
-
+    beginProjectEditSession(values, contract.id);
     navigate("project-create");
   }
 

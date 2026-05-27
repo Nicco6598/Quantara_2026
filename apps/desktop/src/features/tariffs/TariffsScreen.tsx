@@ -19,6 +19,7 @@ import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { Panel } from "@/components/shared/Panel";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useActionHandler } from "@/hooks/useAction";
 
@@ -209,54 +210,46 @@ export function TariffsScreen() {
     writeJsonToStorage(window.localStorage, FAVORITES_STORAGE_KEY, favoriteBookIds);
   }, [favoriteBookIds]);
 
+  const loadTariffsData = useCallback(async () => {
+    const [tariffBooks, contracts] = await Promise.all([
+      listDesktopTariffBooks(fallbackTariffBooks),
+      listDesktopContracts(fallbackContracts),
+    ]);
+
+    setTariffBooksState(tariffBooks);
+    setContractsState(contracts);
+    setSelectedTariffBookId(
+      (current) => current || tariffBooks.data[0]?.id || fallbackTariffBook.id,
+    );
+
+    try {
+      const voiceCountResult = await listDesktopTariffVoiceCounts(
+        tariffBooks.data,
+        fallbackTariffVoices,
+      );
+      const counts = new Map(
+        voiceCountResult.data.map((entry) => [entry.tariffBookId, entry.count]),
+      );
+      const entries = tariffBooks.data.map((book) => [book.id, counts.get(book.id) ?? 0] as const);
+      setVoiceCountByBookId(Object.fromEntries(entries));
+    } catch {
+      /* voice count failure is non-critical */
+    }
+  }, []);
+
   useEffect(() => {
-    let active = true;
+    loadTariffsData().catch(() => {
+      notify({
+        message: "Impossibile caricare tariffari e contratti.",
+        title: "Caricamento fallito",
+        tone: "danger",
+      });
+    });
+  }, [loadTariffsData, notify]);
 
-    const loadData = async () => {
-      try {
-        const [tariffBooks, contracts] = await Promise.all([
-          listDesktopTariffBooks(fallbackTariffBooks),
-          listDesktopContracts(fallbackContracts),
-        ]);
-        if (!active) return;
-
-        setTariffBooksState(tariffBooks);
-        setContractsState(contracts);
-        setSelectedTariffBookId(tariffBooks.data[0]?.id ?? fallbackTariffBook.id);
-
-        try {
-          const voiceCountResult = await listDesktopTariffVoiceCounts(
-            tariffBooks.data,
-            fallbackTariffVoices,
-          );
-          if (!active) return;
-
-          const counts = new Map(
-            voiceCountResult.data.map((entry) => [entry.tariffBookId, entry.count]),
-          );
-          const entries = tariffBooks.data.map(
-            (book) => [book.id, counts.get(book.id) ?? 0] as const,
-          );
-          setVoiceCountByBookId(Object.fromEntries(entries));
-        } catch {
-          /* voice count failure is non-critical, silently ignore */
-        }
-      } catch {
-        if (!active) return;
-        notify({
-          message: "Impossibile caricare tariffari e contratti.",
-          title: "Caricamento fallito",
-          tone: "danger",
-        });
-      }
-    };
-
-    loadData();
-
-    return () => {
-      active = false;
-    };
-  }, [notify]);
+  useDataChangedListener(() => {
+    void loadTariffsData();
+  });
 
   const tariffMetrics = useMemo<TariffMetrics>(
     () => buildTariffMetrics(tariffBooksState.data),

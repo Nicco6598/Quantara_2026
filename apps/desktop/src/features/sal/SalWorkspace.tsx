@@ -10,9 +10,11 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { AutoSaveIndicator } from "@/components/shared/AutoSaveIndicator";
 import { Button } from "@/components/shared/Button";
 import { Currency } from "@/components/shared/Currency";
 import { StatusChip } from "@/components/shared/StatusChip";
+import type { DraftAutosaveStatus } from "@/hooks/use-draft-autosave";
 import { cn } from "@/lib/utils";
 import type { SalWorkflowPhase } from "./state/workflow";
 import { getPhaseIndex } from "./state/workflow";
@@ -43,6 +45,8 @@ type SalWorkspaceProps = {
   summary: SalEconomicSummary;
   canContinue: boolean;
   primaryDisabledReason: string | null;
+  autoSaveLastSaved?: string | null;
+  autoSaveStatus?: DraftAutosaveStatus;
   onPrimary: () => void;
   onSaveDraft: () => void;
   onExportPdf?: () => void;
@@ -62,6 +66,8 @@ export function SalWorkspace({
   summary,
   canContinue,
   primaryDisabledReason,
+  autoSaveLastSaved = null,
+  autoSaveStatus = "idle",
   onPrimary,
   onSaveDraft,
   onExportPdf,
@@ -85,9 +91,9 @@ export function SalWorkspace({
   const netTotal = summary.total;
 
   return (
-    <div className="flex h-[calc(100dvh-48px)] flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* ─── Document header with horizontal phase stepper ─── */}
-      <header className="sticky top-0 z-[var(--z-topbar)] border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/94 shadow-[0_10px_28px_color-mix(in_srgb,var(--text-primary)_5%,transparent)] backdrop-blur-xl">
+      <header className="z-[var(--z-topbar)] shrink-0 border-b border-[var(--border-subtle)]/55 bg-[var(--surface-base)]/94 shadow-[0_10px_28px_color-mix(in_srgb,var(--text-primary)_5%,transparent)] backdrop-blur-xl">
         {/* Top row: title + actions */}
         <div className="px-4 py-2.5 lg:px-6">
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -118,6 +124,7 @@ export function SalWorkspace({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <AutoSaveIndicator lastSaved={autoSaveLastSaved} status={autoSaveStatus} />
               <div className="flex h-9 items-center gap-2 rounded-lg border border-[var(--accent-primary)]/18 bg-[var(--accent-primary)]/[0.045] px-3">
                 <WalletCards className="size-4 text-[var(--accent-primary)]" />
                 <div className="text-right">
@@ -183,18 +190,20 @@ export function SalWorkspace({
                   ) : null}
                 </div>
               ) : null}
-              <Button
+              <button
                 aria-disabled={!canUsePrimary}
-                className="h-9 text-11px font-black"
+                className={cn(
+                  "sal-primary-button h-9 min-h-9 px-4 text-11px font-black",
+                  !canUsePrimary && "pointer-events-none opacity-50",
+                )}
                 disabled={!canUsePrimary}
                 onClick={onPrimary}
                 title={primaryDisabledReason ?? undefined}
                 type="button"
-                variant="primary"
               >
                 {primaryLabel}
-                <ArrowRight className="size-3.5" />
-              </Button>
+                <ArrowRight aria-hidden className="size-3.5" />
+              </button>
             </div>
           </div>
         </div>
@@ -272,11 +281,19 @@ export function SalWorkspace({
         )}
       </header>
 
-      {/* ─── Body: content ─── */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 lg:p-6">
+        <div
+          className={
+            phase === "measure"
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+              : "min-h-0 flex-1 overflow-y-auto"
+          }
+        >
+          {children}
+        </div>
+      </main>
 
-      {/* ─── Bottom bar (sticky) ─── */}
-      <footer className="sticky bottom-0 z-20 border-t-2 border-[var(--border-subtle)]/40 bg-[var(--surface-base)] shadow-[0_-2px_0_var(--surface-base)]">
+      <footer className="z-20 shrink-0 border-t-2 border-[var(--border-subtle)]/40 bg-[var(--surface-base)] shadow-[0_-8px_24px_color-mix(in_srgb,var(--text-primary)_6%,transparent)]">
         <div className="flex items-center justify-between gap-4 overflow-x-auto px-4 py-2.5 lg:px-6">
           <div className="flex items-center gap-4 text-12px">
             <span className="whitespace-nowrap text-[var(--text-tertiary)]">

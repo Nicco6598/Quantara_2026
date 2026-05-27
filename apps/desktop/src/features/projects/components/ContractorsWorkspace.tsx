@@ -16,9 +16,12 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { memo, type ReactNode, useMemo, useRef, useState } from "react";
+import { memo, type MouseEvent, type ReactNode, useMemo, useRef, useState } from "react";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Button } from "@/components/shared/Button";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildContractorContextMenuEntries } from "@/lib/context-menu-presets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Panel } from "@/components/shared/Panel";
 import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
@@ -380,6 +383,7 @@ function ContractorFoldersPanel({
   onOpenCreateContractor: () => void;
   onOpenFolder: (folderId: string) => void;
 }) {
+  const folderContextMenu = useContextMenu<ContractorFolder>();
   const [query, setQuery] = useState("");
   const filteredFolders = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("it-IT");
@@ -456,6 +460,7 @@ function ContractorFoldersPanel({
               <ContractorCard
                 key={folder.id}
                 folder={folder}
+                onContextMenu={(event) => folderContextMenu.open(event, folder)}
                 onDeleteContractor={onDeleteContractor}
                 onOpenFolder={onOpenFolder}
               />
@@ -478,6 +483,27 @@ function ContractorFoldersPanel({
           </span>
         </div>
       ) : null}
+
+      {folderContextMenu.state ? (
+        <AppContextMenu
+          entries={buildContractorContextMenuEntries({
+            onDelete: () => {
+              const state = folderContextMenu.state;
+              if (!state) return;
+              onDeleteContractor(state.context);
+            },
+          })}
+          header={{
+            title: folderContextMenu.state.context.contractor,
+            subtitle: `${folderContextMenu.state.context.projectCount} progetti`,
+          }}
+          onClose={folderContextMenu.close}
+          position={{
+            x: folderContextMenu.state.x,
+            y: folderContextMenu.state.y,
+          }}
+        />
+      ) : null}
     </Panel>
   );
 }
@@ -495,10 +521,12 @@ function formatRecentDate(dateStr: string): string {
 
 function ContractorCard({
   folder,
+  onContextMenu,
   onDeleteContractor,
   onOpenFolder,
 }: {
   folder: ContractorFolder;
+  onContextMenu: (event: MouseEvent) => void;
   onDeleteContractor: (folder: ContractorFolder) => void;
   onOpenFolder: (id: string) => void;
 }) {
@@ -508,108 +536,114 @@ function ContractorCard({
   const budgetLabel = formatMoney({ amount: folder.budget, currency: "EUR" });
 
   return (
-    <div className="group relative rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] transition-[border-color,background-color] duration-fast hover:border-[color-mix(in_srgb,var(--accent-primary)_24%,var(--border-subtle))] hover:bg-[var(--bg-muted)]/35">
-      <m.article
-        layout
-        animate={MOTION_VARIANTS.card.whileInView}
-        className="relative rounded-lg"
-        exit={{ opacity: 0, scale: 0.994, y: 10 }}
-        initial={MOTION_VARIANTS.card.initial}
-        transition={MOTION_VARIANTS.card.transition}
+    <>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: contractor folder card exposes a context menu on right-click */}
+      <div
+        className="group relative rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] transition-[border-color,background-color] duration-fast hover:border-[color-mix(in_srgb,var(--accent-primary)_24%,var(--border-subtle))] hover:bg-[var(--bg-muted)]/35"
+        onContextMenu={onContextMenu}
       >
-        <div className="absolute right-2 top-2 z-20">
-          <ContractorMenu folder={folder} onDeleteContractor={onDeleteContractor} />
-        </div>
-
-        <button
-          aria-label={`Apri ${folder.contractor}`}
-          className="relative z-10 grid w-full gap-3 p-3 pr-12 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] md:grid-cols-[minmax(0,1.35fr)_88px_110px_112px_minmax(150px,0.9fr)] md:items-center"
-          onClick={() => onOpenFolder(folder.id)}
-          type="button"
+        <m.article
+          layout
+          animate={MOTION_VARIANTS.card.whileInView}
+          className="relative rounded-lg"
+          exit={{ opacity: 0, scale: 0.994, y: 10 }}
+          initial={MOTION_VARIANTS.card.initial}
+          transition={MOTION_VARIANTS.card.transition}
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <ContractorAvatar initials={initials} tone={health.tone} />
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate text-14px font-semibold leading-tight text-[var(--text-primary)]">
-                {folder.contractor}
-              </h3>
-              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-11px font-medium text-[var(--text-secondary)]">
-                <span className="tabular-nums">{folder.projectCount} progetti</span>
-                <span className="tabular-nums">{folder.salCount} SAL</span>
+          <div className="absolute right-2 top-2 z-20">
+            <ContractorMenu folder={folder} onDeleteContractor={onDeleteContractor} />
+          </div>
+
+          <button
+            aria-label={`Apri ${folder.contractor}`}
+            className="relative z-10 grid w-full gap-3 p-3 pr-12 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] md:grid-cols-[minmax(0,1.35fr)_88px_110px_112px_minmax(150px,0.9fr)] md:items-center"
+            onClick={() => onOpenFolder(folder.id)}
+            type="button"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <ContractorAvatar initials={initials} tone={health.tone} />
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-14px font-semibold leading-tight text-[var(--text-primary)]">
+                  {folder.contractor}
+                </h3>
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-11px font-medium text-[var(--text-secondary)]">
+                  <span className="tabular-nums">{folder.projectCount} progetti</span>
+                  <span className="tabular-nums">{folder.salCount} SAL</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <span
-            className={cn(
-              "inline-flex w-fit items-center rounded-md px-2 py-1 text-11px font-semibold",
-              statusToneStyles[health.tone],
-            )}
-          >
-            {health.label}
-          </span>
-
-          <div>
-            <div className="text-10px font-medium text-[var(--text-secondary)]">Budget</div>
-            <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--text-primary)]">
-              {budgetLabel}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-10px font-medium text-[var(--text-secondary)]">SAL aperti</div>
-            <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--accent-primary)]">
-              {exposureLabel}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-10px font-medium text-[var(--text-secondary)]">Criticità</div>
-            <div
+            <span
               className={cn(
-                "mt-0.5 text-12px font-semibold tabular-nums",
-                folder.criticalCount > 0
-                  ? "text-[var(--warning-base)]"
-                  : "text-[var(--text-primary)]",
+                "inline-flex w-fit items-center rounded-md px-2 py-1 text-11px font-semibold",
+                statusToneStyles[health.tone],
               )}
             >
-              {folder.criticalCount} · {folder.salWindowCount} finestre
-            </div>
-          </div>
+              {health.label}
+            </span>
 
-          <div className="min-w-0">
-            {folder.recentSal ? (
-              <div>
-                <div className="flex min-w-0 items-center gap-1.5 text-11px leading-tight">
-                  <span className="truncate font-medium text-[var(--text-primary)]">
-                    {folder.recentSal.title}
-                  </span>
-                  <span
-                    className={cn(
-                      "shrink-0 font-medium",
-                      statusToneStyles[
-                        SAL_STATUS_TONE_KEYS[folder.recentSal.status] ?? "neutral"
-                      ] || "text-[var(--text-tertiary)]",
-                    )}
-                  >
-                    {SAL_STATUS_LABELS[folder.recentSal.status] || folder.recentSal.status}
-                  </span>
-                </div>
-                <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-10px font-medium text-[var(--text-tertiary)]">
-                  <span className="truncate">{folder.recentSal.projectName}</span>
-                  <span className="size-0.5 shrink-0 rounded-full bg-[var(--text-tertiary)]/40" />
-                  <span className="shrink-0">{formatRecentDate(folder.recentSal.date)}</span>
-                </div>
+            <div>
+              <div className="text-10px font-medium text-[var(--text-secondary)]">Budget</div>
+              <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--text-primary)]">
+                {budgetLabel}
               </div>
-            ) : (
-              <span className="text-11px font-medium text-[var(--text-tertiary)]">
-                Nessun SAL recente
-              </span>
-            )}
-          </div>
-        </button>
-      </m.article>
-    </div>
+            </div>
+
+            <div>
+              <div className="text-10px font-medium text-[var(--text-secondary)]">SAL aperti</div>
+              <div className="mt-0.5 truncate text-12px font-semibold tabular-nums text-[var(--accent-primary)]">
+                {exposureLabel}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-10px font-medium text-[var(--text-secondary)]">Criticità</div>
+              <div
+                className={cn(
+                  "mt-0.5 text-12px font-semibold tabular-nums",
+                  folder.criticalCount > 0
+                    ? "text-[var(--warning-base)]"
+                    : "text-[var(--text-primary)]",
+                )}
+              >
+                {folder.criticalCount} · {folder.salWindowCount} finestre
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              {folder.recentSal ? (
+                <div>
+                  <div className="flex min-w-0 items-center gap-1.5 text-11px leading-tight">
+                    <span className="truncate font-medium text-[var(--text-primary)]">
+                      {folder.recentSal.title}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 font-medium",
+                        statusToneStyles[
+                          SAL_STATUS_TONE_KEYS[folder.recentSal.status] ?? "neutral"
+                        ] || "text-[var(--text-tertiary)]",
+                      )}
+                    >
+                      {SAL_STATUS_LABELS[folder.recentSal.status] || folder.recentSal.status}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-10px font-medium text-[var(--text-tertiary)]">
+                    <span className="truncate">{folder.recentSal.projectName}</span>
+                    <span className="size-0.5 shrink-0 rounded-full bg-[var(--text-tertiary)]/40" />
+                    <span className="shrink-0">{formatRecentDate(folder.recentSal.date)}</span>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-11px font-medium text-[var(--text-tertiary)]">
+                  Nessun SAL recente
+                </span>
+              )}
+            </div>
+          </button>
+        </m.article>
+      </div>
+    </>
   );
 }
 

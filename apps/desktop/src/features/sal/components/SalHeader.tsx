@@ -11,7 +11,9 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { AutoSaveIndicator } from "@/components/shared/AutoSaveIndicator";
 import { Button } from "@/components/shared/Button";
+import type { DraftAutosaveStatus } from "@/hooks/use-draft-autosave";
 import { cn } from "@/lib/utils";
 import type { SalWorkflowPhase } from "../state/workflow";
 import { getPhaseIndex } from "../state/workflow";
@@ -47,6 +49,8 @@ export function SalHeader({
   primaryDisabledReason,
   searchBar,
   downloadActions = [],
+  autoSaveLastSaved = null,
+  autoSaveStatus = "idle",
   onPrimary,
   onSaveDraft,
   onPhaseChange,
@@ -71,6 +75,8 @@ export function SalHeader({
     label: string;
     onClick: () => void;
   }>;
+  autoSaveLastSaved?: string | null;
+  autoSaveStatus?: DraftAutosaveStatus;
   onPrimary: () => void;
   onSaveDraft: () => void;
   onPhaseChange: (phase: Exclude<SalWorkflowPhase, "completed">) => void;
@@ -164,6 +170,7 @@ export function SalHeader({
           )}
 
           <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+            <AutoSaveIndicator lastSaved={autoSaveLastSaved} status={autoSaveStatus} />
             <div className="flex h-9 items-center gap-2 rounded-lg border border-[var(--accent-primary)]/18 bg-[var(--accent-primary)]/[0.045] px-3">
               <WalletCards className="size-4 text-[var(--accent-primary)]" />
               <div className="text-right">
@@ -248,18 +255,20 @@ export function SalHeader({
               </div>
             ) : null}
 
-            <Button
+            <button
               aria-disabled={!canUsePrimary}
-              className="h-9 text-11px font-black"
+              className={cn(
+                "sal-primary-button h-9 min-h-9 px-4 text-11px font-black",
+                !canUsePrimary && "pointer-events-none opacity-50",
+              )}
               disabled={!canUsePrimary}
               onClick={onPrimary}
               title={primaryDisabledReason ?? undefined}
               type="button"
-              variant="primary"
             >
               {phase === "completed" ? "Completato" : PRIMARY_LABELS[phase]}
-              <ArrowRight className="size-3.5" />
-            </Button>
+              <ArrowRight aria-hidden className="size-3.5" />
+            </button>
           </div>
         </div>
       </div>

@@ -2536,6 +2536,13 @@ select {
   appearance: none;
 }
 
+:root[data-theme-transitioning] *,
+:root[data-theme-transitioning] *::before,
+:root[data-theme-transitioning] *::after {
+  transition-delay: 0ms;
+  transition-duration: 0ms;
+}
+
 :root[data-motion="reduced"] *,
 :root[data-motion="reduced"] *::before,
 :root[data-motion="reduced"] *::after {

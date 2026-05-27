@@ -24,7 +24,8 @@ import { listDesktopContracts, listDesktopMaterials } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
 import { motionSpring } from "@/motion";
 import { readJsonFromStorage } from "@/persistence/json-storage";
-import { SESSION_STORAGE_KEYS, STORAGE_KEYS } from "@/persistence/storage-keys";
+import { getWorkflowProjectId, selectProjectForWorkflow } from "@/lib/workflow-navigation";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import type { QuantaraRoute } from "@/store/app-store";
 import { useActiveContext } from "@/store/app-store";
 
@@ -151,16 +152,7 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   const projectCount = projects.length;
 
   const contextLabel = useMemo(() => {
-    const selectedProjectId = (() => {
-      try {
-        const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEYS.selectedProjectDetail);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw) as { id?: unknown };
-        return typeof parsed.id === "string" ? parsed.id : null;
-      } catch {
-        return null;
-      }
-    })();
+    const selectedProjectId = getWorkflowProjectId();
 
     if (activeRoute === "projects" && activeContext) {
       return {
@@ -416,13 +408,8 @@ function SidebarContextBreadcrumb({
           <button
             className="min-w-0 rounded-md px-1 py-0.5 text-left text-11px font-semibold leading-4 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--accent-primary)]"
             onClick={() => {
-              try {
-                window.sessionStorage.setItem(
-                  SESSION_STORAGE_KEYS.selectedProjectDetail,
-                  JSON.stringify({ id: label.secondaryId }),
-                );
-              } catch {
-                /* no-op */
+              if (label.secondaryId) {
+                selectProjectForWorkflow(label.secondaryId);
               }
               onNavigate("project-detail");
             }}
