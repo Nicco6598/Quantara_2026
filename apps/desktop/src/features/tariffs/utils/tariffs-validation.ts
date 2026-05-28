@@ -1,30 +1,102 @@
 import type { DesktopTariffVoice } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 
-export function getImportValidation(voices: DesktopTariffVoice[]): ImportValidation {
+export type ImportValidationRow = ImportValidation["invalidRows"][number] & {
+  code: string;
+};
+
+export type ImportCrossFileErrorRow = ImportValidationRow & {
+  fileIndex: number;
+  fileName: string;
+  isActiveFile: boolean;
+};
+
+export function enrichValidationRows(
+  rows: ImportValidation["invalidRows"],
+  voices: readonly DesktopTariffVoice[],
+): ImportValidationRow[] {
+  return rows.map((row) => ({
+    ...row,
+    code: voices[row.index]?.officialCode.trim() || `Riga ${row.index + 1}`,
+  }));
+}
+
+function collectMissingFields(voice: DesktopTariffVoice, code: string) {
+  const missingFields: Array<{ field: keyof DesktopTariffVoice; label: string }> = [];
+  if (code.length === 0) {
+    missingFields.push({ field: "officialCode", label: "codice" });
+  }
+  if (voice.description.trim().length === 0) {
+    missingFields.push({ field: "description", label: "descrizione" });
+  }
+  if (voice.unitOfMeasure.trim().length === 0) {
+    missingFields.push({ field: "unitOfMeasure", label: "U.M." });
+  }
+  if (!Number.isFinite(voice.unitPrice)) {
+    missingFields.push({ field: "unitPrice", label: "prezzo" });
+  }
+  return missingFields;
+}
+
+/** Fast path: counts and examples only — no per-row arrays (used during multi-file prewarm). */
+export function getImportValidationSummary(
+  voices: readonly DesktopTariffVoice[],
+): ImportValidation {
+  const codeCounts = new Map<string, number>();
+  const invalidExamples: string[] = [];
+  let invalidCount = 0;
+
+  for (let index = 0; index < voices.length; index++) {
+    const voice = voices[index];
+    if (!voice) continue;
+    const code = voice.officialCode.trim();
+    codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1);
+
+    if (collectMissingFields(voice, code).length > 0) {
+      invalidCount += 1;
+      if (invalidExamples.length < 4) {
+        invalidExamples.push(code || voice.id);
+      }
+    }
+  }
+
+  const duplicateExamples: string[] = [];
+  let duplicateCount = 0;
+  for (const [code, count] of codeCounts) {
+    if (count > 1) {
+      duplicateCount += count - 1;
+      if (duplicateExamples.length < 4) {
+        duplicateExamples.push(code);
+      }
+    }
+  }
+
+  return {
+    duplicateCount,
+    duplicateExamples,
+    duplicateRows: [],
+    invalidCount,
+    invalidExamples,
+    invalidRows: [],
+    validCount: Math.max(0, voices.length - invalidCount),
+    warningCount: 0,
+  };
+}
+
+/** Full validation with row-level detail for grids and error navigation. */
+export function getImportValidation(voices: readonly DesktopTariffVoice[]): ImportValidation {
   const codeCounts = new Map<string, number>();
   const invalidExamples: string[] = [];
   const invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }> = [];
   let invalidCount = 0;
 
-  for (const [index, voice] of voices.entries()) {
+  for (let index = 0; index < voices.length; index++) {
+    const voice = voices[index];
+    if (!voice) continue;
     const code = voice.officialCode.trim();
     codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1);
 
-    const missingFields: Array<{ field: keyof DesktopTariffVoice; label: string }> = [];
-    if (code.length === 0) {
-      missingFields.push({ field: "officialCode", label: "codice" });
-    }
-    if (voice.description.trim().length === 0) {
-      missingFields.push({ field: "description", label: "descrizione" });
-    }
-    if (voice.unitOfMeasure.trim().length === 0) {
-      missingFields.push({ field: "unitOfMeasure", label: "U.M." });
-    }
-    if (!Number.isFinite(voice.unitPrice)) {
-      missingFields.push({ field: "unitPrice", label: "prezzo" });
-    }
-
+    const missingFields = collectMissingFields(voice, code);
     if (missingFields.length > 0) {
       invalidCount += 1;
       if (invalidExamples.length < 4) {
@@ -37,21 +109,27 @@ export function getImportValidation(voices: DesktopTariffVoice[]): ImportValidat
   }
 
   const duplicateExamples: string[] = [];
+  let duplicateCount = 0;
+  const duplicateCodes = new Set<string>();
   for (const [code, count] of codeCounts) {
     if (count > 1) {
-      duplicateExamples.push(code);
-      if (duplicateExamples.length >= 4) break;
+      duplicateCount += count - 1;
+      duplicateCodes.add(code);
+      if (duplicateExamples.length < 4) {
+        duplicateExamples.push(code);
+      }
     }
   }
-  const duplicateCount = [...codeCounts.values()].reduce(
-    (sum, count) => sum + Math.max(0, count - 1),
-    0,
-  );
+
   const duplicateRows: Array<{ field: "officialCode"; index: number; label: string }> = [];
-  for (const [index, voice] of voices.entries()) {
-    const code = voice.officialCode.trim();
-    if (code.length > 0 && (codeCounts.get(code) ?? 0) > 1) {
-      duplicateRows.push({ field: "officialCode", index, label: "codice duplicato" });
+  if (duplicateCodes.size > 0) {
+    for (let index = 0; index < voices.length; index++) {
+      const voice = voices[index];
+      if (!voice) continue;
+      const code = voice.officialCode.trim();
+      if (code.length > 0 && duplicateCodes.has(code)) {
+        duplicateRows.push({ field: "officialCode", index, label: "codice duplicato" });
+      }
     }
   }
 
@@ -63,8 +141,13 @@ export function getImportValidation(voices: DesktopTariffVoice[]): ImportValidat
     invalidExamples,
     invalidRows,
     validCount: Math.max(0, voices.length - invalidCount),
-    warningCount: duplicateCount + invalidCount,
+    warningCount: 0,
   };
+}
+
+/** Rows that block import confirmation — missing/invalid fields and duplicate codes. */
+export function getBlockingIssueCount(validation: ImportValidation): number {
+  return validation.invalidCount + validation.duplicateCount;
 }
 
 const percentFormatter = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 });

@@ -9,7 +9,15 @@ import {
   Plus,
   Save,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -47,7 +55,10 @@ import { type PendingWorkflowAction, useAppStore } from "@/store/app-store";
 
 import { AddVoiceDialog } from "./components/AddVoiceDialog";
 import { QuickAction } from "./components/QuickAction";
-import { TariffImportLoadingModal } from "./components/TariffImportLoadingModal";
+import {
+  TariffImportLoadingModal,
+  type TariffImportLoadingStage,
+} from "./components/TariffImportLoadingModal";
 import type { TariffImportPreviewResult } from "./components/TariffImportPreviewModal";
 import { TariffBookPreviewCard, TariffImportPreviewPanel } from "./components/TariffScreenPanels";
 import { TariffVoicesExplorerModal } from "./components/TariffVoicesExplorerModal";
@@ -58,6 +69,7 @@ import {
   initialImportMeta,
   isStringArray,
 } from "./state/import-meta";
+import { clearImportPreviewSessionCache } from "./utils/import-preview-session-cache";
 import {
   fallbackContracts,
   fallbackTariffBook,
@@ -143,6 +155,9 @@ export function TariffsScreen() {
   const editPreviewBookIdMap = useRef<Map<string, string>>(new Map());
   const [importMeta, dispatchImport] = useReducer(importMetaReducer, initialImportMeta);
   const { phase: importPhase, previews: importPreviews, files: importFiles } = importMeta;
+  const [showImportLoadingOverlay, setShowImportLoadingOverlay] = useState(false);
+  const [importLoadingStage, setImportLoadingStage] =
+    useState<TariffImportLoadingStage>("selecting");
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [detailBookId, setDetailBookId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditTariffBookForm>({
@@ -403,18 +418,28 @@ export function TariffsScreen() {
     [importPreviews, reviewedFiles],
   );
 
+  const handleImportPreviewReady = useCallback(() => {
+    setShowImportLoadingOverlay(false);
+    setImportLoadingStage("parsing");
+  }, []);
+
   const handlePdfImport = useCallback(async () => {
+    setShowImportLoadingOverlay(true);
+    setImportLoadingStage("selecting");
     dispatchImport({ type: "START_LOADING" });
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    setImportLoadingStage("parsing");
 
     try {
       const results = await selectMultipleTariffPdfMetadatas((progress) => {
-        dispatchImport({ type: "UPDATE_FILE", file: progress });
+        startTransition(() => {
+          dispatchImport({ type: "UPDATE_FILE", file: progress });
+        });
       });
 
-      dispatchImport({ type: "SET_PHASE", phase: "idle" });
-
       if (results.length === 0) {
+        setShowImportLoadingOverlay(false);
+        dispatchImport({ type: "CLEAR" });
         notify({
           message: "Nessun file selezionato o selezione annullata.",
           title: "Import tariffario",
@@ -423,17 +448,21 @@ export function TariffsScreen() {
         return;
       }
 
-      const withVoices = results.filter((m) => m.voices.length > 0);
+      const withVoices = results.filter((metadata) => metadata.voices.length > 0);
       if (withVoices.length > 0) {
-        dispatchImport({ type: "SET_PREVIEWS", previews: results });
         editPreviewBookIdMap.current = new Map();
-        dispatchImport({ type: "SET_PHASE", phase: "preview" });
+        dispatchImport({ type: "SHOW_PREVIEW", previews: results });
+        setShowImportLoadingOverlay(false);
+        setImportLoadingStage("parsing");
         notify({
-          message: `${withVoices.length} file pronti per la preview.`,
+          message: `${results.length} file pronti per la revisione.`,
           title: "Importazione completata",
           tone: "success",
         });
       } else {
+        clearImportPreviewSessionCache();
+        setShowImportLoadingOverlay(false);
+        dispatchImport({ type: "CLEAR" });
         notify({
           message: "Nessuna voce tariffaria rilevata nei file selezionati.",
           title: "Importazione",
@@ -441,7 +470,9 @@ export function TariffsScreen() {
         });
       }
     } catch (error) {
-      dispatchImport({ type: "SET_PHASE", phase: "idle" });
+      clearImportPreviewSessionCache();
+      setShowImportLoadingOverlay(false);
+      dispatchImport({ type: "CLEAR" });
       notify({
         message: formatImportError(error),
         title: "Import tariffario non riuscito",
@@ -778,8 +809,6 @@ export function TariffsScreen() {
       savedVoiceMap.current = nextSavedVoiceMap;
     }
 
-    clearImport();
-
     if (importedCount > 0) {
       const savedBookIds = new Set(savedBooks.map((book) => book.id));
       const duplicateBookIds = duplicateBookIdsToDelete;
@@ -831,9 +860,14 @@ export function TariffsScreen() {
         tone: "success",
       });
     }
+
+    clearImport();
   }
 
   const clearImport = useCallback(() => {
+    clearImportPreviewSessionCache();
+    setShowImportLoadingOverlay(false);
+    setImportLoadingStage("parsing");
     dispatchImport({ type: "CLEAR" });
     editPreviewBookIdMap.current = new Map();
     setReviewedFiles(new Set());
@@ -1081,7 +1115,11 @@ export function TariffsScreen() {
   return (
     <ScreenLayout
       ref={screenRef}
-      className={importPhase === "preview" && importPreviews.length > 0 ? "" : "overflow-x-hidden"}
+      className={
+        importPhase === "preview" && importPreviews.length > 0
+          ? "flex h-full min-h-0 flex-col overflow-hidden !pb-0 !pt-0"
+          : "overflow-x-hidden"
+      }
     >
       {importPhase === "preview" && importPreviews.length > 0 ? (
         <TariffImportPreviewPanel
@@ -1089,6 +1127,7 @@ export function TariffsScreen() {
           getExistingBookIds={getExistingBookIds}
           importPreviewIndex={importPreviewIndex}
           importPreviews={importPreviews}
+          onPreviewReady={handleImportPreviewReady}
           onCancel={clearImport}
           onConfirm={handleConfirmImport}
           onActiveIndexChange={(index) => {
@@ -1394,7 +1433,9 @@ export function TariffsScreen() {
         tariffBooks={tariffBooksState.data}
         onSave={handleAddVoiceSave}
       />
-      {importPhase === "loading" ? <TariffImportLoadingModal files={importFiles} /> : null}
+      {showImportLoadingOverlay ? (
+        <TariffImportLoadingModal files={importFiles} stage={importLoadingStage} />
+      ) : null}
       {isVoicesExplorerOpen ? (
         <TariffVoicesExplorerModal
           groups={groupedVoices}

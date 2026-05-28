@@ -4,10 +4,7 @@ import {
   CaretDown,
   CaretLeft,
   CaretRight,
-  CheckCircle,
-  FloppyDisk,
   MagnifyingGlass,
-  Trash,
 } from "@phosphor-icons/react";
 import { AnimatePresence, m } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,11 +13,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cn } from "@/lib/utils";
 import { beginProjectCreate } from "@/lib/workflow-navigation";
 import { MOTION_DURATION, SPRING_EASE } from "@/motion";
-import {
-  useActiveRouteState,
-  useHistoryNavigationState,
-  useTariffImportToolbarState,
-} from "@/store/app-store";
+import { useActiveRouteState, useHistoryNavigationState } from "@/store/app-store";
 import {
   commonPageActions,
   markIconMap,
@@ -75,9 +68,8 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {isTariffPreview ? (
-            <TariffImportControls onAction={onPageAction} />
-          ) : activeRoute === "sal-create" || activeRoute === "project-create" ? null : (
+          {isTariffPreview ? null : activeRoute === "sal-create" ||
+            activeRoute === "project-create" ? null : (
             <>
               <div className="top-toolbar-divider" />
               <PageActions actions={pageActions} onAction={onPageAction} />
@@ -87,224 +79,6 @@ export function TopToolbar({ onPageAction }: TopToolbarProps) {
         </div>
       </div>
     </header>
-  );
-}
-
-function TariffImportControls({ onAction }: { onAction: (actionId: string) => void }) {
-  const tariffImportToolbar = useTariffImportToolbarState();
-  const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
-  const fileCount = tariffImportToolbar.fileLabels.length;
-  const activeLabel = tariffImportToolbar.fileLabels[tariffImportToolbar.activeIndex];
-  const canGoPrevious = tariffImportToolbar.activeIndex > 0;
-  const canGoNext = tariffImportToolbar.activeIndex < fileCount - 1;
-
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-1 ring-1 ring-[var(--border-subtle)]/50">
-        <div className="relative hidden min-w-0 items-center gap-1 xl:flex">
-          <button
-            className={cn(
-              "top-toolbar-icon-button flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)]",
-              !canGoPrevious && "cursor-not-allowed opacity-40",
-            )}
-            disabled={!canGoPrevious}
-            onClick={() => onAction(`tariff-import-select-${tariffImportToolbar.activeIndex - 1}`)}
-            title="File precedente"
-            type="button"
-          >
-            <CaretLeft size={14} weight="bold" />
-          </button>
-          <button
-            aria-expanded={isFileMenuOpen}
-            className="flex h-8 min-w-[164px] max-w-[220px] items-center justify-between gap-2 rounded-full bg-[var(--bg-muted)] px-2.5 text-left text-10px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-muted-strong)]"
-            onClick={() => setIsFileMenuOpen((current) => !current)}
-            title={activeLabel}
-            type="button"
-          >
-            <span className="min-w-0 truncate">{activeLabel ?? "Preview importazione"}</span>
-            <span className="shrink-0 text-[var(--text-secondary)]">
-              {fileCount > 0 ? `${tariffImportToolbar.activeIndex + 1}/${fileCount}` : "0/0"}
-            </span>
-            <CaretDown
-              size={10}
-              weight="bold"
-              className={cn("shrink-0 transition-transform", isFileMenuOpen && "rotate-180")}
-            />
-          </button>
-          <button
-            className={cn(
-              "top-toolbar-icon-button flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)]",
-              !canGoNext && "cursor-not-allowed opacity-40",
-            )}
-            disabled={!canGoNext}
-            onClick={() => onAction(`tariff-import-select-${tariffImportToolbar.activeIndex + 1}`)}
-            title="File successivo"
-            type="button"
-          >
-            <CaretRight size={14} weight="bold" />
-          </button>
-          <AnimatePresence>
-            {isFileMenuOpen ? (
-              <>
-                <button
-                  aria-label="Chiudi selezione file"
-                  className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
-                  onClick={() => setIsFileMenuOpen(false)}
-                  type="button"
-                />
-                <m.div
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="absolute right-0 top-full z-[var(--z-dropdown-menu)] mt-3 w-[360px] overflow-hidden rounded-22px bg-[color-mix(in_srgb,var(--bg-muted-strong)_72%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)] backdrop-blur-md"
-                  exit={{ opacity: 0, scale: 0.96, y: -8 }}
-                  initial={{ opacity: 0, scale: 0.96, y: -8 }}
-                  transition={{ duration: MOTION_DURATION.base, ease: SPRING_EASE }}
-                >
-                  <div className="max-h-[360px] overflow-y-auto rounded-17px bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--bg-muted)_6%)] p-1">
-                    {tariffImportToolbar.fileLabels.map((label, index) => {
-                      const isActive = index === tariffImportToolbar.activeIndex;
-                      return (
-                        <button
-                          className={cn(
-                            "flex w-full items-center gap-3 rounded-14px px-3 py-2.5 text-left transition-colors",
-                            isActive
-                              ? "bg-[var(--accent-primary)] text-[var(--text-inverse)]"
-                              : "text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-                          )}
-                          key={label}
-                          onClick={() => {
-                            onAction(`tariff-import-select-${index}`);
-                            setIsFileMenuOpen(false);
-                          }}
-                          type="button"
-                        >
-                          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-current/10 text-10px font-black">
-                            {index + 1}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-12px font-semibold">
-                            {label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </m.div>
-              </>
-            ) : null}
-          </AnimatePresence>
-        </div>
-        <m.button
-          className={cn(
-            "flex size-9 items-center justify-center rounded-full transition-colors",
-            fileCount > 0
-              ? "text-[var(--danger-base)] hover:bg-[var(--danger-soft)]"
-              : "text-[var(--text-secondary)]/40 cursor-not-allowed",
-          )}
-          disabled={fileCount === 0}
-          onClick={() => onAction("tariff-import-delete-file")}
-          title="Cancella file dalla revisione"
-          type="button"
-        >
-          <Trash size={14} weight="bold" />
-        </m.button>
-      </div>
-
-      <div className="inline-flex items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] px-3 py-1 text-10px font-bold ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_78%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_36%,transparent)]">
-        <div className="flex flex-col justify-center gap-0.5 leading-none">
-          <span
-            className={cn(
-              "text-11px",
-              tariffImportToolbar.reviewedCount === fileCount && fileCount > 0
-                ? "text-[var(--success-base)]"
-                : tariffImportToolbar.reviewedCount > 0
-                  ? "text-[var(--warning-base)]"
-                  : "text-[var(--text-secondary)]",
-            )}
-          >
-            <span className="text-10px font-semibold text-[var(--text-secondary)]">Rev.</span>{" "}
-            {tariffImportToolbar.reviewedCount}/{fileCount}
-          </span>
-          <span
-            className={cn(
-              "text-11px",
-              tariffImportToolbar.draftedCount > 0
-                ? "text-[var(--warning-base)]"
-                : "text-[var(--text-secondary)]",
-            )}
-          >
-            <span className="text-10px font-semibold text-[var(--text-secondary)]">Bozza</span>{" "}
-            {tariffImportToolbar.draftedCount}/{fileCount}
-          </span>
-        </div>
-        <span className="h-8 w-px bg-[var(--border-subtle)]/60" />
-        <div className="flex flex-col items-center">
-          <span className="text-15px font-black tabular-nums leading-none text-[var(--text-primary)]">
-            {fileCount}
-          </span>
-          <span className="text-9px font-semibold text-[var(--text-secondary)]">totali</span>
-        </div>
-      </div>
-
-      <div className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--bg-muted)_70%,var(--surface-base)_30%)] p-1 ring-1 ring-[var(--border-subtle)]/50">
-        <m.button
-          className={cn(
-            "group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold transition-colors",
-            tariffImportToolbar.activeReviewed
-              ? "bg-[var(--success-base)] text-[var(--text-inverse)] shadow-sm"
-              : "border border-[var(--success-base)]/25 bg-[color-mix(in_srgb,var(--success-base)_8%,var(--surface-base)_92%)] text-[color-mix(in_srgb,var(--success-base)_82%,var(--text-primary))] hover:bg-[color-mix(in_srgb,var(--success-base)_18%,var(--surface-base)_82%)]",
-          )}
-          onClick={() => onAction("tariff-import-toggle-reviewed")}
-          type="button"
-        >
-          <span
-            className={cn(
-              "flex size-5 items-center justify-center rounded-full",
-              tariffImportToolbar.activeReviewed
-                ? "bg-[var(--accent-primary)]/20 text-[var(--text-inverse)]"
-                : "text-[var(--success-base)]",
-            )}
-          >
-            <CheckCircle size={11} weight="bold" />
-          </span>
-          <span>{tariffImportToolbar.activeReviewed ? "Revisionato" : "Revisiona"}</span>
-        </m.button>
-        <m.button
-          className={cn(
-            "group flex h-9 items-center gap-1.5 rounded-full px-3 text-12px font-bold transition-colors",
-            tariffImportToolbar.activeDrafted
-              ? "bg-[var(--warning-base)] text-[var(--text-inverse)] shadow-sm"
-              : "border border-[var(--warning-base)]/30 bg-[color-mix(in_srgb,var(--warning-base)_10%,var(--surface-base)_90%)] text-[color-mix(in_srgb,var(--warning-base)_80%,var(--text-primary))] hover:bg-[color-mix(in_srgb,var(--warning-base)_20%,var(--surface-base)_80%)]",
-          )}
-          onClick={() => onAction("tariff-import-save-draft")}
-          title="Salva questo file come bozza"
-          type="button"
-        >
-          <span
-            className={cn(
-              "flex size-5 items-center justify-center rounded-full",
-              tariffImportToolbar.activeDrafted
-                ? "bg-[var(--accent-primary)]/20 text-[var(--text-inverse)]"
-                : "text-[var(--warning-base)]",
-            )}
-          >
-            <FloppyDisk size={11} weight="bold" />
-          </span>
-          <span>{tariffImportToolbar.activeDrafted ? "Salvato in bozza" : "Salva bozza"}</span>
-        </m.button>
-      </div>
-
-      <m.button
-        className={cn(
-          "inline-flex h-10 items-center gap-2 rounded-full bg-[var(--accent-primary)] px-5 text-12px font-bold text-[var(--text-inverse)] shadow-sm transition-colors hover:bg-[var(--accent-primary)]/90",
-          !tariffImportToolbar.canConfirm && "cursor-not-allowed opacity-45 grayscale",
-        )}
-        disabled={!tariffImportToolbar.canConfirm}
-        onClick={() => onAction("tariff-import-confirm")}
-        type="button"
-      >
-        <CheckCircle size={14} weight="bold" />
-        <span>Approva import</span>
-      </m.button>
-    </div>
   );
 }
 

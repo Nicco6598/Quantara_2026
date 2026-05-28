@@ -27,13 +27,6 @@ function getGroupCode(voice: DesktopTariffVoice): string {
   return codeParts.length >= 4 ? codeParts.slice(0, 4).join(".") : voice.officialCode || "Altro";
 }
 
-function extractVoceFromCode(officialCode: string): string {
-  const parts = officialCode.split(".");
-  if (parts.length >= 4) return parts[3] ?? "";
-  if (parts.length >= 3) return parts[2] ?? "";
-  return "";
-}
-
 function inferGroupDescription(voice: DesktopTariffVoice): string {
   if (voice.category.includes("VOCE")) {
     const voceIndex = voice.category.indexOf("VOCE");
@@ -68,25 +61,34 @@ export function groupTariffVoices(voices: DesktopTariffVoice[]): TariffGroup<Des
   return [...groups.values()];
 }
 
-export function groupEditableTariffVoices(voices: DesktopTariffVoice[]): VoiceGroup[] {
+export function groupEditableTariffVoices(voices: readonly DesktopTariffVoice[]): VoiceGroup[] {
   const groups = new Map<string, VoiceGroup>();
 
-  for (const [index, voice] of voices.entries()) {
-    const groupCode = getGroupCode(voice);
-    const codeVoce = extractVoceFromCode(voice.officialCode);
-    const voce = codeVoce || voice.voce || "";
-    const group = groups.get(groupCode) ?? {
-      children: [],
-      code: groupCode,
-      description: inferGroupDescription(voice),
-      voce,
-      voceDesc: voice.voceDesc ?? "",
-      categoria: voice.officialCode.split(".")[1] ?? "",
-      gruppo: voice.officialCode.split(".")[2] ?? "",
-      gruppoDesc: voice.gruppoDesc ?? "",
-    };
+  for (let index = 0; index < voices.length; index++) {
+    const voice = voices[index];
+    if (!voice) continue;
+
+    const officialCode = voice.officialCode;
+    const parts = officialCode.split(".");
+    const groupCode = parts.length >= 4 ? parts.slice(0, 4).join(".") : officialCode || "Altro";
+    const voce =
+      (parts.length >= 4 ? parts[3] : parts.length >= 3 ? parts[2] : "") || voice.voce || "";
+
+    let group = groups.get(groupCode);
+    if (!group) {
+      group = {
+        children: [],
+        code: groupCode,
+        description: inferGroupDescription(voice),
+        voce,
+        voceDesc: voice.voceDesc ?? "",
+        categoria: parts[1] ?? "",
+        gruppo: parts[2] ?? "",
+        gruppoDesc: voice.gruppoDesc ?? "",
+      };
+      groups.set(groupCode, group);
+    }
     group.children.push({ index, voice });
-    groups.set(groupCode, group);
   }
 
   return [...groups.values()];

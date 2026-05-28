@@ -1,102 +1,213 @@
-import { CheckCircle2, FileText, Loader, ScanLine, XCircle } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { CheckCircle2, FileText, Loader2, ScanLine, XCircle } from "lucide-react";
+import { useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ImportFileProgress } from "@/lib/desktopData";
 
-export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[] }) {
-  const doneCount = files.filter((f) => f.status === "done").length;
-  const errorCount = files.filter((f) => f.status === "error").length;
-  const processingCount = files.filter((f) => f.status === "processing").length;
-  const total = files.length;
+export type TariffImportLoadingStage = "opening-preview" | "parsing" | "selecting";
+
+function statusLabel(file: ImportFileProgress): string {
+  if (file.status === "error") return file.error ?? "Errore di lettura";
+  if (file.status === "pending") return "In coda";
+  if (file.status === "processing") {
+    if (file.pagesTotal && file.pagesParsed != null) {
+      return `Pagina ${file.pagesParsed} di ${file.pagesTotal}`;
+    }
+    return "Analisi PDF in corso…";
+  }
+  if (file.pagesTotal) return `${file.pagesTotal} pagine elaborate`;
+  return "Completato";
+}
+
+const SPIN_CLASS = "animate-spin [animation-duration:1.35s]";
+
+function FileStatusIcon({ status }: { status: ImportFileProgress["status"] }) {
+  switch (status) {
+    case "processing":
+      return <Loader2 className={`size-4 shrink-0 text-[var(--accent-primary)] ${SPIN_CLASS}`} />;
+    case "done":
+      return <CheckCircle2 className="size-4 shrink-0 text-[var(--success-base)]" />;
+    case "error":
+      return <XCircle className="size-4 shrink-0 text-[var(--danger-base)]" />;
+    default:
+      return (
+        <span className="size-4 shrink-0 rounded-full border-2 border-[var(--border-subtle)] bg-[var(--surface-base)]" />
+      );
+  }
+}
+
+export function TariffImportLoadingModal({
+  files,
+  stage = "parsing",
+}: {
+  files: readonly ImportFileProgress[];
+  stage?: TariffImportLoadingStage;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sortedFiles = useMemo(
+    () => [...files].sort((left, right) => left.index - right.index),
+    [files],
+  );
+
+  const total = sortedFiles[0]?.total ?? sortedFiles.length;
+  const doneCount = sortedFiles.filter((file) => file.status === "done").length;
+  const errorCount = sortedFiles.filter((file) => file.status === "error").length;
+  const processingFile = sortedFiles.find((file) => file.status === "processing");
   const completedCount = doneCount + errorCount;
+  const progressPercent = total > 0 ? Math.min(100, Math.round((completedCount / total) * 100)) : 0;
+  const allSettled = total > 0 && completedCount >= total && !processingFile;
+
+  const headline =
+    stage === "opening-preview"
+      ? "Apertura anteprima"
+      : stage === "selecting" || total === 0
+        ? "Selezione file"
+        : allSettled
+          ? "Elaborazione completata"
+          : "Importazione tariffari";
+
+  const subtitle =
+    stage === "opening-preview"
+      ? "Preparazione griglia voci e controlli di validazione…"
+      : stage === "selecting" || total === 0
+        ? "Attendi la scelta dei PDF dal dialogo di sistema."
+        : processingFile
+          ? `Lettura di ${processingFile.fileName}`
+          : allSettled
+            ? errorCount > 0
+              ? `${doneCount} file pronti, ${errorCount} con errori.`
+              : `${doneCount} file pronti per la revisione.`
+            : `${completedCount} di ${total} file elaborati`;
+
+  const virtualizer = useVirtualizer({
+    count: sortedFiles.length,
+    estimateSize: () => 76,
+    gap: 10,
+    getScrollElement: () => scrollRef.current,
+    overscan: 8,
+  });
 
   return createPortal(
-    <div className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]">
-        <div className="rounded-22px bg-[var(--surface-base)] p-6 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-          <div className="flex items-start gap-4">
-            <div className="relative flex size-14 shrink-0 items-center justify-center rounded-18px bg-[var(--info-soft)] text-[var(--info-base)]">
-              <FileText className="size-6" />
-              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-[var(--surface-base)] text-[var(--accent-primary)]">
-                <ScanLine className="size-3 animate-pulse" />
-              </span>
+    <div
+      aria-busy="true"
+      aria-live="polite"
+      className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm"
+      role="dialog"
+    >
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-lg">
+        <div className="border-b border-[var(--border-subtle)]/80 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <div className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
+              {stage === "opening-preview" ? (
+                <Loader2 className={`size-5 ${SPIN_CLASS}`} />
+              ) : (
+                <>
+                  <FileText className="size-5" />
+                  <ScanLine className="absolute -right-1 -top-1 size-3.5 animate-pulse" />
+                </>
+              )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-3">
-                <h3 className="text-24px font-semibold leading-1_05 tracking-neg-0_035em text-[var(--text-primary)]">
-                  Importazione tariffari
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-18px font-semibold leading-tight text-[var(--text-primary)]">
+                  {headline}
                 </h3>
-                <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-[var(--accent-primary)]/10 px-3 text-12px font-bold text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]/20">
-                  {completedCount}/{total}
-                </span>
+                {total > 0 ? (
+                  <span className="rounded-full bg-[var(--bg-muted)] px-2 py-0.5 text-11px font-bold tabular-nums text-[var(--text-secondary)]">
+                    {completedCount}/{total}
+                  </span>
+                ) : null}
               </div>
-              <p className="mt-1.5 text-13px font-medium leading-5 text-[var(--text-secondary)]">
-                {total === 0
-                  ? "In attesa dei file PDF..."
-                  : processingCount > 0
-                    ? `Elaborazione in corso...`
-                    : completedCount === total && errorCount === 0
-                      ? `${total} file pronti per la preview`
-                      : `${completedCount}/${total} file elaborati`}
+              <p className="mt-1 text-12px font-medium leading-5 text-[var(--text-secondary)]">
+                {subtitle}
               </p>
             </div>
           </div>
 
-          <div className="mt-6 max-h-[50vh] space-y-2 overflow-y-auto pr-1">
-            {files.map((file) => (
-              <div
-                className="flex items-center gap-3 rounded-14px bg-[var(--bg-muted)]/60 px-4 py-3"
-                key={file.index}
-              >
-                {file.status === "processing" ? (
-                  <Loader className="size-5 shrink-0 animate-spin text-[var(--info-base)]" />
-                ) : file.status === "done" ? (
-                  <CheckCircle2 className="size-5 shrink-0 text-[var(--success-base)]" />
-                ) : file.status === "error" ? (
-                  <XCircle className="size-5 shrink-0 text-[var(--danger-base)]" />
-                ) : (
-                  <div className="size-5 shrink-0 rounded-full border-2 border-[var(--border-subtle)]" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-13px font-semibold text-[var(--text-primary)]">
-                    {file.fileName}
-                  </div>
-                  {file.status === "error" && file.error ? (
-                    <div className="mt-0.5 truncate text-11px font-medium text-[var(--danger-base)]">
-                      {file.error}
-                    </div>
-                  ) : (
-                    <div className="mt-0.5 text-11px font-medium text-[var(--text-secondary)]">
-                      {file.status === "pending"
-                        ? "In attesa"
-                        : file.status === "processing"
-                          ? file.pagesTotal
-                            ? `Lettura pagina ${file.pagesParsed ?? 0} di ${file.pagesTotal}`
-                            : "Lettura in corso..."
-                          : file.status === "done"
-                            ? file.pagesTotal
-                              ? `${file.pagesTotal} pagine elaborate`
-                              : "Completato"
-                            : "Errore"}
-                    </div>
-                  )}
-                </div>
-                {file.status === "processing" ? (
-                  <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-                    {file.pagesTotal && file.pagesParsed ? (
-                      <div
-                        className="h-full rounded-full bg-[var(--accent-primary)] transition-all duration-[var(--duration-base)]"
-                        style={{
-                          width: `${Math.min(100, (file.pagesParsed / file.pagesTotal) * 100)}%`,
-                        }}
-                      />
-                    ) : (
-                      <div className="h-full w-1/3 animate-[tariff-import-scan_1.15s_cubic-bezier(0.22,1,0.36,1)_infinite] rounded-full bg-[var(--accent-primary)]" />
-                    )}
-                  </div>
-                ) : null}
+          {total > 0 ? (
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between text-10px font-bold uppercase tracking-wide text-[var(--text-tertiary)]">
+                <span>Avanzamento complessivo</span>
+                <span className="tabular-nums text-[var(--text-secondary)]">
+                  {progressPercent}%
+                </span>
               </div>
-            ))}
-          </div>
+              <div className="h-2 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
+                <div
+                  className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300 ease-out"
+                  style={{
+                    width: stage === "opening-preview" ? "100%" : `${progressPercent}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          className="max-h-[min(50vh,380px)] min-h-[140px] overflow-auto px-4 py-3"
+          ref={scrollRef}
+        >
+          {sortedFiles.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 rounded-xl bg-[var(--bg-muted)]/50 px-4 py-8 text-13px font-medium text-[var(--text-secondary)]">
+              <Loader2 className={`size-4 text-[var(--accent-primary)] ${SPIN_CLASS}`} />
+              In attesa dei file selezionati…
+            </div>
+          ) : (
+            <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+              {virtualizer.getVirtualItems().map((virtualRow) => {
+                const file = sortedFiles[virtualRow.index];
+                if (!file) return null;
+                const isActive = file.status === "processing" || file.status === "pending";
+
+                return (
+                  <div
+                    className="absolute left-0 top-0 w-full"
+                    key={`${file.index}-${file.fileName}`}
+                    style={{
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <div
+                      className={`flex h-[calc(100%-10px)] items-center gap-3.5 rounded-xl border px-3.5 py-3 shadow-sm ${
+                        file.status === "error"
+                          ? "border-[var(--danger-base)]/25 bg-[var(--danger-soft)]/30"
+                          : file.status === "done"
+                            ? "border-[var(--success-base)]/20 bg-[var(--success-soft)]/20"
+                            : isActive
+                              ? "border-[var(--accent-primary)]/25 bg-[var(--accent-primary)]/5"
+                              : "border-[var(--border-subtle)]/80 bg-[var(--bg-muted)]/40"
+                      }`}
+                    >
+                      <FileStatusIcon status={file.status} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-12px font-semibold text-[var(--text-primary)]">
+                          {file.fileName}
+                        </div>
+                        <div
+                          className={`mt-0.5 truncate text-11px font-medium ${
+                            file.status === "error"
+                              ? "text-[var(--danger-base)]"
+                              : "text-[var(--text-secondary)]"
+                          }`}
+                        >
+                          {statusLabel(file)}
+                        </div>
+                      </div>
+                      {file.status === "processing" &&
+                      file.pagesTotal &&
+                      file.pagesParsed != null ? (
+                        <span className="shrink-0 text-10px font-bold tabular-nums text-[var(--accent-primary)]">
+                          {Math.round((file.pagesParsed / file.pagesTotal) * 100)}%
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>,

@@ -371,7 +371,7 @@ export async function selectMultipleTariffPdfMetadatas(
     });
   });
 
-  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  await yieldImportUiFrame();
 
   runImportStageSync("avvio parsing", () => {
     // Mark all files as "processing" synchronously so the modal shows them all at once
@@ -396,6 +396,7 @@ export async function selectMultipleTariffPdfMetadatas(
         ...(metadata.pagesTotal !== undefined && { pagesTotal: metadata.pagesTotal }),
         ...(metadata.pagesParsed !== undefined && { pagesParsed: metadata.pagesParsed }),
       });
+      await yieldImportUiFrame();
       return metadata;
     } catch (error) {
       onProgress({
@@ -405,6 +406,7 @@ export async function selectMultipleTariffPdfMetadatas(
         status: "error",
         error: error instanceof Error ? error.message : String(error),
       });
+      await yieldImportUiFrame();
       return null;
     }
   });
@@ -439,6 +441,14 @@ function runImportStageSync<T>(stage: string, action: () => T): T {
   } catch (error) {
     throw createImportStageError(stage, error);
   }
+}
+
+function yieldImportUiFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
 }
 
 function createImportStageError(stage: string, error: unknown): Error {

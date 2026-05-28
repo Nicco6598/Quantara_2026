@@ -566,6 +566,9 @@ function AppShell() {
 
   const { activeRoute, canGoBack, canGoForward, navigateBack, navigateForward } =
     useAppShellNavigationState();
+  const tariffImportPreviewActive = useAppStore(
+    (state) => state.tariffImportToolbar.phase === "preview",
+  );
   const navigate = useNavigate();
   const { notify } = useToast();
   const { motionMode, showReleaseNotesAfterUpdate } = usePreferenceState();
@@ -974,7 +977,7 @@ function AppShell() {
 
             <div
               className={
-                activeRoute === "sal-create"
+                activeRoute === "sal-create" || tariffImportPreviewActive
                   ? "flex min-h-0 flex-1 flex-col overflow-hidden"
                   : "min-h-0 flex-1 overflow-y-auto px-4 pb-8 md:px-8"
               }

@@ -2,6 +2,26 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.5.2 — 2026-05-28
+
+### Tariffari — import multi-file e revisione molto più fluidi
+
+- **Anteprima import ridisegnata** — revisione a pagina intera con sidebar unificata (file, errori, indice categorie, note), barra azioni fissa e griglia voci che scrolla senza trascinare tutta l’app.
+- **Prestazioni su cataloghi grandi** — validazione e raggruppamento voci spostati in background: il primo file si apre subito, gli altri si preparano a frame senza congelare l’interfaccia (miglioramento netto con decine di file / migliaia di voci).
+- **Errori su tutti i file** — conteggi subito in sidebar; elenco dettagliato cross-file che si completa in background; clic su un errore apre il file e la riga giusta.
+- **Overlay «Salvataggio import»** — torna la modale dedicata quando approvi l’import dopo la revisione, fino al salvataggio nel catalogo locale.
+
+### Tariffari — correzioni import e revisione
+
+- **Cambio file più leggero** — gruppi ed errori del file selezionato si calcolano on demand; indicatore «Preparazione griglia voci…» solo sull’area centrale, non a schermo intero.
+- **Scroll bloccato in anteprima** — la shell dell’app non scrolla più sotto la maschera di revisione import.
+
+**Come usarlo in pratica**
+
+1. Catalogo prezzi → **Importa tariffario** e seleziona uno o più PDF.
+2. Attendi il parsing (lista file con avanzamento), poi revisiona file per file nella vista dedicata.
+3. Correggi errori dalla tab **Errori** in sidebar, segna i file rivisti e **Approva import** quando tutto è coerente.
+
 ## 0.5.1 — 2026-05-28
 
 ### Appaltatori — anagrafica sul database locale (non più solo nel browser)

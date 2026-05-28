@@ -35,6 +35,7 @@ export type TariffGridSectionSummary = {
   categoria: string;
   groupsCount: number;
   rowsCount: number;
+  errorCount: number;
   warningCount: number;
 };
 
@@ -50,6 +51,7 @@ export type TariffGridDraftChange = {
 
 export type EditableTariffVoicesGridHandle = {
   drainDraftChanges: () => TariffGridDraftChange[];
+  peekDraftChanges: () => TariffGridDraftChange[];
 };
 
 type HighlightedCell = {
@@ -131,12 +133,25 @@ function WarningTooltip({
   );
 }
 
+function cellStateClass(invalid: boolean, highlighted: boolean): string {
+  if (invalid) {
+    return highlighted
+      ? "border-[var(--danger-base)] bg-[color-mix(in_srgb,var(--danger-base)_12%,var(--surface-base)_88%)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--danger-base)_22%,transparent)]"
+      : "border-[var(--danger-base)]/70 bg-[color-mix(in_srgb,var(--danger-base)_8%,var(--surface-base)_92%)]";
+  }
+  if (highlighted) {
+    return "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-primary)_18%,transparent)]";
+  }
+  return "";
+}
+
 function ImportCell({
   align = "left",
   draftValue,
   field,
   highlighted,
   index,
+  invalid = false,
   onDraftChange,
   onDraftDiscard,
   value,
@@ -147,6 +162,7 @@ function ImportCell({
   field: keyof DesktopTariffVoice;
   highlighted: boolean;
   index: number;
+  invalid?: boolean;
   onDraftChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDraftDiscard: (index: number, field: keyof DesktopTariffVoice) => void;
   value: string;
@@ -166,11 +182,8 @@ function ImportCell({
   return (
     <div className="relative flex items-center gap-1">
       <input
-        className={`${CELL_BASE} ${CELL_EDIT} ${align === "right" ? "text-right" : ""} ${
-          highlighted
-            ? "border-[var(--warning-base)] bg-[color-mix(in_srgb,var(--warning-base)_10%,var(--surface-base)_90%)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--warning-base)_18%,transparent)]"
-            : ""
-        }`}
+        className={`${CELL_BASE} ${CELL_EDIT} ${align === "right" ? "text-right" : ""} ${cellStateClass(invalid, highlighted)}`}
+        aria-invalid={invalid || undefined}
         id={`import-cell-${index}-${field}`}
         onBlur={() => {
           isFocusedRef.current = false;
@@ -199,7 +212,8 @@ function ImportCell({
         <>
           <button
             ref={infoButtonRef}
-            className="flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--warning-base)] transition-colors hover:bg-[var(--warning-soft)]"
+            className="flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--info-base)] transition-colors hover:bg-[var(--info-soft)]"
+            title="Note parser (non bloccano l'import)"
             onClick={() => setShowWarnings(!showWarnings)}
             type="button"
           >
@@ -296,8 +310,8 @@ function VoiceContextLine({ voice }: { voice: DesktopTariffVoice }) {
         </span>
       ))}
       {warningCount > 0 ? (
-        <span className="rounded-md bg-[var(--warning-soft)] px-1.5 py-0.5 text-[var(--warning-base)]">
-          {warningCount} avv.
+        <span className="rounded-md bg-[var(--info-soft)] px-1.5 py-0.5 text-[var(--info-base)]">
+          {warningCount} nota/e parser
         </span>
       ) : null}
     </div>
@@ -309,6 +323,7 @@ function DescriptionCell({
   field,
   highlighted,
   index,
+  invalid = false,
   onDraftChange,
   onDraftDiscard,
   value,
@@ -317,6 +332,7 @@ function DescriptionCell({
   field: keyof DesktopTariffVoice;
   highlighted: boolean;
   index: number;
+  invalid?: boolean;
   onDraftChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDraftDiscard: (index: number, field: keyof DesktopTariffVoice) => void;
   value: string;
@@ -348,11 +364,8 @@ function DescriptionCell({
 
   return (
     <textarea
-      className={`min-h-[34px] w-full resize-none rounded-lg border border-[color-mix(in_srgb,var(--border-subtle)_92%,var(--text-secondary)_8%)] bg-[var(--surface-base)]/54 px-2.5 py-2 text-12px font-semibold leading-1_45 text-[var(--text-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_45%,transparent)] outline-none transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-standard hover:border-[var(--accent-primary)]/60 hover:bg-[var(--surface-base)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${
-        highlighted
-          ? "border-[var(--warning-base)] bg-[color-mix(in_srgb,var(--warning-base)_10%,var(--surface-base)_90%)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--warning-base)_18%,transparent)]"
-          : ""
-      }`}
+      className={`min-h-[34px] w-full resize-none rounded-lg border border-[color-mix(in_srgb,var(--border-subtle)_92%,var(--text-secondary)_8%)] bg-[var(--surface-base)]/54 px-2.5 py-2 text-12px font-semibold leading-1_45 text-[var(--text-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_45%,transparent)] outline-none transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-standard hover:border-[var(--accent-primary)]/60 hover:bg-[var(--surface-base)] focus:bg-[var(--surface-base)] focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)] ${cellStateClass(invalid, highlighted)}`}
+      aria-invalid={invalid || undefined}
       id={`import-cell-${index}-${field}`}
       onBlur={() => {
         isFocusedRef.current = false;
@@ -423,14 +436,17 @@ const VoiceRow = memo(function VoiceRow({
   draftByCellRef,
   highlightedField,
   index,
+  invalidCellKeys,
   isDuplicate,
   isInvalid,
   voice,
   onDraftChange,
   onDraftDiscard,
   onDelete,
-}: VoiceRowProps) {
+}: VoiceRowProps & { invalidCellKeys: Set<string> }) {
   const isHighlighted = (field: keyof DesktopTariffVoice) => highlightedField === field;
+  const isFieldInvalid = (field: keyof DesktopTariffVoice) =>
+    invalidCellKeys.has(`${index}-${field}`);
   const getDraftValue = (field: keyof DesktopTariffVoice) =>
     draftByCellRef.current.get(getDraftKey(index, field));
   const contextMenu = useContextMenu<void>();
@@ -442,7 +458,7 @@ const VoiceRow = memo(function VoiceRow({
       <div
         className={`${GRID_COLS} min-w-[980px] items-start rounded-xl border [contain:layout_style] [content-visibility:auto] [contain-intrinsic-size:auto_58px] ${
           isDuplicate
-            ? "border-[var(--warning-base)]/28 bg-[var(--warning-soft)]/22"
+            ? "border-[var(--danger-base)]/35 bg-[color-mix(in_srgb,var(--danger-base)_6%,var(--surface-base)_94%)]"
             : "border-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] bg-[color-mix(in_srgb,var(--surface-base)_46%,transparent)]"
         } ${
           index % 2 === 0 && !isDuplicate
@@ -450,7 +466,7 @@ const VoiceRow = memo(function VoiceRow({
             : ""
         } ${
           isInvalid && !isDuplicate
-            ? "border-l-[var(--warning-base)] shadow-[inset_3px_0_0_var(--warning-base)]"
+            ? "border-l-[var(--danger-base)] shadow-[inset_3px_0_0_var(--danger-base)]"
             : ""
         }`}
         data-voice-id={voice.id}
@@ -467,6 +483,7 @@ const VoiceRow = memo(function VoiceRow({
             field="officialCode"
             highlighted={isHighlighted("officialCode")}
             index={index}
+            invalid={isFieldInvalid("officialCode")}
             onDraftChange={onDraftChange}
             onDraftDiscard={onDraftDiscard}
             value={voice.officialCode}
@@ -480,6 +497,7 @@ const VoiceRow = memo(function VoiceRow({
             field="description"
             highlighted={isHighlighted("description")}
             index={index}
+            invalid={isFieldInvalid("description")}
             onDraftChange={onDraftChange}
             onDraftDiscard={onDraftDiscard}
             value={voice.description}
@@ -491,6 +509,7 @@ const VoiceRow = memo(function VoiceRow({
           field="unitOfMeasure"
           highlighted={isHighlighted("unitOfMeasure")}
           index={index}
+          invalid={isFieldInvalid("unitOfMeasure")}
           onDraftChange={onDraftChange}
           onDraftDiscard={onDraftDiscard}
           value={voice.unitOfMeasure}
@@ -502,6 +521,7 @@ const VoiceRow = memo(function VoiceRow({
           field="laborPercentage"
           highlighted={isHighlighted("laborPercentage")}
           index={index}
+          invalid={isFieldInvalid("laborPercentage")}
           onDraftChange={onDraftChange}
           onDraftDiscard={onDraftDiscard}
           value={formatEditablePercent(voice.laborPercentage)}
@@ -513,6 +533,7 @@ const VoiceRow = memo(function VoiceRow({
           field="unitPrice"
           highlighted={isHighlighted("unitPrice")}
           index={index}
+          invalid={isFieldInvalid("unitPrice")}
           onDraftChange={onDraftChange}
           onDraftDiscard={onDraftDiscard}
           value={Number.isFinite(voice.unitPrice) ? String(voice.unitPrice).replace(".", ",") : ""}
@@ -544,11 +565,15 @@ const VoiceRow = memo(function VoiceRow({
   );
 }, areVoiceRowsEqual);
 
-function areVoiceRowsEqual(previous: Readonly<VoiceRowProps>, next: Readonly<VoiceRowProps>) {
+function areVoiceRowsEqual(
+  previous: Readonly<VoiceRowProps & { invalidCellKeys: Set<string> }>,
+  next: Readonly<VoiceRowProps & { invalidCellKeys: Set<string> }>,
+) {
   return (
     previous.index === next.index &&
     previous.draftByCellRef === next.draftByCellRef &&
     previous.highlightedField === next.highlightedField &&
+    previous.invalidCellKeys === next.invalidCellKeys &&
     previous.isDuplicate === next.isDuplicate &&
     previous.isInvalid === next.isInvalid &&
     previous.voice === next.voice &&
@@ -564,7 +589,9 @@ type EditableTariffVoicesGridProps = {
   onAddVoice?: () => void;
   onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDelete: (index: number) => void;
+  onDraftActivity?: () => void;
   onSectionsChange?: (sections: TariffGridSectionSummary[]) => void;
+  scrollLayout?: "fill" | "viewport";
   scrollTarget?: TariffGridScrollTarget | null;
   validation: ImportValidation;
 };
@@ -572,12 +599,34 @@ type EditableTariffVoicesGridProps = {
 export const EditableTariffVoicesGrid = memo(
   forwardRef<EditableTariffVoicesGridHandle, EditableTariffVoicesGridProps>(
     function EditableTariffVoicesGrid(
-      { duplicateCodes, groups, onAddVoice, onDelete, onSectionsChange, scrollTarget, validation },
+      {
+        duplicateCodes,
+        groups,
+        onAddVoice,
+        onDelete,
+        onDraftActivity,
+        onSectionsChange,
+        scrollLayout = "viewport",
+        scrollTarget,
+        validation,
+      },
       ref,
     ) {
       const invalidCellKeys = useMemo(
-        () => new Set(validation.invalidRows.map((row) => `${row.index}-${row.field}`)),
-        [validation.invalidRows],
+        () =>
+          new Set([
+            ...validation.invalidRows.map((row) => `${row.index}-${row.field}`),
+            ...validation.duplicateRows.map((row) => `${row.index}-${row.field}`),
+          ]),
+        [validation.duplicateRows, validation.invalidRows],
+      );
+      const invalidRowIndices = useMemo(
+        () =>
+          new Set([
+            ...validation.invalidRows.map((row) => row.index),
+            ...validation.duplicateRows.map((row) => row.index),
+          ]),
+        [validation.duplicateRows, validation.invalidRows],
       );
       const totalVoices = useMemo(
         () => groups.reduce((sum, group) => sum + group.children.length, 0),
@@ -589,11 +638,23 @@ export const EditableTariffVoicesGrid = memo(
       const draftByCellRef = useRef(new Map<string, string>());
       const [highlightedCell, setHighlightedCell] = useState<HighlightedCell | null>(null);
 
+      const readDraftChanges = useCallback((): TariffGridDraftChange[] => {
+        return [...draftByCellRef.current.entries()].map(([key, value]) => {
+          const [rowIndex, field] = key.split(":");
+          return {
+            field: field as keyof DesktopTariffVoice,
+            rowIndex: Number(rowIndex),
+            value,
+          };
+        });
+      }, []);
+
       const handleDraftChange = useCallback(
         (index: number, field: keyof DesktopTariffVoice, value: string) => {
           draftByCellRef.current.set(getDraftKey(index, field), value);
+          onDraftActivity?.();
         },
-        [],
+        [onDraftActivity],
       );
 
       const handleDraftDiscard = useCallback((index: number, field: keyof DesktopTariffVoice) => {
@@ -604,19 +665,13 @@ export const EditableTariffVoicesGrid = memo(
         ref,
         () => ({
           drainDraftChanges: () => {
-            const changes = [...draftByCellRef.current.entries()].map(([key, value]) => {
-              const [rowIndex, field] = key.split(":");
-              return {
-                field: field as keyof DesktopTariffVoice,
-                rowIndex: Number(rowIndex),
-                value,
-              };
-            });
+            const changes = readDraftChanges();
             draftByCellRef.current.clear();
             return changes;
           },
+          peekDraftChanges: readDraftChanges,
         }),
-        [],
+        [readDraftChanges],
       );
 
       const sections = useMemo(() => {
@@ -667,15 +722,30 @@ export const EditableTariffVoicesGrid = memo(
                 ),
               0,
             );
+            const errorCount = section.groups.reduce(
+              (sum, group) =>
+                sum +
+                group.voci.reduce(
+                  (voiceSum, voice) =>
+                    voiceSum +
+                    voice.children.reduce(
+                      (rowSum, child) => rowSum + (invalidRowIndices.has(child.index) ? 1 : 0),
+                      0,
+                    ),
+                  0,
+                ),
+              0,
+            );
             return {
               id: section.id,
               categoria: section.categoria,
               groupsCount: section.groups.length,
               rowsCount,
+              errorCount,
               warningCount,
             };
           }),
-        [sections],
+        [invalidRowIndices, sections],
       );
 
       useLayoutEffect(() => {
@@ -769,7 +839,7 @@ export const EditableTariffVoicesGrid = memo(
         },
         getItemKey: (index) => flatItems[index]?.key ?? index,
         getScrollElement: () => scrollParentRef.current,
-        overscan: 18,
+        overscan: scrollLayout === "fill" ? 8 : 18,
       });
 
       useEffect(() => {
@@ -901,7 +971,13 @@ export const EditableTariffVoicesGrid = memo(
       }, [highlightedCell, invalidCellKeys]);
 
       return (
-        <div>
+        <div
+          className={
+            scrollLayout === "fill"
+              ? "flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden"
+              : "w-full"
+          }
+        >
           {sections.length === 0 ? (
             <EmptyState
               icon={Info}
@@ -910,8 +986,14 @@ export const EditableTariffVoicesGrid = memo(
               className="rounded-2xl"
             />
           ) : (
-            <div className="overflow-hidden">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)]/70 pb-3">
+            <div
+              className={
+                scrollLayout === "fill"
+                  ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+                  : "overflow-hidden"
+              }
+            >
+              <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)]/70 pb-3">
                 <div className="min-w-0">
                   <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-tertiary)]">
                     Ledger voci estratte
@@ -935,7 +1017,11 @@ export const EditableTariffVoicesGrid = memo(
               </div>
               <div
                 data-tariff-virtual-scroll="true"
-                className="max-h-[72vh] min-h-[520px] overflow-auto pr-2"
+                className={
+                  scrollLayout === "fill"
+                    ? "h-0 min-h-0 flex-1 overflow-y-auto overflow-x-auto pr-2"
+                    : "max-h-[72vh] min-h-[520px] overflow-auto pr-2"
+                }
                 ref={scrollParentRef}
               >
                 <div
@@ -1059,11 +1145,11 @@ function VirtualGridItem({
             ) : null}
             {item.warningCount > 0 ? (
               <span
-                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--warning-soft)] px-2.5 text-11px font-bold text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/20"
-                title={`${item.warningCount.toLocaleString("it-IT")} avvertenze nel gruppo`}
+                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--info-soft)]/80 px-2.5 text-11px font-semibold text-[var(--info-base)] ring-1 ring-[var(--info-base)]/15"
+                title={`${item.warningCount.toLocaleString("it-IT")} note informative del parser nel gruppo (non bloccano l'import)`}
               >
                 <Info className="size-3.5" />
-                {item.warningCount.toLocaleString("it-IT")} avv.
+                {item.warningCount.toLocaleString("it-IT")} note
               </span>
             ) : null}
           </div>
@@ -1124,6 +1210,7 @@ function VirtualGridItem({
           draftByCellRef={draftByCellRef}
           highlightedField={highlightedCell?.rowIndex === item.index ? highlightedCell.field : null}
           index={item.index}
+          invalidCellKeys={invalidCellKeys}
           isDuplicate={isDuplicate}
           isInvalid={rowInvalid}
           onDraftChange={onDraftChange}

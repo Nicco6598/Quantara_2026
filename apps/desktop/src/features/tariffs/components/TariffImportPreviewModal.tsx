@@ -1,4 +1,4 @@
-import { parseEuroAmount } from "@quantara/domain-utils";
+﻿import { parseEuroAmount } from "@quantara/domain-utils";
 import { m } from "framer-motion";
 import {
   AlertTriangle,
@@ -8,8 +8,7 @@ import {
   FileWarning,
   Gauge,
   Link2,
-  List,
-  ListChecks,
+  Loader,
   MapPinned,
   Save,
   ShieldCheck,
@@ -18,6 +17,7 @@ import {
 import {
   startTransition,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useReducer,
@@ -32,7 +32,7 @@ import { useActionHandler } from "@/hooks/useAction";
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 
 import type { ImportValidation } from "../tariffs-types";
-import { groupEditableTariffVoices, type VoiceGroup } from "../utils/tariff-grouping";
+import type { VoiceGroup } from "../utils/tariff-grouping";
 import type { ImportDraft } from "../utils/tariff-import-drafts";
 import {
   createDraftName,
@@ -43,29 +43,31 @@ import {
 } from "../utils/tariff-import-drafts";
 import { getImportValidation, parseOptionalPercent } from "../utils/tariffs-validation";
 import {
+  buildAllImportErrorRows,
+  buildRegularIndexMap,
+  getGridBlockingCount,
+  getImportFileStatus,
+  isMaggiorazioneVoice,
+  estimateImportBlockingIssues,
+  useImportPreviewDerivations,
+  useImportPreviewSessionPrewarm,
+} from "../utils/import-preview-helpers";
+import {
+  ensureImportPreviewInvalidRows,
+  ensureImportPreviewSessionGroups,
+} from "../utils/import-preview-session-cache";
+import { TariffImportConfirmLoadingModal } from "./TariffImportConfirmLoadingModal";
+import { ImportPreviewActionBar } from "./import-preview/ImportPreviewActionBar";
+import {
   EditableTariffVoicesGrid,
   type EditableTariffVoicesGridHandle,
   type TariffGridDraftChange,
   type TariffGridScrollTarget,
   type TariffGridSectionSummary,
 } from "./EditableTariffVoicesGrid";
-import { ValidationLine } from "./ValidationLine";
-
-type InspectorTab = "checks" | "categories" | "issues" | "warnings";
-
-type ImportReviewSummary = {
-  blockingIssueCount: number;
-  completionPercent: number;
-  filesWithoutVoices: number;
-  hasVoices: boolean;
-  issueCount: number;
-  isReviewReady: boolean;
-  maggiorazioniCount: number;
-  sourceIssues: number;
-  validation: ImportValidation;
-  warningRows: number;
-  yearIssues: number;
-};
+import { ImportPreviewSidebar } from "./import-preview/ImportPreviewSidebar";
+import { ImportPreviewWorkspace } from "./import-preview/ImportPreviewWorkspace";
+import type { ImportPreviewFileItem } from "../utils/import-preview-helpers";
 
 type ExtractionSummary = {
   averageConfidence: number | null;
@@ -151,71 +153,6 @@ function buildExtractionSummary(
   };
 }
 
-function isMaggiorazioneVoice(voice: DesktopTariffVoice): boolean {
-  return voice.isMaggiorazione === true || voice.officialCode?.includes(".MG.");
-}
-
-function buildImportReviewSummary(
-  metadatas: readonly TariffPdfMetadata[],
-  editableVoicesList: readonly DesktopTariffVoice[][],
-  validations: readonly ImportValidation[],
-): ImportReviewSummary {
-  const duplicateExamples = new Set<string>();
-  let duplicateCount = 0;
-  let filesWithoutVoices = 0;
-  let invalidCount = 0;
-  let maggiorazioniCount = 0;
-  let sourceIssues = 0;
-  let totalVoices = 0;
-  let validCount = 0;
-  let warningRows = 0;
-  let yearIssues = 0;
-
-  metadatas.forEach((metadata, index) => {
-    const voices = editableVoicesList[index] ?? [];
-    const validation = validations[index] ?? emptyImportValidation;
-
-    totalVoices += voices.length;
-    maggiorazioniCount += voices.filter((voice) => isMaggiorazioneVoice(voice)).length;
-    warningRows += voices.filter((voice) => (voice.warnings?.length ?? 0) > 0).length;
-    validCount += validation.validCount;
-    invalidCount += validation.invalidCount;
-    duplicateCount += validation.duplicateCount;
-    validation.duplicateExamples.forEach((code) => {
-      duplicateExamples.add(code);
-    });
-
-    if (voices.length === 0) filesWithoutVoices += 1;
-    if (metadata.sourceName === "Ente da confermare") sourceIssues += 1;
-    if (metadata.year < 1900 || metadata.year > 2200) yearIssues += 1;
-  });
-
-  const blockingIssueCount = invalidCount + duplicateCount;
-  const metadataIssues = sourceIssues + yearIssues;
-  const issueCount = filesWithoutVoices + blockingIssueCount + metadataIssues;
-
-  return {
-    blockingIssueCount,
-    completionPercent: totalVoices > 0 ? Math.round((validCount / totalVoices) * 100) : 0,
-    filesWithoutVoices,
-    hasVoices: filesWithoutVoices === 0,
-    issueCount,
-    isReviewReady: metadatas.length > 0 && issueCount === 0,
-    maggiorazioniCount,
-    sourceIssues,
-    validation: {
-      ...emptyImportValidation,
-      duplicateCount,
-      duplicateExamples: [...duplicateExamples].slice(0, 8),
-      invalidCount,
-      validCount,
-      warningCount: warningRows,
-    },
-    warningRows,
-    yearIssues,
-  };
-}
-
 function isMacPlatform() {
   if (typeof navigator === "undefined") return false;
   return /mac|iphone|ipad|ipod/i.test(navigator.platform);
@@ -243,12 +180,12 @@ function ShortcutHint({ action, keys }: { action: string; keys: string[] }) {
 }
 
 function ImportShortcutLegend({ compact = false }: { compact?: boolean }) {
-  const modKey = isMacPlatform() ? "⌘" : "Ctrl";
-  const deleteKey = isMacPlatform() ? "⌫" : "Del";
+  const modKey = isMacPlatform() ? "âŒ˜" : "Ctrl";
+  const deleteKey = isMacPlatform() ? "âŒ«" : "Del";
   const groups = [
     {
       label: "Navigazione",
-      hints: [{ action: "File", keys: [modKey, "Shift", "←/→"] }],
+      hints: [{ action: "File", keys: [modKey, "Shift", "â†/â†’"] }],
     },
     {
       label: "Stato",
@@ -428,124 +365,63 @@ function HeaderStat({
 function VoicesPanel({
   duplicateCodes,
   editableGroups,
+  gridValidation,
   handleAddVoice,
+  isSwitching,
+  onDraftActivity,
   updateVoice,
   askDeleteVoice,
   updateCategorySections,
   gridRef,
   gridScrollTarget,
-  activeValidation,
   hasVoices,
+  scrollLayout,
 }: {
   duplicateCodes: Set<string>;
   editableGroups: VoiceGroup[];
+  gridValidation: ImportValidation;
   handleAddVoice: () => void;
+  isSwitching: boolean;
+  onDraftActivity: () => void;
   updateVoice: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   askDeleteVoice: (index: number) => void;
   updateCategorySections: (next: TariffGridSectionSummary[]) => void;
   gridRef: React.RefObject<EditableTariffVoicesGridHandle | null>;
   gridScrollTarget: TariffGridScrollTarget | null;
-  activeValidation: ImportValidation;
   hasVoices: boolean;
+  scrollLayout: "fill" | "viewport";
 }) {
   return (
-    <>
-      <div className="min-w-0 self-start">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {isSwitching ? (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[var(--surface-base)]/60 backdrop-blur-[1px]">
+          <Loader className="size-6 animate-spin text-[var(--accent-primary)] [animation-duration:1.35s]" />
+          <p className="text-12px font-medium text-[var(--text-secondary)]">
+            Preparazione griglia voci…
+          </p>
+        </div>
+      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <EditableTariffVoicesGrid
           duplicateCodes={duplicateCodes}
           groups={editableGroups}
           onAddVoice={handleAddVoice}
           onChange={updateVoice}
           onDelete={askDeleteVoice}
+          onDraftActivity={onDraftActivity}
           onSectionsChange={updateCategorySections}
           ref={gridRef}
+          scrollLayout={scrollLayout}
           scrollTarget={gridScrollTarget}
-          validation={activeValidation}
+          validation={gridValidation}
         />
       </div>
       {!hasVoices ? (
-        <div className="mt-4 rounded-2xl bg-[var(--warning-soft)] px-4 py-3 text-13px font-semibold text-[var(--warning-base)]">
+        <div className="mt-3 shrink-0 rounded-2xl bg-[var(--warning-soft)] px-4 py-3 text-13px font-semibold text-[var(--warning-base)]">
           Nessuna voce tariffaria importabile trovata nel PDF. Verifica che il documento contenga
           codici, unita di misura e prezzi leggibili.
         </div>
       ) : null}
-    </>
-  );
-}
-
-function FileTabs({
-  metadatas,
-  validations,
-  editableVoicesList,
-  modalReviewedFiles,
-  draftedFiles,
-  switchFile,
-  localActiveIndex,
-}: {
-  metadatas: TariffPdfMetadata[];
-  validations: ImportValidation[];
-  editableVoicesList: DesktopTariffVoice[][];
-  modalReviewedFiles: Set<number>;
-  draftedFiles: Set<number>;
-  switchFile: (index: number) => void;
-  localActiveIndex: number;
-}) {
-  return (
-    <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/25 px-5 py-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="text-11px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
-          File import
-        </div>
-        <div className="text-12px font-semibold text-[var(--text-secondary)]">
-          {metadatas.length}/{metadatas.length} in revisione
-        </div>
-      </div>
-      <div className="flex gap-2 overflow-x-auto">
-        {metadatas.map((meta, i) => {
-          const v = validations[i];
-          const voices = editableVoicesList[i];
-          const hasErrors = (v?.invalidCount ?? 0) > 0 || (v?.duplicateCount ?? 0) > 0;
-          const isValid = (voices?.length ?? 0) > 0 && !hasErrors;
-          const isReviewed = modalReviewedFiles.has(i);
-          return (
-            <m.button
-              className={cn(
-                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-12px font-semibold transition-all duration-[var(--duration-fast)]",
-                i === localActiveIndex
-                  ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
-                  : draftedFiles.has(i)
-                    ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-1 ring-[var(--warning-base)]/30"
-                    : isReviewed
-                      ? "bg-[var(--success-soft)] text-[var(--success-base)] ring-1 ring-[var(--success-base)]/30"
-                      : "bg-[var(--surface-base)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)] hover:text-[var(--text-primary)]",
-              )}
-              key={meta.name}
-              onClick={() => switchFile(i)}
-              type="button"
-            >
-              {draftedFiles.has(i) ? (
-                <Save className="size-3.5 shrink-0" />
-              ) : isReviewed ? (
-                <CheckCircle2 className="size-3.5 shrink-0" />
-              ) : isValid ? (
-                <CheckCircle2 className="size-3.5 shrink-0 text-[var(--success-base)]" />
-              ) : hasErrors ? (
-                <span className="size-3.5 shrink-0 rounded-full bg-[var(--warning-base)]" />
-              ) : null}
-              <span className="min-w-0 truncate">{meta.name}</span>
-              {draftedFiles.has(i) ? (
-                <span className="shrink-0 rounded-full bg-[var(--warning-base)]/15 px-1.5 py-0.5 text-9px font-bold uppercase tracking-wider text-[var(--warning-base)]">
-                  Bozza
-                </span>
-              ) : isReviewed ? (
-                <span className="shrink-0 rounded-full bg-[var(--success-base)]/15 px-1.5 py-0.5 text-9px font-bold uppercase tracking-wider text-[var(--success-base)]">
-                  Rev.
-                </span>
-              ) : null}
-            </m.button>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -586,10 +462,10 @@ function ModalFooter({
       <ImportShortcutLegend />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={onCancel} variant="outline">
+          <Button disabled={isBusy} onClick={onCancel} variant="outline">
             Annulla
           </Button>
-          <Button icon={Save} onClick={saveDraft} variant="secondary">
+          <Button disabled={isBusy} icon={Save} onClick={saveDraft} variant="secondary">
             Salva bozza
           </Button>
           {loadedDraft ? (
@@ -628,15 +504,17 @@ function ModalFooter({
         </div>
         <Button
           disabled={!canConfirm || isBusy}
-          icon={CheckCircle2}
+          icon={isBusy ? Loader : CheckCircle2}
           onClick={confirmChanges}
           variant="primary"
         >
-          {metadatas.length > 1
-            ? modalReviewedFiles.size === metadatas.length
-              ? `Conferma tutti (${metadatas.length})`
-              : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
-            : "Conferma importazione"}
+          {isBusy
+            ? "Salvataggio in corso…"
+            : metadatas.length > 1
+              ? modalReviewedFiles.size === metadatas.length
+                ? `Conferma tutti (${metadatas.length})`
+                : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
+              : "Conferma importazione"}
         </Button>
       </div>
     </div>
@@ -672,6 +550,7 @@ type ImportPreviewAction =
   | { type: "TOGGLE_DRAFT"; index: number }
   | { type: "SAVE_AS_DRAFT"; index: number }
   | { type: "MARK_REVIEWED"; index: number }
+  | { type: "MARK_ALL_REVIEWED"; fileCount: number }
   | { type: "TOGGLE_REVIEWED"; index: number }
   | { type: "SWITCH_FILE"; index: number };
 
@@ -695,7 +574,8 @@ function areSectionSummariesEqual(
         section.categoria === nextSection.categoria &&
         section.groupsCount === nextSection.groupsCount &&
         section.rowsCount === nextSection.rowsCount &&
-        section.warningCount === nextSection.warningCount
+        section.warningCount === nextSection.warningCount &&
+        section.errorCount === nextSection.errorCount
       );
     })
   );
@@ -793,6 +673,14 @@ function importPreviewReducer(
       nextReviewed.add(action.index);
       return { ...state, draftedFiles: nextDrafted, modalReviewedFiles: nextReviewed };
     }
+    case "MARK_ALL_REVIEWED": {
+      const nextReviewed = new Set<number>();
+      const nextDrafted = new Set(state.draftedFiles);
+      for (let index = 0; index < action.fileCount; index++) {
+        if (!nextDrafted.has(index)) nextReviewed.add(index);
+      }
+      return { ...state, modalReviewedFiles: nextReviewed };
+    }
     case "TOGGLE_REVIEWED": {
       const nextDrafted = new Set(state.draftedFiles);
       if (nextDrafted.has(action.index)) nextDrafted.delete(action.index);
@@ -845,6 +733,31 @@ function applyDraftChangesToVoicesList(
   });
 }
 
+function remapGridDraftChanges(
+  changes: ParsedDraftChange[],
+  regularIndexMap: Map<number, number>,
+): ParsedDraftChange[] {
+  return changes.map((change) => ({
+    ...change,
+    rowIndex: regularIndexMap.get(change.rowIndex) ?? change.rowIndex,
+  }));
+}
+
+function applyDraftChangesToVoiceList(
+  voices: DesktopTariffVoice[],
+  changes: ParsedDraftChange[],
+): DesktopTariffVoice[] {
+  if (changes.length === 0) return voices;
+  return voices.map((voice, voiceIndex) => {
+    const voiceChanges = changes.filter((change) => change.rowIndex === voiceIndex);
+    if (voiceChanges.length === 0) return voice;
+    return voiceChanges.reduce(
+      (nextVoice, change) => Object.assign(nextVoice, { [change.field]: change.value }),
+      { ...voice },
+    );
+  });
+}
+
 export function TariffImportPreviewModal({
   activeIndex = 0,
   existingBookIds,
@@ -856,6 +769,7 @@ export function TariffImportPreviewModal({
   onDraftedFilesChange,
   onMetadatasChange,
   onPageCanConfirmChange,
+  onPreviewReady,
   onReviewedFilesChange,
   pageView = false,
 }: {
@@ -864,15 +778,18 @@ export function TariffImportPreviewModal({
   isBusy: boolean;
   metadatas: TariffPdfMetadata[];
   onCancel: () => void;
-  onConfirm: (metadatas: TariffImportPreviewResult[]) => void;
+  onConfirm: (metadatas: TariffImportPreviewResult[]) => void | Promise<void>;
   onActiveIndexChange?: (index: number) => void;
   onDraftedFilesChange?: (draftedFiles: Set<number>) => void;
   onMetadatasChange?: (metadatas: TariffPdfMetadata[]) => void;
   onPageCanConfirmChange?: (canConfirm: boolean) => void;
+  onPreviewReady?: () => void;
   onReviewedFilesChange?: (reviewedFiles: Set<number>) => void;
   pageView?: boolean;
 }) {
   const { notify } = useToast();
+  const onPreviewReadyRef = useRef(onPreviewReady);
+  onPreviewReadyRef.current = onPreviewReady;
   const onDraftedFilesChangeRef = useRef(onDraftedFilesChange);
   onDraftedFilesChangeRef.current = onDraftedFilesChange;
   const onReviewedFilesChangeRef = useRef(onReviewedFilesChange);
@@ -911,85 +828,145 @@ export function TariffImportPreviewModal({
   } | null>(null);
   const [categorySections, setCategorySections] = useState<TariffGridSectionSummary[]>([]);
   const [gridScrollTarget, setGridScrollTarget] = useState<TariffGridScrollTarget | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
   const gridRef = useRef<EditableTariffVoicesGridHandle>(null);
-  const updateCategorySections = useCallback((next: TariffGridSectionSummary[]) => {
-    setCategorySections((current) => (areSectionSummariesEqual(current, next) ? current : next));
-  }, []);
+  const sectionsByFileRef = useRef<Map<number, TariffGridSectionSummary[]>>(new Map());
   const scrollToVoiceIdRef = useRef<string | null>(null);
+  const pendingCellFocusRef = useRef<{
+    field: keyof DesktopTariffVoice;
+    fileIndex: number;
+    rowIndex: number;
+  } | null>(null);
   const [voiceAddedNonce, setVoiceAddedNonce] = useState(0);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const confirmBusy = isBusy || isConfirming;
   const localActiveIndex = pageView ? activeIndex : modalActiveIndex;
+  const renderIndex = useDeferredValue(localActiveIndex);
+  const isSwitchingFile = renderIndex !== localActiveIndex;
+  const handleGridDraftActivity = useCallback(() => {
+    setDraftRevision((revision) => revision + 1);
+  }, []);
+  const updateCategorySections = useCallback(
+    (next: TariffGridSectionSummary[]) => {
+      sectionsByFileRef.current.set(renderIndex, next);
+      if (renderIndex !== localActiveIndex) return;
+      setCategorySections((current) => (areSectionSummariesEqual(current, next) ? current : next));
+    },
+    [localActiveIndex, renderIndex],
+  );
+
+  useEffect(() => {
+    setCategorySections(sectionsByFileRef.current.get(localActiveIndex) ?? []);
+  }, [localActiveIndex]);
   const activeMetadata = metadatas[localActiveIndex];
-  const activeVoices = editableVoicesList[localActiveIndex] ?? [];
-  const regularVoices = useMemo(
-    () => activeVoices.filter((v) => !isMaggiorazioneVoice(v)),
-    [activeVoices],
-  );
-  const maggiorazioniVoices = useMemo(
-    () => activeVoices.filter((v) => isMaggiorazioneVoice(v)),
-    [activeVoices],
-  );
-  const validations = useMemo(
-    () => metadatas.map((_, i) => getImportValidation(editableVoicesList[i] ?? [])),
-    [metadatas, editableVoicesList],
-  );
-  const activeValidation = validations[localActiveIndex] ?? emptyImportValidation;
-  const reviewSummary = useMemo(
-    () => buildImportReviewSummary(metadatas, editableVoicesList, validations),
-    [editableVoicesList, metadatas, validations],
+  const sessionPrewarmRevision = useImportPreviewSessionPrewarm(metadatas);
+  const {
+    regularByFile,
+    groupsByFile,
+    gridValidationByFile,
+    invalidRowsByFile,
+    isActiveFileReady,
+  } = useImportPreviewDerivations(editableVoicesList, localActiveIndex, sessionPrewarmRevision);
+  const displayVoices = editableVoicesList[localActiveIndex] ?? [];
+  const displayRegularVoices = regularByFile[localActiveIndex] ?? [];
+  const gridVoices = editableVoicesList[renderIndex] ?? [];
+  const regularVoices = regularByFile[renderIndex] ?? [];
+  const maggiorazioniVoices = useMemo(() => {
+    const mag: DesktopTariffVoice[] = [];
+    for (const voice of displayVoices) {
+      if (isMaggiorazioneVoice(voice)) mag.push(voice);
+    }
+    return mag;
+  }, [displayVoices]);
+  const activeValidation = gridValidationByFile[renderIndex] ?? emptyImportValidation;
+  const regularVoicesForValidation = useMemo(() => {
+    void draftRevision;
+    const parsedChanges = (gridRef.current?.peekDraftChanges() ?? []).map(parseDraftChange);
+    return applyDraftChangesToVoiceList(regularVoices, parsedChanges);
+  }, [regularVoices, draftRevision]);
+  const activeGridValidation = useMemo(() => {
+    if (draftRevision === 0) {
+      return gridValidationByFile[renderIndex] ?? emptyImportValidation;
+    }
+    return getImportValidation(regularVoicesForValidation);
+  }, [draftRevision, gridValidationByFile, regularVoicesForValidation, renderIndex]);
+  const activeGridBlockingCount = getGridBlockingCount(
+    activeGridValidation,
+    activeMetadata,
+    regularVoices.length > 0,
   );
   const activeExtractionSummary = useMemo(
-    () => buildExtractionSummary(activeMetadata, activeVoices),
-    [activeMetadata, activeVoices],
+    () => buildExtractionSummary(activeMetadata, displayVoices),
+    [activeMetadata, displayVoices],
   );
-  const hasVoices = regularVoices.length > 0;
+  const hasVoices = displayRegularVoices.length > 0;
   const canConfirm =
     metadatas.length > 0 &&
     metadatas.every((_, i) => {
       const voices = editableVoicesList[i];
-      const v = validations[i];
+      const validation = gridValidationByFile[i];
       const isDrafted = draftedFiles.has(i);
       return (
         voices &&
         voices.length > 0 &&
-        v &&
-        (isDrafted || (v.invalidCount === 0 && modalReviewedFiles.has(i)))
+        validation &&
+        (isDrafted || (validation.invalidCount === 0 && modalReviewedFiles.has(i)))
       );
     });
   const duplicateCodes = useMemo(
     () => new Set<string>(activeValidation.duplicateExamples),
     [activeValidation],
   );
-  const editableGroups = useMemo(() => groupEditableTariffVoices(regularVoices), [regularVoices]);
-  const regularIndexMap = useMemo(() => {
-    const map = new Map<number, number>();
-    let displayIndex = 0;
-    activeVoices.forEach((v, i) => {
-      if (!isMaggiorazioneVoice(v)) {
-        map.set(displayIndex, i);
-        displayIndex++;
-      }
-    });
-    return map;
-  }, [activeVoices]);
+  const editableGroups = groupsByFile[renderIndex] ?? [];
+  const deferredEditableGroups = useDeferredValue(editableGroups);
+  const regularIndexMap = useMemo(() => buildRegularIndexMap(gridVoices), [gridVoices]);
 
   const voicesWithWarnings = useMemo(
-    () => activeVoices.filter((v) => (v.warnings?.length ?? 0) > 0),
-    [activeVoices],
+    () => displayVoices.filter((v) => (v.warnings?.length ?? 0) > 0),
+    [displayVoices],
   );
 
-  const invalidRows = useMemo(
+  const allErrorRows = useMemo(
     () =>
-      activeValidation.invalidRows
-        .concat(
-          activeValidation.duplicateRows.map((r) => ({
-            ...r,
-            field: r.field as keyof DesktopTariffVoice,
-          })),
-        )
-        .slice(0, 8),
-    [activeValidation],
+      buildAllImportErrorRows({
+        activeFileIndex: localActiveIndex,
+        invalidRowsByFile,
+        metadatas,
+      }),
+    [invalidRowsByFile, localActiveIndex, metadatas],
   );
-
+  const { otherFiles: otherFilesErrorCount, total: estimatedErrorTotal } = useMemo(
+    () =>
+      estimateImportBlockingIssues({
+        activeFileIndex: localActiveIndex,
+        gridValidationByFile,
+        metadatas,
+        regularByFile,
+      }),
+    [gridValidationByFile, localActiveIndex, metadatas, regularByFile],
+  );
+  const errorRowCount = Math.max(allErrorRows.length, estimatedErrorTotal);
+  const importFileItems = useMemo<ImportPreviewFileItem[]>(
+    () =>
+      metadatas.map((metadata, index) => {
+        const gridValidation = gridValidationByFile[index] ?? emptyImportValidation;
+        const regular = regularByFile[index] ?? [];
+        const blockingCount = getGridBlockingCount(gridValidation, metadata, regular.length > 0);
+        return {
+          blockingCount,
+          index,
+          metadata,
+          status: getImportFileStatus({
+            blockingCount,
+            hasVoices: regular.length > 0,
+            isDrafted: draftedFiles.has(index),
+            isReviewed: modalReviewedFiles.has(index),
+          }),
+          voiceCount: regular.length,
+        };
+      }),
+    [draftedFiles, gridValidationByFile, metadatas, modalReviewedFiles, regularByFile],
+  );
   const updateVoice = useCallback(
     (displayIndex: number, field: keyof DesktopTariffVoice, value: string) => {
       const originalIndex = regularIndexMap.get(displayIndex) ?? displayIndex;
@@ -1014,12 +991,15 @@ export function TariffImportPreviewModal({
   );
 
   const flushGridDraftChanges = useCallback(() => {
-    const parsedChanges = (gridRef.current?.drainDraftChanges() ?? []).map(parseDraftChange);
+    const parsedChanges = remapGridDraftChanges(
+      (gridRef.current?.drainDraftChanges() ?? []).map(parseDraftChange),
+      regularIndexMap,
+    );
     if (parsedChanges.length > 0) {
       dispatch({ type: "APPLY_DRAFTS", activeIndex: localActiveIndex, changes: parsedChanges });
     }
     return applyDraftChangesToVoicesList(editableVoicesList, localActiveIndex, parsedChanges);
-  }, [editableVoicesList, localActiveIndex]);
+  }, [editableVoicesList, localActiveIndex, regularIndexMap]);
 
   const handleAddVoice = useCallback(() => {
     const now = Date.now();
@@ -1073,15 +1053,54 @@ export function TariffImportPreviewModal({
     [metadatas, existingBookIds, draftedFiles],
   );
 
-  const confirmChanges = useCallback(() => {
-    const nextEditableVoicesList = flushGridDraftChanges();
-    deleteTariffImportDraft(draftStorageKey);
-    onConfirm(buildConfirmableMetadatas(nextEditableVoicesList));
-  }, [draftStorageKey, flushGridDraftChanges, onConfirm, buildConfirmableMetadatas]);
-  confirmChangesRef.current = confirmChanges;
+  const confirmChanges = useCallback(async () => {
+    if (confirmBusy) return;
+    setIsConfirming(true);
+    try {
+      const nextEditableVoicesList = flushGridDraftChanges();
+      deleteTariffImportDraft(draftStorageKey);
+      await onConfirm(buildConfirmableMetadatas(nextEditableVoicesList));
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Approvazione import non riuscita",
+        tone: "danger",
+      });
+    } finally {
+      setIsConfirming(false);
+    }
+  }, [
+    buildConfirmableMetadatas,
+    confirmBusy,
+    draftStorageKey,
+    flushGridDraftChanges,
+    notify,
+    onConfirm,
+  ]);
+  confirmChangesRef.current = () => {
+    void confirmChanges();
+  };
+
+  const previewReadyNotifiedRef = useRef(false);
+  useEffect(() => {
+    if (!pageView || !isActiveFileReady) return;
+    if (previewReadyNotifiedRef.current) return;
+
+    const frameId = requestAnimationFrame(() => {
+      if (previewReadyNotifiedRef.current) return;
+      previewReadyNotifiedRef.current = true;
+      onPreviewReadyRef.current?.();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [isActiveFileReady, pageView]);
+
+  useEffect(() => {
+    void draftSignature;
+    previewReadyNotifiedRef.current = false;
+  }, [draftSignature]);
 
   const initialSyncRef = useRef(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — runs once on mount, subsequent changes handled by individual action handlers
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional â€” runs once on mount, subsequent changes handled by individual action handlers
   useEffect(() => {
     if (initialSyncRef.current) return;
     initialSyncRef.current = true;
@@ -1132,14 +1151,25 @@ export function TariffImportPreviewModal({
 
   const switchFile = useCallback(
     (index: number) => {
-      flushGridDraftChanges();
-      onActiveIndexChange?.(index);
+      if (index === localActiveIndex) return;
+      const fromIndex = localActiveIndex;
+      const fromMap = buildRegularIndexMap(editableVoicesList[fromIndex] ?? []);
       startTransition(() => {
-        setCategorySections([]);
-        dispatch({ type: "SWITCH_FILE", index });
+        const parsedChanges = remapGridDraftChanges(
+          (gridRef.current?.drainDraftChanges() ?? []).map(parseDraftChange),
+          fromMap,
+        );
+        if (parsedChanges.length > 0) {
+          dispatch({ type: "APPLY_DRAFTS", activeIndex: fromIndex, changes: parsedChanges });
+        }
+        ensureImportPreviewSessionGroups(index);
+        ensureImportPreviewInvalidRows(index);
+        onActiveIndexChange?.(index);
+        setDraftRevision(0);
+        if (!pageView) dispatch({ type: "SWITCH_FILE", index });
       });
     },
-    [flushGridDraftChanges, onActiveIndexChange],
+    [editableVoicesList, localActiveIndex, onActiveIndexChange, pageView],
   );
 
   const removeActiveFile = useCallback(() => {
@@ -1246,6 +1276,17 @@ export function TariffImportPreviewModal({
     onReviewedFilesChangeRef.current?.(nextReviewed);
   }, [localActiveIndex, draftedFiles, modalReviewedFiles, flushGridDraftChanges]);
 
+  const markAllFilesReviewed = useCallback(() => {
+    flushGridDraftChanges();
+    const nextReviewed = new Set<number>();
+    const nextDrafted = new Set(draftedFiles);
+    for (let index = 0; index < metadatas.length; index++) {
+      if (!nextDrafted.has(index)) nextReviewed.add(index);
+    }
+    dispatch({ type: "MARK_ALL_REVIEWED", fileCount: metadatas.length });
+    onReviewedFilesChangeRef.current?.(nextReviewed);
+  }, [draftedFiles, flushGridDraftChanges, metadatas.length]);
+
   const toggleActiveFileReviewed = useCallback(() => {
     flushGridDraftChanges();
     const nextDrafted = new Set(draftedFiles);
@@ -1262,7 +1303,7 @@ export function TariffImportPreviewModal({
   const askDeleteVoice = useCallback(
     (displayIndex: number) => {
       const originalIndex = regularIndexMap.get(displayIndex) ?? displayIndex;
-      const voice = activeVoices[originalIndex];
+      const voice = gridVoices[originalIndex];
       if (!voice) return;
       setDeleteTarget({
         code: voice.officialCode || `Riga ${displayIndex + 1}`,
@@ -1270,7 +1311,7 @@ export function TariffImportPreviewModal({
         index: originalIndex,
       });
     },
-    [activeVoices, regularIndexMap],
+    [gridVoices, regularIndexMap],
   );
 
   const confirmDeleteVoice = useCallback(() => {
@@ -1341,7 +1382,7 @@ export function TariffImportPreviewModal({
 
       if (!isImportShortcut) return;
 
-      if (mod && key === "enter" && canConfirm && !isBusy) {
+      if (mod && key === "enter" && canConfirm && !confirmBusy) {
         event.preventDefault();
         event.stopPropagation();
         confirmChanges();
@@ -1391,7 +1432,7 @@ export function TariffImportPreviewModal({
     canConfirm,
     confirmChanges,
     deleteTarget,
-    isBusy,
+    confirmBusy,
     localActiveIndex,
     markActiveFileReviewed,
     metadatas.length,
@@ -1400,14 +1441,41 @@ export function TariffImportPreviewModal({
     toggleActiveFileDraft,
   ]);
 
-  function focusImportCell(rowIndex: number, field: string) {
+  const focusImportCell = useCallback((rowIndex: number, field: string) => {
     setGridScrollTarget({
       field: field as keyof DesktopTariffVoice,
       nonce: Date.now(),
       rowIndex,
       type: "cell",
     });
-  }
+  }, []);
+
+  const focusImportCellAnyFile = useCallback(
+    (fileIndex: number, rowIndex: number, field: string) => {
+      if (fileIndex !== localActiveIndex) {
+        pendingCellFocusRef.current = {
+          field: field as keyof DesktopTariffVoice,
+          fileIndex,
+          rowIndex,
+        };
+        switchFile(fileIndex);
+        return;
+      }
+      focusImportCell(rowIndex, field);
+    },
+    [focusImportCell, localActiveIndex, switchFile],
+  );
+
+  useEffect(() => {
+    void isActiveFileReady;
+    const pending = pendingCellFocusRef.current;
+    if (!pending || pending.fileIndex !== localActiveIndex) return;
+    pendingCellFocusRef.current = null;
+    const frameId = requestAnimationFrame(() => {
+      focusImportCell(pending.rowIndex, pending.field);
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [focusImportCell, isActiveFileReady, localActiveIndex]);
 
   function focusImportCategory(categoryId: string) {
     setGridScrollTarget({
@@ -1426,48 +1494,141 @@ export function TariffImportPreviewModal({
     />
   ) : null;
 
-  return pageView ? (
-    <>
-      <div className="flex w-full flex-col gap-5 pb-28 xl:pb-0 xl:pr-[410px]">
+  const showFileList = metadatas.length > 1;
+  const scrollLayout = pageView ? "fill" : "viewport";
+  const confirmFileCount = metadatas.length;
+  const confirmVoiceCount = useMemo(
+    () => editableVoicesList.reduce((sum, voices) => sum + voices.length, 0),
+    [editableVoicesList],
+  );
+  const confirmLoadingModal = isConfirming ? (
+    <TariffImportConfirmLoadingModal fileCount={confirmFileCount} totalVoices={confirmVoiceCount} />
+  ) : null;
+  const sidebarNode = (
+    <ImportPreviewSidebar
+      activeFileBlockingCount={activeGridBlockingCount}
+      activeFileName={activeMetadata?.name ?? "Tariffario"}
+      activeIndex={localActiveIndex}
+      allErrorRows={allErrorRows}
+      errorRowCount={errorRowCount}
+      files={importFileItems}
+      onFocusCategory={focusImportCategory}
+      onFocusCell={focusImportCellAnyFile}
+      onSelectFile={switchFile}
+      onShowWarningDetail={setWarningDetailVoice}
+      otherFilesErrorCount={otherFilesErrorCount}
+      reviewedCount={modalReviewedFiles.size}
+      sections={categorySections}
+      showFileList={showFileList}
+      voicesWithWarnings={voicesWithWarnings}
+    />
+  );
+  const centerContent = (
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="shrink-0">
         <ImportWorkspaceHeader
           maggiorazioniCount={maggiorazioniVoices.length}
           metadata={activeMetadata}
-          regularCount={regularVoices.length}
+          regularCount={displayRegularVoices.length}
           summary={activeExtractionSummary}
         />
-        <ExtractionAuditStrip summary={activeExtractionSummary} />
-        <div className="min-w-0">
-          {maggiorazioniVoices.length > 0 ? (
+        <div className="mt-2">
+          <ExtractionAuditStrip summary={activeExtractionSummary} />
+        </div>
+        {maggiorazioniVoices.length > 0 ? (
+          <div className="mt-2 max-h-[22dvh] shrink-0 overflow-auto">
             <MaggiorazioniPanel
               maggiorazioni={maggiorazioniVoices}
               onShowWarningDetail={setWarningDetailVoice}
             />
-          ) : null}
-          <VoicesPanel
-            activeValidation={activeValidation}
-            askDeleteVoice={askDeleteVoice}
-            duplicateCodes={duplicateCodes}
-            editableGroups={editableGroups}
-            gridRef={gridRef}
-            gridScrollTarget={gridScrollTarget}
-            handleAddVoice={handleAddVoice}
-            hasVoices={hasVoices}
-            updateCategorySections={updateCategorySections}
-            updateVoice={updateVoice}
-          />
-        </div>
+          </div>
+        ) : null}
       </div>
-      <TariffImportReviewInspector
-        globalReviewSummary={reviewSummary}
-        extractionSummary={activeExtractionSummary}
-        invalidRows={invalidRows}
-        onFocusCategory={focusImportCategory}
-        onFocusCell={focusImportCell}
-        onShowWarningDetail={setWarningDetailVoice}
-        sections={categorySections}
-        variant="page"
-        voicesWithWarnings={voicesWithWarnings}
-      />
+      <div
+        className="mt-3 flex h-0 min-h-0 flex-1 flex-col overflow-hidden"
+        data-tariff-preview-scroll
+      >
+        <VoicesPanel
+          askDeleteVoice={askDeleteVoice}
+          duplicateCodes={duplicateCodes}
+          editableGroups={deferredEditableGroups}
+          gridRef={gridRef}
+          gridScrollTarget={gridScrollTarget}
+          gridValidation={activeGridValidation}
+          handleAddVoice={handleAddVoice}
+          hasVoices={hasVoices}
+          isSwitching={isSwitchingFile || !isActiveFileReady}
+          onDraftActivity={handleGridDraftActivity}
+          scrollLayout={scrollLayout}
+          updateCategorySections={updateCategorySections}
+          updateVoice={updateVoice}
+        />
+      </div>
+    </div>
+  );
+  const topBar = pageView ? null : (
+    <div className="min-w-0">
+      <h3 className="truncate text-20px font-semibold leading-tight text-[var(--text-primary)]">
+        {metadatas.length > 1
+          ? `${metadatas.length} tariffari da importare`
+          : (activeMetadata?.name ?? "Preview importazione")}
+      </h3>
+      <p className="mt-1 text-12px font-medium text-[var(--text-secondary)]">
+        Revisione voci estratte dal PDF
+      </p>
+    </div>
+  );
+
+  const actionBar = pageView ? (
+    <ImportPreviewActionBar
+      canConfirm={canConfirm}
+      draftedFiles={draftedFiles}
+      isBusy={confirmBusy}
+      loadedDraft={loadedDraft}
+      localActiveIndex={localActiveIndex}
+      markActiveFileReviewed={markActiveFileReviewed}
+      markAllFilesReviewed={markAllFilesReviewed}
+      metadatasCount={metadatas.length}
+      modalReviewedFiles={modalReviewedFiles}
+      onCancel={onCancel}
+      onConfirm={() => void confirmChanges()}
+      removeActiveFile={removeActiveFile}
+      saveDraft={saveDraft}
+      toggleActiveFileDraft={toggleActiveFileDraft}
+    />
+  ) : (
+    <ModalFooter
+      canConfirm={canConfirm}
+      confirmChanges={() => void confirmChanges()}
+      discardDraft={discardDraft}
+      draftedFiles={draftedFiles}
+      isBusy={confirmBusy}
+      loadedDraft={loadedDraft}
+      localActiveIndex={localActiveIndex}
+      markActiveFileReviewed={markActiveFileReviewed}
+      metadatas={metadatas}
+      modalReviewedFiles={modalReviewedFiles}
+      onCancel={onCancel}
+      removeActiveFile={removeActiveFile}
+      saveDraft={saveDraft}
+      toggleActiveFileDraft={toggleActiveFileDraft}
+    />
+  );
+
+  const workspace = (
+    <ImportPreviewWorkspace
+      actionBar={actionBar}
+      center={centerContent}
+      layoutMode={pageView ? "page" : "modal"}
+      sidebar={sidebarNode}
+      topBar={topBar}
+    />
+  );
+
+  return pageView ? (
+    <>
+      {workspace}
+      {confirmLoadingModal}
       {deleteDialog}
       {warningDetailVoice ? (
         <WarningDetailModal
@@ -1477,10 +1638,11 @@ export function TariffImportPreviewModal({
       ) : null}
     </>
   ) : (
-    <div className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-[var(--overlay-bg)] px-3 backdrop-blur-sm">
       <m.button
         aria-label="Chiudi"
         className="absolute inset-0 cursor-default"
+        disabled={confirmBusy}
         onClick={onCancel}
         type="button"
         initial={{ opacity: 0 }}
@@ -1488,664 +1650,27 @@ export function TariffImportPreviewModal({
         exit={{ opacity: 0 }}
       />
       <m.div
-        className="relative flex max-h-[92vh] w-full max-w-[min(1480px,calc(100vw-2rem))] flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        className="relative flex max-h-[94vh] w-full max-w-[min(1600px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-4xl bg-[color-mix(in_srgb,var(--bg-muted-strong)_66%,transparent)] p-1.5 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_84%,transparent)]"
+        initial={{ opacity: 0, scale: 0.98, y: 6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 8 }}
-        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        exit={{ opacity: 0, scale: 0.98, y: 6 }}
+        transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="flex min-h-0 flex-col rounded-22px bg-[var(--surface-base)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
-          <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
-            <div className="min-w-0">
-              <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-                Preview importazione
-              </div>
-              <h3 className="mt-2 text-24px font-semibold leading-1_05 tracking-neg-0_035em text-[var(--text-primary)] md:text-30px">
-                {metadatas.length > 1
-                  ? `${metadatas.length} tariffari da importare`
-                  : (activeMetadata?.name ?? "Preview importazione")}
-              </h3>
-              <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
-                Controlla i dati estratti prima di confermarli nel catalogo.
-              </p>
-            </div>
-          </div>
-
-          {metadatas.length > 1 ? (
-            <FileTabs
-              draftedFiles={draftedFiles}
-              editableVoicesList={editableVoicesList}
-              localActiveIndex={localActiveIndex}
-              metadatas={metadatas}
-              modalReviewedFiles={modalReviewedFiles}
-              switchFile={switchFile}
-              validations={validations}
-            />
-          ) : null}
-
-          <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="min-h-0 overflow-y-auto p-5" data-tariff-preview-scroll>
-              <ImportWorkspaceHeader
-                maggiorazioniCount={maggiorazioniVoices.length}
-                metadata={activeMetadata}
-                regularCount={regularVoices.length}
-                summary={activeExtractionSummary}
-              />
-              <div className="mt-3">
-                <ExtractionAuditStrip summary={activeExtractionSummary} />
-              </div>
-              <div className="mt-4 min-w-0">
-                {maggiorazioniVoices.length > 0 ? (
-                  <MaggiorazioniPanel
-                    maggiorazioni={maggiorazioniVoices}
-                    onShowWarningDetail={setWarningDetailVoice}
-                  />
-                ) : null}
-                <VoicesPanel
-                  activeValidation={activeValidation}
-                  askDeleteVoice={askDeleteVoice}
-                  duplicateCodes={duplicateCodes}
-                  editableGroups={editableGroups}
-                  gridRef={gridRef}
-                  gridScrollTarget={gridScrollTarget}
-                  handleAddVoice={handleAddVoice}
-                  hasVoices={hasVoices}
-                  updateCategorySections={updateCategorySections}
-                  updateVoice={updateVoice}
-                />
-              </div>
-            </div>
-            <TariffImportReviewInspector
-              globalReviewSummary={reviewSummary}
-              extractionSummary={activeExtractionSummary}
-              invalidRows={invalidRows}
-              onFocusCategory={focusImportCategory}
-              onFocusCell={focusImportCell}
-              onShowWarningDetail={setWarningDetailVoice}
-              sections={categorySections}
-              variant="modal"
-              voicesWithWarnings={voicesWithWarnings}
-            />
-          </div>
-          {warningDetailVoice ? (
-            <WarningDetailModal
-              voice={warningDetailVoice}
-              onClose={() => setWarningDetailVoice(null)}
-            />
-          ) : null}
-
-          <ModalFooter
-            canConfirm={canConfirm}
-            confirmChanges={confirmChanges}
-            discardDraft={discardDraft}
-            draftedFiles={draftedFiles}
-            isBusy={isBusy}
-            loadedDraft={loadedDraft}
-            localActiveIndex={localActiveIndex}
-            markActiveFileReviewed={markActiveFileReviewed}
-            metadatas={metadatas}
-            modalReviewedFiles={modalReviewedFiles}
-            onCancel={onCancel}
-            removeActiveFile={removeActiveFile}
-            saveDraft={saveDraft}
-            toggleActiveFileDraft={toggleActiveFileDraft}
-          />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-22px bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_62%,transparent)]">
+          {workspace}
         </div>
       </m.div>
+      {confirmLoadingModal}
       {deleteDialog}
-    </div>
-  );
-}
-
-function TariffImportReviewInspector({
-  extractionSummary,
-  globalReviewSummary,
-  invalidRows,
-  onFocusCategory,
-  onFocusCell,
-  onShowWarningDetail,
-  sections,
-  variant,
-  voicesWithWarnings,
-}: {
-  extractionSummary: ExtractionSummary;
-  globalReviewSummary: ImportReviewSummary;
-  invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
-  onFocusCategory: (categoryId: string) => void;
-  onFocusCell: (rowIndex: number, field: string) => void;
-  onShowWarningDetail: ((voice: DesktopTariffVoice) => void) | undefined;
-  sections: TariffGridSectionSummary[];
-  variant: "modal" | "page";
-  voicesWithWarnings: DesktopTariffVoice[];
-}) {
-  const [activeTab, setActiveTab] = useState<InspectorTab>("checks");
-  const issueCount = globalReviewSummary.issueCount;
-
-  const body = (
-    <InspectorContent
-      activeTab={activeTab}
-      extractionSummary={extractionSummary}
-      globalReviewSummary={globalReviewSummary}
-      invalidRows={invalidRows}
-      issueCount={issueCount}
-      onFocusCategory={onFocusCategory}
-      onFocusCell={onFocusCell}
-      onShowWarningDetail={onShowWarningDetail}
-      onTabChange={setActiveTab}
-      sections={sections}
-      voicesWithWarnings={voicesWithWarnings}
-    />
-  );
-
-  if (variant === "page") {
-    return (
-      <aside className="fixed inset-x-3 bottom-3 z-20 xl:inset-x-auto xl:bottom-4 xl:left-auto xl:right-6 xl:top-28 xl:w-[380px]">
-        <div className="max-h-[68dvh] overflow-y-auto rounded-22px xl:max-h-[calc(100dvh-6rem-1rem)]">
-          {body}
-        </div>
-      </aside>
-    );
-  }
-
-  if (variant === "modal") {
-    return (
-      <aside className="min-h-0 overflow-y-auto border-t border-[var(--border-subtle)]/70 bg-[color-mix(in_srgb,var(--surface-base)_82%,var(--bg-muted)_18%)] p-4 xl:border-l xl:border-t-0">
-        {body}
-      </aside>
-    );
-  }
-}
-
-function InspectorContent({
-  activeTab,
-  extractionSummary,
-  globalReviewSummary,
-  invalidRows,
-  issueCount,
-  onFocusCategory,
-  onFocusCell,
-  onShowWarningDetail,
-  onTabChange,
-  sections,
-  voicesWithWarnings,
-}: {
-  activeTab: InspectorTab;
-  extractionSummary: ExtractionSummary;
-  globalReviewSummary: ImportReviewSummary;
-  invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
-  issueCount: number;
-  onFocusCategory: (categoryId: string) => void;
-  onFocusCell: (rowIndex: number, field: string) => void;
-  onShowWarningDetail: ((voice: DesktopTariffVoice) => void) | undefined;
-  onTabChange: (tab: InspectorTab) => void;
-  sections: TariffGridSectionSummary[];
-  voicesWithWarnings: DesktopTariffVoice[];
-}) {
-  return (
-    <div className="rounded-22px bg-[color-mix(in_srgb,var(--surface-base)_78%,var(--bg-muted)_22%)] p-1 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_54%,transparent)] shadow-[0_18px_44px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]">
-      <div className="rounded-18px bg-[var(--surface-base)] p-3">
-        <InspectorHeader
-          completionPercent={globalReviewSummary.completionPercent}
-          isReviewReady={globalReviewSummary.isReviewReady}
-          issueCount={issueCount}
+      {warningDetailVoice ? (
+        <WarningDetailModal
+          voice={warningDetailVoice}
+          onClose={() => setWarningDetailVoice(null)}
         />
-        <InspectorTabs
-          activeTab={activeTab}
-          issueCount={issueCount}
-          onTabChange={onTabChange}
-          sectionsCount={sections.length}
-        />
-        <div className="mt-3">
-          <ImportShortcutLegend compact />
-        </div>
-        <div className="mt-3 text-12px font-semibold text-[var(--text-primary)]">
-          {activeTab === "checks"
-            ? "Stato import e controlli"
-            : activeTab === "categories"
-              ? "Indice categorie e voci"
-              : activeTab === "issues"
-                ? "Errori e anomalie da risolvere"
-                : "Avvertenze del parser"}
-        </div>
-        <div className="mt-3">
-          {activeTab === "checks" ? (
-            <ControlPanel
-              extractionSummary={extractionSummary}
-              globalReviewSummary={globalReviewSummary}
-              compact
-            />
-          ) : null}
-          {activeTab === "categories" ? (
-            <CategoryJumpPanel onFocusCategory={onFocusCategory} sections={sections} compact />
-          ) : null}
-          {activeTab === "issues" ? (
-            <InterventionPanel
-              globalReviewSummary={globalReviewSummary}
-              invalidRows={invalidRows}
-              onFocusCell={onFocusCell}
-              compact
-            />
-          ) : null}
-          {activeTab === "warnings" ? (
-            <WarningsPanel
-              onShowWarningDetail={onShowWarningDetail}
-              voicesWithWarnings={voicesWithWarnings}
-              compact
-            />
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InspectorHeader({
-  completionPercent,
-  isReviewReady,
-  issueCount,
-}: {
-  completionPercent: number;
-  isReviewReady: boolean;
-  issueCount: number;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
-          Revisione import
-        </div>
-        <div className="mt-1 truncate text-14px font-bold text-[var(--text-primary)]">
-          {isReviewReady ? "Import pronto" : `${issueCount.toLocaleString("it-IT")} interventi`}
-        </div>
-      </div>
-      <span
-        className={cn(
-          "shrink-0 rounded-full px-2.5 py-1 text-11px font-bold",
-          isReviewReady
-            ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
-            : "bg-[var(--warning-base)] text-[var(--text-inverse)]",
-        )}
-      >
-        {completionPercent}%
-      </span>
-    </div>
-  );
-}
-
-function InspectorTabs({
-  activeTab,
-  issueCount,
-  onTabChange,
-  sectionsCount,
-}: {
-  activeTab: InspectorTab;
-  issueCount: number;
-  onTabChange: (tab: InspectorTab) => void;
-  sectionsCount: number;
-}) {
-  return (
-    <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted-strong)]/70 p-1.5">
-      <InspectorTabButton
-        active={activeTab === "checks"}
-        count={undefined}
-        icon={ListChecks}
-        label="Stato"
-        onClick={() => onTabChange("checks")}
-      />
-      <InspectorTabButton
-        active={activeTab === "categories"}
-        count={sectionsCount}
-        icon={List}
-        label="Indice"
-        onClick={() => onTabChange("categories")}
-      />
-      <InspectorTabButton
-        active={activeTab === "issues"}
-        count={issueCount}
-        icon={AlertTriangle}
-        label="Errori"
-        onClick={() => onTabChange("issues")}
-      />
-      <InspectorTabButton
-        active={activeTab === "warnings"}
-        count={undefined}
-        icon={AlertTriangle}
-        label="Avvertenze"
-        onClick={() => onTabChange("warnings")}
-      />
-    </div>
-  );
-}
-
-function InspectorTabButton({
-  active,
-  count,
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  count: number | undefined;
-  icon: typeof ListChecks;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={cn(
-        "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-11px px-2 text-12px font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]",
-        active
-          ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm"
-          : "bg-[var(--surface-base)]/58 text-[var(--text-primary)] hover:bg-[var(--surface-base)]",
-      )}
-      onClick={onClick}
-      type="button"
-    >
-      <Icon className="size-3.5 shrink-0" />
-      <span className="truncate">{label}</span>
-      {typeof count === "number" ? (
-        <span
-          className={cn(
-            "rounded-full px-1.5 py-0.5 text-10px tabular-nums",
-            active
-              ? "bg-[var(--text-inverse)]/20 text-[var(--text-inverse)]"
-              : "bg-[var(--bg-muted-strong)] text-[var(--text-secondary)]",
-          )}
-        >
-          {count.toLocaleString("it-IT")}
-        </span>
-      ) : null}
-    </button>
-  );
-}
-
-function CategoryJumpPanel({
-  compact = false,
-  onFocusCategory,
-  sections,
-}: {
-  compact?: boolean;
-  onFocusCategory: (categoryId: string) => void;
-  sections: TariffGridSectionSummary[];
-}) {
-  if (sections.length === 0) return null;
-
-  return (
-    <div
-      className={cn(
-        "rounded-18px bg-[var(--surface-base)] p-3 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
-        !compact && "shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]",
-      )}
-    >
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
-        <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
-          Indice categorie
-        </div>
-        <span className="text-11px font-semibold text-[var(--text-secondary)]">
-          {sections.length}
-        </span>
-      </div>
-      <div className={cn("space-y-1 overflow-y-auto pr-1", compact ? "max-h-[34dvh]" : "max-h-56")}>
-        {sections.map((section) => (
-          <button
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-            key={section.id}
-            onClick={() => onFocusCategory(section.id)}
-            type="button"
-          >
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-11px font-bold text-[var(--accent-primary)]">
-              {section.categoria || "-"}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-12px font-bold text-[var(--text-primary)]">
-                Categoria {section.categoria || "Altre"}
-              </span>
-              <span className="block text-11px font-medium text-[var(--text-secondary)]">
-                {section.groupsCount} gruppi · {section.rowsCount.toLocaleString("it-IT")} righe
-              </span>
-            </span>
-            <ChevronRight className="size-3.5 text-[var(--text-secondary)]" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function InterventionPanel({
-  compact = false,
-  globalReviewSummary,
-  invalidRows,
-  onFocusCell,
-}: {
-  compact?: boolean;
-  globalReviewSummary: ImportReviewSummary;
-  invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }>;
-  onFocusCell: (rowIndex: number, field: string) => void;
-}) {
-  const hasBlockingIssues =
-    !globalReviewSummary.hasVoices ||
-    globalReviewSummary.validation.invalidCount > 0 ||
-    globalReviewSummary.validation.duplicateCount > 0 ||
-    globalReviewSummary.issueCount > globalReviewSummary.blockingIssueCount;
-
-  return (
-    <div
-      className={cn(
-        "rounded-18px p-4 text-12px font-medium leading-5 ring-1",
-        !compact && "shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]",
-        hasBlockingIssues
-          ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[var(--warning-base)]/15"
-          : "bg-[var(--success-soft)] text-[var(--success-base)] ring-[var(--success-base)]/15",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 font-bold">
-          {hasBlockingIssues ? (
-            <AlertTriangle className="size-4 shrink-0" />
-          ) : (
-            <CheckCircle2 className="size-4 shrink-0" />
-          )}
-          Gestione anomalie
-        </div>
-        <span className="rounded-full bg-[var(--surface-base)]/70 px-2 py-0.5 text-11px font-bold tabular-nums">
-          {globalReviewSummary.validation.warningCount}
-        </span>
-      </div>
-
-      <div className="mt-3 space-y-2">
-        <IssueLine
-          count={globalReviewSummary.filesWithoutVoices}
-          label="File senza voci importabili"
-          ok={globalReviewSummary.hasVoices}
-        />
-        <IssueLine
-          count={globalReviewSummary.warningRows}
-          label="Righe con warning parser"
-          ok={globalReviewSummary.warningRows === 0}
-        />
-        <IssueLine
-          count={globalReviewSummary.validation.invalidCount}
-          label="Righe con dati mancanti"
-          ok={globalReviewSummary.validation.invalidCount === 0}
-        />
-        <IssueLine
-          count={globalReviewSummary.validation.duplicateCount}
-          label="Codici duplicati"
-          ok={globalReviewSummary.validation.duplicateCount === 0}
-        />
-        <IssueLine
-          count={globalReviewSummary.sourceIssues}
-          label="Ente da confermare"
-          ok={globalReviewSummary.sourceIssues === 0}
-        />
-        <IssueLine
-          count={globalReviewSummary.yearIssues}
-          label="Anno non coerente"
-          ok={globalReviewSummary.yearIssues === 0}
-        />
-      </div>
-
-      {globalReviewSummary.validation.duplicateExamples.length > 0 ? (
-        <div className="mt-3 rounded-lg bg-[var(--surface-base)]/65 px-3 py-2">
-          <div className="text-10px font-bold uppercase tracking-caption opacity-75">
-            Duplicati principali
-          </div>
-          <div className="mt-1 font-bold">
-            {globalReviewSummary.validation.duplicateExamples.join(", ")}
-          </div>
-        </div>
-      ) : null}
-
-      {invalidRows.length > 0 ? (
-        <div className="mt-3">
-          <div className="mb-2 text-10px font-bold uppercase tracking-caption opacity-75">
-            Vai alla correzione
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {invalidRows.map((row) => (
-              <m.button
-                className="rounded-full bg-[var(--warning-base)]/15 px-3 py-1 text-11px font-bold transition-colors hover:bg-[var(--warning-base)]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-                key={`${row.index}-${row.field}`}
-                onClick={() => onFocusCell(row.index, row.field)}
-                type="button"
-              >
-                Riga {row.index + 1}: {row.label}
-              </m.button>
-            ))}
-          </div>
-        </div>
       ) : null}
     </div>
   );
 }
-
-function IssueLine({ count, label, ok }: { count: number; label: string; ok: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-base)]/55 px-3 py-2">
-      <span className="flex min-w-0 items-center gap-2">
-        {ok ? (
-          <CheckCircle2 className="size-3.5 shrink-0" />
-        ) : (
-          <AlertTriangle className="size-3.5 shrink-0" />
-        )}
-        <span className="truncate">{label}</span>
-      </span>
-      <span className="font-bold tabular-nums">{count.toLocaleString("it-IT")}</span>
-    </div>
-  );
-}
-
-function ControlPanel({
-  compact = false,
-  extractionSummary,
-  globalReviewSummary,
-}: {
-  compact?: boolean;
-  extractionSummary: ExtractionSummary;
-  globalReviewSummary: ImportReviewSummary;
-}) {
-  const confidencePercent =
-    extractionSummary.averageConfidence == null
-      ? null
-      : Math.round(extractionSummary.averageConfidence * 100);
-
-  return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-18px bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
-        !compact && "shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]",
-      )}
-    >
-      <div
-        className={cn(
-          "border-b p-4",
-          globalReviewSummary.isReviewReady
-            ? "border-[var(--success-base)]/15 bg-[var(--surface-base)]"
-            : "border-[var(--warning-base)]/15 bg-[var(--surface-base)]",
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
-              <ListChecks className="size-3.5" />
-              Centro controllo
-            </div>
-            <div className="mt-2 text-15px font-bold leading-tight text-[var(--text-primary)]">
-              {globalReviewSummary.isReviewReady ? "Import pronto" : "Verifiche richieste"}
-            </div>
-          </div>
-          <span
-            className={cn(
-              "shrink-0 rounded-full px-2.5 py-1 text-11px font-bold",
-              globalReviewSummary.isReviewReady
-                ? "bg-[var(--success-base)] text-[var(--text-inverse)]"
-                : "bg-[var(--warning-base)] text-[var(--text-inverse)]",
-            )}
-          >
-            {globalReviewSummary.completionPercent}%
-          </span>
-        </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-muted-strong)]">
-          <div
-            className={cn(
-              "h-full rounded-full transition-[width] duration-[var(--duration-base)]",
-              globalReviewSummary.isReviewReady
-                ? "bg-[var(--success-base)]"
-                : "bg-[var(--warning-base)]",
-            )}
-            style={{ width: `${globalReviewSummary.completionPercent}%` }}
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-3 divide-x divide-[var(--border-subtle)]/70 border-b border-[var(--border-subtle)]/70">
-        <ControlStat
-          label="Valide"
-          tone="success"
-          value={globalReviewSummary.validation.validCount}
-        />
-        <ControlStat
-          label="Warning"
-          tone="warning"
-          value={globalReviewSummary.validation.warningCount}
-        />
-        <ControlStat
-          label="Blocchi"
-          tone={globalReviewSummary.blockingIssueCount > 0 ? "warning" : "neutral"}
-          value={globalReviewSummary.blockingIssueCount}
-        />
-      </div>
-      <div className="space-y-4 p-4">
-        <div className="space-y-2 text-12px font-medium text-[var(--text-secondary)]">
-          <ValidationLine ok={globalReviewSummary.hasVoices} text="Voci prezzo rilevate" />
-          <ValidationLine
-            ok={globalReviewSummary.validation.invalidCount === 0}
-            text={`${globalReviewSummary.validation.invalidCount.toLocaleString("it-IT")} voci con dati mancanti`}
-          />
-          <ValidationLine
-            ok={globalReviewSummary.validation.duplicateCount === 0}
-            text={`${globalReviewSummary.validation.duplicateCount.toLocaleString("it-IT")} codici duplicati`}
-          />
-          <ValidationLine ok={globalReviewSummary.sourceIssues === 0} text="Ente riconosciuto" />
-          <ValidationLine ok={globalReviewSummary.yearIssues === 0} text="Anno coerente" />
-          <ValidationLine
-            ok={extractionSummary.lowConfidenceRows === 0}
-            text={`${extractionSummary.lowConfidenceRows.toLocaleString("it-IT")} righe sotto soglia confidenza`}
-          />
-          <ValidationLine
-            ok={extractionSummary.parserIssues === 0}
-            text={`${extractionSummary.parserIssues.toLocaleString("it-IT")} issue audit parser`}
-          />
-          <ValidationLine
-            ok={confidencePercent == null || confidencePercent >= 85}
-            text={`Confidenza media ${confidencePercent == null ? "-" : `${confidencePercent}%`}`}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function DeleteVoiceDialog({
   code,
   description,
@@ -2182,91 +1707,6 @@ function DeleteVoiceDialog({
         </Button>
       </DialogActions>
     </Dialog>
-  );
-}
-
-function ControlStat({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone: "neutral" | "success" | "warning";
-  value: number;
-}) {
-  return (
-    <div className="p-3">
-      <div className="text-9px font-bold uppercase tracking-caption text-[var(--text-secondary)]">
-        {label}
-      </div>
-      <div
-        className={cn(
-          "mt-1 text-18px font-bold leading-none tabular-nums",
-          tone === "success" && "text-[var(--success-base)]",
-          tone === "warning" && "text-[var(--warning-base)]",
-          tone === "neutral" && "text-[var(--text-primary)]",
-        )}
-      >
-        {value.toLocaleString("it-IT")}
-      </div>
-    </div>
-  );
-}
-
-function WarningsPanel({
-  compact = false,
-  onShowWarningDetail,
-  voicesWithWarnings,
-}: {
-  compact?: boolean;
-  onShowWarningDetail: ((voice: DesktopTariffVoice) => void) | undefined;
-  voicesWithWarnings: DesktopTariffVoice[];
-}) {
-  return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-18px bg-[var(--surface-base)] ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_58%,transparent)]",
-        !compact && "shadow-[0_16px_36px_color-mix(in_srgb,var(--text-primary)_10%,transparent)]",
-      )}
-    >
-      <div className="border-b border-[var(--border-subtle)]/70 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-10px font-bold uppercase tracking-0_14em text-[var(--text-secondary)]">
-            Avvertenze parser
-          </div>
-          <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-11px font-bold text-[var(--warning-base)]">
-            {voicesWithWarnings.length}
-          </span>
-        </div>
-      </div>
-      <div className={cn("space-y-1 overflow-y-auto p-2", compact ? "max-h-[34dvh]" : "max-h-56")}>
-        {voicesWithWarnings.length === 0 ? (
-          <div className="px-2 py-6 text-center text-12px font-medium text-[var(--text-secondary)]">
-            Nessuna avvertenza
-          </div>
-        ) : (
-          voicesWithWarnings.map((voice) => (
-            <button
-              className="flex w-full items-start gap-2 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-              key={voice.id}
-              onClick={() => onShowWarningDetail?.(voice)}
-              type="button"
-            >
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-[var(--warning-base)]" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-12px font-bold text-[var(--text-primary)]">
-                  {voice.officialCode}
-                </span>
-                <span className="mt-0.5 block text-11px font-medium leading-4 text-[var(--text-secondary)]">
-                  {voice.warnings?.length} avvertenza{voice.warnings?.length !== 1 ? "e" : ""}
-                </span>
-              </span>
-              <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-[var(--text-secondary)]" />
-            </button>
-          ))
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -2328,7 +1768,7 @@ function WarningDetailModal({
                 {w.scope ? (
                   <span className="ml-auto text-10px font-medium text-[var(--text-tertiary)]">
                     {w.scope}
-                    {w.refCode ? ` · ${w.refCode}` : ""}
+                    {w.refCode ? ` Â· ${w.refCode}` : ""}
                   </span>
                 ) : null}
               </div>
@@ -2438,15 +1878,15 @@ function MaggiorazioniPanel({
                 ) : null}
               </div>
               <span className="truncate text-12px font-semibold text-[var(--text-secondary)]">
-                {m.description || "—"}
+                {m.description || "â€”"}
               </span>
               <span className="text-right text-12px font-semibold text-[var(--text-secondary)]">
-                {m.laborPercentage != null ? `${m.laborPercentage}%` : "—"}
+                {m.laborPercentage != null ? `${m.laborPercentage}%` : "â€”"}
               </span>
               <span className="text-right text-12px font-bold text-[var(--text-primary)]">
                 {Number.isFinite(m.unitPrice)
-                  ? `${m.unitPrice.toLocaleString("it-IT", { minimumFractionDigits: 2 })} €`
-                  : "—"}
+                  ? `${m.unitPrice.toLocaleString("it-IT", { minimumFractionDigits: 2 })} â‚¬`
+                  : "â€”"}
               </span>
             </div>
           ))}

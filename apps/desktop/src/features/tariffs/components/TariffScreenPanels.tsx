@@ -1,14 +1,5 @@
 import { m } from "framer-motion";
-import {
-  CheckCircle2,
-  Database,
-  Eye,
-  MoreVertical,
-  Pencil,
-  Save,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { Database, Eye, MoreVertical, Pencil, Save, Star, Trash2 } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { useRef, useState } from "react";
 import { AppContextMenu } from "@/components/shared/AppContextMenu";
@@ -306,7 +297,7 @@ export function TariffBookPreviewCard({
   );
 }
 export function TariffImportPreviewPanel({
-  draftedImportFiles,
+  draftedImportFiles: _draftedImportFiles,
   getExistingBookIds,
   importPreviewIndex,
   importPreviews,
@@ -316,8 +307,9 @@ export function TariffImportPreviewPanel({
   onDraftedFilesChange,
   onMetadatasChange,
   onPageCanConfirmChange,
+  onPreviewReady,
   onReviewedFilesChange,
-  reviewedFiles,
+  reviewedFiles: _reviewedFiles,
 }: {
   draftedImportFiles: Set<number>;
   getExistingBookIds: () => string[];
@@ -329,53 +321,13 @@ export function TariffImportPreviewPanel({
   onDraftedFilesChange: (next: Set<number>) => void;
   onMetadatasChange: (metadatas: TariffPdfMetadata[]) => void;
   onPageCanConfirmChange: (value: boolean) => void;
+  onPreviewReady?: () => void;
   onReviewedFilesChange: (next: Set<number>) => void;
   reviewedFiles: Set<number>;
 }) {
   return (
-    <div className="-mx-4 -mt-4 flex flex-col md:-mx-6">
-      <div className="p-6">
-        <section className="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-          <div className="min-w-0">
-            <div className="text-10px font-semibold uppercase tracking-uppercase text-[var(--text-secondary)]">
-              Preview importazione
-            </div>
-            <h2 className="mt-2 truncate text-28px font-semibold leading-tight text-[var(--text-primary)]">
-              {importPreviews[importPreviewIndex]?.name ?? "Tariffario da importare"}
-            </h2>
-            <p className="mt-1 text-13px font-medium text-[var(--text-secondary)]">
-              Revisiona descrizioni, codici e prezzi; i comandi principali sono nella toolbar.
-            </p>
-          </div>
-          <div
-            className={cn(
-              "flex items-center gap-2 rounded-full px-3 py-2 text-12px font-bold ring-1",
-              draftedImportFiles.has(importPreviewIndex)
-                ? "bg-[var(--warning-soft)] text-[var(--warning-base)] ring-[var(--warning-base)]/30"
-                : reviewedFiles.has(importPreviewIndex)
-                  ? "bg-[var(--success-soft)] text-[var(--success-base)] ring-[var(--success-base)]/30"
-                  : "bg-[var(--bg-muted)] text-[var(--text-secondary)] ring-[var(--border-subtle)]",
-            )}
-          >
-            {draftedImportFiles.has(importPreviewIndex) ? (
-              <Save className="size-4" />
-            ) : (
-              <CheckCircle2
-                className={cn(
-                  "size-4",
-                  reviewedFiles.has(importPreviewIndex)
-                    ? "text-[var(--success-base)]"
-                    : "text-[var(--text-secondary)]",
-                )}
-              />
-            )}
-            {draftedImportFiles.has(importPreviewIndex)
-              ? "Salvato in bozza"
-              : reviewedFiles.has(importPreviewIndex)
-                ? "File revisionato"
-                : "Da revisionare"}
-          </div>
-        </section>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TariffImportPreviewModal
           activeIndex={importPreviewIndex}
           existingBookIds={getExistingBookIds()}
@@ -387,6 +339,7 @@ export function TariffImportPreviewPanel({
           onDraftedFilesChange={onDraftedFilesChange}
           onMetadatasChange={onMetadatasChange}
           onPageCanConfirmChange={onPageCanConfirmChange}
+          {...(onPreviewReady ? { onPreviewReady } : {})}
           onReviewedFilesChange={onReviewedFilesChange}
           pageView
         />

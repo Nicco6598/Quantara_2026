@@ -1,12 +1,6 @@
-import type { TariffPdfMetadata } from "@/lib/desktopData";
+import type { ImportFileProgress, TariffPdfMetadata } from "@/lib/desktopData";
 
-export type ImportFile = {
-  fileName: string;
-  index: number;
-  total: number;
-  status: "pending" | "processing" | "done" | "error";
-  error?: string;
-};
+export type ImportFile = ImportFileProgress;
 
 export type ImportMetaState = {
   phase: "idle" | "loading" | "preview";
