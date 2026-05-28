@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useNavigate } from "@/hooks/useNavigate";
+import { resolveContractorName } from "@/lib/contractor-resolve";
 import type { DesktopContract, DesktopDataResult } from "@/lib/desktopData";
 import { deleteDesktopContract } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
@@ -54,7 +55,7 @@ export function useProjectMutations({
 
     const values = {
       applicationContractCode: contract.applicationContractCode,
-      contractorName: contract.contractorName ?? projectContractors[contract.id] ?? "",
+      contractorName: resolveContractorName(contract, projectContractors),
       contractualAmount: String(amount),
       frameworkAgreementCode: contract.frameworkAgreementCode,
       tenderDiscountPercent: String(contract.tenderDiscountPercent ?? 0),
@@ -74,7 +75,7 @@ export function useProjectMutations({
     navigate("project-create");
   }
 
-  async function deleteProject(projectId: string) {
+  async function deleteProject(projectId: string, options?: { silent?: boolean }) {
     try {
       const deletedContract = contracts.find((contract) => contract.id === projectId);
 
@@ -103,11 +104,13 @@ export function useProjectMutations({
           : state.activeSalId,
       }));
       dispatchDataChanged();
-      notify({
-        message: `${deletedContract?.title ?? "Progetto"} e relative SAL eliminate.`,
-        title: "Progetto eliminato",
-        tone: "success",
-      });
+      if (!options?.silent) {
+        notify({
+          message: `${deletedContract?.title ?? "Progetto"} e relative SAL eliminate.`,
+          title: "Progetto eliminato",
+          tone: "success",
+        });
+      }
     } catch (error) {
       notify({
         message: error instanceof Error ? error.message : String(error),

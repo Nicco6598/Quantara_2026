@@ -11,14 +11,14 @@ import {
 } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { useRef, useState } from "react";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { DetailList, DetailRow } from "@/components/shared/DetailList";
-import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
+import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import { useContextMenu } from "@/hooks/useContextMenu";
 import { buildTariffBookContextMenuEntries } from "@/lib/context-menu-presets";
-import { SelectionCheckbox } from "@/components/shared/SelectionCheckbox";
 import type { DesktopTariffBook, TariffPdfMetadata } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
 import { MOTION_VARIANTS } from "@/motion";

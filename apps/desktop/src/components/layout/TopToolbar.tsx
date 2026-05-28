@@ -1,16 +1,21 @@
 import {
   Bell,
+  Briefcase,
   CaretDown,
   CaretLeft,
   CaretRight,
   CheckCircle,
   FloppyDisk,
+  MagnifyingGlass,
   Trash,
 } from "@phosphor-icons/react";
 import { AnimatePresence, m } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { MOTION_DURATION, SPRING_EASE } from "@/motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useContractorRegistryOptions } from "@/hooks/useContractorRegistryOptions";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cn } from "@/lib/utils";
+import { beginProjectCreate } from "@/lib/workflow-navigation";
+import { MOTION_DURATION, SPRING_EASE } from "@/motion";
 import {
   useActiveRouteState,
   useHistoryNavigationState,
@@ -20,6 +25,7 @@ import {
   commonPageActions,
   markIconMap,
   type PageAction,
+  type PageActionMenuItem,
   routeActionOverrides,
   routeMetaMap,
 } from "./top-toolbar-config";
@@ -530,6 +536,7 @@ function PageActionMenu({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const isPrimary = action.variant === "primary";
+  const closeMenu = useCallback(() => setIsOpen(false), []);
 
   return (
     <div className="relative">
@@ -563,7 +570,7 @@ function PageActionMenu({
             <button
               aria-label="Chiudi menu topbar"
               className="fixed inset-0 z-[var(--z-dropdown-menu)] cursor-default"
-              onClick={() => setIsOpen(false)}
+              onClick={closeMenu}
               type="button"
             />
             <m.div
@@ -575,6 +582,18 @@ function PageActionMenu({
             >
               <div className="rounded-18px bg-[color-mix(in_srgb,var(--surface-base)_92%,var(--bg-muted)_8%)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--surface-highlight)_72%,transparent)]">
                 {action.menuItems?.map((item, index) => {
+                  if (item.actionId === "new-project") {
+                    return (
+                      <NewProjectContractorPicker
+                        index={index}
+                        item={item}
+                        key={item.actionId}
+                        onAction={onAction}
+                        onClose={closeMenu}
+                      />
+                    );
+                  }
+
                   return (
                     <m.button
                       animate={{ opacity: 1, x: 0 }}
@@ -583,7 +602,7 @@ function PageActionMenu({
                       key={item.actionId}
                       onClick={() => {
                         onAction(item.actionId);
-                        setIsOpen(false);
+                        closeMenu();
                       }}
                       transition={{
                         delay: index * 0.05,
@@ -612,6 +631,107 @@ function PageActionMenu({
         ) : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+function NewProjectContractorPicker({
+  index,
+  item,
+  onAction,
+  onClose,
+}: {
+  index: number;
+  item: PageActionMenuItem;
+  onAction: (actionId: string) => void;
+  onClose: () => void;
+}) {
+  const contractors = useContractorRegistryOptions();
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 100);
+  const filtered = useMemo(() => {
+    const q = debouncedQuery.trim().toLowerCase();
+    if (!q) return contractors;
+    return contractors.filter((name) => name.toLowerCase().includes(q));
+  }, [contractors, debouncedQuery]);
+
+  function openCreate(contractorName?: string) {
+    if (contractorName) {
+      beginProjectCreate({ contractorName, lockContractor: false });
+    } else {
+      beginProjectCreate({ lockContractor: false });
+    }
+    onAction("open-project-create");
+    onClose();
+  }
+
+  return (
+    <m.div
+      animate={{ opacity: 1, x: 0 }}
+      className="rounded-18px p-2"
+      initial={{ opacity: 0, x: -12 }}
+      transition={{
+        delay: index * 0.05,
+        duration: MOTION_DURATION.base,
+        ease: SPRING_EASE,
+      }}
+    >
+      <div className="flex items-start gap-3 rounded-14px bg-[color-mix(in_srgb,var(--accent-primary)_6%,var(--surface-base)_94%)] p-3 ring-1 ring-[color-mix(in_srgb,var(--accent-primary)_18%,transparent)]">
+        <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)]/12 text-[var(--accent-primary)]">
+          <Briefcase size={18} weight="bold" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-13px font-semibold text-[var(--text-primary)]">
+            {item.label}
+          </span>
+          <span className="mt-0.5 block text-11px leading-4 text-[var(--text-secondary)]">
+            {item.description}
+          </span>
+        </span>
+      </div>
+
+      <div className="mt-2 rounded-14px bg-[color-mix(in_srgb,var(--bg-muted)_55%,var(--surface-base)_45%)] p-2 ring-1 ring-[color-mix(in_srgb,var(--border-subtle)_70%,transparent)]">
+        <div className="relative">
+          <MagnifyingGlass
+            className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-tertiary)]"
+            weight="bold"
+          />
+          <input
+            className="h-9 w-full rounded-10px border border-[color-mix(in_srgb,var(--border-subtle)_65%,transparent)] bg-[var(--surface-base)] pl-8 pr-3 text-12px font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Cerca appaltatore..."
+            value={query}
+          />
+        </div>
+
+        <div className="mt-2 max-h-44 space-y-0.5 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="px-2 py-3 text-center text-11px text-[var(--text-tertiary)]">
+              Nessun appaltatore trovato
+            </p>
+          ) : (
+            filtered.map((name) => (
+              <button
+                className="flex w-full items-center gap-2 rounded-10px px-2.5 py-2 text-left text-12px font-semibold text-[var(--text-primary)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-base)_92%)]"
+                key={name}
+                onClick={() => openCreate(name)}
+                type="button"
+              >
+                <Briefcase className="size-3.5 shrink-0 text-[var(--accent-primary)]" />
+                <span className="truncate">{name}</span>
+              </button>
+            ))
+          )}
+        </div>
+
+        <button
+          className="mt-2 flex w-full items-center justify-center rounded-10px border border-dashed border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] px-3 py-2 text-11px font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)]/35 hover:text-[var(--accent-primary)]"
+          onClick={() => openCreate()}
+          type="button"
+        >
+          Scegli in anagrafica progetto
+        </button>
+      </div>
+    </m.div>
   );
 }
 

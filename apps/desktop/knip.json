@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "index.html",
+    "src/main.tsx",
+    "src/**/*.test.{ts,tsx}",
+    "../../tests/unit/**/*.test.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignoreFiles": ["src/themes/**"],
+  "vite": {
+    "config": ["vite.config.ts"]
+  },
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true
+  },
+  "ignoreDependencies": ["@quantara/ui-tokens", "tailwindcss", "tw-animate-css"],
+  "ignoreIssues": {
+    "src/components/shared/index.ts": ["exports", "types"],
+    "src/components/shared/form/index.ts": ["exports", "types"],
+    "src/components/shared/charts/index.ts": ["exports", "types"],
+    "src/lib/contractorMigration.ts": ["exports"]
+  },
+  "rules": {
+    "dependencies": "error",
+    "devDependencies": "warn",
+    "files": "error",
+    "exports": "off",
+    "types": "off"
+  }
+}

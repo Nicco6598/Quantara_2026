@@ -1,12 +1,22 @@
-import { BookOpen, Loader2 } from "lucide-react";
 import { m } from "framer-motion";
+import { BookOpen, Loader2 } from "lucide-react";
 import { useCallback, useDeferredValue, useMemo } from "react";
 import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
 import { cn } from "@/lib/utils";
-import { TemplatePicker } from "./TemplatePicker";
-import type { SalVoiceDraft } from "../types";
 import type { SalTemplate } from "@/store/template-store";
+import {
+  expandVoiceCodeSegments,
+  normalizeVoiceCodeCompact,
+} from "../domain/sal-voice-code-search";
+import {
+  normalizeSalSearchText,
+  prepareSalVoiceSearch,
+  rankSalVoiceMatchesPrepared,
+  type SalVoiceSearchCandidate,
+} from "../domain/sal-voice-search";
+import type { SalVoiceDraft } from "../types";
 import { tariffTokenMatchesQuery } from "../utils/search-utils";
+import { TemplatePicker } from "./TemplatePicker";
 
 export type SalAutocompleteOption = {
   id?: string;
@@ -16,29 +26,17 @@ export type SalAutocompleteOption = {
   metadata?: string;
 };
 
-export type IndexedVoiceOption = {
+export type IndexedVoiceOption = SalVoiceSearchCandidate & {
   code: string;
   codeSegments: string[];
-  haystack: string;
   option: SalAutocompleteOption;
-  tariffBookId: string;
-  voice: SalVoiceDraft;
 };
 
 const MAX_SEARCH_RESULTS = 80;
 
-function normalizeSalSearch(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
 export function buildTariffSearchTokens(voice: SalVoiceDraft) {
-  const normalizedName = normalizeSalSearch(voice.tariffBookName);
-  const normalizedId = normalizeSalSearch(voice.tariffBookId);
+  const normalizedName = normalizeSalSearchText(voice.tariffBookName);
+  const normalizedId = normalizeSalSearchText(voice.tariffBookId);
   const words = normalizedName.split(" ").filter(Boolean);
   const acronym = words
     .filter((word) => !/^\d+$/.test(word))
@@ -47,67 +45,12 @@ export function buildTariffSearchTokens(voice: SalVoiceDraft) {
   return new Set([normalizedName, normalizedId, acronym, ...words].filter(Boolean));
 }
 
-function normalizeVoiceCode(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-}
-
 export function splitVoiceCodeSegments(code: string): string[] {
-  return code
-    .split(".")
-    .map((segment) =>
-      segment
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase(),
-    )
-    .filter(Boolean);
+  return expandVoiceCodeSegments(code);
 }
 
-export function parseCodePathQuery(query: string): string[] {
-  const trimmed = query.trim();
-  if (!trimmed) return [];
-  return trimmed
-    .split(/[.\s]+/)
-    .map((part) =>
-      part
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase(),
-    )
-    .filter(Boolean);
-}
+export { matchesCodePathSegments, parseCodePathQuery } from "../domain/sal-voice-code-search";
 
-export function matchesCodePathSegments(voiceSegments: string[], querySegments: string[]): boolean {
-  for (let index = 0; index < querySegments.length; index++) {
-    const querySegment = querySegments[index];
-    if (!querySegment) return false;
-    const voiceSegment = voiceSegments[index];
-    if (voiceSegment == null) return false;
-    if (index === querySegments.length - 1) {
-      if (!voiceSegment.startsWith(querySegment)) return false;
-    } else if (voiceSegment !== querySegment) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function looksLikeVoicePrefix(part: string) {
-  return /^[a-z]{1,4}\d*$/.test(part);
-}
-
-function shouldUseCodePathSearch(query: string, codePathParts: string[]): boolean {
-  if (codePathParts.length === 0) return false;
-  if (query.includes(".")) return true;
-  const first = codePathParts[0];
-  return first != null && looksLikeVoicePrefix(first);
-}
-
-/** Lighter option for bulk index build (no per-voice currency formatting). */
 function buildVoiceOptionForIndex(voice: SalVoiceDraft): SalAutocompleteOption {
   return {
     id: voice.id,
@@ -121,10 +64,13 @@ function buildVoiceOptionForIndex(voice: SalVoiceDraft): SalAutocompleteOption {
 export function buildIndexedVoiceOptions(voices: readonly SalVoiceDraft[]): IndexedVoiceOption[] {
   return voices.map((voice) => {
     const option = buildVoiceOptionForIndex(voice);
+    const compactCode = normalizeVoiceCodeCompact(voice.code);
     return {
-      code: normalizeVoiceCode(voice.code),
-      codeSegments: splitVoiceCodeSegments(voice.code),
-      haystack: normalizeSalSearch(
+      code: compactCode,
+      codeSegments: expandVoiceCodeSegments(voice.code),
+      compactCode,
+      fieldHaystack: normalizeSalSearchText(`${voice.code} ${voice.description} ${voice.category}`),
+      haystack: normalizeSalSearchText(
         `${voice.code} ${voice.description} ${voice.category} ${voice.tariffBookName} ${voice.tariffBookId}`,
       ),
       option,
@@ -132,10 +78,6 @@ export function buildIndexedVoiceOptions(voices: readonly SalVoiceDraft[]): Inde
       voice,
     };
   });
-}
-
-function limitResults(items: IndexedVoiceOption[]) {
-  return items.slice(0, MAX_SEARCH_RESULTS).map((item) => item.option);
 }
 
 export function filterIndexedVoiceOptions({
@@ -147,54 +89,10 @@ export function filterIndexedVoiceOptions({
   query: string;
   tariffTokensByBookId: Map<string, Set<string>>;
 }) {
-  const normalizedQuery = normalizeSalSearch(query);
-  if (!normalizedQuery) return [];
-  const queryParts = normalizedQuery.split(" ").filter(Boolean);
-  const codePathParts = parseCodePathQuery(query);
-
-  if (shouldUseCodePathSearch(query, codePathParts)) {
-    const pathMatches = index.filter((item) =>
-      matchesCodePathSegments(item.codeSegments, codePathParts),
-    );
-    if (pathMatches.length > 0) {
-      const remainingParts = query.includes(".")
-        ? []
-        : queryParts.filter((part) => !codePathParts.includes(part));
-      const matches =
-        remainingParts.length > 0
-          ? pathMatches.filter((item) =>
-              remainingParts.every((part) => item.haystack.includes(part)),
-            )
-          : pathMatches;
-      return limitResults(
-        matches.sort((left, right) => left.option.value.localeCompare(right.option.value, "it-IT")),
-      );
-    }
-  }
-
-  const matchedTariffIds = new Set<string>();
-  const matchedQueryParts = new Set<string>();
-  for (const part of queryParts) {
-    for (const [tariffBookId, tokens] of tariffTokensByBookId) {
-      if ([...tokens].some((token) => tariffTokenMatchesQuery(token, part))) {
-        matchedTariffIds.add(tariffBookId);
-        matchedQueryParts.add(part);
-      }
-    }
-  }
-  if (matchedTariffIds.size === 0) {
-    return limitResults(
-      index.filter((item) => queryParts.every((part) => item.haystack.includes(part))),
-    );
-  }
-  const remainingQuery = queryParts.filter((part) => !matchedQueryParts.has(part)).join(" ");
-  const remainingParts = queryParts.filter((part) => !matchedQueryParts.has(part));
-  return limitResults(
-    index.filter((item) => {
-      if (!matchedTariffIds.has(item.tariffBookId)) return false;
-      return remainingQuery ? remainingParts.every((part) => item.haystack.includes(part)) : true;
-    }),
-  );
+  const prepared = prepareSalVoiceSearch(query, tariffTokensByBookId, tariffTokenMatchesQuery);
+  if (!prepared) return [];
+  const ranked = rankSalVoiceMatchesPrepared(index, prepared, MAX_SEARCH_RESULTS);
+  return ranked.map((item) => item.option);
 }
 
 export function SalSearchBar({

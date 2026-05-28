@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { toSalDocumentPayload } from "../../apps/desktop/src/lib/sal-data";
 import type { SalDocument } from "../../apps/desktop/src/features/sal/types";
+import { toSalDocumentPayload } from "../../apps/desktop/src/lib/sal-data";
 
 describe("SAL Tauri payload serialization", () => {
   it("adds explicit derived counts and cents without mutating the source document", () => {

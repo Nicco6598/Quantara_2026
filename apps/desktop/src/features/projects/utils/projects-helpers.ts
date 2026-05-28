@@ -155,17 +155,33 @@ export function isPlaceholderContractorName(value: string): boolean {
 
 const contractorIdCache = new Map<string, string>();
 
+/** Must match `create_contractor_id` in contract_repository.rs (`contractor_<slug>`). */
 export function createContractorId(contractor: string): string {
   const normalized = normalizeContractorName(contractor);
   const cached = contractorIdCache.get(normalized);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    return cached;
+  }
 
-  const id = normalized
+  const slug = normalized
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+  const id = slug ? `contractor_${slug}` : "";
   contractorIdCache.set(normalized, id);
   return id;
+}
+
+/** When creating a project inside a contractor folder, auto-draft restore must keep that contractor. */
+export function applyLockedContractorToProjectDraft<T extends { contractorName: string }>(
+  draft: T,
+  lockedContractorName: string,
+): T {
+  const locked = normalizeContractorName(lockedContractorName);
+  if (!locked || locked === "Appaltatore da assegnare") {
+    return draft;
+  }
+  return { ...draft, contractorName: locked };
 }
 
 export function mergeContractorRegistry(current: string[], contractorName: string): string[] {
@@ -180,11 +196,19 @@ export function mergeContractorRegistry(current: string[], contractorName: strin
 export function readStringList(key: string): string[] {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
-    return Array.isArray(parsed)
-      ? parsed
-          .filter((item): item is string => typeof item === "string")
-          .map(normalizeContractorName)
-      : [];
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const item of parsed) {
+      if (typeof item !== "string") continue;
+      const normalized = normalizeContractorName(item);
+      if (!normalized) continue;
+      const id = createContractorId(normalized);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      result.push(normalized);
+    }
+    return result;
   } catch {
     return [];
   }

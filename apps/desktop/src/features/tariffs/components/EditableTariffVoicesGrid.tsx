@@ -1,12 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AlertTriangle, Info, Link2, MapPin, Plus, Trash2, WandSparkles, X } from "lucide-react";
-import { AppContextMenu } from "@/components/shared/AppContextMenu";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { useContextMenu } from "@/hooks/useContextMenu";
-import {
-  buildTariffVoiceContextMenuEntries,
-  copyTextToClipboard,
-} from "@/lib/context-menu-presets";
 import {
   forwardRef,
   memo,
@@ -19,6 +12,13 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import {
+  buildTariffVoiceContextMenuEntries,
+  copyTextToClipboard,
+} from "@/lib/context-menu-presets";
 import type { DesktopTariffVoice, TariffWarning } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 import type { VoiceGroup } from "../utils/tariff-grouping";

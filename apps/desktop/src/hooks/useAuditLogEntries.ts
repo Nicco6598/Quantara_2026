@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { listDesktopAuditEvents } from "@/lib/audit-data";
 import { isTauriRuntime } from "@/lib/tauri-wrapper";
-import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import type { AuditEntry } from "@/store/audit-log-store";
 import { useAuditLogStore } from "@/store/audit-log-store";
 

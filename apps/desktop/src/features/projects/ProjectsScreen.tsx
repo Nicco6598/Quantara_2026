@@ -1,5 +1,4 @@
 import { FileSpreadsheet, FolderKanban, Trash2, X } from "lucide-react";
-import { EmptyState } from "@/components/shared/EmptyState";
 import {
   type ChangeEvent,
   lazy,
@@ -15,14 +14,15 @@ import {
 import { Button } from "@/components/shared/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Dialog, DialogActions } from "@/components/shared/Dialog";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
 import { ContractorDetailView } from "@/features/projects/components/ContractorDetailView";
 import { ContractorsWorkspace } from "@/features/projects/components/ContractorsWorkspace";
 import {
-  ContractorTreeView,
   buildContractorTree,
+  ContractorTreeView,
 } from "@/features/projects/components/ContractorTreeView";
 import { useProjectMigration } from "@/features/projects/hooks/useProjectMigration";
 import { useProjectMutations } from "@/features/projects/hooks/useProjectMutations";
@@ -37,16 +37,21 @@ import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useNavigate } from "@/hooks/useNavigate";
 import {
+  loadContractorRegistryNames,
+  persistContractorRegistryName,
+} from "@/lib/contractor-registry";
+import { isContractorMigrationComplete, resolveContractorName } from "@/lib/contractor-resolve";
+import {
   type DesktopContract,
   type DesktopDataResult,
+  deleteDesktopContractor,
+  ensureDesktopContractor,
   listDesktopContracts,
   listDesktopTariffBooks,
-  updateDesktopContract,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
-import { isContractorMigrationComplete, resolveContractorName } from "@/lib/contractor-resolve";
-import { selectProjectForWorkflow } from "@/lib/workflow-navigation";
+import { beginProjectCreate, selectProjectForWorkflow } from "@/lib/workflow-navigation";
 import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import {
   type PendingWorkflowAction,
@@ -58,9 +63,9 @@ import { fallbackProjectTariffBook, focusOptions } from "./projects-data";
 import { mapContractToProject } from "./utils/project-mappers";
 import {
   createContractorId,
+  isPlaceholderContractorName,
   mergeContractorRegistry,
   normalizeContractorName,
-  readStringList,
   readStringRecord,
   writeJson,
 } from "./utils/projects-helpers";
@@ -69,7 +74,6 @@ export type { PortfolioProject } from "@/features/projects/types";
 export { portfolioProjects } from "./projects-data";
 export { mapContractToProject } from "./utils/project-mappers";
 
-const contractorRegistryStorageKey = STORAGE_KEYS.contractorRegistry;
 const projectContractorStorageKey = STORAGE_KEYS.projectContractors;
 
 const ContractorModal = lazy(() =>
@@ -95,11 +99,9 @@ export function ProjectsScreen() {
   const [contractorDeleteTarget, setContractorDeleteTarget] = useState<ContractorFolder | null>(
     null,
   );
-  const [contractorRegistry, setContractorRegistry] = useState<string[]>(() =>
-    readStringList(contractorRegistryStorageKey),
-  );
+  const [contractorRegistry, setContractorRegistry] = useState<string[]>([]);
   const [projectContractors, setProjectContractors] = useState<Record<string, string>>(() =>
-    readStringRecord(projectContractorStorageKey),
+    isContractorMigrationComplete() ? {} : readStringRecord(projectContractorStorageKey),
   );
   const [selectedContractorId, setSelectedContractorId] = useState<string | null>(null);
   const [selectedContractId, setSelectedContractId] = useState("");
@@ -142,10 +144,14 @@ export function ProjectsScreen() {
         : [],
     [contractsState.data, contractsState.source, projectContractors, salDocuments, tariffVoices],
   );
+  const portfolioProjects = useMemo(
+    () => activeProjects.filter((project) => !isPlaceholderContractorName(project.contractor)),
+    [activeProjects],
+  );
   const { exportProjectsReportWorkbook, importMigrationFile } = useProjectMigration({
     contracts: contractsState.data,
     notify,
-    projects: activeProjects,
+    projects: portfolioProjects,
     salDocuments,
     setMigrationAction,
     tariffVoices,
@@ -153,7 +159,7 @@ export function ProjectsScreen() {
   const treeData = useMemo(
     () =>
       buildContractorTree(
-        activeProjects,
+        portfolioProjects,
         salDocuments.map((sal) => ({
           date: sal.date,
           projectId: sal.projectId,
@@ -162,7 +168,7 @@ export function ProjectsScreen() {
           total: sal.total ?? 0,
         })),
       ),
-    [activeProjects, salDocuments],
+    [portfolioProjects, salDocuments],
   );
   const projectSalIndex = useMemo(
     () => new Map(salProjects.map((project) => [project.id, project])),
@@ -179,17 +185,23 @@ export function ProjectsScreen() {
   );
   const recentSals = useMemo(() => allSals.slice(0, 5), [allSals]);
   const totalPortfolioValue = useMemo(
-    () => activeProjects.reduce((sum, project) => sum + project.budget.amount, 0),
-    [activeProjects],
+    () => portfolioProjects.reduce((sum, project) => sum + project.budget.amount, 0),
+    [portfolioProjects],
   );
+
+  const reloadContractorRegistry = useCallback(() => {
+    return loadContractorRegistryNames().then(setContractorRegistry);
+  }, []);
 
   const reloadPortfolio = useCallback(() => {
     return Promise.all([
       listDesktopContracts([]),
       listDesktopTariffBooks([fallbackProjectTariffBook]),
-    ]).then(([contracts, tariffBooks]) => {
+      loadContractorRegistryNames(),
+    ]).then(([contracts, tariffBooks, registry]) => {
       setContractsState(contracts);
       setTariffBooksState(tariffBooks.data);
+      setContractorRegistry(registry);
       setSelectedContractId((current) => current || contracts.data[0]?.id || "");
     });
   }, []);
@@ -198,12 +210,29 @@ export function ProjectsScreen() {
     void reloadPortfolio();
   }, [reloadPortfolio]);
 
+  useEffect(() => {
+    const orphanProjectIds = activeProjects
+      .filter((project) => isPlaceholderContractorName(project.contractor))
+      .map((project) => project.id);
+    if (orphanProjectIds.length === 0) {
+      return;
+    }
+
+    void (async () => {
+      for (const projectId of orphanProjectIds) {
+        await deleteProject(projectId, { silent: true });
+      }
+    })();
+  }, [activeProjects, deleteProject]);
+
   useDataChangedListener(() => {
     void reloadPortfolio();
   });
 
   useEffect(() => {
-    writeJson(contractorRegistryStorageKey, contractorRegistry);
+    if (!isContractorMigrationComplete()) {
+      writeJson(STORAGE_KEYS.contractorRegistry, contractorRegistry);
+    }
   }, [contractorRegistry]);
 
   useEffect(() => {
@@ -215,6 +244,7 @@ export function ProjectsScreen() {
   const processPendingWorkflowAction = useCallback(
     (action: PendingWorkflowAction) => {
       if (action === "new-project") {
+        beginProjectCreate({ lockContractor: false });
         navigate("project-create");
         useAppStore.getState().setPendingWorkflowAction(null);
         return;
@@ -263,7 +293,7 @@ export function ProjectsScreen() {
     navigate("project-detail");
   }
 
-  function handleCreateContractor(name?: string) {
+  async function handleCreateContractor(name?: string) {
     const contractorName = normalizeContractorName(name ?? contractorDraft);
 
     if (contractorName.length < 2) {
@@ -271,15 +301,30 @@ export function ProjectsScreen() {
       return;
     }
 
-    setContractorRegistry((current) => mergeContractorRegistry(current, contractorName));
-    setContractorDraft("");
-    setIsContractorModalOpen(false);
-    dispatchDataChanged();
-    notify({
-      message: `${contractorName} creato tra gli appaltatori.`,
-      title: "Appaltatore aggiunto",
-      tone: "success",
-    });
+    try {
+      if (isContractorMigrationComplete()) {
+        await ensureDesktopContractor(contractorName);
+        await reloadContractorRegistry();
+      } else {
+        setContractorRegistry((current) => mergeContractorRegistry(current, contractorName));
+        await persistContractorRegistryName(contractorName);
+      }
+
+      setContractorDraft("");
+      setIsContractorModalOpen(false);
+      dispatchDataChanged();
+      notify({
+        message: `${contractorName} creato tra gli appaltatori.`,
+        title: "Appaltatore aggiunto",
+        tone: "success",
+      });
+    } catch (error) {
+      notify({
+        message: error instanceof Error ? error.message : String(error),
+        title: "Appaltatore non salvato",
+        tone: "danger",
+      });
+    }
   }
 
   async function handleConfirmDeleteContractor() {
@@ -289,75 +334,54 @@ export function ProjectsScreen() {
 
     const deletedId = contractorDeleteTarget.id;
     const deletedName = contractorDeleteTarget.contractor;
+    const linkedProjectIds = activeProjects
+      .filter((project) => createContractorId(project.contractor) === deletedId)
+      .map((project) => project.id);
 
-    const unassignedProjectsCount = activeProjects.filter(
-      (project) => createContractorId(project.contractor) === deletedId,
-    ).length;
-    const contractsToUnassign = contractsState.data.filter((contract) => {
-      const contractor = contract.contractorName ?? projectContractors[contract.id] ?? "";
-      return createContractorId(contractor) === deletedId;
-    });
-
-    try {
-      const updatedContracts = await Promise.all(
-        contractsToUnassign.map((contract) =>
-          updateDesktopContract(contract.id, {
-            applicationContractCode: contract.applicationContractCode,
-            contractorName: null,
-            contractualAmount: contract.contractualAmount.amount,
-            frameworkAgreementCode: contract.frameworkAgreementCode,
-            id: contract.id,
-            osExcludedAmount: contract.osExcludedAmount ?? null,
-            tenderDiscountPercent: contract.tenderDiscountPercent,
-            tariffPriorities: contract.tariffPriorities,
-            title: contract.title,
-          }),
-        ),
-      );
-
-      if (updatedContracts.length > 0) {
-        const updatedById = new Map(updatedContracts.map((contract) => [contract.id, contract]));
-        setContractsState((current) => ({
-          ...current,
-          data: current.data.map((contract) => updatedById.get(contract.id) ?? contract),
-        }));
-      }
-    } catch (error) {
-      notify({
-        message: error instanceof Error ? error.message : String(error),
-        title: "Eliminazione non riuscita",
-        tone: "danger",
-      });
-      return;
-    }
-
-    setContractorRegistry((current) =>
-      current.filter((contractor) => createContractorId(contractor) !== deletedId),
-    );
-    setProjectContractors((current) =>
-      Object.fromEntries(
-        Object.entries(current).filter(
-          ([, contractor]) => createContractorId(contractor) !== deletedId,
-        ),
-      ),
-    );
-    useSalWorkflowStore.setState((state) => ({
-      projects: state.projects.map((project) =>
-        createContractorId(project.client) === deletedId
-          ? { ...project, client: "Senza appaltatore" }
-          : project,
-      ),
-    }));
     if (selectedContractorId === deletedId) {
       navigateBack();
     }
     setContractorDeleteTarget(null);
+
+    for (const projectId of linkedProjectIds) {
+      await deleteProject(projectId, { silent: true });
+    }
+
+    if (isContractorMigrationComplete()) {
+      await deleteDesktopContractor(deletedId);
+      await reloadContractorRegistry();
+    } else {
+      setContractorRegistry((current) =>
+        current.filter((contractor) => createContractorId(contractor) !== deletedId),
+      );
+    }
+
+    useSalWorkflowStore.setState((state) => {
+      const removedProjectIds = new Set(
+        state.projects
+          .filter((project) => createContractorId(project.client) === deletedId)
+          .map((project) => project.id),
+      );
+
+      return {
+        projects: state.projects.filter((project) => !removedProjectIds.has(project.id)),
+        salDocuments: state.salDocuments.filter((sal) => !removedProjectIds.has(sal.projectId)),
+        activeProjectId: removedProjectIds.has(state.activeProjectId) ? "" : state.activeProjectId,
+        activeSalId: state.salDocuments.some(
+          (sal) => sal.id === state.activeSalId && removedProjectIds.has(sal.projectId),
+        )
+          ? ""
+          : state.activeSalId,
+      };
+    });
+
+    await reloadPortfolio();
     dispatchDataChanged();
     notify({
       message:
-        unassignedProjectsCount > 0
-          ? `${deletedName} rimosso: ${unassignedProjectsCount} progetti restano nel registro senza appaltatore.`
-          : `${deletedName} rimosso dal registro appaltatori.`,
+        linkedProjectIds.length > 0
+          ? `${deletedName} rimosso insieme a ${linkedProjectIds.length} progetti collegati.`
+          : `${deletedName} rimosso dall'anagrafica appaltatori.`,
       title: "Appaltatore eliminato",
       tone: "success",
     });
@@ -368,10 +392,6 @@ export function ProjectsScreen() {
     setFocus("all");
     navigateBack();
   }, [navigateBack]);
-
-  const handleOpenCreateProject = useCallback(() => {
-    navigate("project-create");
-  }, [navigate]);
 
   const handleOpenFolder = useCallback(
     (folderId: string) => {
@@ -405,7 +425,7 @@ export function ProjectsScreen() {
     visibleProjects,
     visibleQueue,
   } = useProjectPortfolioView({
-    activeProjects,
+    activeProjects: portfolioProjects,
     allSals,
     contractorRegistry,
     deferredQuery,
@@ -413,6 +433,18 @@ export function ProjectsScreen() {
     projectSalIndex,
     selectedContractorId,
   });
+
+  const handleOpenCreateProject = useCallback(() => {
+    if (selectedContractor) {
+      beginProjectCreate({
+        contractorName: selectedContractor.contractor,
+        lockContractor: true,
+      });
+    } else {
+      beginProjectCreate({ lockContractor: false });
+    }
+    navigate("project-create");
+  }, [navigate, selectedContractor]);
 
   const { averageProgress, criticalCount, salExposure, salWindowCount, totalBudget } =
     portfolioMetrics;
@@ -488,14 +520,14 @@ export function ProjectsScreen() {
             <ContractorTreeView
               contractors={treeData}
               onOpenProject={(id) => {
-                const p = activeProjects.find((proj) => proj.id === id);
+                const p = portfolioProjects.find((proj) => proj.id === id);
                 if (p) handleOpenProject(p);
               }}
               onSwitchView={() => setIsTreeView(false)}
             />
           ) : (
             <ContractorsWorkspace
-              activeProjectsCount={activeProjects.length}
+              activeProjectsCount={portfolioProjects.length}
               folders={contractorFolders}
               onImport={() => fileInputRef.current?.click()}
               onDeleteContractor={setContractorDeleteTarget}
@@ -827,8 +859,8 @@ function ContractorDeleteDialog({
       </div>
       <p className="mt-3 text-13px leading-6 text-[var(--text-secondary)]">
         {contractor.projectCount > 0
-          ? `I ${contractor.projectCount} progetti collegati resteranno nel registro senza appaltatore assegnato. Anche i SAL collegati non ricreeranno la cartella.`
-          : "La cartella verra rimossa dal registro appaltatori e dai SAL collegati."}
+          ? `Elimina ${contractor.contractor} dall'anagrafica e cancella anche ${contractor.projectCount} progetti collegati con i relativi SAL. L'operazione non è reversibile.`
+          : "Rimuove la voce dall'anagrafica appaltatori. Nessun progetto e collegato."}
       </p>
       <DialogActions>
         <Button onClick={onClose} variant="ghost">

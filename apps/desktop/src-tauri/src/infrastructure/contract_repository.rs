@@ -47,6 +47,64 @@ pub struct ContractRecord {
     pub os_excluded_amount: Option<f64>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContractorRecord {
+    pub id: String,
+    pub name: String,
+}
+
+pub fn list_contractors(connection: &Connection) -> Result<Vec<ContractorRecord>, AppError> {
+    let mut statement = connection
+        .prepare("SELECT id, name FROM contractors ORDER BY name COLLATE NOCASE ASC")
+        .map_err(to_database_error)?;
+
+    let rows = statement
+        .query_map([], |row| {
+            Ok(ContractorRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        })
+        .map_err(to_database_error)?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(to_database_error)
+}
+
+pub fn delete_contractor(connection: &Connection, contractor_id: &str) -> Result<(), AppError> {
+    let trimmed = contractor_id.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Validation("ID appaltatore non valido.".into()));
+    }
+
+    connection
+        .execute("DELETE FROM contractors WHERE id = ?1", params![trimmed])
+        .map_err(to_database_error)?;
+
+    Ok(())
+}
+
+pub fn ensure_contractor(connection: &Connection, name: &str) -> Result<ContractorRecord, AppError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Validation(
+            "Il nome appaltatore non puo essere vuoto.".into(),
+        ));
+    }
+
+    let transaction = connection.unchecked_transaction().map_err(to_database_error)?;
+    let contractor_id = upsert_contractor(&transaction, Some(trimmed))?
+        .ok_or_else(|| AppError::Validation("Appaltatore non valido.".into()))?;
+    transaction
+        .commit()
+        .map_err(to_database_error)?;
+
+    Ok(ContractorRecord {
+        id: contractor_id,
+        name: trimmed.to_string(),
+    })
+}
+
 pub fn list_contracts(connection: &Connection) -> Result<Vec<ContractRecord>, AppError> {
     let mut statement = connection
         .prepare(

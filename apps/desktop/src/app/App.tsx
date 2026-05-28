@@ -31,7 +31,6 @@ import {
 } from "@/lib/appUpdater";
 import { migrateLegacyContractorsToDb } from "@/lib/contractorMigration";
 import { migrateSalLocalStorageToBackend } from "@/lib/sal-data";
-import { migrateWorkflowNavigationFromSession } from "@/lib/workflow-navigation";
 import {
   applyThemeAttributes,
   beginThemeTransition,
@@ -43,6 +42,10 @@ import {
 } from "@/lib/theme-loader";
 import { storePendingReleaseNotes, usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { useAutomaticUpdater } from "@/lib/useAutomaticUpdater";
+import {
+  beginProjectCreate,
+  migrateWorkflowNavigationFromSession,
+} from "@/lib/workflow-navigation";
 import { RouteRenderer } from "@/routes/RouteRenderer";
 import {
   type QuantaraRoute,
@@ -652,9 +655,11 @@ function AppShell() {
 
   const handleTopbarAction = useCallback(
     (actionId: string) => {
-      if (actionId === "new-project") {
-        useAppStore.getState().setPendingWorkflowAction("new-project");
-        navigate("projects");
+      if (actionId === "new-project" || actionId === "open-project-create") {
+        if (actionId === "new-project") {
+          beginProjectCreate({ lockContractor: false });
+        }
+        navigate("project-create");
         notify({
           message: "Aperta la creazione guidata del progetto.",
           sound: "none",

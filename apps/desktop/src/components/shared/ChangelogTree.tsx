@@ -1,8 +1,8 @@
 import { m } from "framer-motion";
 import { Minus, Plus } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import type { TreeNode } from "@/lib/changelog-tree";
+import { cn } from "@/lib/utils";
 
 type ChangelogTreeProps = {
   nodes: TreeNode[];

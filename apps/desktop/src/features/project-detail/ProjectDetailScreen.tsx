@@ -25,10 +25,11 @@ import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import { getSalDocumentDisplaySummary } from "@/features/sal/domain/sal-document-summary";
-import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useTableSort } from "@/hooks/use-table-sort";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useNavigate } from "@/hooks/useNavigate";
+import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
 import {
   listDesktopContracts,
   listDesktopTariffBooks,
@@ -36,17 +37,16 @@ import {
   updateDesktopContract,
 } from "@/lib/desktopData";
 import { formatMoney } from "@/lib/formatters";
-import { removeSalDocument, restoreSalDocument } from "@/repositories/sal-repository";
 import { syncSalWorkflowFromBackend } from "@/lib/sal-workflow-sync";
-import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
-import { MOTION_VARIANTS } from "@/motion";
 import {
   clearResumeSalDraftId,
   selectProjectForWorkflow,
   setResumeSalDraftId,
 } from "@/lib/workflow-navigation";
+import { MOTION_VARIANTS } from "@/motion";
+import { removeSalDocument, restoreSalDocument } from "@/repositories/sal-repository";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
 
@@ -143,10 +143,10 @@ export function ProjectDetailScreen() {
     [contracts, selectedProject?.id],
   );
 
-  const projectTariffBookIds = useMemo(
-    () => selectedContract?.tariffPriorities.map((p) => p.tariffBookId) ?? [],
-    [selectedContract],
-  );
+  const projectTariffBookIds = useMemo(() => {
+    const ids = selectedContract?.tariffPriorities.map((p) => p.tariffBookId) ?? [];
+    return [...new Set(ids)];
+  }, [selectedContract]);
 
   const salViews = useMemo(() => {
     if (!selectedProject) {
@@ -433,7 +433,8 @@ export function ProjectDetailScreen() {
     async (tariffBookIds: string[]) => {
       if (!selectedContract) return;
       try {
-        const tariffPriorities = tariffBookIds.map((bookId, index) => ({
+        const uniqueBookIds = [...new Set(tariffBookIds)];
+        const tariffPriorities = uniqueBookIds.map((bookId, index) => ({
           priority: (index + 1) * 10,
           reason: "Tariffario associato al progetto",
           tariffBookId: bookId,

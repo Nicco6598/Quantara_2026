@@ -1,4 +1,4 @@
-import { statusToneStyles, type StatusTone } from "@/components/shared/StatusBadge";
+import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
 import type { DesktopMaterial } from "@/lib/desktopData";
 
 export type StockTone = StatusTone;

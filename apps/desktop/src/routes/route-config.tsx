@@ -1,4 +1,4 @@
-import { lazy, type ComponentType } from "react";
+import { type ComponentType, lazy } from "react";
 import type { QuantaraRoute } from "@/store/app-store";
 
 const AccountingScreen = lazy(() =>

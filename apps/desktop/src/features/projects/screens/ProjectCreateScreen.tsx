@@ -14,29 +14,6 @@ import {
   WalletCards,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { useToast } from "@/components/shared/ToastProvider";
-import { clearAutoDraft, loadAutoDraft, saveAutoDraft, useAutoSave } from "@/hooks/use-auto-save";
-import { useActionHandler } from "@/hooks/useAction";
-import { useNavigate } from "@/hooks/useNavigate";
-import {
-  type CreateDesktopContractRequest,
-  createDesktopContract,
-  type DesktopTariffBook,
-  listDesktopContracts,
-  listDesktopTariffBooks,
-  updateDesktopContract,
-} from "@/lib/desktopData";
-
-import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
-import { dispatchDataChanged } from "@/lib/sync-events";
-import { motionDuration, motionEase, motionSpring } from "@/motion";
-import { isContractorMigrationComplete } from "@/lib/contractor-resolve";
-import { takeProjectEditSession } from "@/lib/workflow-navigation";
-import { STORAGE_KEYS } from "@/persistence/storage-keys";
-import { useAppStore } from "@/store/app-store";
-import { useSalWorkflowStore } from "@/store/sal-workflow-store";
-import { cn } from "@/lib/utils";
 import {
   AlertBanner,
   Button,
@@ -46,8 +23,44 @@ import {
   Panel,
   StatusChip,
 } from "@/components/shared";
-import { CurrencyField, SelectField, TextField } from "@/components/shared/form";
-import type { SelectOption } from "@/components/shared/form";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import {
+  Combobox,
+  LocalizedDecimalField,
+  LocalizedMoneyField,
+  TextField,
+} from "@/components/shared/form";
+import { useToast } from "@/components/shared/ToastProvider";
+import { applyLockedContractorToProjectDraft } from "@/features/projects/utils/projects-helpers";
+import { clearAutoDraft, loadAutoDraft, saveAutoDraft, useAutoSave } from "@/hooks/use-auto-save";
+import { useActionHandler } from "@/hooks/useAction";
+import { useNavigate } from "@/hooks/useNavigate";
+import {
+  loadContractorRegistryNames,
+  persistContractorRegistryName,
+} from "@/lib/contractor-registry";
+import { isContractorMigrationComplete, resolveContractorName } from "@/lib/contractor-resolve";
+import {
+  type CreateDesktopContractRequest,
+  createDesktopContract,
+  type DesktopTariffBook,
+  listDesktopContracts,
+  listDesktopTariffBooks,
+  updateDesktopContract,
+} from "@/lib/desktopData";
+import {
+  parseLocalizedDecimal,
+  parseLocalizedMoney,
+  sanitizeDecimalInput,
+} from "@/lib/localized-number-input";
+import { normalizeContractorName, readStringRecord, writeJson } from "@/lib/shared-utils";
+import { dispatchDataChanged } from "@/lib/sync-events";
+import { cn } from "@/lib/utils";
+import { takeProjectCreatePrefill, takeProjectEditSession } from "@/lib/workflow-navigation";
+import { motionDuration, motionEase, motionSpring } from "@/motion";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
+import { useAppStore } from "@/store/app-store";
+import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 const PROJECT_AUTO_DRAFT_KEY = STORAGE_KEYS.projectAutoDraft;
 const PROJECT_STEPPER_SPRING = { type: "spring", ...motionSpring.panel } as const;
@@ -70,7 +83,6 @@ type ProjectFormState = {
 };
 
 const projectContractorStorageKey = STORAGE_KEYS.projectContractors;
-const contractorRegistryStorageKey = STORAGE_KEYS.contractorRegistry;
 
 type ProjectUIState = {
   draft: ProjectFormState;
@@ -118,7 +130,13 @@ export function ProjectCreateScreen() {
   const savingRef = useRef(false);
 
   const editSession = useMemo(() => takeProjectEditSession(), []);
+  const createPrefill = useMemo(() => takeProjectCreatePrefill(), []);
   const editingContractIdRef = useRef(editSession?.contractId ?? null);
+  const lockContractor = createPrefill?.lockContractor ?? false;
+  const lockedContractorName = useMemo(
+    () => (lockContractor ? normalizeContractorName(createPrefill?.contractorName ?? "") : ""),
+    [createPrefill?.contractorName, lockContractor],
+  );
 
   const initialValues = useMemo(() => {
     return (editSession?.form as ProjectFormState | undefined) ?? null;
@@ -127,7 +145,7 @@ export function ProjectCreateScreen() {
   const [ui, dispatch] = useReducer(projectUIReducer, null, () => ({
     draft: initialValues ?? {
       applicationContractCode: "",
-      contractorName: "",
+      contractorName: createPrefill?.contractorName ?? "",
       contractualAmount: "",
       frameworkAgreementCode: "",
       tenderDiscountPercent: "",
@@ -175,10 +193,10 @@ export function ProjectCreateScreen() {
         if (!active) return;
         setTariffBooks(tariffBooksResult.data);
         const contractors = readStringRecord(projectContractorStorageKey);
-        const registry = readStringList(contractorRegistryStorageKey);
+        const registry = await loadContractorRegistryNames();
         const assignedContractorNames = contractsResult.data.reduce<string[]>((acc, contract) => {
-          const name = contract.contractorName ?? contractors[contract.id];
-          if (typeof name === "string" && name.trim() !== "") acc.push(name);
+          const name = resolveContractorName(contract, contractors);
+          if (name) acc.push(name);
           return acc;
         }, []);
         const uniqueContractors = mergeContractorOptions([...registry, ...assignedContractorNames]);
@@ -210,7 +228,7 @@ export function ProjectCreateScreen() {
   }, [firstTariffBook?.id, tariffBooks]);
 
   const amount = parseLocalizedMoney(draft.contractualAmount);
-  const discountPercent = parseFloat(draft.tenderDiscountPercent.replace(",", "."));
+  const discountPercent = parseLocalizedDecimal(draft.tenderDiscountPercent);
   const parsedDiscount =
     Number.isFinite(discountPercent) && discountPercent >= 0 && discountPercent <= 100
       ? discountPercent
@@ -225,11 +243,14 @@ export function ProjectCreateScreen() {
     if (!initialValues) {
       const savedDraft = loadAutoDraft<ProjectFormState>(PROJECT_AUTO_DRAFT_KEY);
       if (savedDraft?.title) {
-        restoredDraftRef.current = savedDraft;
+        restoredDraftRef.current = applyLockedContractorToProjectDraft(
+          savedDraft,
+          lockedContractorName,
+        );
         setShowRestoreDialog(true);
       }
     }
-  }, [initialValues]);
+  }, [initialValues, lockedContractorName]);
 
   const handleRestoreDraft = useCallback(() => {
     if (restoredDraftRef.current) {
@@ -243,9 +264,26 @@ export function ProjectCreateScreen() {
     setShowRestoreDialog(false);
   }, []);
 
-  const handleProjectAutoSave = useCallback((data: unknown) => {
-    saveAutoDraft(PROJECT_AUTO_DRAFT_KEY, data);
-  }, []);
+  const handleProjectAutoSave = useCallback(
+    (data: unknown) => {
+      const form = data as ProjectFormState;
+      saveAutoDraft(
+        PROJECT_AUTO_DRAFT_KEY,
+        applyLockedContractorToProjectDraft(form, lockedContractorName),
+      );
+    },
+    [lockedContractorName],
+  );
+
+  useEffect(() => {
+    if (!lockedContractorName || draft.contractorName === lockedContractorName) {
+      return;
+    }
+    dispatch({
+      type: "SET_DRAFT",
+      payload: (current) => applyLockedContractorToProjectDraft(current, lockedContractorName),
+    });
+  }, [draft.contractorName, lockedContractorName]);
 
   const autoSave = useAutoSave({
     data: draft,
@@ -365,12 +403,16 @@ export function ProjectCreateScreen() {
       }
 
       const contractorName = sanitizeTextValue(draft.contractorName);
-      if (contractorName && !isContractorMigrationComplete()) {
-        const contractors = readStringRecord(projectContractorStorageKey);
-        writeJson(projectContractorStorageKey, {
-          ...contractors,
-          [savedContract.id]: contractorName,
-        });
+      if (contractorName) {
+        if (isContractorMigrationComplete()) {
+          await persistContractorRegistryName(contractorName);
+        } else {
+          const contractors = readStringRecord(projectContractorStorageKey);
+          writeJson(projectContractorStorageKey, {
+            ...contractors,
+            [savedContract.id]: contractorName,
+          });
+        }
       }
 
       // Sync SAL workflow project so the project appears in SAL screens immediately
@@ -400,9 +442,12 @@ export function ProjectCreateScreen() {
   }, []);
 
   const handleSaveDraft = useCallback(() => {
-    saveAutoDraft(PROJECT_AUTO_DRAFT_KEY, draft);
+    saveAutoDraft(
+      PROJECT_AUTO_DRAFT_KEY,
+      applyLockedContractorToProjectDraft(draft, lockedContractorName),
+    );
     notify({ message: "Bozza progetto salvata.", title: "Bozza salvata", tone: "success" });
-  }, [draft, notify]);
+  }, [draft, lockedContractorName, notify]);
 
   const actionFeedback =
     error ||
@@ -414,12 +459,12 @@ export function ProjectCreateScreen() {
       ? "warning"
       : "success";
 
-  const contractorSelectOptions: SelectOption[] = useMemo(
+  const contractorSelectOptions = useMemo(
     () => contractorOptions.map((name) => ({ value: name, label: name })),
     [contractorOptions],
   );
 
-  const budgetIvaPct = parseFloat(draft.budgetIvaPercent.replace(",", "."));
+  const budgetIvaPct = parseLocalizedDecimal(draft.budgetIvaPercent);
   const hasBudgetIva =
     draft.budgetIvaPercent !== "" && Number.isFinite(budgetIvaPct) && budgetIvaPct > 0;
   const budgetIvaAmount =
@@ -427,7 +472,7 @@ export function ProjectCreateScreen() {
   const budgetIvaTotal = hasBudgetIva && Number.isFinite(amount) ? amount + budgetIvaAmount : 0;
 
   const osParsed = parseLocalizedMoney(draft.osExcludedAmount);
-  const osIvaPctVal = parseFloat(draft.osIvaPercent.replace(",", "."));
+  const osIvaPctVal = parseLocalizedDecimal(draft.osIvaPercent);
   const hasOsIva = draft.osIvaPercent !== "" && Number.isFinite(osIvaPctVal) && osIvaPctVal > 0;
   const osIvaAmount = hasOsIva && Number.isFinite(osParsed) ? osParsed * (osIvaPctVal / 100) : 0;
   const osIvaTotal = hasOsIva && Number.isFinite(osParsed) ? osParsed + osIvaAmount : 0;
@@ -442,7 +487,11 @@ export function ProjectCreateScreen() {
           onConfirm={handleRestoreDraft}
           title="Ripristina bozza"
         >
-          {`È stata trovata una bozza salvata "${restoredDraftRef.current?.title}". Vuoi ripristinarla?`}
+          {`È stata trovata una bozza salvata "${restoredDraftRef.current?.title}". Vuoi ripristinarla?${
+            lockedContractorName
+              ? ` L'appaltatore resta "${lockedContractorName}" (cartella corrente).`
+              : ""
+          }`}
         </ConfirmDialog>
       )}
       <div className="flex items-start justify-between gap-5 border-b border-[var(--border-subtle)] pb-5">
@@ -545,18 +594,33 @@ export function ProjectCreateScreen() {
                   placeholder="AQ-RFI-2026"
                   value={draft.frameworkAgreementCode}
                 />
-                <SelectField
-                  label="Appaltatore"
-                  onChange={(v) =>
-                    dispatch({
-                      type: "SET_DRAFT",
-                      payload: (s) => ({ ...s, contractorName: sanitizeTextInput(v) }),
-                    })
-                  }
-                  options={contractorSelectOptions}
-                  placeholder="Seleziona appaltatore"
-                  value={draft.contractorName}
-                />
+                {lockContractor && draft.contractorName ? (
+                  <div>
+                    <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
+                      Appaltatore
+                    </span>
+                    <div className="mt-3 flex h-11 items-center gap-2 rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/50 px-4 text-14px font-semibold text-[var(--text-primary)]">
+                      <span className="truncate">{draft.contractorName}</span>
+                      <span className="ml-auto shrink-0 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-10px font-bold text-[var(--info-base)]">
+                        Da cartella
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <Combobox
+                    label="Appaltatore"
+                    onChange={(v) =>
+                      dispatch({
+                        type: "SET_DRAFT",
+                        payload: (s) => ({ ...s, contractorName: sanitizeTextInput(v) }),
+                      })
+                    }
+                    options={contractorSelectOptions}
+                    placeholder="Cerca e seleziona appaltatore"
+                    searchPlaceholder="Filtra appaltatori..."
+                    value={draft.contractorName}
+                  />
+                )}
               </div>
             </section>
           ) : (
@@ -577,13 +641,13 @@ export function ProjectCreateScreen() {
 
               <div className="mt-6 grid gap-x-4 gap-y-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <CurrencyField
+                  <LocalizedMoneyField
                     label="Importo contrattuale"
-                    value={safeParseMoney(draft.contractualAmount)}
+                    value={draft.contractualAmount}
                     onChange={(v) =>
                       dispatch({
                         type: "SET_DRAFT",
-                        payload: (s) => ({ ...s, contractualAmount: v > 0 ? String(v) : "" }),
+                        payload: (s) => ({ ...s, contractualAmount: v }),
                       })
                     }
                     placeholder="26.150.000,00"
@@ -601,49 +665,29 @@ export function ProjectCreateScreen() {
                   />
                 </div>
 
-                <label className="block">
-                  <span className="text-11px font-semibold uppercase tracking-overline text-[var(--text-secondary)]">
-                    Ribasso d'asta (%)
-                  </span>
-                  <input
-                    className="mt-3 h-11 w-full rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/65 px-4 text-sm font-medium text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-                    max={100}
-                    min={0}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === "" || v === "-") {
-                        dispatch({
-                          type: "SET_DRAFT",
-                          payload: (s) => ({ ...s, tenderDiscountPercent: v }),
-                        });
-                        return;
-                      }
-                      const parsed = parseFloat(v.replace(",", "."));
-                      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100)
-                        dispatch({
-                          type: "SET_DRAFT",
-                          payload: (s) => ({
-                            ...s,
-                            tenderDiscountPercent: String(Math.round(parsed * 100) / 100),
-                          }),
-                        });
-                    }}
-                    placeholder="18,25"
-                    step="0.01"
-                    type="number"
-                    value={draft.tenderDiscountPercent}
-                  />
-                </label>
-              </div>
-
-              <div className="mt-5">
-                <CurrencyField
-                  label="OS Esclusi da ribassi"
-                  value={safeParseMoney(draft.osExcludedAmount)}
+                <LocalizedDecimalField
+                  className="mt-0"
+                  label="Ribasso d'asta"
+                  placeholder="18,25"
+                  suffix="%"
+                  value={draft.tenderDiscountPercent}
                   onChange={(v) =>
                     dispatch({
                       type: "SET_DRAFT",
-                      payload: (s) => ({ ...s, osExcludedAmount: v > 0 ? String(v) : "" }),
+                      payload: (s) => ({ ...s, tenderDiscountPercent: v }),
+                    })
+                  }
+                />
+              </div>
+
+              <div className="mt-5">
+                <LocalizedMoneyField
+                  label="OS Esclusi da ribassi"
+                  value={draft.osExcludedAmount}
+                  onChange={(v) =>
+                    dispatch({
+                      type: "SET_DRAFT",
+                      payload: (s) => ({ ...s, osExcludedAmount: v }),
                     })
                   }
                   placeholder="1.500.000,00"
@@ -1116,7 +1160,7 @@ function IvaToggleInput({
   percent: string;
 }) {
   const [isOpen, setIsOpen] = useState(percent !== "");
-  const pct = parseFloat(percent.replace(",", "."));
+  const pct = parseLocalizedDecimal(percent);
   const hasValidPct = Number.isFinite(pct) && pct > 0;
   const ivaAmount = hasValidPct && Number.isFinite(baseAmount) ? baseAmount * (pct / 100) : 0;
   const total = ivaAmount > 0 && Number.isFinite(baseAmount) ? baseAmount + ivaAmount : 0;
@@ -1143,21 +1187,10 @@ function IvaToggleInput({
           <div className="flex items-center gap-2">
             <input
               className="h-8 w-20 rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] px-2.5 text-12px font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--ring-focus)]"
-              max={100}
-              min={0}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "" || v === "-") {
-                  onChange(v);
-                  return;
-                }
-                const parsed = parseFloat(v.replace(",", "."));
-                if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100)
-                  onChange(String(Math.round(parsed * 100) / 100));
-              }}
+              inputMode="decimal"
+              onChange={(e) => onChange(sanitizeDecimalInput(e.target.value))}
               placeholder="22"
-              step="0.1"
-              type="number"
+              type="text"
               value={percent}
             />
             <span className="text-11px font-medium text-[var(--text-secondary)]">% IVA</span>
@@ -1209,17 +1242,6 @@ function sanitizeTextValue(value: string) {
   return sanitizeTextInput(value).trim();
 }
 
-function readStringList(key: string): string[] {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
-    return Array.isArray(parsed)
-      ? parsed.filter((item): item is string => typeof item === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
-
 function mergeContractorOptions(values: string[]) {
   const options = new Map<string, string>();
 
@@ -1233,53 +1255,6 @@ function mergeContractorOptions(values: string[]) {
   }
 
   return [...options.values()].sort((left, right) => left.localeCompare(right));
-}
-
-function sanitizeMoneyInput(value: string) {
-  const normalized = value.replace(/\s+/g, "").replace(/[٫،]/g, ",").replace(/[．]/g, ".");
-  const sanitized = normalized.replace(/[^\d.,]/g, "");
-  if (!sanitized) return "";
-  const lastComma = sanitized.lastIndexOf(",");
-  const lastDot = sanitized.lastIndexOf(".");
-  const sepIndex = Math.max(lastComma, lastDot);
-  if (sepIndex < 0) return sanitized.replace(/[.,]/g, "");
-  const intPart = sanitized.slice(0, sepIndex).replace(/[.,]/g, "");
-  const decPart = sanitized
-    .slice(sepIndex + 1)
-    .replace(/[.,]/g, "")
-    .slice(0, 2);
-  const sep = sanitized[sepIndex];
-  const hasTrailing = sepIndex === sanitized.length - 1;
-  if (!intPart && !decPart && hasTrailing) return "";
-  if (!decPart && hasTrailing) return `${intPart}${sep}`;
-  return decPart ? `${intPart}${sep}${decPart}` : intPart;
-}
-
-function parseLocalizedMoney(value: string) {
-  const sanitized = sanitizeMoneyInput(value);
-  if (!sanitized) return Number.NaN;
-  const lastComma = sanitized.lastIndexOf(",");
-  const lastDot = sanitized.lastIndexOf(".");
-  const sepIndex = Math.max(lastComma, lastDot);
-  const intRaw = sepIndex < 0 ? sanitized.replace(/[.,]/g, "") : sanitized.slice(0, sepIndex);
-  const intPart = intRaw.replace(/[.,]/g, "");
-  const decPart =
-    sepIndex < 0
-      ? ""
-      : sanitized
-          .slice(sepIndex + 1)
-          .replace(/[.,]/g, "")
-          .slice(0, 2);
-  if (!intPart && !decPart) return Number.NaN;
-  const normalized = decPart ? `${intPart || "0"}.${decPart}` : intPart || "0";
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : Number.NaN;
-}
-
-function safeParseMoney(value: string): number {
-  if (!value) return 0;
-  const p = parseLocalizedMoney(value);
-  return Number.isFinite(p) ? p : 0;
 }
 
 function validateProjectIdentity(draft: ProjectFormState) {
@@ -1297,11 +1272,11 @@ function validateProjectIdentity(draft: ProjectFormState) {
 function getProjectValidation(draft: ProjectFormState) {
   const identityError = validateProjectIdentity(draft);
   const amount = parseLocalizedMoney(draft.contractualAmount);
-  const discountStr = draft.tenderDiscountPercent.replace(",", ".");
-  const discountVal = parseFloat(discountStr);
+  const discountVal = parseLocalizedDecimal(draft.tenderDiscountPercent);
   const hasValidAmount = Number.isFinite(amount) && amount > 0;
   const hasValidDiscount =
-    discountStr === "" || (Number.isFinite(discountVal) && discountVal >= 0 && discountVal <= 100);
+    draft.tenderDiscountPercent === "" ||
+    (Number.isFinite(discountVal) && discountVal >= 0 && discountVal <= 100);
   const osParsed = parseLocalizedMoney(draft.osExcludedAmount);
   const hasValidOs =
     draft.osExcludedAmount === "" ||

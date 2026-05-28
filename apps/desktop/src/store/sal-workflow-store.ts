@@ -2,8 +2,6 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { generateSalTitle } from "@/features/sal/domain/sal-utils";
 import { createId } from "@/features/sal/domain/sal-workflow";
-import { createSafeLocalStorage } from "@/lib/safe-storage";
-import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import type {
   SalDocument,
   SalDocumentStatus,
@@ -13,6 +11,8 @@ import type {
   SalSurchargeKind,
   SalTariffVoice,
 } from "@/features/sal/types";
+import { createSafeLocalStorage } from "@/lib/safe-storage";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
 export type CreateSalInput = {
   projectId: string;

@@ -7,8 +7,8 @@ import {
 } from "../domain/sal-calculations";
 import { buildSalDocumentView } from "../domain/sal-workflow";
 import type {
-  SalEconomicRules,
   SalDocument,
+  SalEconomicRules,
   SalLineDraft,
   SalLineView,
   SalProjectContext,

@@ -1,7 +1,7 @@
 import { createDesktopVoiceKey } from "@/lib/shared-utils";
+import type { SalLine, SalVoiceDraft } from "../types";
 import { isSafetyVoice } from "./sal-safety";
 import type { SalDocument } from "./sal-workflow";
-import type { SalLine, SalVoiceDraft } from "../types";
 
 type SnapshotVoice = {
   category?: string;

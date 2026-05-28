@@ -1,6 +1,6 @@
+import { SortIndicator } from "@/components/shared/SortIndicator";
 import type { SortDirection } from "@/hooks/use-table-sort";
 import { cn } from "@/lib/utils";
-import { SortIndicator } from "@/components/shared/SortIndicator";
 
 export type SortableHeaderProps = {
   label: string;

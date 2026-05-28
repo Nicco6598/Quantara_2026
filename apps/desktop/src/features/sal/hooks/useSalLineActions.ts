@@ -1,7 +1,7 @@
 import { useCallback, useRef } from "react";
+import { remapMeasurementRowsForPaste } from "../domain/sal-clipboard";
 import { parseMeasurementTarget } from "../domain/sal-measurement-target";
 import type { SalLineDraft, SalMeasurementRowDraft, SalVoiceDraft } from "../types";
-import { remapMeasurementRowsForPaste } from "../domain/sal-clipboard";
 import {
   cloneMeasurementRowForDuplicate,
   createEmptyMeasurementRow,
@@ -244,12 +244,13 @@ export function useSalLineActions({
       lineId: string,
       rows: readonly SalMeasurementRowDraft[],
       insertIndex: number,
+      options?: { stationOnly?: boolean },
     ): string | null => {
       if (rows.length === 0) return null;
       const target = linesRef.current.find((line) => line.id === lineId);
       if (!target) return null;
 
-      const remapped = remapMeasurementRowsForPaste(rows, target.voice.unit, 0);
+      const remapped = remapMeasurementRowsForPaste(rows, target.voice.unit, 0, options);
       setLines((current) =>
         current.map((line) => {
           if (line.id !== lineId) return line;
@@ -276,10 +277,14 @@ export function useSalLineActions({
   );
 
   const pasteMeasurementRows = useCallback(
-    (lineId: string, rows: readonly SalMeasurementRowDraft[]): string | null => {
+    (
+      lineId: string,
+      rows: readonly SalMeasurementRowDraft[],
+      options?: { stationOnly?: boolean },
+    ): string | null => {
       const target = linesRef.current.find((line) => line.id === lineId);
       if (!target) return null;
-      return pasteMeasurementRowsAt(lineId, rows, target.measurementRows.length);
+      return pasteMeasurementRowsAt(lineId, rows, target.measurementRows.length, options);
     },
     [pasteMeasurementRowsAt],
   );

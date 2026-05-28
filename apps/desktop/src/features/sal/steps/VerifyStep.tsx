@@ -1,15 +1,15 @@
 import { m } from "framer-motion";
 import { ArrowRightLeft, Package } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { useDataChangedListener } from "@/hooks/useDataChangedListener";
-import type { DesktopMaterial } from "@/lib/desktopData";
-import { cn } from "@/lib/utils";
 import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { useContextMenu } from "@/hooks/useContextMenu";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import {
   buildSalMaterialContextMenuEntries,
   copyTextToClipboard,
 } from "@/lib/context-menu-presets";
+import type { DesktopMaterial } from "@/lib/desktopData";
+import { cn } from "@/lib/utils";
 import { SalComparisonView } from "../components/SalComparisonView";
 import { SalReceipt } from "../components/SalReceipt";
 import type {

@@ -1,20 +1,20 @@
 import { readJsonFromStorage, writeJsonToStorage } from "@/persistence/json-storage";
 import { STORAGE_KEYS } from "@/persistence/storage-keys";
-import { defaultSalEconomicRules, isMgVoice } from "./sal-calculations";
+import type { SalWorkflowPhase } from "../state/workflow";
 import type {
   SalEconomicRules,
   SalLineDraft,
   SalMeasurementRowDraft,
   SalVoiceDraft,
 } from "../types";
-import type { SalWorkflowPhase } from "../state/workflow";
-import type { SalDocument } from "./sal-workflow";
+import { defaultSalEconomicRules, isMgVoice } from "./sal-calculations";
 import {
   extractSnapshotVoicesFromSal,
   resolveVoiceForSalLine,
   voiceIdsMatch,
   voicesFromSalLines,
 } from "./sal-voice-resolve";
+import type { SalDocument } from "./sal-workflow";
 
 type SalCreationDraft = {
   economicRules: SalEconomicRules;

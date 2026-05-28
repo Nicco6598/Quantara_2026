@@ -1,7 +1,8 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Search, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cn } from "@/lib/utils";
 
 type AutocompleteOption = {
@@ -35,6 +36,10 @@ export function AutocompleteInput({
   placeholder = "Cerca per codice o descrizione...",
 }: AutocompleteInputProps) {
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 200);
+  const deferredQuery = useDeferredValue(debouncedQuery);
+  const [isFiltering, startFilterTransition] = useTransition();
+  const [filtered, setFiltered] = useState<AutocompleteOption[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [floating, setFloating] = useState<DropdownPos | null>(null);
@@ -44,17 +49,33 @@ export function AutocompleteInput({
   const isFirstRender = useRef(true);
   const measureRef = useRef<() => void>(() => {});
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [] as AutocompleteOption[];
-    if (filterOptions) return filterOptions(options, query);
-    return options.filter(
-      (opt) =>
-        opt.value.toLowerCase().includes(q) ||
-        opt.label.toLowerCase().includes(q) ||
-        opt.keywords?.toLowerCase().includes(q),
-    );
-  }, [filterOptions, options, query]);
+  const filterOptionsRef = useRef(filterOptions);
+  filterOptionsRef.current = filterOptions;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
+  useEffect(() => {
+    const trimmed = deferredQuery.trim();
+    if (trimmed.length < 2) {
+      setFiltered([]);
+      return;
+    }
+
+    startFilterTransition(() => {
+      const runFilter = filterOptionsRef.current;
+      const source = optionsRef.current;
+      const q = trimmed.toLowerCase();
+      const next = runFilter
+        ? runFilter(source, deferredQuery)
+        : source.filter(
+            (opt) =>
+              opt.value.toLowerCase().includes(q) ||
+              opt.label.toLowerCase().includes(q) ||
+              opt.keywords?.toLowerCase().includes(q),
+          );
+      setFiltered(next);
+    });
+  }, [deferredQuery]);
 
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
@@ -172,8 +193,9 @@ export function AutocompleteInput({
           className="h-full min-w-0 flex-1 bg-transparent px-3 text-14px font-medium text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none"
           onBlur={() => setTimeout(() => setIsOpen(false), 180)}
           onChange={(e) => {
-            setQuery(e.target.value);
-            onQueryChange?.(e.target.value);
+            const next = e.target.value;
+            setQuery(next);
+            onQueryChange?.(next);
             setActiveIndex(0);
             setIsOpen(true);
           }}
@@ -184,6 +206,12 @@ export function AutocompleteInput({
           placeholder={placeholder}
           value={query}
         />
+        {(isFiltering || query !== debouncedQuery) && query.trim().length >= 2 ? (
+          <span
+            className="mr-1 size-4 shrink-0 animate-spin rounded-full border-2 border-[var(--text-tertiary)] border-t-transparent"
+            aria-hidden
+          />
+        ) : null}
         {query && (
           <button
             aria-label="Cancella ricerca"

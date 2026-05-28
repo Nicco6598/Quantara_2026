@@ -3,12 +3,10 @@ import { AnimatePresence, m } from "framer-motion";
 import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Dialog } from "@/components/shared/Dialog";
-import { MOTION_VARIANTS } from "@/motion";
 import type { DesktopTariffVoice } from "@/lib/desktopData";
-
 import { formatEuro } from "@/lib/formatters";
-
 import { cn } from "@/lib/utils";
+import { MOTION_VARIANTS } from "@/motion";
 
 import { formatPercent } from "../utils/tariffs-validation";
 

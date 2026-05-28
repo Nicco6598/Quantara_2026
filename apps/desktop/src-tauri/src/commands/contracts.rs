@@ -2,7 +2,9 @@ use crate::infrastructure::audit_repository;
 use tauri::State;
 
 use crate::infrastructure::{
-    contract_repository::{ContractRecord, CreateContractRequest, UpdateContractRequest},
+    contract_repository::{
+        ContractRecord, ContractorRecord, CreateContractRequest, UpdateContractRequest,
+    },
     local_storage::{DbConnection, with_db, with_db_mut},
 };
 
@@ -49,6 +51,28 @@ pub fn update_contract(
         )?;
         audit_repository::append_event(conn, "contract", &contract_id, "update", None, None)?;
         Ok(record)
+    })
+}
+
+#[tauri::command]
+pub fn list_contractors(state: State<'_, DbConnection>) -> Result<Vec<ContractorRecord>, String> {
+    with_db(&state, |conn| crate::infrastructure::contract_repository::list_contractors(conn))
+}
+
+#[tauri::command]
+pub fn ensure_contractor(
+    state: State<'_, DbConnection>,
+    name: String,
+) -> Result<ContractorRecord, String> {
+    with_db_mut(&state, |conn| {
+        crate::infrastructure::contract_repository::ensure_contractor(conn, &name)
+    })
+}
+
+#[tauri::command]
+pub fn delete_contractor(state: State<'_, DbConnection>, contractor_id: String) -> Result<(), String> {
+    with_db_mut(&state, |conn| {
+        crate::infrastructure::contract_repository::delete_contractor(conn, &contractor_id)
     })
 }
 

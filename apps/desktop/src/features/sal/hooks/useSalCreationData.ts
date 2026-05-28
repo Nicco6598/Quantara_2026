@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
+import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
 import {
   type DesktopContract,
   type DesktopTariffBook,
@@ -7,7 +8,6 @@ import {
   listDesktopTariffBooks,
   listDesktopTariffVoices,
 } from "@/lib/desktopData";
-import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
 import { getWorkflowProjectId, selectProjectForWorkflow } from "@/lib/workflow-navigation";
 import {
   mapContractToSalProject,

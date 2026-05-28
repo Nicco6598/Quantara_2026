@@ -26,6 +26,7 @@ import { Panel } from "@/components/shared/Panel";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
 import { APP_VERSION } from "@/generated/appVersion";
+import { useAuditLogEntries } from "@/hooks/useAuditLogEntries";
 import { runAppUpdateCheck, type UpdateCheckResult } from "@/lib/appUpdater";
 import {
   backupDatabase,
@@ -35,12 +36,11 @@ import {
   restoreDatabase,
   restoreDatabaseWithPassphrase,
 } from "@/lib/backup";
+import { isTauriRuntime } from "@/lib/tauri-wrapper";
 import { usePendingReleaseNotes } from "@/lib/updateReleaseNotes";
 import { getErrorMessage, reportUserActionError } from "@/lib/user-action-error";
 import { cn } from "@/lib/utils";
 import { usePreferenceState, useThemeState } from "@/store/app-store";
-import { useAuditLogEntries } from "@/hooks/useAuditLogEntries";
-import { isTauriRuntime } from "@/lib/tauri-wrapper";
 import { useAuditLogStore } from "@/store/audit-log-store";
 
 type UpdateViewState = { kind: "idle" } | UpdateCheckResult;

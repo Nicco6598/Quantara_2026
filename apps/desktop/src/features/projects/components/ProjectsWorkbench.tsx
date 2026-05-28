@@ -11,17 +11,17 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { memo, type MouseEvent, type ReactNode, useRef, useState } from "react";
+import { type MouseEvent, memo, type ReactNode, useRef, useState } from "react";
 import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Button } from "@/components/shared/Button";
 import { DropdownDivider, DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { useContextMenu } from "@/hooks/useContextMenu";
-import { buildProjectRowContextMenuEntries } from "@/lib/context-menu-presets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Panel } from "@/components/shared/Panel";
 import { statusToneStyles } from "@/components/shared/StatusBadge";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatDueWindow } from "@/features/projects/utils/projects-helpers";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildProjectRowContextMenuEntries } from "@/lib/context-menu-presets";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { MOTION_VARIANTS } from "@/motion";

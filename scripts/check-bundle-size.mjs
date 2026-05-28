@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { gzipSync } from "node:zlib";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 
 const BUDGET = {
   initialJsGzip: 350 * 1024,

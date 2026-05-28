@@ -141,12 +141,18 @@ type PreferenceSlice = {
   showReleaseNotesAfterUpdate: boolean;
 };
 
+export type ProjectCreatePrefill = {
+  contractorName: string;
+  lockContractor: boolean;
+};
+
 /** In-memory workflow handoff between routes (replaces sessionStorage). */
 type WorkflowNavigationSlice = {
   resumeSalDraftId: string;
   salCreatedRedirectPending: boolean;
   editingProjectForm: unknown | null;
   editingContractId: string;
+  projectCreatePrefill: ProjectCreatePrefill | null;
   setResumeSalDraftId: (salId: string) => void;
   clearResumeSalDraftId: () => void;
   takeResumeSalDraftId: () => string | null;
@@ -155,6 +161,8 @@ type WorkflowNavigationSlice = {
   setEditingProjectForm: (form: unknown | null) => void;
   setEditingContractId: (contractId: string) => void;
   takeProjectEditSession: () => { form: unknown; contractId: string } | null;
+  setProjectCreatePrefill: (prefill: ProjectCreatePrefill | null) => void;
+  takeProjectCreatePrefill: () => ProjectCreatePrefill | null;
 };
 
 export type WorkspaceMemberRole =
@@ -262,6 +270,7 @@ export const useAppStore = create<AppStore>()(
       salCreatedRedirectPending: false,
       editingProjectForm: null as unknown | null,
       editingContractId: "",
+      projectCreatePrefill: null,
       setResumeSalDraftId: (resumeSalDraftId) => set({ resumeSalDraftId }),
       clearResumeSalDraftId: () => set({ resumeSalDraftId: "" }),
       takeResumeSalDraftId: () => {
@@ -288,6 +297,12 @@ export const useAppStore = create<AppStore>()(
         }
         set({ editingProjectForm: null, editingContractId: "" });
         return { form: editingProjectForm, contractId: editingContractId };
+      },
+      setProjectCreatePrefill: (projectCreatePrefill) => set({ projectCreatePrefill }),
+      takeProjectCreatePrefill: () => {
+        const prefill = useAppStore.getState().projectCreatePrefill;
+        set({ projectCreatePrefill: null });
+        return prefill;
       },
       navigateBack: () =>
         set((state) => {

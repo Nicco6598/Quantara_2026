@@ -17,7 +17,7 @@ import type {
   SalMeasurementRowDraft,
   SalVoiceDraft,
 } from "../types";
-import { createMeasurementId } from "../types";
+import { buildStationOnlyMeasurementClipboardRow, createMeasurementId } from "../types";
 
 function isTypingTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null;
@@ -69,11 +69,16 @@ export const MeasureStep = memo(function MeasureStep({
   onNotesChange: (lineId: string, notes: string) => void;
   onSurcharge: (lineId: string, p: number) => void;
   onPasteLine: (d: SalLineDraft) => void;
-  onPasteMeasurementRows: (lineId: string, rows: SalMeasurementRowDraft[]) => string | null;
+  onPasteMeasurementRows: (
+    lineId: string,
+    rows: SalMeasurementRowDraft[],
+    options?: { stationOnly?: boolean },
+  ) => string | null;
   onPasteMeasurementRowsAt: (
     lineId: string,
     rows: SalMeasurementRowDraft[],
     insertIndex: number,
+    options?: { stationOnly?: boolean },
   ) => string | null;
   onSearchSelectVoice?: (voice: SalVoiceDraft) => void;
   onScrollToLineHandled?: () => void;
@@ -84,18 +89,30 @@ export const MeasureStep = memo(function MeasureStep({
 }) {
   const { notify } = useToast();
   const [copiedLine, setCopiedLine] = useState<SalLineDraft | null>(null);
-  const [copiedMeasurements, setCopiedMeasurements] = useState<SalMeasurementRowDraft[] | null>(
-    null,
-  );
+  const [copiedMeasurements, setCopiedMeasurements] = useState<{
+    rows: SalMeasurementRowDraft[];
+    stationOnly: boolean;
+  } | null>(null);
   const [activeLineId, setActiveLineId] = useState<string | null>(null);
+  const [clipboardScope, setClipboardScope] = useState<"voice" | "measurement">("voice");
   const [selectedMeasurementRow, setSelectedMeasurementRow] = useState<{
     lineId: string;
     rowIndex: number;
   } | null>(null);
   const lastInteractedRef = useRef<string | null>(null);
 
+  const handleActiveLineChange = useCallback((lineId: string) => {
+    setActiveLineId(lineId);
+    lastInteractedRef.current = lineId;
+    setClipboardScope("voice");
+    setSelectedMeasurementRow(null);
+  }, []);
+
   const handleSelectMeasurementRow = useCallback((lineId: string, rowIndex: number) => {
     setSelectedMeasurementRow({ lineId, rowIndex });
+    setActiveLineId(lineId);
+    lastInteractedRef.current = lineId;
+    setClipboardScope("measurement");
   }, []);
 
   const searchConfig = useMemo(
@@ -134,6 +151,9 @@ export const MeasureStep = memo(function MeasureStep({
         voice: line.voice,
       };
       setCopiedLine(draft);
+      setCopiedMeasurements(null);
+      setClipboardScope("voice");
+      setSelectedMeasurementRow(null);
       setActiveLineId(lineId);
       lastInteractedRef.current = lineId;
       if (!navigator.clipboard?.writeText) {
@@ -163,15 +183,16 @@ export const MeasureStep = memo(function MeasureStep({
       const line = lineViews.find((l) => l.id === lineId);
       const row = line?.measurementRows[rowIndex];
       if (!line || !row) return;
-      const rows = [{ ...row }];
-      setCopiedMeasurements(rows);
+      const rows = [buildStationOnlyMeasurementClipboardRow(row, line.voice.unit)];
+      setCopiedMeasurements({ rows, stationOnly: true });
       setCopiedLine(null);
+      setClipboardScope("measurement");
       setSelectedMeasurementRow({ lineId, rowIndex });
       setActiveLineId(lineId);
       lastInteractedRef.current = lineId;
       if (!navigator.clipboard?.writeText) return;
       navigator.clipboard
-        .writeText(serializeSalMeasurementsClipboard(rows, line.voice.code))
+        .writeText(serializeSalMeasurementsClipboard(rows, line.voice.code, { stationOnly: true }))
         .catch(() => {});
     },
     [lineViews],
@@ -182,7 +203,7 @@ export const MeasureStep = memo(function MeasureStep({
       const line = lineViews.find((l) => l.id === lineId);
       if (!line || line.measurementRows.length === 0) return;
       const rows = line.measurementRows.map((row) => ({ ...row }));
-      setCopiedMeasurements(rows);
+      setCopiedMeasurements({ rows, stationOnly: false });
       setCopiedLine(null);
       setActiveLineId(lineId);
       lastInteractedRef.current = lineId;
@@ -211,8 +232,10 @@ export const MeasureStep = memo(function MeasureStep({
 
   const handlePasteMeasurementRowAt = useCallback(
     (lineId: string, insertIndex: number) => {
-      if (!copiedMeasurements || copiedMeasurements.length === 0) return;
-      onPasteMeasurementRowsAt(lineId, copiedMeasurements, insertIndex);
+      if (!copiedMeasurements || copiedMeasurements.rows.length === 0) return;
+      onPasteMeasurementRowsAt(lineId, copiedMeasurements.rows, insertIndex, {
+        stationOnly: copiedMeasurements.stationOnly,
+      });
     },
     [copiedMeasurements, onPasteMeasurementRowsAt],
   );
@@ -221,11 +244,12 @@ export const MeasureStep = memo(function MeasureStep({
     (lineId: string) => {
       const insertIndex =
         selectedMeasurementRow?.lineId === lineId ? selectedMeasurementRow.rowIndex + 1 : undefined;
-      if (copiedMeasurements && copiedMeasurements.length > 0) {
+      if (copiedMeasurements && copiedMeasurements.rows.length > 0) {
+        const pasteOpts = { stationOnly: copiedMeasurements.stationOnly };
         if (insertIndex != null) {
-          onPasteMeasurementRowsAt(lineId, copiedMeasurements, insertIndex);
+          onPasteMeasurementRowsAt(lineId, copiedMeasurements.rows, insertIndex, pasteOpts);
         } else {
-          onPasteMeasurementRows(lineId, copiedMeasurements);
+          onPasteMeasurementRows(lineId, copiedMeasurements.rows, pasteOpts);
         }
         return;
       }
@@ -242,8 +266,10 @@ export const MeasureStep = memo(function MeasureStep({
         .then((text) => {
           const parsed = parseSalClipboardText(text);
           if (parsed?.kind === "measurements") {
-            setCopiedMeasurements(parsed.rows);
-            onPasteMeasurementRows(lineId, parsed.rows);
+            setCopiedMeasurements({ rows: parsed.rows, stationOnly: parsed.stationOnly });
+            onPasteMeasurementRows(lineId, parsed.rows, {
+              stationOnly: parsed.stationOnly,
+            });
           }
         })
         .catch((error) =>
@@ -294,6 +320,17 @@ export const MeasureStep = memo(function MeasureStep({
     [lineViews],
   );
 
+  const getMeasurementRowClipboardText = useCallback(
+    (lineId: string, rowIndex: number) => {
+      const line = lineViews.find((l) => l.id === lineId);
+      const row = line?.measurementRows[rowIndex];
+      if (!line || !row) return null;
+      const rows = [buildStationOnlyMeasurementClipboardRow(row, line.voice.unit)];
+      return serializeSalMeasurementsClipboard(rows, line.voice.code, { stationOnly: true });
+    },
+    [lineViews],
+  );
+
   const handlePasteClipboardText = useCallback(
     (lineId: string, text: string) => {
       const parsed = parseSalClipboardText(text);
@@ -302,8 +339,10 @@ export const MeasureStep = memo(function MeasureStep({
           onPasteLine(copiedLine);
           return;
         }
-        if (copiedMeasurements && copiedMeasurements.length > 0) {
-          onPasteMeasurementRows(lineId, copiedMeasurements);
+        if (copiedMeasurements && copiedMeasurements.rows.length > 0) {
+          onPasteMeasurementRows(lineId, copiedMeasurements.rows, {
+            stationOnly: copiedMeasurements.stationOnly,
+          });
         }
         return;
       }
@@ -313,9 +352,9 @@ export const MeasureStep = memo(function MeasureStep({
         onPasteLine(parsed.draft);
         return;
       }
-      setCopiedMeasurements(parsed.rows);
+      setCopiedMeasurements({ rows: parsed.rows, stationOnly: parsed.stationOnly });
       setCopiedLine(null);
-      onPasteMeasurementRows(lineId, parsed.rows);
+      onPasteMeasurementRows(lineId, parsed.rows, { stationOnly: parsed.stationOnly });
     },
     [copiedLine, copiedMeasurements, onPasteLine, onPasteMeasurementRows],
   );
@@ -362,6 +401,7 @@ export const MeasureStep = memo(function MeasureStep({
         if (!lineId) return;
         e.preventDefault();
         if (
+          clipboardScope === "measurement" &&
           selectedMeasurementRow?.lineId === lineId &&
           lineViews.find((line) => line.id === lineId)?.measurementRows[
             selectedMeasurementRow.rowIndex
@@ -378,7 +418,7 @@ export const MeasureStep = memo(function MeasureStep({
         e.preventDefault();
         const lineId = activeLineId ?? lastInteractedRef.current;
         if (!lineId) return;
-        if (copiedMeasurements && copiedMeasurements.length > 0) {
+        if (copiedMeasurements && copiedMeasurements.rows.length > 0) {
           handlePasteMeasurements(lineId);
           return;
         }
@@ -396,6 +436,7 @@ export const MeasureStep = memo(function MeasureStep({
     handlePasteVoice,
     isActive,
     lineViews,
+    clipboardScope,
     selectedMeasurementRow,
   ]);
 
@@ -405,12 +446,11 @@ export const MeasureStep = memo(function MeasureStep({
         className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         role="none"
         onClick={(e) => {
+          const measurementRow = (e.target as HTMLElement).closest("[data-measurement-row]");
+          if (measurementRow) return;
           const row = (e.target as HTMLElement).closest("[data-line-id]");
           const lineId = row?.getAttribute("data-line-id") ?? null;
-          if (lineId) {
-            lastInteractedRef.current = lineId;
-            setActiveLineId(lineId);
-          }
+          if (lineId) handleActiveLineChange(lineId);
         }}
         onKeyDown={() => {}}
       >
@@ -422,8 +462,8 @@ export const MeasureStep = memo(function MeasureStep({
           copiedVoiceId={copiedLine?.id ?? null}
           onAllocateMg={onAllocateMg}
           onAddMgVoice={onAddMgVoice}
-          onActiveLineChange={setActiveLineId}
-          canPasteMeasurements={(copiedMeasurements?.length ?? 0) > 0}
+          onActiveLineChange={handleActiveLineChange}
+          canPasteMeasurements={(copiedMeasurements?.rows.length ?? 0) > 0}
           canPasteVoice={!!copiedLine}
           onCopyLine={handleCopyLine}
           onCopyMeasurements={handleCopyMeasurements}
@@ -435,6 +475,7 @@ export const MeasureStep = memo(function MeasureStep({
           onPasteMeasurements={handlePasteMeasurements}
           getVoiceClipboardText={getVoiceClipboardText}
           getMeasurementsClipboardText={getMeasurementsClipboardText}
+          getMeasurementRowClipboardText={getMeasurementRowClipboardText}
           onPasteClipboardText={handlePasteClipboardText}
           {...(onScrollToLineHandled ? { onScrollToLineHandled } : {})}
           scrollToLineId={scrollToLineId ?? null}

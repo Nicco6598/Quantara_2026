@@ -2,6 +2,39 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.5.1 — 2026-05-28
+
+### Appaltatori — anagrafica sul database locale (non più solo nel browser)
+
+- **Elenco appaltatori salvato in SQLite** — i nomi in anagrafica (cartella Appaltatori, menu **Nuovo progetto**, combobox appaltatore) provengono dal database locale dell'app, non da una lista separata nel `localStorage` del browser.
+- **Allineamento con i progetti** — ogni contratto/progetto tiene il proprio `contractorName` su SQLite; l'anagrafica e i progetti condividono la stessa fonte dopo la migrazione.
+- **Aggiornamento automatico delle liste** — creando o eliminando un appaltatore, le schermate collegate (Progetti, sidebar, creazione progetto) si aggiornano senza riavviare Quantara.
+
+**Cosa noti dopo l'aggiornamento** — al primo avvio della 0.5.1 l'app importa in background eventuali dati ancora presenti nel browser e poi rimuove le vecchie chiavi `quantara.contractorRegistry.v1` e `quantara.projectContractors.v1` quando non servono più.
+
+### Appaltatori — riparazione per chi ha installato la 0.5.0
+
+- **Migrazione di riparazione (v2)** — se avevi già la 0.5.0 e la migrazione risultava «completata» ma mancavano appaltatori o nomi accorciati, la 0.5.1 esegue **una sola** passata di recupero al primo avvio.
+- **Recupero nomi completi quando possibile** — se nel browser è rimasta la mappa vecchia `projectContractors` con un nome più lungo (es. `RFI TEST 5.0.1`) e sul contratto compariva solo `RFI`, il contratto viene aggiornato con il nome completo **solo** quando il legacy è chiaramente più informativo (non si sovrascrivono nomi diversi già corretti).
+- **Import anagrafica residua** — eventuali appaltatori ancora solo in `contractorRegistry` vengono portati in SQLite prima della pulizia delle chiavi legacy.
+
+**Limite importante** — se la 0.5.0 aveva già cancellato tutto dal browser e in SQLite resta solo il nome corto, l'app **non può inventare** il testo originale: serve un backup o la rinomina manuale del progetto/appaltatore.
+
+### Appaltatori — nomi custom non più troncati
+
+- **Normalizzazione solo su alias noti** — `RFI S.p.A.` → `RFI` e `ANAS` restano riconosciuti, ma etichette come **`RFI TEST 5.0.1`** o **`Regione Lombardia`** non vengono più ridotte a `RFI` solo perché contengono le lettere «rfi».
+- **Lettura migrazione senza alterare i dati** — le migrazioni leggono i valori dal `localStorage` così come salvati, senza passarli prima da una normalizzazione aggressiva.
+
+### Progetti e appaltatori — comportamento più prevedibile
+
+- **Elimina appaltatore** — rimuove l'appaltatore dall'anagrafica e, se presenti, **elimina i progetti collegati** (niente cartella virtuale «da riassegnare»).
+- **Menu Nuovo progetto** — corretto un blocco dell'interfaccia (`Maximum update depth exceeded`) aprendo il selettore appaltatore dalla toolbar.
+
+### Correzioni importanti
+
+- **Client 0.5.0 con appaltatori «spariti» o accorciati** — affrontato con migrazione v2 + anagrafica SQLite; chi è ancora sulla 0.5.0 deve passare alla **0.5.1** (updater o installazione manuale).
+- **Flag migrazione** — `quantara.contractorsDbMigration.v1` (migrazione iniziale) e `quantara.contractorsDbMigration.v2` (riparazione 0.5.0); entrambi a `done` al termine, senza riesecuzioni successive.
+
 ## 0.5.0 — 2026-05-27
 
 ### SAL — copia, incolla e duplica come in un foglio di lavoro

@@ -47,6 +47,11 @@ export type DesktopContractRecord = {
   osExcludedAmount?: number | null;
 };
 
+export type DesktopContractorRecord = {
+  id: string;
+  name: string;
+};
+
 export type CreateDesktopContractRecordRequest = {
   applicationContractCode: string;
   contractualAmount: number;

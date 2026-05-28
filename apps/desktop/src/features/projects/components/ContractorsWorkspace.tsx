@@ -16,16 +16,16 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { memo, type MouseEvent, type ReactNode, useMemo, useRef, useState } from "react";
+import { type MouseEvent, memo, type ReactNode, useMemo, useRef, useState } from "react";
 import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Button } from "@/components/shared/Button";
 import { DropdownItem, DropdownMenu } from "@/components/shared/DropdownMenu";
-import { useContextMenu } from "@/hooks/useContextMenu";
-import { buildContractorContextMenuEntries } from "@/lib/context-menu-presets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Panel } from "@/components/shared/Panel";
 import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
 import type { ContractorFolder } from "@/features/projects/types";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildContractorContextMenuEntries } from "@/lib/context-menu-presets";
 import { formatMoney } from "@/lib/formatters";
 import { SAL_STATUS_LABELS, SAL_STATUS_TONE_KEYS } from "@/lib/sal-status";
 import { cn } from "@/lib/utils";

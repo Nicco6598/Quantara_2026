@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { STORAGE_KEYS } from "@/persistence/storage-keys";
-import { invokeForRead, invokeForWrite, isTauriRuntime } from "./tauri-wrapper";
-import type { DesktopDataResult } from "./tauri-wrapper";
 import type { SalDocument, SalProject } from "@/features/sal/types";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
+import type { DesktopDataResult } from "./tauri-wrapper";
+import { invokeForRead, invokeForWrite, isTauriRuntime } from "./tauri-wrapper";
 
 // Separato da quantara-sal-workflow (usato da zustand persist per UI state).
 // Questo key contiene solo i documenti SAL, non sovrascritto da partialize.

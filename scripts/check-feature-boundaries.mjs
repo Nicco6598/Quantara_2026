@@ -4,8 +4,7 @@
 // Only blocks imports from components/ and top-level feature files.
 // Run via: node scripts/check-feature-boundaries.mjs
 
-import { readFileSync } from "node:fs";
-import { globSync } from "node:fs";
+import { globSync, readFileSync } from "node:fs";
 
 const FEATURES = [
   "accounting",

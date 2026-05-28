@@ -5,6 +5,7 @@ export type {
   ContractRecord,
   CreateDesktopContractRecordRequest,
   CreateDesktopTariffBookRecordRequest,
+  DesktopContractorRecord,
   DesktopContractRecord,
   DesktopTariffBookRecord,
   DesktopTariffPriorityRecord,

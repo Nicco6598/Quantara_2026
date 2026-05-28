@@ -5,9 +5,9 @@ import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Dialog } from "@/components/shared/Dialog";
 import { useToast } from "@/components/shared/ToastProvider";
-import { cn } from "@/lib/utils";
-import { dispatchDataChanged } from "@/lib/sync-events";
 import { restoreMaterialsFromSalUsage } from "@/lib/desktopData";
+import { dispatchDataChanged } from "@/lib/sync-events";
+import { cn } from "@/lib/utils";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import type { RecentSalItem } from "../types";
 

@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState } from "react";
 import { m } from "framer-motion";
 import { ChevronDown, TrendingUp } from "lucide-react";
-import { useChartColors } from "./useChartColors";
+import { useMemo, useRef, useState } from "react";
+import type uPlot from "uplot";
+import { cn } from "@/lib/utils";
 import { buildCalendarAxisTicks } from "./chart-helpers";
 import { UplotChart } from "./UplotChart";
-import { cn } from "@/lib/utils";
-import type uPlot from "uplot";
+import { useChartColors } from "./useChartColors";
 
 type Timeframe = "3M" | "6M" | "1Y" | "ALL";
 

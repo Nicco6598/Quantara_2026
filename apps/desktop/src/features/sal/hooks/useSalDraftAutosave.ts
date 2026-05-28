@@ -1,8 +1,8 @@
 import { useCallback, useRef } from "react";
 import { useDraftAutosave } from "@/hooks/use-draft-autosave";
 import { persistSalCreationLocalDraft, type StoredSalDraft } from "../domain/sal-creation-draft";
-import type { SalEconomicRules, SalLineDraft } from "../types";
 import type { SalWorkflowPhase } from "../state/workflow";
+import type { SalEconomicRules, SalLineDraft } from "../types";
 
 export type SalDraftAutosaveSnapshot = {
   economicRules: SalEconomicRules;

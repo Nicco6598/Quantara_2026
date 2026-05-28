@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SalAutocompleteOption, IndexedVoiceOption } from "../components/SalSearchBar";
+import type { IndexedVoiceOption, SalAutocompleteOption } from "../components/SalSearchBar";
 import {
   EMPTY_SAL_VOICE_SEARCH_INDEX,
   getCachedSalVoiceSearchIndex,
@@ -9,12 +9,11 @@ import {
 } from "../domain/sal-voice-search-index-cache";
 import type { SalVoiceDraft } from "../types";
 
-export type { SalVoiceSearchIndex };
-export type { SalAutocompleteOption, IndexedVoiceOption };
 export {
-  scheduleSalVoiceSearchIndexWarmup,
   resolveSalVoiceSearchIndex,
+  scheduleSalVoiceSearchIndexWarmup,
 } from "../domain/sal-voice-search-index-cache";
+export type { IndexedVoiceOption, SalAutocompleteOption, SalVoiceSearchIndex };
 
 export function useSalVoiceSearchIndex(
   voices: SalVoiceDraft[],

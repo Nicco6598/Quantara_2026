@@ -1,10 +1,8 @@
-import { Search, Trash2, UserPlus, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { Search, Trash2, UserPlus, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Button } from "@/components/shared/Button";
-import { useContextMenu } from "@/hooks/useContextMenu";
-import { buildTeamMemberContextMenuEntries, copyTextToClipboard } from "@/lib/context-menu-presets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SearchField } from "@/components/shared/form/SearchField";
 import { SelectField } from "@/components/shared/form/SelectField";
@@ -12,6 +10,8 @@ import { Panel } from "@/components/shared/Panel";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { StatusChip } from "@/components/shared/StatusChip";
 import { type Column, DataTable } from "@/components/shared/table/DataTable";
+import { useContextMenu } from "@/hooks/useContextMenu";
+import { buildTeamMemberContextMenuEntries, copyTextToClipboard } from "@/lib/context-menu-presets";
 import type { WorkspaceMember } from "@/store/app-store";
 import { useTeamState } from "@/store/app-store";
 

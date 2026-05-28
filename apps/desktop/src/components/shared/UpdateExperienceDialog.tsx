@@ -2,8 +2,8 @@ import { Clock3, LoaderCircle, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/shared/Button";
 import { ChangelogTree } from "@/components/shared/ChangelogTree";
 import { Dialog } from "@/components/shared/Dialog";
-import { parseChangelogTree } from "@/lib/changelog-tree";
 import type { AvailableAppUpdate, UpdateInstallState } from "@/lib/appUpdater";
+import { parseChangelogTree } from "@/lib/changelog-tree";
 
 type UpdateExperienceDialogProps = {
   installState: UpdateInstallState | { message: string; phase: "error" } | { phase: "idle" };

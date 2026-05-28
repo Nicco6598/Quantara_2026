@@ -15,10 +15,10 @@ export type {
   SalTariffVoice,
 } from "../types";
 
+import type { SalVoiceDraft } from "../types";
 import { buildLineViews, defaultSalEconomicRules, summarizeSalLines } from "./sal-calculations";
 import { isSafetyVoice } from "./sal-safety";
 import { extractSnapshotVoicesFromSal, resolveVoiceForSalLine } from "./sal-voice-resolve";
-import type { SalVoiceDraft } from "../types";
 
 type SalLineView = SalLine & {
   discountAmount: number;

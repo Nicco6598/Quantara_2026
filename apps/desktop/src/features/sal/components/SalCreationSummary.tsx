@@ -1,5 +1,5 @@
-import { Calculator, CheckCircle2 } from "lucide-react";
 import { m } from "framer-motion";
+import { Calculator, CheckCircle2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";

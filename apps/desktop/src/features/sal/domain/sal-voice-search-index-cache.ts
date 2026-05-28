@@ -20,14 +20,24 @@ export const EMPTY_SAL_VOICE_SEARCH_INDEX: SalVoiceSearchIndex = {
 const indexCache = new Map<string, SalVoiceSearchIndex>();
 let warmupTask: { key: string; cancel: () => void } | null = null;
 
+function hashVoiceIds(voices: readonly SalVoiceDraft[]): number {
+  let hash = voices.length;
+  const stride = Math.max(1, Math.floor(voices.length / 12));
+  for (let index = 0; index < voices.length; index += stride) {
+    const id = voices[index]?.id ?? "";
+    for (let char = 0; char < id.length; char++) {
+      hash = (hash * 31 + id.charCodeAt(char)) | 0;
+    }
+  }
+  return hash;
+}
+
 export function getSalVoiceSearchIndexCacheKey(
   voices: readonly SalVoiceDraft[],
   tariffBookIds: readonly string[],
 ): string {
   if (voices.length === 0) return "empty";
-  const first = voices[0];
-  const last = voices[voices.length - 1];
-  return `${voices.length}:${tariffBookIds.join(",")}:${first?.id ?? ""}:${last?.id ?? ""}`;
+  return `${voices.length}:${tariffBookIds.join(",")}:${hashVoiceIds(voices)}`;
 }
 
 export function buildSalVoiceSearchIndex(

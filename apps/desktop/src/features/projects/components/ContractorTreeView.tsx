@@ -1,13 +1,13 @@
 import { m } from "framer-motion";
 import { Building2, ChevronDown, FileText, FolderKanban, Grid3x3 } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { MOTION_VARIANTS, motionDuration, motionEase } from "@/motion";
-import { StatusChip } from "@/components/shared/StatusChip";
 import type { StatusTone } from "@/components/shared/StatusBadge";
+import { StatusChip } from "@/components/shared/StatusChip";
 import type { PortfolioProject } from "@/features/projects/types";
 import { formatMoney } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
 import { SAL_STATUS_LABELS, SAL_STATUS_TONE_KEYS } from "@/lib/sal-status";
+import { cn } from "@/lib/utils";
+import { MOTION_VARIANTS, motionDuration, motionEase } from "@/motion";
 
 type SalNode = {
   amount: number;

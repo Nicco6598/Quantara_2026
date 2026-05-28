@@ -1,20 +1,19 @@
 import { describe, expect, it } from "vitest";
+import type { SalDocument, SalEconomicRules, SalLineDraft } from "../../types";
 import { defaultSalEconomicRules } from "../sal-calculations";
 import {
   applyMgManualAllocation,
   buildSalResumeState,
-  rebuildMgLineAllocationsFromVoiceIds,
   mergeResumeEconomicRules,
   mergeStoredSalDrafts,
   normalizeMgManualAllocations,
   prepareEconomicRulesForDraftPersist,
+  rebuildMgLineAllocationsFromVoiceIds,
   remapMgManualAllocations,
   resolveMgLineAllocationsFromVoices,
   saveSalCreationDraftBySalId,
   syncMgVoiceAllocations,
 } from "../sal-creation-draft";
-import type { SalDocument, SalEconomicRules } from "../../types";
-import type { SalLineDraft } from "../../types";
 
 function rules(overrides: Partial<SalEconomicRules> = {}): SalEconomicRules {
   return { ...defaultSalEconomicRules, ...overrides };

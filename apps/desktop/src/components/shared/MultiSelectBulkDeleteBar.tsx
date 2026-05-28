@@ -1,5 +1,5 @@
-import { type ReactNode, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { MultiSelectBulkBar } from "./MultiSelectControls";
 
@@ -73,7 +73,8 @@ export function MultiSelectBulkDeleteBar({
       </MultiSelectBulkBar>
 
       <ConfirmDialog
-        confirmLabel={isDeleting ? "Eliminazione..." : "Elimina"}
+        confirmLabel="Elimina"
+        isConfirming={isDeleting}
         isOpen={isDeleteConfirmOpen}
         onCancel={onDeleteConfirmDismiss}
         onConfirm={handleDelete}

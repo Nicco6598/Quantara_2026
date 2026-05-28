@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -6,7 +7,6 @@ import {
   Layers3,
   TrendingUp,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { FilterSearch } from "@/components/filters";
 import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";

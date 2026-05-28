@@ -3,6 +3,7 @@ import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 // Invalida le bozze salvate con un comportamento di parsing/UI precedente.
 // Serve soprattutto quando cambiano regole di normalizzazione (es. spazi nel codice voce).
 const DRAFT_VERSION = 3;
+
 import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
 const TARIFF_IMPORT_DRAFTS_INDEX_KEY = STORAGE_KEYS.tariffImportDraftsIndex;

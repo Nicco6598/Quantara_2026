@@ -1,6 +1,7 @@
 import type {
   CreateDesktopContractRecordRequest,
   CreateDesktopTariffBookRecordRequest,
+  DesktopContractorRecord,
   DesktopContractRecord,
   DesktopTariffBookRecord,
   DesktopTariffVoiceCountRecord,
@@ -11,10 +12,11 @@ import type {
 } from "@quantara/shared-types";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { invokeForRead, isTauriRuntime } from "./tauri-wrapper";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { invokeForRead, isTauriRuntime } from "./tauri-wrapper";
 
 export type DesktopContract = DesktopContractRecord;
+export type DesktopContractor = DesktopContractorRecord;
 export type CreateDesktopContractRequest = CreateDesktopContractRecordRequest;
 export type DesktopTariffBook = DesktopTariffBookRecord;
 export type DesktopTariffVoice = DesktopTariffVoiceRecord;
@@ -55,6 +57,42 @@ function withInflightCache<T>(key: InflightKey, run: () => Promise<DesktopDataRe
 
   inflightRequests.set(key, request as Promise<DesktopDataResult<unknown>>);
   return request;
+}
+
+export async function listDesktopContractors(
+  fallback: DesktopContractor[] = [],
+): Promise<DesktopDataResult<DesktopContractor[]>> {
+  if (!isTauriRuntime()) {
+    return {
+      data: fallback,
+      message: "Runtime browser: anagrafica appaltatori in anteprima.",
+      source: "fallback",
+    };
+  }
+
+  return invokeForRead("list_contractors", {}, fallback, "anagrafica appaltatori");
+}
+
+export async function ensureDesktopContractor(name: string): Promise<DesktopContractor> {
+  if (!isTauriRuntime()) {
+    const id = `contractor_${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    return { id, name };
+  }
+
+  return invoke<DesktopContractor>("ensure_contractor", { name });
+}
+
+export async function deleteDesktopContractor(contractorId: string): Promise<void> {
+  if (!isTauriRuntime()) {
+    return;
+  }
+
+  const normalizedId = contractorId.trim().startsWith("contractor_")
+    ? contractorId.trim()
+    : `contractor_${contractorId.trim().replace(/^-|-$/g, "")}`;
+
+  await invoke("delete_contractor", { contractorId: normalizedId });
+  dispatchDataChanged();
 }
 
 export async function listDesktopContracts(

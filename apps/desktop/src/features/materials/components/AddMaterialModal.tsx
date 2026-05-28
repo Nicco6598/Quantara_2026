@@ -2,9 +2,9 @@ import { X } from "lucide-react";
 import { useEffect, useReducer } from "react";
 import { Button } from "@/components/shared/Button";
 import { Dialog } from "@/components/shared/Dialog";
+import { useToast } from "@/components/shared/ToastProvider";
 import { type DesktopMaterial, updateDesktopMaterial } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { useToast } from "@/components/shared/ToastProvider";
 import { CATEGORIES, type FormField, formReducer } from "../materials-screen-state";
 
 export function AddMaterialModal({

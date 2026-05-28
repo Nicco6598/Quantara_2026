@@ -1,3 +1,5 @@
+import type { SalDocument } from "@quantara/shared-types";
+import type { LucideIcon } from "lucide-react";
 import {
   Calculator,
   CheckCircle2,
@@ -8,7 +10,6 @@ import {
   ReceiptText,
   ShieldCheck,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClearFiltersButton,
@@ -19,8 +20,6 @@ import {
 } from "@/components/filters";
 import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Button } from "@/components/shared/Button";
-import { useContextMenu } from "@/hooks/useContextMenu";
-import { useNavigate } from "@/hooks/useNavigate";
 import { DetailList, DetailRow } from "@/components/shared/DetailList";
 import { MultiSelectBulkDeleteBar } from "@/components/shared/MultiSelectBulkDeleteBar";
 import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
@@ -35,18 +34,19 @@ import { mapContractToProject } from "@/features/projects/utils/project-mappers"
 import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useTableSort } from "@/hooks/use-table-sort";
+import { useContextMenu } from "@/hooks/useContextMenu";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
-import { listDesktopContracts, restoreMaterialsFromSalUsage } from "@/lib/desktopData";
-import { formatMoney } from "@/lib/formatters";
-import { restoreSalDocument } from "@/repositories/sal-repository";
-import { dispatchDataChanged } from "@/lib/sync-events";
+import { useNavigate } from "@/hooks/useNavigate";
 import {
   buildAccountingSalContextMenuEntries,
   copyTextToClipboard,
 } from "@/lib/context-menu-presets";
-import { selectProjectForWorkflow } from "@/lib/workflow-navigation";
+import { listDesktopContracts, restoreMaterialsFromSalUsage } from "@/lib/desktopData";
+import { formatMoney } from "@/lib/formatters";
+import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
-import type { SalDocument } from "@quantara/shared-types";
+import { selectProjectForWorkflow } from "@/lib/workflow-navigation";
+import { restoreSalDocument } from "@/repositories/sal-repository";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
 

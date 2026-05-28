@@ -7,20 +7,24 @@ import {
   Plus,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
-import { PortfolioBurn } from "@/components/shared/charts";
+import { type ElementType, useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/shared/Button";
+import { PortfolioBurn } from "@/components/shared/charts";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { Panel } from "@/components/shared/Panel";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
+import type {
+  DashboardOperationalTotal,
+  DashboardRealitySummary,
+} from "@/features/dashboard/components/DashboardSections";
 import {
-  buildActivityRows,
   type ActivityRow,
+  buildActivityRows,
+  buildDashboardRealitySummary,
   buildFocusRows,
   buildGanttBars,
-  buildDashboardRealitySummary,
   buildOverviewMetrics,
   buildPriorityActions,
   buildSalTimeline,
@@ -28,23 +32,19 @@ import {
   PriorityActions,
   TimelineGantt,
 } from "@/features/dashboard/components/DashboardSections";
-import type {
-  DashboardOperationalTotal,
-  DashboardRealitySummary,
-} from "@/features/dashboard/components/DashboardSections";
 import type { PortfolioProject } from "@/features/projects/types";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import type { SalDocumentView } from "@/features/sal/domain/sal-workflow";
 import { buildSalDocumentViews } from "@/features/sal/domain/sal-workflow";
+import { useAuditLogEntries } from "@/hooks/useAuditLogEntries";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useNavigate } from "@/hooks/useNavigate";
+import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
 import { deleteDesktopContract, listDesktopContracts } from "@/lib/desktopData";
 import { syncSalWorkflowFromBackend } from "@/lib/sal-workflow-sync";
-import { readLegacyProjectContractors, resolveContractorName } from "@/lib/contractor-resolve";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
 import { selectProjectForWorkflow } from "@/lib/workflow-navigation";
-import { useAuditLogEntries } from "@/hooks/useAuditLogEntries";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 let cachedGreeting: string | null = null;

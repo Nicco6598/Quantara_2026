@@ -1,5 +1,5 @@
 import type { SalLineDraft, SalMeasurementRowDraft } from "../types";
-import { createMeasurementId } from "../types";
+import { createEmptyMeasurementRow, createMeasurementId } from "../types";
 
 const VOICE_MARKER = "__salDraft";
 const MEASUREMENTS_MARKER = "__salMeasurements";
@@ -10,6 +10,8 @@ export type SalClipboardMeasurementsPayload = {
   __salMeasurements: true;
   rows: SalMeasurementRowDraft[];
   sourceVoiceCode?: string;
+  /** Incolla solo la stazione (Ctrl+C/V riga misura). */
+  stationOnly?: boolean;
 };
 
 export function serializeSalVoiceClipboard(draft: SalLineDraft): string {
@@ -19,11 +21,13 @@ export function serializeSalVoiceClipboard(draft: SalLineDraft): string {
 export function serializeSalMeasurementsClipboard(
   rows: SalMeasurementRowDraft[],
   sourceVoiceCode?: string,
+  options?: { stationOnly?: boolean },
 ): string {
   return JSON.stringify({
     [MEASUREMENTS_MARKER]: true,
     rows,
     sourceVoiceCode,
+    ...(options?.stationOnly ? { stationOnly: true } : {}),
   });
 }
 
@@ -31,7 +35,7 @@ export function parseSalClipboardText(
   text: string,
 ):
   | { kind: "voice"; draft: SalLineDraft }
-  | { kind: "measurements"; rows: SalMeasurementRowDraft[] }
+  | { kind: "measurements"; rows: SalMeasurementRowDraft[]; stationOnly: boolean }
   | null {
   try {
     const data = JSON.parse(text) as Record<string, unknown>;
@@ -44,6 +48,7 @@ export function parseSalClipboardText(
       return {
         kind: "measurements",
         rows: data.rows as SalMeasurementRowDraft[],
+        stationOnly: data.stationOnly === true,
       };
     }
   } catch {
@@ -56,7 +61,19 @@ export function remapMeasurementRowsForPaste(
   rows: readonly SalMeasurementRowDraft[],
   unit: string,
   startOrder: number,
+  options?: { stationOnly?: boolean },
 ): SalMeasurementRowDraft[] {
+  if (options?.stationOnly) {
+    return rows.map((row, index) => {
+      const empty = createEmptyMeasurementRow(unit, startOrder + index);
+      const station = row.station?.trim();
+      if (station) {
+        empty.station = station;
+      }
+      return empty;
+    });
+  }
+
   return rows.map((row, index) => ({
     ...row,
     id: createMeasurementId(),

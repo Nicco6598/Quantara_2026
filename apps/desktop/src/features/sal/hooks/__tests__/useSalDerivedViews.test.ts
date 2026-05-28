@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildLineViews, summarizeSalLines } from "../../domain/sal-calculations";
+import {
+  buildLineViews,
+  computeMgOnLaborPortion,
+  summarizeSalLines,
+} from "../../domain/sal-calculations";
 import type { SalEconomicRules, SalLineDraft, SalLineView, SalVoiceDraft } from "../../types";
 
 const defaultRules: SalEconomicRules = {
@@ -139,7 +143,7 @@ describe("MG distribution", () => {
     });
   }
 
-  function makeFaLine(id: string, code: string, qty: number): SalLineDraft {
+  function makeFaLine(id: string, code: string, qty: number, laborPercentage = 100): SalLineDraft {
     return makeLine({
       id,
       measurementRows: [makeMeasurementRow(qty)],
@@ -148,9 +152,12 @@ describe("MG distribution", () => {
         code,
         description: `Voce ${code}`,
         unitPrice: 100,
+        laborPercentage,
       }),
     });
   }
+
+  const MG_PERCENT = 2;
 
   it("does not apply MG until manual allocation is configured", () => {
     const lines = [
@@ -172,7 +179,7 @@ describe("MG distribution", () => {
       makeFaLine("fa1", "FA.001-US", 10),
       makeFaLine("fa2", "FA.002-TLS", 5),
       makeFaLine("ac1", "AC.001", 4),
-      makeMgLine("FA.MG.01", 2),
+      makeMgLine("FA.MG.01", MG_PERCENT),
     ];
 
     const views = buildLineViews(lines, {
@@ -182,10 +189,12 @@ describe("MG distribution", () => {
       },
     });
 
-    expect(views.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + 20);
+    const mgFa1 = computeMgOnLaborPortion(1000, MG_PERCENT, 100);
+    const mgAc1 = computeMgOnLaborPortion(400, MG_PERCENT, 100);
+    expect(views.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + mgFa1);
     expect(views.find((v) => v.id === "fa2")?.netAmount).toBe(500);
-    expect(views.find((v) => v.id === "ac1")?.netAmount).toBe(400 + 8);
-    expect(views.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(28);
+    expect(views.find((v) => v.id === "ac1")?.netAmount).toBe(400 + mgAc1);
+    expect(views.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(mgFa1 + mgAc1);
   });
 
   it("respects mgManualAllocations — limits to selected voices", () => {
@@ -210,12 +219,37 @@ describe("MG distribution", () => {
     expect(fa2).toBeDefined();
     expect(mg).toBeDefined();
 
-    // FA.001 gets MG (1000 * 0.02 = 20)
-    expect(fa1?.netAmount).toBe(1000 + 20);
-    // FA.002 does NOT get MG
+    const mgShare = computeMgOnLaborPortion(1000, MG_PERCENT, 100);
+    expect(fa1?.netAmount).toBe(1000 + mgShare);
     expect(fa2?.netAmount).toBe(500);
-    // MG line total based only on selected voices
-    expect(mg?.netAmount).toBe(20);
+    expect(mg?.netAmount).toBe(mgShare);
+  });
+
+  it("does not apply MG when labor percentage is zero", () => {
+    const lines = [makeFaLine("fa1", "FA.001-US", 10, 0), makeMgLine("FA.MG.01", MG_PERCENT)];
+
+    const views = buildLineViews(lines, {
+      ...defaultRules,
+      mgManualAllocations: { "mg-FA.MG.01": ["fa1"] },
+    });
+
+    expect(views.find((v) => v.id === "fa1")?.netAmount).toBe(1000);
+    expect(views.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(0);
+  });
+
+  it("applies MG on partial labor portion (lordo × %MG × %manodopera)", () => {
+    const lines = [makeFaLine("fa1", "FA.001-US", 10, 40), makeMgLine("FA.MG.01", 10)];
+
+    const views = buildLineViews(lines, {
+      ...defaultRules,
+      discountEnabled: false,
+      mgManualAllocations: { "mg-FA.MG.01": ["fa1"] },
+    });
+
+    const mgShare = computeMgOnLaborPortion(1000, 10, 40);
+    expect(mgShare).toBe(40);
+    expect(views.find((v) => v.id === "fa1")?.netAmount).toBe(1040);
+    expect(views.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(40);
   });
 
   it("skips MG when manual allocation references non-existent IDs", () => {
@@ -251,10 +285,12 @@ describe("MG distribution", () => {
       ...defaultRules,
       mgManualAllocations: { "mg-FA.MG.01": ["fa1", "fa2"] },
     };
+    const mgFa1 = computeMgOnLaborPortion(1000, MG_PERCENT, 100);
+    const mgFa2 = computeMgOnLaborPortion(500, MG_PERCENT, 100);
     const viewsBoth = buildLineViews(lines, rulesBoth);
-    expect(viewsBoth.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + 20);
-    expect(viewsBoth.find((v) => v.id === "fa2")?.netAmount).toBe(500 + 10);
-    expect(viewsBoth.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(30);
+    expect(viewsBoth.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + mgFa1);
+    expect(viewsBoth.find((v) => v.id === "fa2")?.netAmount).toBe(500 + mgFa2);
+    expect(viewsBoth.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(mgFa1 + mgFa2);
 
     // Step 2: remove fa2 from manual allocation
     const rulesOne: SalEconomicRules = {
@@ -262,9 +298,9 @@ describe("MG distribution", () => {
       mgManualAllocations: { "mg-FA.MG.01": ["fa1"] },
     };
     const viewsOne = buildLineViews(lines, rulesOne);
-    expect(viewsOne.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + 20);
+    expect(viewsOne.find((v) => v.id === "fa1")?.netAmount).toBe(1000 + mgFa1);
     expect(viewsOne.find((v) => v.id === "fa2")?.netAmount).toBe(500);
-    expect(viewsOne.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(20);
+    expect(viewsOne.find((v) => v.id === "mg-FA.MG.01")?.netAmount).toBe(mgFa1);
   });
 
   it("disables MG when manual allocation has empty array", () => {

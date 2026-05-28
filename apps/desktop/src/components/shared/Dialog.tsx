@@ -6,40 +6,48 @@ import { cn } from "@/lib/utils";
 import { motionVariants } from "@/motion";
 
 type DialogProps = {
+  ariaDescribedBy?: string;
+  ariaLabelledBy?: string;
   children: ReactNode;
   className?: string;
   closeOnOverlay?: boolean;
   contentClassName?: string;
   isOpen: boolean;
   onClose: () => void;
+  role?: "alertdialog" | "dialog";
   title?: string;
   zIndex?: number | string;
 };
 
 export function Dialog({
+  ariaDescribedBy,
+  ariaLabelledBy,
   children,
   className,
   closeOnOverlay = true,
   contentClassName,
   isOpen,
   onClose,
+  role = "dialog",
   title,
   zIndex = "var(--z-dialog)",
 }: DialogProps) {
   const titleId = useId();
+  const labelledBy = ariaLabelledBy ?? (title ? titleId : undefined);
 
   return createPortal(
     <AnimatePresence>
       {isOpen ? (
         <m.div
-          aria-labelledby={title ? titleId : undefined}
+          aria-describedby={ariaDescribedBy}
+          aria-labelledby={labelledBy}
           aria-modal="true"
           animate={motionVariants.dialogBackdrop.animate}
           className="fixed inset-0 flex items-center justify-center bg-[var(--overlay-bg)] px-4 backdrop-blur-sm"
           exit={motionVariants.dialogBackdrop.exit}
           initial={motionVariants.dialogBackdrop.initial}
           onClick={closeOnOverlay ? onClose : undefined}
-          role="dialog"
+          role={role}
           style={{ zIndex }}
           transition={motionVariants.dialogBackdrop.transition}
         >

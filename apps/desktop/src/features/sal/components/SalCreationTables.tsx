@@ -21,17 +21,15 @@ import {
 } from "lucide-react";
 import {
   memo,
+  type ClipboardEvent as ReactClipboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ClipboardEvent as ReactClipboardEvent,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
-import { AutocompleteInput } from "@/components/shared/AutocompleteInput";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { Currency } from "@/components/shared/Currency";
@@ -42,13 +40,13 @@ import { Panel } from "@/components/shared/Panel";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { SPRING_EASE } from "@/motion";
 import type { SalTemplate } from "@/store/template-store";
-import { filterIndexedVoiceOptions, type SalAutocompleteOption } from "./SalSearchBar";
 import type { SalVoiceSearchIndex } from "../hooks/useSalVoiceSearchIndex";
 import {
   buildSalContextMenuEntries,
-  SalLineContextMenu,
   type SalContextMenuScope,
+  SalLineContextMenu,
 } from "./SalLineContextMenu";
+import { SalVoiceSearchField } from "./SalVoiceSearchField";
 import { TemplatePicker } from "./TemplatePicker";
 
 export { Currency };
@@ -59,12 +57,13 @@ import {
   getMgAssignableTargetLines,
   isMgVoice,
 } from "../domain/sal-calculations";
+import { shouldUseNativeClipboard, shouldUseNativePaste } from "../domain/sal-clipboard-events";
 import { buildMeasurementTarget } from "../domain/sal-measurement-target";
 import type {
   SalEconomicRules,
   SalEconomicSummary,
-  SalLinkedCharge,
   SalLineView,
+  SalLinkedCharge,
   SalMeasurementRowDraft,
   SalVoiceDraft,
 } from "../types";
@@ -164,6 +163,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   canPasteVoice = false,
   canPasteMeasurements = false,
   getMeasurementsClipboardText,
+  getMeasurementRowClipboardText,
   getVoiceClipboardText,
   onPasteClipboardText,
   onAddMeasurementRow,
@@ -196,6 +196,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   canPasteMeasurements?: boolean;
   getVoiceClipboardText: (lineId: string) => string | null;
   getMeasurementsClipboardText: (lineId: string) => string | null;
+  getMeasurementRowClipboardText?: (lineId: string, rowIndex: number) => string | null;
   onPasteClipboardText: (lineId: string, text: string) => void;
   onAddMeasurementRow: (lineId: string) => void;
   onDuplicateMeasurementRow: (lineId: string, measurementId: string) => void;
@@ -450,19 +451,6 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
     return () => window.removeEventListener("keydown", handler);
   }, [handleToggleAll]);
 
-  const deferredSearchIndex = useDeferredValue(search?.searchIndex);
-  const filterOptions = useCallback(
-    (_options: SalAutocompleteOption[], query: string) => {
-      if (!deferredSearchIndex) return [];
-      return filterIndexedVoiceOptions({
-        index: deferredSearchIndex.index,
-        query,
-        tariffTokensByBookId: deferredSearchIndex.tariffTokensByBookId,
-      });
-    },
-    [deferredSearchIndex],
-  );
-
   const allocPanelMgLine = allocPanelMgId
     ? lines.find((line) => line.id === allocPanelMgId)
     : undefined;
@@ -521,8 +509,10 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
         onOpenContextMenu={openSalContextMenu}
         getVoiceClipboardText={getVoiceClipboardText}
         getMeasurementsClipboardText={getMeasurementsClipboardText}
+        {...(getMeasurementRowClipboardText ? { getMeasurementRowClipboardText } : {})}
         onPasteClipboardText={onPasteClipboardText}
         {...(onCopyMeasurements ? { onCopyMeasurements } : {})}
+        {...(onCopyMeasurementRow ? { onCopyMeasurementRow } : {})}
         {...(selectedMeasurementRow ? { selectedMeasurementRow } : {})}
         {...(onSelectMeasurementRow ? { onSelectMeasurementRow } : {})}
         onAddMeasurementRow={onAddMeasurementRow}
@@ -543,8 +533,10 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
       openSalContextMenu,
       getVoiceClipboardText,
       getMeasurementsClipboardText,
+      getMeasurementRowClipboardText,
       onPasteClipboardText,
       onCopyMeasurements,
+      onCopyMeasurementRow,
       selectedMeasurementRow,
       onSelectMeasurementRow,
       onAddMeasurementRow,
@@ -602,28 +594,13 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
 
               {search ? (
                 <div className="w-full min-w-0 lg:justify-self-center lg:max-w-[520px]">
-                  <AutocompleteInput
-                    options={[]}
-                    onSelect={(o) => {
-                      const v =
-                        (o.id ? deferredSearchIndex?.voiceById.get(o.id) : undefined) ??
-                        deferredSearchIndex?.index.find((item) => item.option.value === o.value)
-                          ?.voice;
-                      if (v) search.onSelectVoice(v);
-                    }}
-                    onOptionContextMenu={(o, event) => {
-                      const v =
-                        (o.id ? deferredSearchIndex?.voiceById.get(o.id) : undefined) ??
-                        deferredSearchIndex?.index.find((item) => item.option.value === o.value)
-                          ?.voice;
-                      if (v) openSearchVoiceContextMenu(v, event);
-                    }}
-                    placeholder={
-                      search.isLoading
-                        ? `Caricamento voci (${search.tariffBookIds.length} tariffari)...`
-                        : `Cerca codice, descrizione o categoria (${search.voicesCount} voci)`
-                    }
-                    filterOptions={filterOptions}
+                  <SalVoiceSearchField
+                    {...(search.isLoading ? { isLoading: true } : {})}
+                    searchIndex={search.searchIndex}
+                    tariffBookIds={search.tariffBookIds}
+                    voicesCount={search.voicesCount}
+                    onSelectVoice={search.onSelectVoice}
+                    onOptionContextMenu={openSearchVoiceContextMenu}
                   />
                 </div>
               ) : (
@@ -1537,8 +1514,10 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   onOpenContextMenu,
   getVoiceClipboardText,
   getMeasurementsClipboardText,
+  getMeasurementRowClipboardText,
   onPasteClipboardText,
   onCopyMeasurements,
+  onCopyMeasurementRow,
   selectedMeasurementRow,
   onSelectMeasurementRow,
   onAddMeasurementRow,
@@ -1565,8 +1544,10 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   ) => void;
   getVoiceClipboardText: (lineId: string) => string | null;
   getMeasurementsClipboardText: (lineId: string) => string | null;
+  getMeasurementRowClipboardText?: (lineId: string, rowIndex: number) => string | null;
   onPasteClipboardText: (lineId: string, text: string) => void;
   onCopyMeasurements?: (lineId: string) => void;
+  onCopyMeasurementRow?: (lineId: string, rowIndex: number) => void;
   selectedMeasurementRow?: { lineId: string; rowIndex: number } | null;
   onSelectMeasurementRow?: (lineId: string, rowIndex: number) => void;
   onAddMeasurementRow: (lineId: string) => void;
@@ -1615,6 +1596,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
         onFocus={() => onActivate?.(line.id)}
         onContextMenu={(event) => void onOpenContextMenu(line.id, "voice", event)}
         onCopy={(event: ReactClipboardEvent) => {
+          if (shouldUseNativeClipboard(event)) return;
           const text = getVoiceClipboardText(line.id);
           if (!text) return;
           event.preventDefault();
@@ -1622,6 +1604,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
           onCopy(line.id);
         }}
         onPaste={(event: ReactClipboardEvent) => {
+          if (shouldUseNativePaste(event)) return;
           event.preventDefault();
           onPasteClipboardText(line.id, event.clipboardData.getData("text/plain"));
         }}
@@ -1813,7 +1796,9 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             unitPrice={line.voice.unitPrice}
             laborPercentage={line.voice.laborPercentage ?? 0}
             getMeasurementsClipboardText={getMeasurementsClipboardText}
+            {...(getMeasurementRowClipboardText ? { getMeasurementRowClipboardText } : {})}
             {...(onCopyMeasurements ? { onCopyMeasurements } : {})}
+            {...(onCopyMeasurementRow ? { onCopyMeasurementRow } : {})}
             selectedRowIndex={
               selectedMeasurementRow?.lineId === line.id ? selectedMeasurementRow.rowIndex : null
             }
@@ -1962,7 +1947,9 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
   unitPrice: _unitPrice,
   laborPercentage,
   getMeasurementsClipboardText,
+  getMeasurementRowClipboardText,
   onCopyMeasurements,
+  onCopyMeasurementRow,
   selectedRowIndex = null,
   onSelectRow,
   onOpenContextMenu,
@@ -1986,7 +1973,9 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
   unitPrice: number;
   laborPercentage: number;
   getMeasurementsClipboardText: (lineId: string) => string | null;
+  getMeasurementRowClipboardText?: (lineId: string, rowIndex: number) => string | null;
   onCopyMeasurements?: (lineId: string) => void;
+  onCopyMeasurementRow?: (lineId: string, rowIndex: number) => void;
   selectedRowIndex?: number | null;
   onSelectRow?: (rowIndex: number) => void;
   onOpenContextMenu: (
@@ -2006,7 +1995,6 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
   ) => void;
 }) {
   const hasMultipleRows = rows.length > 1;
-  const lastRow = rows[rows.length - 1];
   const [factorDrafts, setFactorDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -2030,6 +2018,7 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
       <div
         className="ml-6 min-w-0 border-l-2 border-[var(--accent-primary)]/30 bg-[var(--surface-base)] pl-2 [contain:layout_style]"
         onCopy={(event: ReactClipboardEvent) => {
+          if (shouldUseNativeClipboard(event)) return;
           const text = getMeasurementsClipboardText(lineId);
           if (!text) return;
           event.preventDefault();
@@ -2038,6 +2027,7 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
           onCopyMeasurements?.(lineId);
         }}
         onPaste={(event: ReactClipboardEvent) => {
+          if (shouldUseNativePaste(event)) return;
           event.preventDefault();
           event.stopPropagation();
           onPasteClipboardText(lineId, event.clipboardData.getData("text/plain"));
@@ -2054,12 +2044,18 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
                 {rows.length} rig{rows.length === 1 ? "a" : "he"},{" "}
                 {totalQuantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })} {unit}
               </span>
-              {lastRow && (
+              {rows.length > 0 && (
                 <button
                   className="ml-auto inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-2.5 text-12px font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)]"
-                  onClick={() =>
-                    onDuplicateRow(lineId, buildMeasurementTarget(lastRow.id, rows.length - 1))
-                  }
+                  onClick={() => {
+                    const index =
+                      selectedRowIndex != null && selectedRowIndex >= 0
+                        ? selectedRowIndex
+                        : rows.length - 1;
+                    const row = rows[index];
+                    if (!row) return;
+                    onDuplicateRow(lineId, buildMeasurementTarget(row.id, index));
+                  }}
                   type="button"
                 >
                   <Copy className="size-3" />
@@ -2115,6 +2111,7 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
                         "grid border-b border-[var(--border-subtle)]/35 bg-[var(--surface-base)] text-14px font-medium transition-colors hover:bg-[var(--accent-primary)]/[0.025]",
                         MEASURE_GRID_COLS,
                       )}
+                      data-measurement-row
                       key={`${row.id}-${row.order}`}
                       onContextMenu={(event) => {
                         if (
@@ -2123,6 +2120,15 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
                           return;
                         }
                         void onOpenContextMenu(lineId, "measurement-row", event, rowIndex);
+                      }}
+                      onCopy={(event: ReactClipboardEvent) => {
+                        if (shouldUseNativeClipboard(event)) return;
+                        const text = getMeasurementRowClipboardText?.(lineId, rowIndex);
+                        if (!text) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.clipboardData.setData("text/plain", text);
+                        onCopyMeasurementRow?.(lineId, rowIndex);
                       }}
                     >
                       {/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: row index selector for measurement clipboard actions */}

@@ -1,4 +1,5 @@
 import { m } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
   Bell,
@@ -11,7 +12,6 @@ import {
   Trash2,
   Warehouse,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   ClearFiltersButton,
@@ -19,6 +19,7 @@ import {
   FilterSelect,
   FilterTemplatePicker,
 } from "@/components/filters";
+import { AppContextMenu } from "@/components/shared/AppContextMenu";
 import { Badge } from "@/components/shared/Badge";
 import { Button } from "@/components/shared/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -36,7 +37,9 @@ import { SeverityBar } from "@/components/shared/SeverityBar";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
+import { useContextMenu } from "@/hooks/useContextMenu";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
+import { buildMaterialContextMenuEntries, copyTextToClipboard } from "@/lib/context-menu-presets";
 import {
   createDesktopMaterial,
   type DesktopMaterial,
@@ -49,9 +52,6 @@ import { cn } from "@/lib/utils";
 import { MOTION_VARIANTS } from "@/motion";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import { useUndoStore } from "@/store/undo-store";
-import { AppContextMenu } from "@/components/shared/AppContextMenu";
-import { useContextMenu } from "@/hooks/useContextMenu";
-import { buildMaterialContextMenuEntries, copyTextToClipboard } from "@/lib/context-menu-presets";
 import { AddMaterialModal } from "./components/AddMaterialModal";
 import {
   CATEGORIES,
@@ -526,7 +526,11 @@ export function MaterialsScreen() {
         confirmLabel="Elimina"
         isOpen={state.deleteConfirmId !== null}
         onCancel={() => dispatch({ type: "SET_DELETE_CONFIRM_ID", payload: null })}
-        onConfirm={() => state.deleteConfirmId && handleDelete(state.deleteConfirmId)}
+        onConfirm={() => {
+          if (state.deleteConfirmId) {
+            void handleDelete(state.deleteConfirmId);
+          }
+        }}
         title="Eliminare questo materiale?"
         tone="danger"
       >

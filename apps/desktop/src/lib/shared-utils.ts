@@ -1,15 +1,23 @@
 // Shared utilities used across features.
 // Import from here instead of from other feature directories.
 
+/** Exact aliases only — never truncate custom names such as "RFI TEST 5.0.1". */
+const CONTRACTOR_CANONICAL_ALIASES: Record<string, string> = {
+  anas: "ANAS",
+  "a.n.a.s.": "ANAS",
+  rfi: "RFI",
+  "rfi s.p.a.": "RFI",
+  "rfi s.p.a": "RFI",
+  "rfi spa": "RFI",
+  "regione marche": "Regione Marche",
+};
+
 export function normalizeContractorName(value: string): string {
-  const normalized = value.trim();
-  const lowerValue = normalized.toLowerCase();
-  if (lowerValue.includes("rfi")) return "RFI";
-  if (lowerValue.includes("anas")) return "ANAS";
-  if (lowerValue.includes("regione marche") || lowerValue.includes("adriatica"))
-    return "Regione Marche";
-  if (lowerValue.includes("regione")) return normalized;
-  return normalized || "Appaltatore da assegnare";
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (!normalized) return "Appaltatore da assegnare";
+
+  const canonical = CONTRACTOR_CANONICAL_ALIASES[normalized.toLowerCase()];
+  return canonical ?? normalized;
 }
 
 export function readStringRecord(key: string): Record<string, string> {

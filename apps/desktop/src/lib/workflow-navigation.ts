@@ -114,3 +114,28 @@ export function beginProjectEditSession(form: unknown, contractId: string): void
 export function takeProjectEditSession(): ProjectEditSession | null {
   return useAppStore.getState().takeProjectEditSession();
 }
+
+export function beginProjectCreate(prefill?: {
+  contractorName?: string;
+  lockContractor?: boolean;
+}): void {
+  const contractorName = prefill?.contractorName?.trim() ?? "";
+  if (contractorName) {
+    useAppStore.getState().setProjectCreatePrefill({
+      contractorName,
+      lockContractor: prefill?.lockContractor ?? false,
+    });
+    return;
+  }
+  useAppStore.getState().setProjectCreatePrefill({
+    contractorName: "",
+    lockContractor: false,
+  });
+}
+
+export function takeProjectCreatePrefill(): {
+  contractorName: string;
+  lockContractor: boolean;
+} | null {
+  return useAppStore.getState().takeProjectCreatePrefill();
+}

@@ -1,5 +1,5 @@
-import { X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/shared/Button";
 import { cn } from "@/lib/utils";

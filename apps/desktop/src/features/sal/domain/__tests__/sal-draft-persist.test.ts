@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { STORAGE_KEYS } from "@/persistence/storage-keys";
+import type { SalLineDraft } from "../../types";
 import {
   loadSalCreationDraft,
   loadSalCreationDraftBySalId,
   persistSalCreationLocalDraft,
 } from "../sal-creation-draft";
-import type { SalLineDraft } from "../../types";
 
 function line(id: string, voiceId: string, code = "FA.MG.01"): SalLineDraft {
   return {

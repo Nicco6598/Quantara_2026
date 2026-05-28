@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PortfolioProject } from "@/features/projects/types";
 import {
   calculateProjectPerformanceForecast,
   type ProjectFinancials,
   type SalProgressRow,
 } from "@/features/project-detail/domain/project-detail-model";
+import type { PortfolioProject } from "@/features/projects/types";
 import { buildSalTimeline } from "./DashboardSections";
 
 function project(): PortfolioProject {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SalEconomicRules, SalLineDraft, SalVoiceDraft } from "../../types";
 import { defaultSalEconomicRules } from "../sal-calculations";
 import {
   ensureMgLinesForRules,
@@ -6,7 +7,6 @@ import {
   rebuildMgLineAllocationsFromVoiceIds,
   restoreMgRulesForLines,
 } from "../sal-creation-draft";
-import type { SalLineDraft, SalVoiceDraft, SalEconomicRules } from "../../types";
 
 function rules(overrides: Partial<SalEconomicRules> = {}): SalEconomicRules {
   return { ...defaultSalEconomicRules, ...overrides };

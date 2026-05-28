@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createDesktopVoiceKey } from "@/lib/shared-utils";
+import type { SalVoiceDraft } from "../../types";
 import { extractSnapshotVoicesFromSal, resolveVoiceForSalLine } from "../sal-voice-resolve";
 import type { SalDocument } from "../sal-workflow";
-import type { SalVoiceDraft } from "../../types";
 
 function voice(id: string, bookId = "book-1"): SalVoiceDraft {
   return {

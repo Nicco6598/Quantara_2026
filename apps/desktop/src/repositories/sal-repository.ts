@@ -5,8 +5,7 @@ import {
   prepareEconomicRulesForDraftPersist,
 } from "@/features/sal/domain/sal-creation-draft";
 import type { SalWorkflowPhase } from "@/features/sal/state/workflow";
-import type { SalLineDraft } from "@/features/sal/types";
-import type { SalDocument, SalProject, SalTariffVoice } from "@/features/sal/types";
+import type { SalDocument, SalLineDraft, SalProject, SalTariffVoice } from "@/features/sal/types";
 import {
   deleteSalDocument,
   saveSalDocument,
@@ -16,7 +15,7 @@ import {
 } from "@/lib/sal-data";
 import { syncSalWorkflowFromBackend } from "@/lib/sal-workflow-sync";
 import { dispatchDataChanged } from "@/lib/sync-events";
-import { useSalWorkflowStore, type CreateSalInput } from "@/store/sal-workflow-store";
+import { type CreateSalInput, useSalWorkflowStore } from "@/store/sal-workflow-store";
 
 export type SalDraftUpsertInput = {
   date: string;

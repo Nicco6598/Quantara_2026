@@ -1,6 +1,6 @@
 import { CheckCircle2, FileText, Loader, ScanLine, XCircle } from "lucide-react";
-import type { ImportFileProgress } from "@/lib/desktopData";
 import { createPortal } from "react-dom";
+import type { ImportFileProgress } from "@/lib/desktopData";
 
 export function TariffImportLoadingModal({ files }: { files: ImportFileProgress[] }) {
   const doneCount = files.filter((f) => f.status === "done").length;

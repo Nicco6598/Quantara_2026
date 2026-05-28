@@ -6,15 +6,19 @@ import {
 
 describe("shared-utils", () => {
   describe("normalizeContractorName", () => {
-    it("recognizes known contractor names", () => {
+    it("recognizes exact canonical aliases", () => {
       expect(normalizeContractorName("RFI S.p.A.")).toBe("RFI");
       expect(normalizeContractorName("ANAS")).toBe("ANAS");
-      expect(normalizeContractorName("Regione Lombardia")).toBe("Regione Lombardia");
       expect(normalizeContractorName("Regione Marche")).toBe("Regione Marche");
     });
 
-    it("falls back to trimmed input for unknown names", () => {
+    it("keeps custom contractor names intact", () => {
+      expect(normalizeContractorName("RFI TEST 5.0.1")).toBe("RFI TEST 5.0.1");
+      expect(normalizeContractorName("Regione Lombardia")).toBe("Regione Lombardia");
       expect(normalizeContractorName("  Impresa Edile  ")).toBe("Impresa Edile");
+    });
+
+    it("falls back to trimmed input for empty names", () => {
       expect(normalizeContractorName("")).toBe("Appaltatore da assegnare");
     });
   });

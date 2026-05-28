@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { useChartColors } from "./useChartColors";
 import type { ContractorExposureItem } from "./chart-helpers";
 import { UplotChart } from "./UplotChart";
+import { useChartColors } from "./useChartColors";
 
 type ContractorExposureProps = {
   items: ContractorExposureItem[];

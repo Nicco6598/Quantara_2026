@@ -1,6 +1,7 @@
 export const STORAGE_KEYS = {
   auditLog: "quantara-audit-log-v1",
   contractorMigrationDone: "quantara.contractorsDbMigration.v1",
+  contractorRepairDone: "quantara.contractorsDbMigration.v2",
   contractorRegistry: "quantara.contractorRegistry.v1",
   projectContractors: "quantara.projectContractors.v1",
   projectDraft: "quantara.projectDraft.v2",

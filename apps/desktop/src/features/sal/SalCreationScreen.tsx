@@ -21,21 +21,21 @@ import type { SalDocument } from "@/features/sal/types";
 import { useActionHandler } from "@/hooks/useAction";
 import { useNavigate } from "@/hooks/useNavigate";
 import { confirmSalTransaction } from "@/lib/sal-data";
-import { persistSalProjectMetadata, upsertSalDraftDocument } from "@/repositories/sal-repository";
 import {
+  clearResumeSalDraftId,
   consumeSalCreatedRedirect,
+  getResumeSalDraftId,
   markSalCreatedRedirect,
   selectProjectForWorkflow,
-  clearResumeSalDraftId,
-  getResumeSalDraftId,
 } from "@/lib/workflow-navigation";
+import { persistSalProjectMetadata, upsertSalDraftDocument } from "@/repositories/sal-repository";
 import { useSalWorkflowService } from "@/services/sal-service";
 import { useAppStore } from "@/store/app-store";
 import { useSalWorkflowStore } from "@/store/sal-workflow-store";
 import type { SalTemplate } from "@/store/template-store";
 import { SaveAsTemplateDialog } from "./components/SaveAsTemplateDialog";
-import { buildLineViews, defaultSalEconomicRules, isMgVoice } from "./domain/sal-calculations";
 import { buildSalDraftPayload } from "./domain/build-sal-draft-payload";
+import { buildLineViews, defaultSalEconomicRules, isMgVoice } from "./domain/sal-calculations";
 import {
   applyMgManualAllocation,
   buildSalResumeState,
@@ -46,9 +46,9 @@ import {
   prepareEconomicRulesForDraftPersist,
   syncMgVoiceAllocations,
 } from "./domain/sal-creation-draft";
-import type { SalDraftAutosaveSnapshot } from "./hooks/useSalDraftAutosave";
 import { useSalCreationData } from "./hooks/useSalCreationData";
 import { useSalDerivedViews } from "./hooks/useSalDerivedViews";
+import type { SalDraftAutosaveSnapshot } from "./hooks/useSalDraftAutosave";
 import { useSalDraftAutosave } from "./hooks/useSalDraftAutosave";
 import { useSalLineActions } from "./hooks/useSalLineActions";
 import {

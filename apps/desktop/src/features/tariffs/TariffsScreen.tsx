@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import {
   Building2,
   CalendarDays,
@@ -8,7 +9,6 @@ import {
   Plus,
   Save,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { ClearFiltersButton, FilterSearch, FilterSelect } from "@/components/filters";
 import { Button } from "@/components/shared/Button";
@@ -19,9 +19,9 @@ import { MultiSelectToggle } from "@/components/shared/MultiSelectControls";
 import { Panel } from "@/components/shared/Panel";
 import { ScreenLayout } from "@/components/shared/ScreenLayout";
 import { useToast } from "@/components/shared/ToastProvider";
-import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 import { useMultiSelectDelete } from "@/hooks/use-multi-select-delete";
 import { useActionHandler } from "@/hooks/useAction";
+import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 
 import {
   createDesktopTariffBook,

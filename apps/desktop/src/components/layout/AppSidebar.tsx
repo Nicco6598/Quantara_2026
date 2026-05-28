@@ -11,7 +11,6 @@ import {
 import { LayoutGroup, m } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import logoSidebar from "@/assets/branding/logo-sidebar.png";
-import { useAppStore } from "@/store/app-store";
 import { mapContractToProject } from "@/features/projects/utils/project-mappers";
 import {
   createContractorId,
@@ -19,15 +18,19 @@ import {
 } from "@/features/projects/utils/projects-helpers";
 import { APP_VERSION } from "@/generated/appVersion";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
+import { loadContractorRegistryNames } from "@/lib/contractor-registry";
+import {
+  isContractorMigrationComplete,
+  readLegacyProjectContractors,
+  resolveContractorName,
+} from "@/lib/contractor-resolve";
 import type { DesktopContract, DesktopMaterial } from "@/lib/desktopData";
 import { listDesktopContracts, listDesktopMaterials } from "@/lib/desktopData";
 import { cn } from "@/lib/utils";
-import { motionSpring } from "@/motion";
-import { readJsonFromStorage } from "@/persistence/json-storage";
 import { getWorkflowProjectId, selectProjectForWorkflow } from "@/lib/workflow-navigation";
-import { STORAGE_KEYS } from "@/persistence/storage-keys";
+import { motionSpring } from "@/motion";
 import type { QuantaraRoute } from "@/store/app-store";
-import { useActiveContext } from "@/store/app-store";
+import { useActiveContext, useAppStore } from "@/store/app-store";
 
 type NavItem = {
   badges?: {
@@ -69,57 +72,35 @@ export function AppSidebar({ activeRoute, collapsed, onRouteChange }: AppSidebar
   const loadProjects = useCallback(() => {
     let active = true;
 
-    const registry: Record<string, string> =
-      typeof window === "undefined"
-        ? {}
-        : (() => {
-            try {
-              return readJsonFromStorage<Record<string, string>>(
-                window.localStorage,
-                STORAGE_KEYS.projectContractors,
-                {},
-              );
-            } catch {
-              return {};
-            }
-          })();
-    const contractorRegistry: string[] =
-      typeof window === "undefined"
-        ? []
-        : (() => {
-            try {
-              const parsed = readJsonFromStorage<unknown[]>(
-                window.localStorage,
-                STORAGE_KEYS.contractorRegistry,
-                [],
-                Array.isArray,
-              );
-              return Array.isArray(parsed)
-                ? parsed.filter((item): item is string => typeof item === "string")
-                : [];
-            } catch {
-              return [];
-            }
-          })();
+    const legacyRegistry = isContractorMigrationComplete() ? {} : readLegacyProjectContractors();
 
-    listDesktopContracts([]).then((result) => {
-      if (!active) return;
-      setContracts(result.data);
-      const projectRows = result.data.map((c) => {
-        const p = mapContractToProject(c);
-        const contractor = c.contractorName ?? registry[c.id];
-        return contractor ? { ...p, contractor } : p;
-      });
+    void Promise.all([listDesktopContracts([]), loadContractorRegistryNames()]).then(
+      ([contractsResult, contractorRegistry]) => {
+        if (!active) return;
+        setContracts(contractsResult.data);
+        const projectRows = contractsResult.data.map((contract) => {
+          const project = mapContractToProject(
+            contract,
+            resolveContractorName(contract, legacyRegistry),
+          );
+          return project.contractor ? project : { ...project, contractor: "" };
+        });
 
-      setProjects(projectRows);
-      setContractorCount(
-        new Set(
-          [...projectRows.map((project) => project.contractor), ...contractorRegistry].filter(
-            (contractor) => !isPlaceholderContractorName(contractor),
-          ),
-        ).size,
-      );
-    });
+        setProjects(
+          projectRows.map((project) => ({
+            contractor: project.contractor,
+            id: project.id,
+          })),
+        );
+        setContractorCount(
+          new Set(
+            [...projectRows.map((project) => project.contractor), ...contractorRegistry].filter(
+              (contractor) => !isPlaceholderContractorName(contractor),
+            ),
+          ).size,
+        );
+      },
+    );
 
     const matFbPromise: Promise<DesktopMaterial[]> = import.meta.env.DEV
       ? import("@/features/materials/materials-data").then((m) => m.fallbackMaterials)

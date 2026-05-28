@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { actionRegistry, type AppAction, type ActionHandler } from "@/lib/action-registry";
+import { type ActionHandler, type AppAction, actionRegistry } from "@/lib/action-registry";
 
 export function useAction() {
   const dispatch = useCallback((action: AppAction) => {

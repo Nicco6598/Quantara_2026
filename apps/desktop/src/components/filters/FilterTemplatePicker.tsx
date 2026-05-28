@@ -1,8 +1,8 @@
 import { m } from "framer-motion";
 import { BookmarkPlus, ChevronDown, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MOTION_VARIANTS } from "@/motion";
 import { cn } from "@/lib/utils";
+import { MOTION_VARIANTS } from "@/motion";
 import { type FilterTemplateScope, useFilterTemplatesStore } from "@/store/filter-templates-store";
 
 type QuickTemplate = {

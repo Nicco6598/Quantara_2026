@@ -1,6 +1,7 @@
-import { Search, ChevronDown, X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cn } from "@/lib/utils";
 import { Field, type FieldProps } from "./Field";
 
@@ -28,6 +29,7 @@ export function Combobox({
 }: ComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 100);
   const [activeIndex, setActiveIndex] = useState(0);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,12 +42,12 @@ export function Combobox({
   );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     if (!q) return options;
     return options.filter(
       (opt) => opt.value.toLowerCase().includes(q) || opt.label.toLowerCase().includes(q),
     );
-  }, [options, query]);
+  }, [options, debouncedQuery]);
 
   const measureDropdown = useCallback(() => {
     if (!containerRef.current) return;

@@ -1,7 +1,7 @@
-import { BezelSurface } from "@/components/shared/ui-primitives";
-import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { type StatusTone, statusToneStyles } from "@/components/shared/StatusBadge";
+import { BezelSurface } from "@/components/shared/ui-primitives";
 import { cn } from "@/lib/utils";
 
 type QuickActionProps = {

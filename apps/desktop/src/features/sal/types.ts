@@ -176,13 +176,28 @@ export function createEmptyMeasurementRow(unit: string, order: number): SalMeasu
   };
 }
 
-/** Nuova riga misura: data odierna, campi vuoti, solo stazione copiata dalla sorgente. */
+/** Duplica riga misura: copia completa con nuovo id e parziale ricalcolato. */
 export function cloneMeasurementRowForDuplicate(
   source: SalMeasurementRowDraft,
   unit: string,
   order: number,
 ): SalMeasurementRowDraft {
-  const row = createEmptyMeasurementRow(unit, order);
+  const partialQuantity = recalcPartialQuantity(source);
+  return {
+    ...source,
+    id: createMeasurementId(),
+    order,
+    partialQuantity,
+    unit: source.unit || unit,
+  };
+}
+
+/** Ctrl+C / incolla riga: solo stazione su riga vuota. */
+export function buildStationOnlyMeasurementClipboardRow(
+  source: SalMeasurementRowDraft,
+  unit: string,
+): SalMeasurementRowDraft {
+  const row = createEmptyMeasurementRow(unit, 0);
   const station = source.station?.trim();
   if (station) {
     row.station = station;

@@ -1,13 +1,13 @@
 import type { ProjectsReportProject, QuantaraMigrationWorkbook } from "@quantara/excel-import";
 import type { MigrationAction } from "@/features/projects/types";
-import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import {
   countValidationIssues,
   saveWorkbookAs,
   waitForUiPaint,
 } from "@/features/projects/utils/projects-helpers";
-import type { DesktopContract } from "@/lib/desktopData";
+import { buildSalDocumentView } from "@/features/sal/domain/sal-workflow";
 import type { SalDocument, SalTariffVoice } from "@/features/sal/types";
+import type { DesktopContract } from "@/lib/desktopData";
 
 type Notify = (toast: {
   message: string;

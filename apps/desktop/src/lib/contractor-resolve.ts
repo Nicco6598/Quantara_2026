@@ -1,9 +1,12 @@
 import type { DesktopContract } from "@/lib/desktopData";
-import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import { normalizeContractorName, readStringRecord } from "@/lib/shared-utils";
+import { isTauriRuntime } from "@/lib/tauri-wrapper";
+import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
+/** SQLite is source of truth only in the desktop runtime after one-time migration. */
 export function isContractorMigrationComplete(): boolean {
   if (typeof window === "undefined") return true;
+  if (!isTauriRuntime()) return false;
   return window.localStorage.getItem(STORAGE_KEYS.contractorMigrationDone) === "done";
 }
 

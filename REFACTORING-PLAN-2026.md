@@ -59,7 +59,7 @@
 - [ ] 2.3.1 — Verifica tree-shaking framer-motion
 - [ ] 2.3.2 — Lazy loading modali pesanti (TariffsScreen gia in route-level lazy)
 - [ ] 2.3.3 — PurgeCSS audit
-- [ ] 2.3.4 — `@hello-pangea/dnd` (valutato: skip, richiede rewrite nativo)
+- [x] 2.3.4 — `@hello-pangea/dnd` rimosso (2026-05-28; reorder nativo se servirà in futuro)
 
 ### 2.4 — Riduzione framer motion
 - [x] 2.4.1 — whileHover → CSS `:hover`
