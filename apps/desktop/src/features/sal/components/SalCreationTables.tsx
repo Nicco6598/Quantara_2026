@@ -168,6 +168,8 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onPasteClipboardText,
   onAddMeasurementRow,
   onDuplicateMeasurementRow,
+  onDuplicateVoiceDirect,
+  onCopyMeasurementRowFull,
   onNotesChange,
   onRemove,
   onRemoveMeasurementRow,
@@ -189,6 +191,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onPasteVoice?: () => void;
   onPasteMeasurements?: (lineId: string) => void;
   onCopyMeasurementRow?: (lineId: string, rowIndex: number) => void;
+  onCopyMeasurementRowFull?: (lineId: string, rowIndex: number) => void;
   onPasteMeasurementRowAt?: (lineId: string, insertIndex: number) => void;
   selectedMeasurementRow?: { lineId: string; rowIndex: number } | null;
   onSelectMeasurementRow?: (lineId: string, rowIndex: number) => void;
@@ -200,6 +203,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onPasteClipboardText: (lineId: string, text: string) => void;
   onAddMeasurementRow: (lineId: string) => void;
   onDuplicateMeasurementRow: (lineId: string, measurementId: string) => void;
+  onDuplicateVoiceDirect?: (lineId: string) => void;
   onNotesChange: (lineId: string, notes: string) => void;
   onRemove: (lineId: string) => void;
   onRemoveMeasurementRow: (lineId: string, measurementId: string) => void;
@@ -774,6 +778,10 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
               const rowIndex = contextMenu.rowIndex ?? 0;
               onCopyMeasurementRow?.(contextMenu.lineId, rowIndex);
             },
+            onCopyMeasurementRowFull: () => {
+              const rowIndex = contextMenu.rowIndex ?? 0;
+              onCopyMeasurementRowFull?.(contextMenu.lineId, rowIndex);
+            },
             onPasteMeasurementRowAbove: () => {
               const rowIndex = contextMenu.rowIndex ?? 0;
               onPasteMeasurementRowAt?.(contextMenu.lineId, rowIndex);
@@ -800,8 +808,12 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
               onRemoveMeasurementRow(contextMenu.lineId, buildMeasurementTarget(row.id, rowIndex));
             },
             onDuplicateVoice: () => {
-              onCopyLine(contextMenu.lineId);
-              onPasteVoice?.();
+              if (onDuplicateVoiceDirect) {
+                onDuplicateVoiceDirect(contextMenu.lineId);
+              } else {
+                onCopyLine(contextMenu.lineId);
+                onPasteVoice?.();
+              }
             },
             onRemoveVoice: () => onRemove(contextMenu.lineId),
             onOpenMgAllocation: () => setAllocPanelMgId(contextMenu.lineId),

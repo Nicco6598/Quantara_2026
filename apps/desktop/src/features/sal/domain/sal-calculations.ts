@@ -24,14 +24,32 @@ export function isMgCode(code: string): boolean {
   return code.split(".")[1]?.toUpperCase() === MG_SEGMENT;
 }
 
-/** Tariff MG flag or codice con segmento `.MG.` (es. `FA.MG.01` o varianti import). */
+/** True MG voices are percentage-based surcharges (night/holiday/interruption work),
+ *  not regular tariff items that happen to have .MG. in their code.
+ *
+ *  Heuristic (in order):
+ *    1. Category suffix `| PERCENTUALE` from the PDF parser → MG.
+ *    2. Category suffix `| EURO` → regular (economic MG that was flagged in error).
+ *    3. `laborPercentage > 0` → MG (labour‑cost‑proportional surcharge).
+ *    4. `unit === "%"` → MG (flat‑percentage surcharge, e.g. 10 % on target line).
+ *    5. Otherwise → regular.
+ *
+ *  Does NOT consult `source.isMaggiorazione` — the DB flag was set for ~100+
+ *  economic (euro‑priced) MG voices that should be treated as regular lines. */
 export function isMgVoice(voice: {
   code: string;
-  source?: { isMaggiorazione?: boolean };
+  category?: string;
+  unit?: string;
+  laborPercentage?: number | null;
 }): boolean {
-  if (voice.source?.isMaggiorazione === true) return true;
-  if (voice.code.toUpperCase().includes(".MG.")) return true;
-  return isMgCode(voice.code);
+  const hasMgSegment = voice.code.toUpperCase().includes(".MG.");
+  if (!hasMgSegment) return false;
+
+  const cat = voice.category ?? "";
+  if (/\|\s*PERCENTUALE\b/i.test(cat)) return true;
+  if (/\|\s*EURO\b/i.test(cat)) return false;
+
+  return (voice.laborPercentage ?? 0) > 0 || voice.unit === "%";
 }
 
 export function extractMgTariffPrefix(code: string): string | null {

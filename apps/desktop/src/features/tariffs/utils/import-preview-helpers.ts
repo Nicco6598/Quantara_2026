@@ -1,22 +1,37 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 import type { VoiceGroup } from "./tariff-grouping";
+import type { ImportPreviewGridLayout } from "./import-preview-grid-layout";
 import {
-  ensureImportPreviewSessionGroups,
   getImportPreviewSessionCache,
-  prewarmImportPreviewSession,
+  isImportPreviewFileReady,
+  prewarmImportPreviewFile,
 } from "./import-preview-session-cache";
-import { isMaggiorazioneVoice, splitRegularAndMaggiorazioni } from "./import-preview-voice-split";
+import {
+  formatMaggiorazioneDisplayCells,
+  isMaggiorazioneVoice,
+  getImportVoiceBreakdown,
+  splitRegularAndMaggiorazioni,
+  type ImportVoiceBreakdown,
+} from "./import-preview-voice-split";
+
+export type { ImportVoiceBreakdown };
+export { getImportVoiceBreakdown };
 import {
   enrichValidationRows,
   getBlockingIssueCount,
-  getImportValidation,
+  getImportValidationSummary,
   type ImportCrossFileErrorRow,
   type ImportValidationRow,
 } from "./tariffs-validation";
 
-export { isMaggiorazioneVoice, splitRegularAndMaggiorazioni };
+export { formatMaggiorazioneDisplayCells, isMaggiorazioneVoice, splitRegularAndMaggiorazioni };
+
+export {
+  prewarmImportPreviewSession,
+  prewarmImportPreviewVoices,
+} from "./import-preview-session-cache";
 
 export type { ImportCrossFileErrorRow, ImportValidationRow };
 
@@ -40,11 +55,15 @@ export function buildAllImportErrorRows(input: {
   return rows;
 }
 
-export type ImportFileStatus = "draft" | "empty" | "error" | "ready" | "reviewed";
+export type ImportFileStatus = "draft" | "empty" | "error" | "pending" | "ready" | "reviewed";
 
 export type ImportPreviewFileItem = {
   blockingCount: number;
   index: number;
+  isDrafted: boolean;
+  /** Ledger (gruppi/indice) già costruito per questo file. */
+  isGridReady: boolean;
+  isReviewed: boolean;
   metadata: TariffPdfMetadata;
   status: ImportFileStatus;
   voiceCount: number;
@@ -63,6 +82,52 @@ export function getImportFileStatus(input: {
   return "ready";
 }
 
+/**
+ * Conteggi rail da voci parse (O(n), nessun grouping).
+ * Stessi blocchi di getImportValidation; sul file attivo con ledger aperto usa la validazione live.
+ */
+export function buildImportPreviewFileItems(input: {
+  activeFileIndex: number;
+  draftedFiles: ReadonlySet<number>;
+  isFileReady: (fileIndex: number) => boolean;
+  mergedGridValidationByFile: readonly ImportValidation[];
+  metadatas: readonly TariffPdfMetadata[];
+  voiceBreakdownByFile: ReadonlyArray<ImportVoiceBreakdown>;
+  reviewedFiles: ReadonlySet<number>;
+}): ImportPreviewFileItem[] {
+  return input.metadatas.map((metadata, index) => {
+    const isDrafted = input.draftedFiles.has(index);
+    const isReviewed = input.reviewedFiles.has(index);
+    const isGridReady = input.isFileReady(index);
+    const breakdown = input.voiceBreakdownByFile[index] ?? getImportVoiceBreakdown([]);
+    const regular = breakdown.regular;
+    const voiceCount = breakdown.regularCount;
+
+    const useLiveValidation = index === input.activeFileIndex && isGridReady;
+    const gridValidation = useLiveValidation
+      ? (input.mergedGridValidationByFile[index] ?? getImportValidationSummary(regular))
+      : getImportValidationSummary(regular);
+    const blockingCount = getGridBlockingCount(gridValidation, metadata, voiceCount > 0);
+    const hasVoices = voiceCount > 0;
+
+    return {
+      blockingCount,
+      index,
+      isDrafted,
+      isGridReady,
+      isReviewed,
+      metadata,
+      status: getImportFileStatus({
+        blockingCount,
+        hasVoices,
+        isDrafted,
+        isReviewed,
+      }),
+      voiceCount,
+    };
+  });
+}
+
 const emptyGridValidation: ImportValidation = {
   duplicateCount: 0,
   duplicateExamples: [],
@@ -74,25 +139,38 @@ const emptyGridValidation: ImportValidation = {
   warningCount: 0,
 };
 
-/** Background prewarm: phase 1 = active file ready, phase 2 = all error rows materialized. */
-export function useImportPreviewSessionPrewarm(metadatas: readonly TariffPdfMetadata[]) {
+/** Background prewarm: phase initial = groups ready; validation = full row-level checks. */
+export function useImportPreviewSessionPrewarm(
+  metadatas: readonly TariffPdfMetadata[],
+  activeFileIndex = 0,
+) {
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     if (metadatas.length === 0) return;
     let cancelled = false;
 
-    void prewarmImportPreviewSession(metadatas, {
-      activeFileIndex: 0,
-      onPhaseReady: () => {
-        if (!cancelled) setRevision((value) => value + 1);
-      },
+    const bump = () => {
+      if (!cancelled) {
+        startTransition(() => {
+          setRevision((value) => value + 1);
+        });
+      }
+    };
+
+    if (isImportPreviewFileReady(activeFileIndex)) {
+      bump();
+      return;
+    }
+
+    void prewarmImportPreviewFile(metadatas, activeFileIndex, {
+      onPhaseReady: bump,
     });
 
     return () => {
       cancelled = true;
     };
-  }, [metadatas]);
+  }, [activeFileIndex, metadatas]);
 
   return revision;
 }
@@ -122,94 +200,53 @@ export function estimateImportBlockingIssues(input: {
   return { otherFiles, total };
 }
 
-/** Recompute derived data; uses session prewarm cache when available. Groups only for active file (+ cached). */
+/** Recompute derived data from session cache only — never blocks on grouping during render. */
 function usePerFileVoiceDerivation(
   editableVoicesList: DesktopTariffVoice[][],
   activeFileIndex: number,
   sessionRevision: number,
 ) {
-  const regularRef = useRef<DesktopTariffVoice[][]>([]);
-  const groupsRef = useRef<VoiceGroup[][]>([]);
-  const validationRef = useRef<ImportValidation[]>([]);
-  const invalidRowsRef = useRef<ImportValidationRow[][]>([]);
-  const sourceRef = useRef<DesktopTariffVoice[][]>([]);
-
   return useMemo(() => {
     void sessionRevision;
     const sessionCache = getImportPreviewSessionCache();
-    const prevSource = sourceRef.current;
     const regularByFile: DesktopTariffVoice[][] = [];
     const groupsByFile: VoiceGroup[][] = [];
     const gridValidationByFile: ImportValidation[] = [];
     const invalidRowsByFile: ImportValidationRow[][] = [];
+    const gridLayoutByFile: Array<ImportPreviewGridLayout | null> = [];
     let isActiveFileReady = false;
 
     for (let index = 0; index < editableVoicesList.length; index++) {
-      const voices = editableVoicesList[index] ?? [];
       const cached = sessionCache?.get(index);
-      const sourceUnchanged = prevSource[index] === voices && regularRef.current[index];
-
-      if (!cached) {
-        const { regular } = splitRegularAndMaggiorazioni(voices);
-        regularByFile[index] = regular;
-        groupsByFile[index] = groupsRef.current[index] ?? [];
-        gridValidationByFile[index] = emptyGridValidation;
-        invalidRowsByFile[index] = [];
-        continue;
-      }
-
-      if (cached && prevSource[index] === voices) {
-        regularByFile[index] = cached.regular;
-        gridValidationByFile[index] = cached.gridValidation;
-        invalidRowsByFile[index] = cached.invalidRows ?? [];
-        if (index === activeFileIndex) {
-          const activeGroups = ensureImportPreviewSessionGroups(index);
-          groupsByFile[index] = activeGroups;
-          isActiveFileReady = activeGroups.length > 0 || cached.regular.length === 0;
-        } else {
-          groupsByFile[index] = cached.groups ?? groupsRef.current[index] ?? [];
-        }
-        continue;
-      }
-
-      const cachedRegular = regularRef.current[index];
-      if (sourceUnchanged && cachedRegular) {
-        regularByFile[index] = cachedRegular;
-        groupsByFile[index] = groupsRef.current[index] ?? [];
-        gridValidationByFile[index] = validationRef.current[index] ?? emptyGridValidation;
-        invalidRowsByFile[index] = invalidRowsRef.current[index] ?? [];
-        if (index === activeFileIndex) {
-          const activeGroups = groupsByFile[index] ?? [];
-          const activeRegular = regularByFile[index] ?? [];
-          isActiveFileReady = activeGroups.length > 0 || activeRegular.length === 0;
-        }
-        continue;
-      }
-
-      const { regular } = splitRegularAndMaggiorazioni(voices);
+      const fallbackRegular = splitRegularAndMaggiorazioni(editableVoicesList[index] ?? []).regular;
+      const regular = cached?.regular?.length ? cached.regular : fallbackRegular;
       regularByFile[index] = regular;
-      const gridValidation = getImportValidation(regular);
+
+      const gridValidation = cached?.gridValidation ?? emptyGridValidation;
       gridValidationByFile[index] = gridValidation;
-      invalidRowsByFile[index] = buildInvalidRowsForGrid(gridValidation, regular);
+      invalidRowsByFile[index] =
+        gridValidation.invalidRows.length > 0 || gridValidation.duplicateRows.length > 0
+          ? buildInvalidRowsForGrid(gridValidation, regular)
+          : [];
+
+      const ready = isImportPreviewFileReady(index);
+      if (ready && cached?.groups) {
+        groupsByFile[index] = cached.groups;
+        gridLayoutByFile[index] = cached.gridLayout;
+      } else {
+        groupsByFile[index] = [];
+        gridLayoutByFile[index] = null;
+      }
 
       if (index === activeFileIndex) {
-        const sessionGroups = cached?.groups ?? ensureImportPreviewSessionGroups(index);
-        groupsByFile[index] = sessionGroups;
-        isActiveFileReady = sessionGroups.length > 0 || regular.length === 0;
-      } else {
-        groupsByFile[index] = groupsRef.current[index] ?? [];
+        isActiveFileReady = ready;
       }
     }
-
-    sourceRef.current = editableVoicesList;
-    regularRef.current = regularByFile;
-    groupsRef.current = groupsByFile;
-    validationRef.current = gridValidationByFile;
-    invalidRowsRef.current = invalidRowsByFile;
 
     return {
       regularByFile,
       groupsByFile,
+      gridLayoutByFile,
       gridValidationByFile,
       invalidRowsByFile,
       isActiveFileReady,
@@ -225,13 +262,16 @@ export function useImportPreviewDerivations(
   return usePerFileVoiceDerivation(editableVoicesList, activeFileIndex, sessionRevision);
 }
 
+export type { ImportPreviewGridLayout };
+
+/** Grid row index (regular-only) → index in the full editable voice list (incl. MG). */
 export function buildRegularIndexMap(activeVoices: readonly DesktopTariffVoice[]) {
   const map = new Map<number, number>();
-  let displayIndex = 0;
-  activeVoices.forEach((voice, index) => {
+  let regularIndex = 0;
+  activeVoices.forEach((voice, fullIndex) => {
     if (!isMaggiorazioneVoice(voice)) {
-      map.set(displayIndex, index);
-      displayIndex++;
+      map.set(regularIndex, fullIndex);
+      regularIndex++;
     }
   });
   return map;

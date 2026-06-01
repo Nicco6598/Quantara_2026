@@ -1,4 +1,5 @@
 ﻿import { parseEuroAmount } from "@quantara/domain-utils";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { m } from "framer-motion";
 import {
   AlertTriangle,
@@ -10,7 +11,6 @@ import {
   Link2,
   Loader,
   MapPinned,
-  Save,
   ShieldCheck,
   Trash2,
 } from "lucide-react";
@@ -34,27 +34,44 @@ import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 import type { VoiceGroup } from "../utils/tariff-grouping";
 import type { ImportDraft } from "../utils/tariff-import-drafts";
+import { resolveImportDraftVoicesList } from "../utils/tariff-import-draft-persistence";
 import {
   createDraftName,
   createDraftSignature,
   deleteTariffImportDraft,
-  loadImportDraft,
-  saveImportDraftRecord,
+  deleteTariffImportDraftAsync,
+  loadImportDraftAsync,
+  saveImportDraftRecordAsync,
 } from "../utils/tariff-import-drafts";
+import { splitRegularAndMaggiorazioni } from "../utils/import-preview-voice-split";
 import { getImportValidation, parseOptionalPercent } from "../utils/tariffs-validation";
 import {
   buildAllImportErrorRows,
+  buildImportPreviewFileItems,
+  buildInvalidRowsForGrid,
   buildRegularIndexMap,
+  formatMaggiorazioneDisplayCells,
   getGridBlockingCount,
-  getImportFileStatus,
-  isMaggiorazioneVoice,
   estimateImportBlockingIssues,
   useImportPreviewDerivations,
   useImportPreviewSessionPrewarm,
 } from "../utils/import-preview-helpers";
+import { getImportVoiceBreakdown } from "../utils/import-preview-voice-split";
 import {
+  ImportPreviewConfirmLabel,
+  ImportPreviewWorkflowControls,
+} from "./import-preview/ImportPreviewWorkflowControls";
+import type { ImportPreviewGridLayout } from "../utils/import-preview-grid-layout";
+import {
+  buildImportPreviewPrewarmKey,
+  clearImportPreviewSessionCache,
   ensureImportPreviewInvalidRows,
-  ensureImportPreviewSessionGroups,
+  getImportPreviewSessionCache,
+  invalidateImportPreviewFileStructure,
+  isImportPreviewFileReady,
+  patchImportPreviewSessionVoice,
+  prewarmImportPreviewFile,
+  prewarmImportPreviewVoices,
 } from "../utils/import-preview-session-cache";
 import { TariffImportConfirmLoadingModal } from "./TariffImportConfirmLoadingModal";
 import { ImportPreviewActionBar } from "./import-preview/ImportPreviewActionBar";
@@ -75,8 +92,10 @@ type ExtractionSummary = {
   linkedRows: number;
   lowConfidenceRows: number;
   maggiorazioneRules: number;
+  maggiorazioneVoiceCount: number;
   pagesLabel: string;
   parserIssues: number;
+  regularVoiceCount: number;
   sourceMappedRows: number;
   warningLibraryRows: number;
 };
@@ -112,17 +131,49 @@ function getArrayLength(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
 
+const LARGE_EXTRACTION_SCAN_THRESHOLD = 4_000;
+
 function buildExtractionSummary(
   metadata: TariffPdfMetadata | undefined,
-  voices: readonly DesktopTariffVoice[],
+  breakdown: ReturnType<typeof getImportVoiceBreakdown>,
 ): ExtractionSummary {
   const report = metadata?.validationReport as unknown;
   const counts = readNumberMap(report, "counts");
   const confidence = readNumberMap(report, "confidence");
-  const issueRows = voices.filter((voice) => (voice.issues?.length ?? 0) > 0).length;
-  const lowConfidenceRows = voices.filter((voice) => (voice.confidence ?? 1) < 0.85).length;
-  const sourceMappedRows = voices.filter((voice) => voice.source?.page != null).length;
-  const linkedRows = voices.filter((voice) => (voice.linkedMaggiorazioni?.length ?? 0) > 0).length;
+  const { regular, maggiorazioni, regularCount, maggiorazioneCount, totalCount } = breakdown;
+  const scanVoices = totalCount <= LARGE_EXTRACTION_SCAN_THRESHOLD;
+
+  const issueRows = scanVoices
+    ? regular.filter((voice) => (voice.issues?.length ?? 0) > 0).length
+    : (counts.records_with_review_flags ?? 0);
+
+  const lowConfidenceRows =
+    typeof counts.low_confidence_records === "number"
+      ? counts.low_confidence_records
+      : scanVoices
+        ? [...regular, ...maggiorazioni].filter((voice) => (voice.confidence ?? 1) < 0.85).length
+        : 0;
+
+  /** Codici indicizzati nel PDF (report parser), non righe con `source.page`. */
+  const sourceMappedRows =
+    typeof counts.source_index_codes === "number"
+      ? counts.source_index_codes
+      : scanVoices
+        ? new Set(
+            regular
+              .filter((voice) => voice.source?.page != null)
+              .map((voice) => voice.officialCode.trim())
+              .filter(Boolean),
+          ).size
+        : 0;
+
+  const linkedRows =
+    typeof counts.records_with_linked_maggiorazioni === "number"
+      ? counts.records_with_linked_maggiorazioni
+      : scanVoices
+        ? regular.filter((voice) => (voice.linkedMaggiorazioni?.length ?? 0) > 0).length
+        : 0;
+
   const parserIssues =
     Object.values(readNumberMap(report, "issuesByType")).reduce((sum, count) => sum + count, 0) +
     Object.values(readNumberMap(report, "warningIssuesByType")).reduce(
@@ -131,24 +182,28 @@ function buildExtractionSummary(
     );
   const pageCount = metadata?.pagesParsed ?? metadata?.pagesTotal ?? counts.pages_total ?? 0;
   const totalPages = metadata?.pagesTotal ?? pageCount;
+  const confidencePool = [...regular, ...maggiorazioni];
 
   return {
     averageConfidence:
       confidence.average_record_confidence ??
-      (voices.length > 0
+      (confidencePool.length > 0
         ? Math.round(
-            (voices.reduce((sum, voice) => sum + (voice.confidence ?? 1), 0) / voices.length) *
+            (confidencePool.reduce((sum, voice) => sum + (voice.confidence ?? 1), 0) /
+              confidencePool.length) *
               1000,
           ) / 1000
         : null),
     issueRows,
     linkedRows,
-    lowConfidenceRows: counts.low_confidence_records ?? lowConfidenceRows,
+    lowConfidenceRows,
     maggiorazioneRules:
       counts.maggiorazione_rules ?? getArrayLength(metadata?.maggiorazioneRules as unknown),
+    maggiorazioneVoiceCount: maggiorazioneCount,
     pagesLabel: pageCount > 0 ? `${pageCount}/${totalPages || pageCount}` : "-",
     parserIssues,
-    sourceMappedRows: counts.source_index_codes ?? sourceMappedRows,
+    regularVoiceCount: regularCount,
+    sourceMappedRows,
     warningLibraryRows: counts.warnings ?? getArrayLength(metadata?.warnings as unknown),
   };
 }
@@ -180,12 +235,12 @@ function ShortcutHint({ action, keys }: { action: string; keys: string[] }) {
 }
 
 function ImportShortcutLegend({ compact = false }: { compact?: boolean }) {
-  const modKey = isMacPlatform() ? "âŒ˜" : "Ctrl";
-  const deleteKey = isMacPlatform() ? "âŒ«" : "Del";
+  const modKey = isMacPlatform() ? "\u2318" : "Ctrl";
+  const deleteKey = isMacPlatform() ? "\u232B" : "Del";
   const groups = [
     {
       label: "Navigazione",
-      hints: [{ action: "File", keys: [modKey, "Shift", "â†/â†’"] }],
+      hints: [{ action: "File", keys: [modKey, "Shift", "\u2190/\u2192"] }],
     },
     {
       label: "Stato",
@@ -228,7 +283,13 @@ function ImportShortcutLegend({ compact = false }: { compact?: boolean }) {
 function ExtractionAuditStrip({ summary }: { summary: ExtractionSummary }) {
   const confidencePercent =
     summary.averageConfidence == null ? null : Math.round(summary.averageConfidence * 100);
-  const cells = [
+  const cells: Array<{
+    icon: typeof Gauge;
+    label: string;
+    title?: string;
+    tone: "danger" | "neutral" | "success" | "warning";
+    value: string;
+  }> = [
     {
       icon: Gauge,
       label: "Confidenza",
@@ -245,6 +306,7 @@ function ExtractionAuditStrip({ summary }: { summary: ExtractionSummary }) {
     {
       icon: MapPinned,
       label: "Source map",
+      title: "Codici indicizzati nel PDF (report parser)",
       tone: summary.sourceMappedRows > 0 ? "success" : "neutral",
       value: summary.sourceMappedRows.toLocaleString("it-IT"),
     },
@@ -256,9 +318,19 @@ function ExtractionAuditStrip({ summary }: { summary: ExtractionSummary }) {
     },
     {
       icon: Link2,
-      label: "Regole MG",
-      tone: summary.maggiorazioneRules > 0 ? "warning" : "neutral",
-      value: summary.maggiorazioneRules.toLocaleString("it-IT"),
+      label: "Maggiorazioni",
+      title:
+        summary.maggiorazioneRules > 0
+          ? `${summary.maggiorazioneVoiceCount.toLocaleString("it-IT")} voci MG · ${summary.maggiorazioneRules.toLocaleString("it-IT")} regole parser`
+          : "Voci maggiorazione estratte (stesso conteggio del pannello sotto)",
+      tone: summary.maggiorazioneVoiceCount > 0 ? "warning" : "neutral",
+      value: summary.maggiorazioneVoiceCount.toLocaleString("it-IT"),
+    },
+    {
+      icon: ShieldCheck,
+      label: "Collegamenti MG",
+      tone: summary.linkedRows > 0 ? "success" : "neutral",
+      value: summary.linkedRows.toLocaleString("it-IT"),
     },
     {
       icon: ShieldCheck,
@@ -266,14 +338,15 @@ function ExtractionAuditStrip({ summary }: { summary: ExtractionSummary }) {
       tone: summary.parserIssues > 0 || summary.lowConfidenceRows > 0 ? "warning" : "success",
       value: (summary.parserIssues + summary.lowConfidenceRows).toLocaleString("it-IT"),
     },
-  ] as const;
+  ];
 
   return (
-    <div className="grid gap-2 border-y border-[var(--border-subtle)]/70 py-2 sm:grid-cols-2 lg:grid-cols-5">
-      {cells.map(({ icon: Icon, label, tone, value }) => (
+    <div className="grid gap-2 border-y border-[var(--border-subtle)]/70 py-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {cells.map(({ icon: Icon, label, title, tone, value }) => (
         <div
           className="flex min-w-0 items-center gap-2 rounded-12px bg-[var(--surface-base)]/42 px-3 py-2 ring-1 ring-[var(--border-subtle)]/44"
           key={label}
+          title={title}
         >
           <span
             className={cn(
@@ -369,6 +442,8 @@ function VoicesPanel({
   handleAddVoice,
   isSwitching,
   onDraftActivity,
+  onDraftCommit,
+  prebuiltGridLayout,
   updateVoice,
   askDeleteVoice,
   updateCategorySections,
@@ -383,6 +458,8 @@ function VoicesPanel({
   handleAddVoice: () => void;
   isSwitching: boolean;
   onDraftActivity: () => void;
+  onDraftCommit: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  prebuiltGridLayout: ImportPreviewGridLayout | null;
   updateVoice: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   askDeleteVoice: (index: number) => void;
   updateCategorySections: (next: TariffGridSectionSummary[]) => void;
@@ -395,7 +472,7 @@ function VoicesPanel({
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {isSwitching ? (
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[var(--surface-base)]/60 backdrop-blur-[1px]">
-          <Loader className="size-6 animate-spin text-[var(--accent-primary)] [animation-duration:1.35s]" />
+          <Loader className="tariff-import-loader-spin size-6 text-[var(--accent-primary)]" />
           <p className="text-12px font-medium text-[var(--text-secondary)]">
             Preparazione griglia voci…
           </p>
@@ -409,7 +486,9 @@ function VoicesPanel({
           onChange={updateVoice}
           onDelete={askDeleteVoice}
           onDraftActivity={onDraftActivity}
+          onDraftCommit={onDraftCommit}
           onSectionsChange={updateCategorySections}
+          prebuiltLayout={prebuiltGridLayout}
           ref={gridRef}
           scrollLayout={scrollLayout}
           scrollTarget={gridScrollTarget}
@@ -429,13 +508,14 @@ function VoicesPanel({
 function ModalFooter({
   onCancel,
   saveDraft,
-  loadedDraft,
+  hasSavedDraftOnDisk,
   discardDraft,
   removeActiveFile,
   toggleActiveFileDraft,
+  toggleActiveFileReviewed,
+  markAllFilesReviewed,
   draftedFiles,
   localActiveIndex,
-  markActiveFileReviewed,
   modalReviewedFiles,
   metadatas,
   canConfirm,
@@ -444,78 +524,64 @@ function ModalFooter({
 }: {
   onCancel: () => void;
   saveDraft: () => void;
-  loadedDraft: ImportDraft | null;
+  hasSavedDraftOnDisk: boolean;
   discardDraft: () => void;
   removeActiveFile: () => void;
   toggleActiveFileDraft: () => void;
+  toggleActiveFileReviewed: () => void;
+  markAllFilesReviewed: () => void;
   draftedFiles: Set<number>;
   localActiveIndex: number;
-  markActiveFileReviewed: () => void;
   modalReviewedFiles: Set<number>;
   metadatas: TariffPdfMetadata[];
   canConfirm: boolean;
   isBusy: boolean;
   confirmChanges: () => void;
 }) {
+  const ConfirmIcon = isBusy ? Loader : CheckCircle2;
+
   return (
-    <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)]/70 px-5 py-4">
+    <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)]/70 px-5 py-3">
       <ImportShortcutLegend />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
+      <ImportPreviewWorkflowControls
+        draftedFiles={draftedFiles}
+        isBusy={isBusy}
+        hasSavedDraftOnDisk={hasSavedDraftOnDisk}
+        localActiveIndex={localActiveIndex}
+        markAllFilesReviewed={markAllFilesReviewed}
+        metadatasCount={metadatas.length}
+        modalReviewedFiles={modalReviewedFiles}
+        onRemoveFile={removeActiveFile}
+        onSaveSessionDraft={saveDraft}
+        toggleActiveFileDraft={toggleActiveFileDraft}
+        toggleActiveFileReviewed={toggleActiveFileReviewed}
+      />
+      {hasSavedDraftOnDisk ? (
+        <div className="flex justify-end">
+          <Button icon={Archive} onClick={discardDraft} size="sm" variant="outline">
+            Elimina bozza salvata
+          </Button>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button disabled={isBusy} onClick={onCancel} variant="outline">
             Annulla
           </Button>
-          <Button disabled={isBusy} icon={Save} onClick={saveDraft} variant="secondary">
-            Salva bozza
+          <Button
+            disabled={!canConfirm || isBusy}
+            icon={ConfirmIcon}
+            onClick={confirmChanges}
+            variant="primary"
+          >
+            <ImportPreviewConfirmLabel
+              canConfirm={canConfirm}
+              isBusy={isBusy}
+              metadatasCount={metadatas.length}
+              reviewedCount={modalReviewedFiles.size}
+            />
           </Button>
-          {loadedDraft ? (
-            <Button icon={Archive} onClick={discardDraft} variant="outline">
-              Elimina bozza
-            </Button>
-          ) : null}
-          {metadatas.length > 0 ? (
-            <Button icon={Trash2} onClick={removeActiveFile} variant="outline">
-              Cancella file
-            </Button>
-          ) : null}
-          {metadatas.length > 1 ? (
-            <Button icon={Save} onClick={toggleActiveFileDraft} variant="secondary">
-              {draftedFiles.has(localActiveIndex) ? "Salvato in bozza" : "Salva in bozza"}
-            </Button>
-          ) : null}
-          {metadatas.length > 1 && !modalReviewedFiles.has(localActiveIndex) ? (
-            <Button
-              disabled={draftedFiles.has(localActiveIndex)}
-              icon={CheckCircle2}
-              onClick={markActiveFileReviewed}
-              variant="secondary"
-            >
-              Segna come revisionato
-            </Button>
-          ) : null}
-          {metadatas.length > 1 && (modalReviewedFiles.size > 0 || draftedFiles.size > 0) ? (
-            <span className="text-12px font-medium text-[var(--text-secondary)]">
-              <span className="text-[var(--success-base)]">{modalReviewedFiles.size}</span>/
-              {metadatas.length} revisionati{" "}
-              <span className="text-[var(--warning-base)]">{draftedFiles.size}</span>/
-              {metadatas.length} in bozza
-            </span>
-          ) : null}
         </div>
-        <Button
-          disabled={!canConfirm || isBusy}
-          icon={isBusy ? Loader : CheckCircle2}
-          onClick={confirmChanges}
-          variant="primary"
-        >
-          {isBusy
-            ? "Salvataggio in corso…"
-            : metadatas.length > 1
-              ? modalReviewedFiles.size === metadatas.length
-                ? `Conferma tutti (${metadatas.length})`
-                : `Revisiona prima di confermare (${modalReviewedFiles.size}/${metadatas.length})`
-              : "Conferma importazione"}
-        </Button>
       </div>
     </div>
   );
@@ -581,6 +647,35 @@ function areSectionSummariesEqual(
   );
 }
 
+function createImportPreviewInitialState(
+  metadatas: TariffPdfMetadata[],
+  seedImportDraft?: ImportDraft | null,
+): ImportPreviewState {
+  if (seedImportDraft) {
+    return {
+      editableVoicesList: resolveImportDraftVoicesList(seedImportDraft),
+      excludedFiles: new Set(seedImportDraft.excludedFiles),
+      draftedFiles: new Set(seedImportDraft.draftedFiles),
+      modalReviewedFiles: new Set(
+        seedImportDraft.reviewedFiles.length > 0
+          ? seedImportDraft.reviewedFiles
+          : metadatas.length === 1
+            ? [0]
+            : [],
+      ),
+      modalActiveIndex: 0,
+    };
+  }
+
+  return {
+    editableVoicesList: metadatas.map((metadata) => metadata.voices ?? []),
+    excludedFiles: new Set<number>(),
+    draftedFiles: new Set<number>(),
+    modalReviewedFiles: new Set(metadatas.length === 1 ? [0] : []),
+    modalActiveIndex: 0,
+  };
+}
+
 function importPreviewReducer(
   state: ImportPreviewState,
   action: ImportPreviewAction,
@@ -588,9 +683,10 @@ function importPreviewReducer(
   switch (action.type) {
     case "LOAD_DRAFT":
       return {
-        editableVoicesList: action.loadedDraft?.metadatas
-          ? action.loadedDraft.metadatas.map((m) => m.voices)
-          : (action.loadedDraft?.editableVoicesList ?? action.metadatas.map((m) => m.voices)),
+        editableVoicesList:
+          action.loadedDraft?.editableVoicesList ??
+          action.loadedDraft?.metadatas.map((m) => m.voices) ??
+          action.metadatas.map((m) => m.voices),
         excludedFiles: new Set(action.loadedDraft?.excludedFiles ?? []),
         draftedFiles: new Set(action.loadedDraft?.draftedFiles ?? []),
         modalReviewedFiles: new Set(
@@ -623,7 +719,7 @@ function importPreviewReducer(
       return {
         ...state,
         editableVoicesList: state.editableVoicesList.map((voices, i) =>
-          i !== action.activeIndex ? voices : [...voices, action.voice],
+          i !== action.activeIndex ? voices : [action.voice, ...voices],
         ),
       };
     case "DELETE_VOICE":
@@ -720,16 +816,27 @@ function applyDraftChangesToVoicesList(
 ) {
   if (changes.length === 0) return editableVoicesList;
 
+  const changesByRow = new Map<number, ParsedDraftChange[]>();
+  for (const change of changes) {
+    const bucket = changesByRow.get(change.rowIndex);
+    if (bucket) bucket.push(change);
+    else changesByRow.set(change.rowIndex, [change]);
+  }
+
   return editableVoicesList.map((voices, index) => {
     if (index !== activeIndex) return voices;
-    return voices.map((voice, voiceIndex) => {
-      const voiceChanges = changes.filter((change) => change.rowIndex === voiceIndex);
-      if (voiceChanges.length === 0) return voice;
-      return voiceChanges.reduce(
-        (nextVoice, change) => Object.assign(nextVoice, { [change.field]: change.value }),
-        { ...voice },
-      );
+    let touched = false;
+    const nextVoices = voices.map((voice, voiceIndex) => {
+      const voiceChanges = changesByRow.get(voiceIndex);
+      if (!voiceChanges?.length) return voice;
+      touched = true;
+      let nextVoice = voice;
+      for (const change of voiceChanges) {
+        nextVoice = { ...nextVoice, [change.field]: change.value };
+      }
+      return nextVoice;
     });
+    return touched ? nextVoices : voices;
   });
 }
 
@@ -748,14 +855,26 @@ function applyDraftChangesToVoiceList(
   changes: ParsedDraftChange[],
 ): DesktopTariffVoice[] {
   if (changes.length === 0) return voices;
-  return voices.map((voice, voiceIndex) => {
-    const voiceChanges = changes.filter((change) => change.rowIndex === voiceIndex);
-    if (voiceChanges.length === 0) return voice;
-    return voiceChanges.reduce(
-      (nextVoice, change) => Object.assign(nextVoice, { [change.field]: change.value }),
-      { ...voice },
-    );
+
+  const changesByRow = new Map<number, ParsedDraftChange[]>();
+  for (const change of changes) {
+    const bucket = changesByRow.get(change.rowIndex);
+    if (bucket) bucket.push(change);
+    else changesByRow.set(change.rowIndex, [change]);
+  }
+
+  let touched = false;
+  const nextVoices = voices.map((voice, voiceIndex) => {
+    const voiceChanges = changesByRow.get(voiceIndex);
+    if (!voiceChanges?.length) return voice;
+    touched = true;
+    let nextVoice = voice;
+    for (const change of voiceChanges) {
+      nextVoice = { ...nextVoice, [change.field]: change.value };
+    }
+    return nextVoice;
   });
+  return touched ? nextVoices : voices;
 }
 
 export function TariffImportPreviewModal({
@@ -769,27 +888,25 @@ export function TariffImportPreviewModal({
   onDraftedFilesChange,
   onMetadatasChange,
   onPageCanConfirmChange,
-  onPreviewReady,
   onReviewedFilesChange,
   pageView = false,
+  seedImportDraft = null,
 }: {
   activeIndex?: number;
   existingBookIds?: (string | undefined)[];
   isBusy: boolean;
   metadatas: TariffPdfMetadata[];
+  seedImportDraft?: ImportDraft | null;
   onCancel: () => void;
   onConfirm: (metadatas: TariffImportPreviewResult[]) => void | Promise<void>;
   onActiveIndexChange?: (index: number) => void;
   onDraftedFilesChange?: (draftedFiles: Set<number>) => void;
   onMetadatasChange?: (metadatas: TariffPdfMetadata[]) => void;
   onPageCanConfirmChange?: (canConfirm: boolean) => void;
-  onPreviewReady?: () => void;
   onReviewedFilesChange?: (reviewedFiles: Set<number>) => void;
   pageView?: boolean;
 }) {
   const { notify } = useToast();
-  const onPreviewReadyRef = useRef(onPreviewReady);
-  onPreviewReadyRef.current = onPreviewReady;
   const onDraftedFilesChangeRef = useRef(onDraftedFilesChange);
   onDraftedFilesChangeRef.current = onDraftedFilesChange;
   const onReviewedFilesChangeRef = useRef(onReviewedFilesChange);
@@ -800,26 +917,34 @@ export function TariffImportPreviewModal({
   pageViewRef.current = pageView;
   const confirmChangesRef = useRef<() => void>(() => {});
   const isEditingExistingTariff = existingBookIds?.some(Boolean) ?? false;
-  const draftSignature = createDraftSignature(metadatas);
-  const draftStorageKey = `quantara:tariff-import-preview:${draftSignature}`;
-  const loadedDraft = useMemo(
+  const draftSignature = useMemo(
     () =>
-      isEditingExistingTariff
-        ? null
-        : loadImportDraft(draftStorageKey, draftSignature, metadatas.length),
-    [draftSignature, draftStorageKey, isEditingExistingTariff, metadatas.length],
+      createDraftSignature(
+        metadatas,
+        metadatas.map(
+          (metadata) => splitRegularAndMaggiorazioni(metadata.voices ?? []).regular.length,
+        ),
+      ),
+    [metadatas],
   );
-  const [importState, dispatch] = useReducer(importPreviewReducer, undefined, () => ({
-    editableVoicesList: loadedDraft?.metadatas
-      ? loadedDraft.metadatas.map((metadata) => metadata.voices)
-      : (loadedDraft?.editableVoicesList ?? metadatas.map((m) => m.voices)),
-    excludedFiles: new Set(loadedDraft?.excludedFiles ?? []),
-    draftedFiles: new Set(loadedDraft?.draftedFiles ?? []),
-    modalReviewedFiles: new Set(loadedDraft?.reviewedFiles ?? (metadatas.length === 1 ? [0] : [])),
-    modalActiveIndex: 0,
-  }));
+  const draftStorageKey = `quantara:tariff-import-preview:${draftSignature}`;
+  const [hasSavedDraftOnDisk, setHasSavedDraftOnDisk] = useState(Boolean(seedImportDraft));
+  const suppressDraftAutoLoadRef = useRef(Boolean(seedImportDraft));
+  const [importState, dispatch] = useReducer(importPreviewReducer, undefined, () =>
+    createImportPreviewInitialState(metadatas, seedImportDraft),
+  );
   const { editableVoicesList, excludedFiles, draftedFiles, modalReviewedFiles, modalActiveIndex } =
     importState;
+
+  const previewSessionKey = useMemo(
+    () =>
+      `${buildImportPreviewPrewarmKey(metadatas)}|${isEditingExistingTariff ? "edit" : "import"}|${
+        existingBookIds?.filter(Boolean).join(",") ?? ""
+      }`,
+    [existingBookIds, isEditingExistingTariff, metadatas],
+  );
+  const previewSessionKeyRef = useRef<string | null>(null);
+
   const [warningDetailVoice, setWarningDetailVoice] = useState<DesktopTariffVoice | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     code: string;
@@ -829,17 +954,23 @@ export function TariffImportPreviewModal({
   const [categorySections, setCategorySections] = useState<TariffGridSectionSummary[]>([]);
   const [gridScrollTarget, setGridScrollTarget] = useState<TariffGridScrollTarget | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
+  const [debouncedDraftRevision, setDebouncedDraftRevision] = useState(0);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedDraftRevision(draftRevision);
+    }, 350);
+    return () => window.clearTimeout(timeoutId);
+  }, [draftRevision]);
   const gridRef = useRef<EditableTariffVoicesGridHandle>(null);
   const sectionsByFileRef = useRef<Map<number, TariffGridSectionSummary[]>>(new Map());
-  const scrollToVoiceIdRef = useRef<string | null>(null);
   const pendingCellFocusRef = useRef<{
     field: keyof DesktopTariffVoice;
     fileIndex: number;
     rowIndex: number;
   } | null>(null);
-  const [voiceAddedNonce, setVoiceAddedNonce] = useState(0);
   const [isConfirming, setIsConfirming] = useState(false);
-  const confirmBusy = isBusy || isConfirming;
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const confirmBusy = isBusy || isConfirming || isSavingDraft;
   const localActiveIndex = pageView ? activeIndex : modalActiveIndex;
   const renderIndex = useDeferredValue(localActiveIndex);
   const isSwitchingFile = renderIndex !== localActiveIndex;
@@ -859,52 +990,143 @@ export function TariffImportPreviewModal({
     setCategorySections(sectionsByFileRef.current.get(localActiveIndex) ?? []);
   }, [localActiveIndex]);
   const activeMetadata = metadatas[localActiveIndex];
-  const sessionPrewarmRevision = useImportPreviewSessionPrewarm(metadatas);
-  const {
-    regularByFile,
-    groupsByFile,
-    gridValidationByFile,
-    invalidRowsByFile,
-    isActiveFileReady,
-  } = useImportPreviewDerivations(editableVoicesList, localActiveIndex, sessionPrewarmRevision);
-  const displayVoices = editableVoicesList[localActiveIndex] ?? [];
-  const displayRegularVoices = regularByFile[localActiveIndex] ?? [];
-  const gridVoices = editableVoicesList[renderIndex] ?? [];
-  const regularVoices = regularByFile[renderIndex] ?? [];
-  const maggiorazioniVoices = useMemo(() => {
-    const mag: DesktopTariffVoice[] = [];
-    for (const voice of displayVoices) {
-      if (isMaggiorazioneVoice(voice)) mag.push(voice);
+  const sessionPrewarmRevision = useImportPreviewSessionPrewarm(metadatas, localActiveIndex);
+  const [regroupRevision, setRegroupRevision] = useState(0);
+  const [sessionVoiceRevision, setSessionVoiceRevision] = useState(0);
+  const derivationRevision = sessionPrewarmRevision + regroupRevision + sessionVoiceRevision;
+
+  useEffect(() => {
+    if (isEditingExistingTariff) return;
+    if (suppressDraftAutoLoadRef.current) {
+      suppressDraftAutoLoadRef.current = false;
+      onDraftedFilesChangeRef.current?.(new Set(seedImportDraft?.draftedFiles ?? []));
+      onReviewedFilesChangeRef.current?.(
+        new Set(seedImportDraft?.reviewedFiles ?? (metadatas.length === 1 ? [0] : [])),
+      );
+      return;
     }
-    return mag;
-  }, [displayVoices]);
-  const activeValidation = gridValidationByFile[renderIndex] ?? emptyImportValidation;
+    let cancelled = false;
+    void loadImportDraftAsync(draftStorageKey, draftSignature, metadatas.length).then((draft) => {
+      if (cancelled) return;
+      if (draft) {
+        dispatch({ type: "LOAD_DRAFT", loadedDraft: draft, metadatas });
+        setHasSavedDraftOnDisk(true);
+      }
+      onDraftedFilesChangeRef.current?.(new Set(draft?.draftedFiles ?? []));
+      onReviewedFilesChangeRef.current?.(
+        new Set(draft?.reviewedFiles ?? (metadatas.length === 1 ? [0] : [])),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draftSignature, draftStorageKey, isEditingExistingTariff, metadatas, seedImportDraft]);
+
+  useEffect(() => {
+    const previousKey = previewSessionKeyRef.current;
+    if (previousKey === previewSessionKey) return;
+
+    const isSessionSwitch = previousKey !== null;
+    previewSessionKeyRef.current = previewSessionKey;
+
+    if (isSessionSwitch) {
+      clearImportPreviewSessionCache();
+      setHasSavedDraftOnDisk(false);
+      if (!isEditingExistingTariff) {
+        void loadImportDraftAsync(draftStorageKey, draftSignature, metadatas.length).then(
+          (nextDraft) => {
+            if (nextDraft) {
+              dispatch({ type: "LOAD_DRAFT", loadedDraft: nextDraft, metadatas });
+              setHasSavedDraftOnDisk(true);
+            } else {
+              dispatch({
+                type: "LOAD_DRAFT",
+                loadedDraft: null,
+                metadatas,
+              });
+            }
+          },
+        );
+      } else {
+        dispatch({ type: "LOAD_DRAFT", loadedDraft: null, metadatas });
+      }
+      setDraftRevision(0);
+      setDebouncedDraftRevision(0);
+      setRegroupRevision(0);
+      setCategorySections([]);
+      sectionsByFileRef.current.clear();
+      setGridScrollTarget(null);
+    }
+  }, [draftSignature, draftStorageKey, isEditingExistingTariff, metadatas, previewSessionKey]);
+
+  useEffect(() => {
+    const voices = editableVoicesList[localActiveIndex] ?? [];
+    if (voices.length === 0 || metadatas.length === 0) return;
+
+    const cached = getImportPreviewSessionCache()?.get(localActiveIndex);
+    if (cached?.groups && cached.groups.length > 0 && cached.regular.length > 0) {
+      const { regular } = splitRegularAndMaggiorazioni(voices);
+      if (cached.regular.length === regular.length) return;
+    }
+
+    let cancelled = false;
+    void prewarmImportPreviewVoices(metadatas, localActiveIndex, voices, {
+      onPhaseReady: () => {
+        if (!cancelled) {
+          startTransition(() => {
+            setRegroupRevision((revision) => revision + 1);
+          });
+        }
+      },
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editableVoicesList, localActiveIndex, metadatas]);
+
+  const { regularByFile, groupsByFile, gridValidationByFile, gridLayoutByFile, isActiveFileReady } =
+    useImportPreviewDerivations(editableVoicesList, localActiveIndex, derivationRevision);
+  const activeGridLayout = gridLayoutByFile[renderIndex] ?? null;
+  const voiceBreakdownByFile = useMemo(
+    () => editableVoicesList.map((voices) => getImportVoiceBreakdown(voices)),
+    [editableVoicesList],
+  );
+  const activeVoiceBreakdown =
+    voiceBreakdownByFile[localActiveIndex] ?? getImportVoiceBreakdown([]);
+  const renderVoiceBreakdown = voiceBreakdownByFile[renderIndex] ?? getImportVoiceBreakdown([]);
+  const displayVoices = editableVoicesList[localActiveIndex] ?? [];
+  const gridVoices = editableVoicesList[renderIndex] ?? [];
+  const cachedRegular = regularByFile[renderIndex];
+  const regularVoices =
+    cachedRegular && cachedRegular.length > 0 ? cachedRegular : renderVoiceBreakdown.regular;
+  const maggiorazioniVoices = activeVoiceBreakdown.maggiorazioni;
   const regularVoicesForValidation = useMemo(() => {
-    void draftRevision;
+    void debouncedDraftRevision;
     const parsedChanges = (gridRef.current?.peekDraftChanges() ?? []).map(parseDraftChange);
     return applyDraftChangesToVoiceList(regularVoices, parsedChanges);
-  }, [regularVoices, draftRevision]);
+  }, [debouncedDraftRevision, regularVoices]);
   const activeGridValidation = useMemo(() => {
-    if (draftRevision === 0) {
+    if (debouncedDraftRevision === 0) {
       return gridValidationByFile[renderIndex] ?? emptyImportValidation;
     }
     return getImportValidation(regularVoicesForValidation);
-  }, [draftRevision, gridValidationByFile, regularVoicesForValidation, renderIndex]);
+  }, [debouncedDraftRevision, gridValidationByFile, regularVoicesForValidation, renderIndex]);
   const activeGridBlockingCount = getGridBlockingCount(
     activeGridValidation,
     activeMetadata,
     regularVoices.length > 0,
   );
   const activeExtractionSummary = useMemo(
-    () => buildExtractionSummary(activeMetadata, displayVoices),
-    [activeMetadata, displayVoices],
+    () => buildExtractionSummary(activeMetadata, activeVoiceBreakdown),
+    [activeMetadata, activeVoiceBreakdown],
   );
-  const hasVoices = displayRegularVoices.length > 0;
+  const hasVoices = activeVoiceBreakdown.regularCount > 0;
   const canConfirm =
     metadatas.length > 0 &&
     metadatas.every((_, i) => {
       const voices = editableVoicesList[i];
-      const validation = gridValidationByFile[i];
+      const validation = i === renderIndex ? activeGridValidation : gridValidationByFile[i];
       const isDrafted = draftedFiles.has(i);
       return (
         voices &&
@@ -913,12 +1135,33 @@ export function TariffImportPreviewModal({
         (isDrafted || (validation.invalidCount === 0 && modalReviewedFiles.has(i)))
       );
     });
+  const mergedGridValidationByFile = useMemo(
+    () =>
+      gridValidationByFile.map((validation, index) =>
+        index === renderIndex ? activeGridValidation : validation,
+      ),
+    [activeGridValidation, gridValidationByFile, renderIndex],
+  );
+
+  const sidebarInvalidRowsByFile = useMemo(
+    () =>
+      mergedGridValidationByFile.map((validation, index) => {
+        const regular = regularByFile[index] ?? [];
+        if (validation.invalidRows.length === 0 && validation.duplicateRows.length === 0) {
+          return [];
+        }
+        return buildInvalidRowsForGrid(validation, regular);
+      }),
+    [mergedGridValidationByFile, regularByFile],
+  );
+
   const duplicateCodes = useMemo(
-    () => new Set<string>(activeValidation.duplicateExamples),
-    [activeValidation],
+    () => new Set<string>(activeGridValidation.duplicateExamples),
+    [activeGridValidation],
   );
   const editableGroups = groupsByFile[renderIndex] ?? [];
   const deferredEditableGroups = useDeferredValue(editableGroups);
+  const gridGroups = isSwitchingFile ? deferredEditableGroups : editableGroups;
   const regularIndexMap = useMemo(() => buildRegularIndexMap(gridVoices), [gridVoices]);
 
   const voicesWithWarnings = useMemo(
@@ -930,43 +1173,54 @@ export function TariffImportPreviewModal({
     () =>
       buildAllImportErrorRows({
         activeFileIndex: localActiveIndex,
-        invalidRowsByFile,
+        invalidRowsByFile: sidebarInvalidRowsByFile,
         metadatas,
       }),
-    [invalidRowsByFile, localActiveIndex, metadatas],
+    [localActiveIndex, metadatas, sidebarInvalidRowsByFile],
   );
-  const { otherFiles: otherFilesErrorCount, total: estimatedErrorTotal } = useMemo(
+  const { otherFiles: otherFilesErrorCount, total: errorRowCount } = useMemo(
     () =>
       estimateImportBlockingIssues({
         activeFileIndex: localActiveIndex,
-        gridValidationByFile,
+        gridValidationByFile: mergedGridValidationByFile,
         metadatas,
         regularByFile,
       }),
-    [gridValidationByFile, localActiveIndex, metadatas, regularByFile],
+    [localActiveIndex, mergedGridValidationByFile, metadatas, regularByFile],
   );
-  const errorRowCount = Math.max(allErrorRows.length, estimatedErrorTotal);
   const importFileItems = useMemo<ImportPreviewFileItem[]>(
     () =>
-      metadatas.map((metadata, index) => {
-        const gridValidation = gridValidationByFile[index] ?? emptyImportValidation;
-        const regular = regularByFile[index] ?? [];
-        const blockingCount = getGridBlockingCount(gridValidation, metadata, regular.length > 0);
-        return {
-          blockingCount,
-          index,
-          metadata,
-          status: getImportFileStatus({
-            blockingCount,
-            hasVoices: regular.length > 0,
-            isDrafted: draftedFiles.has(index),
-            isReviewed: modalReviewedFiles.has(index),
-          }),
-          voiceCount: regular.length,
-        };
+      buildImportPreviewFileItems({
+        activeFileIndex: localActiveIndex,
+        draftedFiles,
+        isFileReady: isImportPreviewFileReady,
+        mergedGridValidationByFile,
+        metadatas,
+        reviewedFiles: modalReviewedFiles,
+        voiceBreakdownByFile,
       }),
-    [draftedFiles, gridValidationByFile, metadatas, modalReviewedFiles, regularByFile],
+    [
+      draftedFiles,
+      localActiveIndex,
+      mergedGridValidationByFile,
+      metadatas,
+      modalReviewedFiles,
+      voiceBreakdownByFile,
+    ],
   );
+  const parseVoiceFieldValue = useCallback(
+    (field: keyof DesktopTariffVoice, value: string): string | number | null => {
+      if (field === "unitPrice") {
+        return value.trim() === "" ? Number.NaN : parseEuroAmount(value);
+      }
+      if (field === "laborPercentage") {
+        return value.trim() === "" ? null : parseOptionalPercent(value);
+      }
+      return value;
+    },
+    [],
+  );
+
   const updateVoice = useCallback(
     (displayIndex: number, field: keyof DesktopTariffVoice, value: string) => {
       const originalIndex = regularIndexMap.get(displayIndex) ?? displayIndex;
@@ -975,68 +1229,72 @@ export function TariffImportPreviewModal({
         activeIndex: localActiveIndex,
         voiceIndex: originalIndex,
         field,
-        value:
-          field === "unitPrice"
-            ? value.trim() === ""
-              ? Number.NaN
-              : parseEuroAmount(value)
-            : field === "laborPercentage"
-              ? value.trim() === ""
-                ? null
-                : parseOptionalPercent(value)
-              : value,
+        value: parseVoiceFieldValue(field, value),
       });
     },
-    [localActiveIndex, regularIndexMap],
+    [localActiveIndex, parseVoiceFieldValue, regularIndexMap],
+  );
+
+  const activeFileRegularIndexMap = useMemo(
+    () => buildRegularIndexMap(editableVoicesList[localActiveIndex] ?? []),
+    [editableVoicesList, localActiveIndex],
+  );
+
+  const commitGridDraftField = useCallback(
+    (regularIndex: number, field: keyof DesktopTariffVoice, value: string) => {
+      const parsedValue = parseVoiceFieldValue(field, value);
+      const fullIndex = activeFileRegularIndexMap.get(regularIndex) ?? regularIndex;
+      dispatch({
+        type: "UPDATE_VOICE",
+        activeIndex: localActiveIndex,
+        voiceIndex: fullIndex,
+        field,
+        value: parsedValue,
+      });
+      patchImportPreviewSessionVoice(localActiveIndex, regularIndex, field, parsedValue);
+      setDebouncedDraftRevision((revision) => revision + 1);
+      setSessionVoiceRevision((revision) => revision + 1);
+    },
+    [activeFileRegularIndexMap, localActiveIndex, parseVoiceFieldValue],
   );
 
   const flushGridDraftChanges = useCallback(() => {
     const parsedChanges = remapGridDraftChanges(
       (gridRef.current?.drainDraftChanges() ?? []).map(parseDraftChange),
-      regularIndexMap,
+      activeFileRegularIndexMap,
     );
-    if (parsedChanges.length > 0) {
-      dispatch({ type: "APPLY_DRAFTS", activeIndex: localActiveIndex, changes: parsedChanges });
+    if (parsedChanges.length === 0) {
+      return editableVoicesList;
     }
+    dispatch({ type: "APPLY_DRAFTS", activeIndex: localActiveIndex, changes: parsedChanges });
+    setDraftRevision(0);
+    setDebouncedDraftRevision(0);
     return applyDraftChangesToVoicesList(editableVoicesList, localActiveIndex, parsedChanges);
-  }, [editableVoicesList, localActiveIndex, regularIndexMap]);
+  }, [activeFileRegularIndexMap, editableVoicesList, localActiveIndex]);
 
   const handleAddVoice = useCallback(() => {
     const now = Date.now();
     const voiceId = `voice_custom_${now}`;
     const bookId = existingBookIds?.[localActiveIndex] ?? `tariff_custom_${now}`;
     const newVoice: DesktopTariffVoice = {
-      category: "",
+      category: "Voce personalizzata",
       description: "",
       id: voiceId,
       laborPercentage: null,
       officialCode: `CUSTOM-${now}`,
       tariffBookId: bookId,
       unitOfMeasure: "",
-      unitPrice: 0,
+      unitPrice: Number.NaN,
     };
-    scrollToVoiceIdRef.current = voiceId;
+    invalidateImportPreviewFileStructure(localActiveIndex);
     dispatch({ type: "ADD_VOICE", activeIndex: localActiveIndex, voice: newVoice });
-    setVoiceAddedNonce((n) => n + 1);
-  }, [localActiveIndex, existingBookIds]);
-
-  // Scroll to newly added voice row
-  // biome-ignore lint/correctness/useExhaustiveDependencies: voiceAddedNonce is a trigger that fires after ADD_VOICE dispatch sets scrollToVoiceIdRef
-  useEffect(() => {
-    const voiceId = scrollToVoiceIdRef.current;
-    if (!voiceId) return;
-    scrollToVoiceIdRef.current = null;
-
-    const frameId = requestAnimationFrame(() => {
-      const row = document.querySelector(`[data-voice-id="${voiceId}"]`);
-      if (row) {
-        row.scrollIntoView({ block: "center", behavior: "smooth" });
-        const firstInput = row.querySelector("input, textarea");
-        if (firstInput instanceof HTMLElement) firstInput.focus();
-      }
+    setGridScrollTarget({
+      field: "officialCode",
+      nonce: Date.now(),
+      rowIndex: 0,
+      type: "cell",
     });
-    return () => cancelAnimationFrame(frameId);
-  }, [voiceAddedNonce]);
+  }, [localActiveIndex, existingBookIds]);
 
   const buildConfirmableMetadatas = useCallback(
     (nextEditableVoicesList: DesktopTariffVoice[][]) => {
@@ -1057,6 +1315,9 @@ export function TariffImportPreviewModal({
     if (confirmBusy) return;
     setIsConfirming(true);
     try {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
       const nextEditableVoicesList = flushGridDraftChanges();
       deleteTariffImportDraft(draftStorageKey);
       await onConfirm(buildConfirmableMetadatas(nextEditableVoicesList));
@@ -1081,72 +1342,60 @@ export function TariffImportPreviewModal({
     void confirmChanges();
   };
 
-  const previewReadyNotifiedRef = useRef(false);
-  useEffect(() => {
-    if (!pageView || !isActiveFileReady) return;
-    if (previewReadyNotifiedRef.current) return;
-
-    const frameId = requestAnimationFrame(() => {
-      if (previewReadyNotifiedRef.current) return;
-      previewReadyNotifiedRef.current = true;
-      onPreviewReadyRef.current?.();
-    });
-    return () => cancelAnimationFrame(frameId);
-  }, [isActiveFileReady, pageView]);
-
-  useEffect(() => {
-    void draftSignature;
-    previewReadyNotifiedRef.current = false;
-  }, [draftSignature]);
-
-  const initialSyncRef = useRef(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional â€” runs once on mount, subsequent changes handled by individual action handlers
-  useEffect(() => {
-    if (initialSyncRef.current) return;
-    initialSyncRef.current = true;
-
-    const newDrafted = new Set(loadedDraft?.draftedFiles ?? []);
-    const newReviewed = new Set(loadedDraft?.reviewedFiles ?? (metadatas.length === 1 ? [0] : []));
-    onDraftedFilesChangeRef.current?.(newDrafted);
-    onReviewedFilesChangeRef.current?.(newReviewed);
-  }, []);
-
   const saveDraft = useCallback(() => {
-    const nextEditableVoicesList = flushGridDraftChanges();
-    const draftMetadatas = metadatas.map((meta, i) => ({
-      ...meta,
-      voices: nextEditableVoicesList[i] ?? [],
-    }));
-    const draft = {
-      draftedFiles: [...draftedFiles],
-      editableVoicesList: nextEditableVoicesList,
-      excludedFiles: [...excludedFiles],
-      id: draftStorageKey,
-      metadatas: draftMetadatas,
-      name: createDraftName(draftMetadatas),
-      reviewedFiles: [...modalReviewedFiles],
-      savedAt: new Date().toISOString(),
-      signature: draftSignature,
-    };
-    saveImportDraftRecord(draft);
-    notify({
-      message: "Bozza import salvata. La trovi nelle azioni rapide del catalogo tariffari.",
-      tone: "success",
-    });
+    if (isSavingDraft) return;
+    void (async () => {
+      setIsSavingDraft(true);
+      try {
+        await new Promise<void>((resolve) => {
+          window.requestAnimationFrame(() => resolve());
+        });
+        const nextEditableVoicesList = flushGridDraftChanges();
+        await saveImportDraftRecordAsync({
+          draftedFiles: [...draftedFiles],
+          editableVoicesList: nextEditableVoicesList,
+          excludedFiles: [...excludedFiles],
+          id: draftStorageKey,
+          metadatas,
+          name: createDraftName(metadatas),
+          reviewedFiles: [...modalReviewedFiles],
+          savedAt: new Date().toISOString(),
+          signature: draftSignature,
+        });
+        setHasSavedDraftOnDisk(true);
+        notify({
+          message: "Bozza salvata. Riprendila da Azioni rapide → Riprendi bozza import.",
+          tone: "success",
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        notify({
+          message,
+          title: "Salvataggio bozza non riuscito",
+          tone: "danger",
+        });
+      } finally {
+        setIsSavingDraft(false);
+      }
+    })();
   }, [
     draftedFiles,
     draftSignature,
     draftStorageKey,
     excludedFiles,
     flushGridDraftChanges,
+    isSavingDraft,
     metadatas,
     modalReviewedFiles,
     notify,
   ]);
 
   const discardDraft = useCallback(() => {
-    deleteTariffImportDraft(draftStorageKey);
-    notify({ message: "Bozza import eliminata.", tone: "success" });
+    void (async () => {
+      await deleteTariffImportDraftAsync(draftStorageKey);
+      setHasSavedDraftOnDisk(false);
+      notify({ message: "Bozza import eliminata.", tone: "success" });
+    })();
   }, [draftStorageKey, notify]);
 
   const switchFile = useCallback(
@@ -1154,22 +1403,22 @@ export function TariffImportPreviewModal({
       if (index === localActiveIndex) return;
       const fromIndex = localActiveIndex;
       const fromMap = buildRegularIndexMap(editableVoicesList[fromIndex] ?? []);
+      const parsedChanges = remapGridDraftChanges(
+        (gridRef.current?.drainDraftChanges() ?? []).map(parseDraftChange),
+        fromMap,
+      );
+      if (parsedChanges.length > 0) {
+        dispatch({ type: "APPLY_DRAFTS", activeIndex: fromIndex, changes: parsedChanges });
+      }
+      setDraftRevision(0);
       startTransition(() => {
-        const parsedChanges = remapGridDraftChanges(
-          (gridRef.current?.drainDraftChanges() ?? []).map(parseDraftChange),
-          fromMap,
-        );
-        if (parsedChanges.length > 0) {
-          dispatch({ type: "APPLY_DRAFTS", activeIndex: fromIndex, changes: parsedChanges });
-        }
-        ensureImportPreviewSessionGroups(index);
+        void prewarmImportPreviewFile(metadatas, index);
         ensureImportPreviewInvalidRows(index);
         onActiveIndexChange?.(index);
-        setDraftRevision(0);
         if (!pageView) dispatch({ type: "SWITCH_FILE", index });
       });
     },
-    [editableVoicesList, localActiveIndex, onActiveIndexChange, pageView],
+    [editableVoicesList, localActiveIndex, metadatas, onActiveIndexChange, pageView],
   );
 
   const removeActiveFile = useCallback(() => {
@@ -1232,17 +1481,13 @@ export function TariffImportPreviewModal({
     onDraftedFilesChangeRef.current?.(nextDraftedFiles);
     onReviewedFilesChangeRef.current?.(nextReviewed);
 
-    const draftMetadatas = metadatas.map((meta, i) => ({
-      ...meta,
-      voices: nextEditableVoicesList[i] ?? [],
-    }));
-    saveImportDraftRecord({
+    void saveImportDraftRecordAsync({
       draftedFiles: [...nextDraftedFiles],
       editableVoicesList: nextEditableVoicesList,
       excludedFiles: [...excludedFiles],
       id: draftStorageKey,
-      metadatas: draftMetadatas,
-      name: createDraftName(draftMetadatas),
+      metadatas,
+      name: createDraftName(metadatas),
       reviewedFiles: [...nextReviewed],
       savedAt: new Date().toISOString(),
       signature: draftSignature,
@@ -1316,6 +1561,7 @@ export function TariffImportPreviewModal({
 
   const confirmDeleteVoice = useCallback(() => {
     if (!deleteTarget) return;
+    invalidateImportPreviewFileStructure(localActiveIndex);
     dispatch({
       type: "DELETE_VOICE",
       activeIndex: localActiveIndex,
@@ -1331,6 +1577,14 @@ export function TariffImportPreviewModal({
   useEffect(() => {
     onPageCanConfirmChangeRef.current?.(canConfirm);
   }, [canConfirm]);
+
+  useEffect(() => {
+    onReviewedFilesChangeRef.current?.(modalReviewedFiles);
+  }, [modalReviewedFiles]);
+
+  useEffect(() => {
+    onDraftedFilesChangeRef.current?.(draftedFiles);
+  }, [draftedFiles]);
 
   useActionHandler(
     "tariff.draft.confirm",
@@ -1527,9 +1781,9 @@ export function TariffImportPreviewModal({
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className="shrink-0">
         <ImportWorkspaceHeader
-          maggiorazioniCount={maggiorazioniVoices.length}
+          maggiorazioniCount={activeVoiceBreakdown.maggiorazioneCount}
           metadata={activeMetadata}
-          regularCount={displayRegularVoices.length}
+          regularCount={activeVoiceBreakdown.regularCount}
           summary={activeExtractionSummary}
         />
         <div className="mt-2">
@@ -1544,25 +1798,56 @@ export function TariffImportPreviewModal({
           </div>
         ) : null}
       </div>
+      {!isActiveFileReady && activeVoiceBreakdown.regularCount > 0 ? (
+        <div
+          aria-live="polite"
+          className="mt-3 flex shrink-0 items-center gap-2.5 rounded-xl border border-[var(--accent-primary)]/20 bg-[var(--accent-primary)]/5 px-3.5 py-2.5"
+          role="status"
+        >
+          <Loader className="tariff-import-loader-spin size-4 shrink-0 text-[var(--accent-primary)]" />
+          <p className="text-12px font-medium text-[var(--text-secondary)]">
+            Organizzazione{" "}
+            <span className="font-bold tabular-nums text-[var(--text-primary)]">
+              {activeVoiceBreakdown.regularCount.toLocaleString("it-IT")}
+            </span>{" "}
+            voci
+            {activeVoiceBreakdown.maggiorazioneCount > 0 ? (
+              <>
+                {" "}
+                e{" "}
+                <span className="font-bold tabular-nums text-[var(--text-primary)]">
+                  {activeVoiceBreakdown.maggiorazioneCount.toLocaleString("it-IT")}
+                </span>{" "}
+                maggiorazioni
+              </>
+            ) : null}{" "}
+            per la griglia…
+          </p>
+        </div>
+      ) : null}
       <div
         className="mt-3 flex h-0 min-h-0 flex-1 flex-col overflow-hidden"
         data-tariff-preview-scroll
       >
-        <VoicesPanel
-          askDeleteVoice={askDeleteVoice}
-          duplicateCodes={duplicateCodes}
-          editableGroups={deferredEditableGroups}
-          gridRef={gridRef}
-          gridScrollTarget={gridScrollTarget}
-          gridValidation={activeGridValidation}
-          handleAddVoice={handleAddVoice}
-          hasVoices={hasVoices}
-          isSwitching={isSwitchingFile || !isActiveFileReady}
-          onDraftActivity={handleGridDraftActivity}
-          scrollLayout={scrollLayout}
-          updateCategorySections={updateCategorySections}
-          updateVoice={updateVoice}
-        />
+        {isActiveFileReady ? (
+          <VoicesPanel
+            askDeleteVoice={askDeleteVoice}
+            duplicateCodes={duplicateCodes}
+            editableGroups={gridGroups}
+            gridRef={gridRef}
+            gridScrollTarget={gridScrollTarget}
+            gridValidation={activeGridValidation}
+            handleAddVoice={handleAddVoice}
+            hasVoices={hasVoices}
+            isSwitching={isSwitchingFile}
+            onDraftActivity={handleGridDraftActivity}
+            onDraftCommit={commitGridDraftField}
+            prebuiltGridLayout={activeGridLayout}
+            scrollLayout={scrollLayout}
+            updateCategorySections={updateCategorySections}
+            updateVoice={updateVoice}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -1584,9 +1869,9 @@ export function TariffImportPreviewModal({
       canConfirm={canConfirm}
       draftedFiles={draftedFiles}
       isBusy={confirmBusy}
-      loadedDraft={loadedDraft}
+      isSavingDraft={isSavingDraft}
+      hasSavedDraftOnDisk={hasSavedDraftOnDisk}
       localActiveIndex={localActiveIndex}
-      markActiveFileReviewed={markActiveFileReviewed}
       markAllFilesReviewed={markAllFilesReviewed}
       metadatasCount={metadatas.length}
       modalReviewedFiles={modalReviewedFiles}
@@ -1595,6 +1880,7 @@ export function TariffImportPreviewModal({
       removeActiveFile={removeActiveFile}
       saveDraft={saveDraft}
       toggleActiveFileDraft={toggleActiveFileDraft}
+      toggleActiveFileReviewed={toggleActiveFileReviewed}
     />
   ) : (
     <ModalFooter
@@ -1602,16 +1888,17 @@ export function TariffImportPreviewModal({
       confirmChanges={() => void confirmChanges()}
       discardDraft={discardDraft}
       draftedFiles={draftedFiles}
+      hasSavedDraftOnDisk={hasSavedDraftOnDisk}
       isBusy={confirmBusy}
-      loadedDraft={loadedDraft}
       localActiveIndex={localActiveIndex}
-      markActiveFileReviewed={markActiveFileReviewed}
+      markAllFilesReviewed={markAllFilesReviewed}
       metadatas={metadatas}
       modalReviewedFiles={modalReviewedFiles}
       onCancel={onCancel}
       removeActiveFile={removeActiveFile}
       saveDraft={saveDraft}
       toggleActiveFileDraft={toggleActiveFileDraft}
+      toggleActiveFileReviewed={toggleActiveFileReviewed}
     />
   );
 
@@ -1821,6 +2108,13 @@ function MaggiorazioniPanel({
   onShowWarningDetail?: (voice: DesktopTariffVoice) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: maggiorazioni.length,
+    estimateSize: () => 46,
+    getScrollElement: () => scrollRef.current,
+    overscan: 8,
+  });
 
   return (
     <div className="mb-4">
@@ -1850,46 +2144,62 @@ function MaggiorazioniPanel({
         />
       </button>
       {isOpen ? (
-        <div className="mt-2 overflow-x-auto rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--surface-base)]/42">
-          <div className="grid min-w-[720px] grid-cols-[160px_1fr_100px_100px] gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/44 px-4 py-2.5 text-10px font-bold uppercase tracking-0_08em text-[var(--text-secondary)]">
+        <div
+          className="mt-2 max-h-[260px] overflow-auto rounded-14px border border-[var(--border-subtle)]/70 bg-[var(--surface-base)]/42"
+          ref={scrollRef}
+        >
+          <div className="grid min-w-[800px] grid-cols-[160px_1fr_88px_88px_100px] gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-muted)]/44 px-4 py-2.5 text-10px font-bold uppercase tracking-0_08em text-[var(--text-secondary)]">
             <span>Codice</span>
             <span>Voce / Descrizione</span>
+            <span className="text-right">% Magg.</span>
             <span className="text-right">% Manod.</span>
             <span className="text-right">Valore</span>
           </div>
-          {maggiorazioni.map((m) => (
-            <div
-              className="grid min-w-[720px] grid-cols-[160px_1fr_100px_100px] items-center gap-3 border-b border-[var(--border-subtle)]/50 px-4 py-2.5 last:border-b-0"
-              key={m.id}
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="text-12px font-bold text-[var(--text-primary)]">
-                  {m.officialCode}
-                </span>
-                {(m.warnings?.length ?? 0) > 0 ? (
-                  <button
-                    className="flex size-4 shrink-0 items-center justify-center rounded-full text-[var(--warning-base)] transition-colors hover:bg-[var(--warning-soft)]"
-                    onClick={() => onShowWarningDetail?.(m)}
-                    title="Vedi avvertenze"
-                    type="button"
-                  >
-                    <AlertTriangle className="size-3" />
-                  </button>
-                ) : null}
-              </div>
-              <span className="truncate text-12px font-semibold text-[var(--text-secondary)]">
-                {m.description || "â€”"}
-              </span>
-              <span className="text-right text-12px font-semibold text-[var(--text-secondary)]">
-                {m.laborPercentage != null ? `${m.laborPercentage}%` : "â€”"}
-              </span>
-              <span className="text-right text-12px font-bold text-[var(--text-primary)]">
-                {Number.isFinite(m.unitPrice)
-                  ? `${m.unitPrice.toLocaleString("it-IT", { minimumFractionDigits: 2 })} â‚¬`
-                  : "â€”"}
-              </span>
-            </div>
-          ))}
+          <div
+            className="relative min-w-[800px]"
+            style={{ height: `${virtualizer.getTotalSize()}px` }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const m = maggiorazioni[virtualRow.index];
+              if (!m) return null;
+              const cells = formatMaggiorazioneDisplayCells(m);
+              return (
+                <div
+                  className="absolute left-0 top-0 grid w-full grid-cols-[160px_1fr_88px_88px_100px] items-center gap-3 border-b border-[var(--border-subtle)]/50 px-4 py-2.5"
+                  key={m.id}
+                  style={{ transform: `translateY(${virtualRow.start}px)` }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-12px font-bold text-[var(--text-primary)]">
+                      {m.officialCode}
+                    </span>
+                    {(m.warnings?.length ?? 0) > 0 ? (
+                      <button
+                        className="flex size-4 shrink-0 items-center justify-center rounded-full text-[var(--warning-base)] transition-colors hover:bg-[var(--warning-soft)]"
+                        onClick={() => onShowWarningDetail?.(m)}
+                        title="Vedi avvertenze"
+                        type="button"
+                      >
+                        <AlertTriangle className="size-3" />
+                      </button>
+                    ) : null}
+                  </div>
+                  <span className="truncate text-12px font-semibold text-[var(--text-secondary)]">
+                    {m.description || "\u2014"}
+                  </span>
+                  <span className="text-right text-12px font-semibold text-[var(--text-secondary)]">
+                    {cells.maggiorazionePercent}
+                  </span>
+                  <span className="text-right text-12px font-semibold text-[var(--text-secondary)]">
+                    {cells.laborPercent}
+                  </span>
+                  <span className="text-right text-12px font-bold text-[var(--text-primary)]">
+                    {cells.economicValue}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : null}
     </div>

@@ -307,9 +307,9 @@ export function TariffImportPreviewPanel({
   onDraftedFilesChange,
   onMetadatasChange,
   onPageCanConfirmChange,
-  onPreviewReady,
   onReviewedFilesChange,
   reviewedFiles: _reviewedFiles,
+  seedImportDraft = null,
 }: {
   draftedImportFiles: Set<number>;
   getExistingBookIds: () => string[];
@@ -321,9 +321,9 @@ export function TariffImportPreviewPanel({
   onDraftedFilesChange: (next: Set<number>) => void;
   onMetadatasChange: (metadatas: TariffPdfMetadata[]) => void;
   onPageCanConfirmChange: (value: boolean) => void;
-  onPreviewReady?: () => void;
   onReviewedFilesChange: (next: Set<number>) => void;
   reviewedFiles: Set<number>;
+  seedImportDraft?: import("../utils/tariff-import-drafts").ImportDraft | null;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -339,9 +339,9 @@ export function TariffImportPreviewPanel({
           onDraftedFilesChange={onDraftedFilesChange}
           onMetadatasChange={onMetadatasChange}
           onPageCanConfirmChange={onPageCanConfirmChange}
-          {...(onPreviewReady ? { onPreviewReady } : {})}
           onReviewedFilesChange={onReviewedFilesChange}
           pageView
+          seedImportDraft={seedImportDraft}
         />
       </div>
     </div>

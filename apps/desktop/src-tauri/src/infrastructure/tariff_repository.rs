@@ -332,6 +332,76 @@ pub fn update_tariff_book(
         .ok_or_else(|| AppError::Database("updated tariff book could not be reloaded".into()))
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmTariffImportItem {
+    pub existing_book_id: Option<String>,
+    pub id: String,
+    pub name: String,
+    pub source_name: String,
+    pub status: String,
+    pub voices: Vec<TariffVoiceRecord>,
+    pub year: i32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmTariffImportBatchRequest {
+    pub items: Vec<ConfirmTariffImportItem>,
+    #[serde(default)]
+    pub duplicate_book_ids_to_delete: Vec<String>,
+}
+
+pub fn confirm_tariff_import_batch(
+    connection: &mut Connection,
+    request: ConfirmTariffImportBatchRequest,
+) -> Result<Vec<TariffBookRecord>, AppError> {
+    let mut saved_books = Vec::with_capacity(request.items.len());
+
+    for item in request.items {
+        if item.voices.is_empty() {
+            continue;
+        }
+
+        let book = if let Some(existing_book_id) = item.existing_book_id.as_deref() {
+            update_tariff_book(
+                connection,
+                existing_book_id,
+                UpdateTariffBookRequest {
+                    name: item.name,
+                    source_name: item.source_name,
+                    status: item.status,
+                    voices: item.voices,
+                    year: item.year,
+                },
+            )?
+        } else {
+            create_tariff_book(
+                connection,
+                CreateTariffBookRequest {
+                    id: item.id,
+                    name: item.name,
+                    source_name: item.source_name,
+                    status: item.status,
+                    voices: item.voices,
+                    year: item.year,
+                },
+            )?
+        };
+
+        saved_books.push(book);
+    }
+
+    for duplicate_id in request.duplicate_book_ids_to_delete {
+        if saved_books.iter().any(|book| book.id == duplicate_id) {
+            continue;
+        }
+        let _ = delete_tariff_book(connection, &duplicate_id);
+    }
+
+    Ok(saved_books)
+}
+
 pub fn delete_tariff_book(
     connection: &mut Connection,
     tariff_book_id: &str,
@@ -1298,9 +1368,23 @@ fn rfi_record_to_tariff_voice(
         record.unita_codice.trim()
     };
 
+    let mut description = clean_import_description(&record.descrizione);
+    if description.is_empty() {
+        let unit_code = record.unita_codice.trim();
+        let unit_label = record.unita_label.trim();
+        let fallback = if !unit_label.is_empty() {
+            unit_label
+        } else {
+            unit_code
+        };
+        if fallback.chars().any(|ch| ch.is_ascii_digit()) && fallback.len() >= 2 {
+            description = clean_import_description(fallback);
+        }
+    }
+
     Some(TariffVoiceRecord {
         category,
-        description: clean_import_description(&record.descrizione),
+        description,
         id: format!(
             "voice_{}_{}",
             tariff_book_id,

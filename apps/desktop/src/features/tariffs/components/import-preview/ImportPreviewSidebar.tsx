@@ -4,13 +4,14 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
+  CircleDashed,
   FileWarning,
   Info,
   List,
   Save,
   Search,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DesktopTariffVoice } from "@/lib/desktopData";
 import type {
   ImportCrossFileErrorRow,
@@ -22,9 +23,10 @@ type PanelSection = "errors" | "categories" | "notes";
 
 function StatusLegend() {
   const items = [
+    { icon: CheckCircle2, label: "Revisionato", className: "text-[var(--success-base)]" },
+    { icon: Save, label: "In bozza", className: "text-[var(--warning-base)]" },
     { icon: AlertTriangle, label: "Errori", className: "text-[var(--danger-base)]" },
-    { icon: Save, label: "Bozza", className: "text-[var(--warning-base)]" },
-    { icon: CheckCircle2, label: "Rev.", className: "text-[var(--success-base)]" },
+    { icon: CircleDashed, label: "Indice", className: "text-[var(--text-tertiary)]" },
     { icon: Circle, label: "Pronto", className: "text-[var(--accent-primary)]" },
   ] as const;
 
@@ -66,6 +68,12 @@ function statusMeta(status: ImportPreviewFileItem["status"]) {
         dot: "bg-[var(--text-tertiary)]",
         ring: "ring-[var(--border-subtle)]",
       };
+    case "pending":
+      return {
+        activeRing: "ring-[var(--text-tertiary)]/35",
+        dot: "bg-[var(--text-tertiary)]",
+        ring: "ring-dashed ring-[var(--border-subtle)]",
+      };
     default:
       return {
         activeRing: "ring-[var(--accent-primary)]/40",
@@ -85,9 +93,23 @@ function StatusIcon({ status }: { status: ImportPreviewFileItem["status"] }) {
       return <CheckCircle2 className="size-3.5 shrink-0 text-[var(--success-base)]" />;
     case "empty":
       return <FileWarning className="size-3.5 shrink-0 text-[var(--text-tertiary)]" />;
+    case "pending":
+      return <CircleDashed className="size-3.5 shrink-0 text-[var(--text-tertiary)]" />;
     default:
       return <Circle className="size-3.5 shrink-0 text-[var(--accent-primary)]" />;
   }
+}
+
+function formatFileRailStats(item: ImportPreviewFileItem): string {
+  if (item.voiceCount === 0) return "Nessuna voce estratta";
+  const voices = `${item.voiceCount.toLocaleString("it-IT")} voci`;
+  if (item.blockingCount > 0) {
+    return `${voices} · ${item.blockingCount.toLocaleString("it-IT")} errori`;
+  }
+  if (!item.isGridReady) {
+    return `${voices} · indice al click`;
+  }
+  return voices;
 }
 
 function FileRailRow({
@@ -100,9 +122,10 @@ function FileRailRow({
   onSelect: (index: number) => void;
 }) {
   const meta = statusMeta(item.status);
+  const statsLine = formatFileRailStats(item);
   return (
     <button
-      className={`flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] ${
+      className={`flex w-full items-start gap-2 rounded-xl px-2.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] ${
         active
           ? `bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-sm ring-2 ${meta.activeRing}`
           : `bg-[var(--surface-base)]/80 hover:bg-[var(--surface-base)] ring-1 ${meta.ring}`
@@ -110,21 +133,44 @@ function FileRailRow({
       onClick={() => onSelect(item.index)}
       type="button"
     >
-      <span className="mt-1 flex shrink-0 flex-col items-center gap-1">
+      <span className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
         <span className={`size-2 rounded-full ${active ? "bg-[var(--text-inverse)]" : meta.dot}`} />
         {!active ? <StatusIcon status={item.status} /> : null}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-12px font-bold leading-tight">
-          {item.metadata.name}
+        <span className="flex items-center gap-1.5">
+          <span className="block min-w-0 flex-1 truncate text-12px font-bold leading-tight">
+            {item.metadata.name}
+          </span>
+          {item.isReviewed ? (
+            <span
+              className={`shrink-0 rounded px-1 py-px text-8px font-bold uppercase tracking-wide ${
+                active
+                  ? "bg-[var(--text-inverse)]/20 text-[var(--text-inverse)]"
+                  : "bg-[var(--success-soft)] text-[var(--success-base)]"
+              }`}
+            >
+              Rev.
+            </span>
+          ) : null}
+          {item.isDrafted ? (
+            <span
+              className={`shrink-0 rounded px-1 py-px text-8px font-bold uppercase tracking-wide ${
+                active
+                  ? "bg-[var(--text-inverse)]/20 text-[var(--text-inverse)]"
+                  : "bg-[var(--warning-soft)] text-[var(--warning-base)]"
+              }`}
+            >
+              Bozza
+            </span>
+          ) : null}
         </span>
         <span
           className={`mt-0.5 block truncate text-10px font-semibold ${
             active ? "text-[var(--text-inverse)]/85" : "text-[var(--text-secondary)]"
           }`}
         >
-          {item.voiceCount.toLocaleString("it-IT")} voci
-          {item.blockingCount > 0 ? ` · ${item.blockingCount.toLocaleString("it-IT")} errori` : ""}
+          {statsLine}
         </span>
       </span>
       {item.blockingCount > 0 ? (
@@ -254,11 +300,17 @@ export function ImportPreviewSidebar({
 }) {
   const [query, setQuery] = useState("");
   const displayedErrorCount = errorRowCount ?? allErrorRows.length;
+  const errorsPendingDetail = displayedErrorCount > 0 && allErrorRows.length === 0;
   const [section, setSection] = useState<PanelSection>(() =>
     displayedErrorCount > 0 ? "errors" : "categories",
   );
   const filesScrollRef = useRef<HTMLDivElement>(null);
   const detailScrollRef = useRef<HTMLDivElement>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to top intentionally on section change
+  useEffect(() => {
+    detailScrollRef.current?.scrollTo({ top: 0 });
+  }, [section]);
 
   const filteredFiles = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -272,7 +324,7 @@ export function ImportPreviewSidebar({
 
   const fileVirtualizer = useVirtualizer({
     count: filteredFiles.length,
-    estimateSize: () => 56,
+    estimateSize: () => 68,
     getScrollElement: () => filesScrollRef.current,
     overscan: 6,
   });
@@ -284,12 +336,30 @@ export function ImportPreviewSidebar({
     overscan: 10,
   });
 
+  const sectionVirtualizer = useVirtualizer({
+    count: sections.length,
+    estimateSize: () => 54,
+    getScrollElement: () => detailScrollRef.current,
+    overscan: 10,
+  });
+
+  const notesVirtualizer = useVirtualizer({
+    count: voicesWithWarnings.length,
+    estimateSize: () => 52,
+    getScrollElement: () => detailScrollRef.current,
+    overscan: 10,
+  });
+
   const errorTotal = useMemo(
     () => files.reduce((sum, file) => sum + file.blockingCount, 0),
     [files],
   );
 
   const errorSections = useMemo(() => sections.filter((item) => item.errorCount > 0), [sections]);
+  const activeFileErrorRowCount = useMemo(
+    () => allErrorRows.reduce((sum, row) => sum + (row.isActiveFile ? 1 : 0), 0),
+    [allErrorRows],
+  );
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col border-r border-[var(--border-subtle)]/70 bg-[var(--bg-muted)]/20">
@@ -301,12 +371,12 @@ export function ImportPreviewSidebar({
           <>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-12px font-bold text-[var(--text-primary)]">
               <span>{files.length.toLocaleString("it-IT")} file</span>
-              <span className="text-10px font-semibold text-[var(--success-base)]">
-                {reviewedCount}/{files.length} rev.
+              <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-10px font-bold text-[var(--success-base)]">
+                {reviewedCount}/{files.length} revisionati
               </span>
               {errorTotal > 0 ? (
-                <span className="text-10px font-semibold text-[var(--danger-base)]">
-                  {errorTotal.toLocaleString("it-IT")} errori
+                <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-10px font-bold text-[var(--danger-base)]">
+                  {errorTotal.toLocaleString("it-IT")} problemi
                 </span>
               ) : null}
             </div>
@@ -376,8 +446,9 @@ export function ImportPreviewSidebar({
               ) : null}
               {activeFileBlockingCount > 0 ? (
                 <p className="text-10px text-[var(--text-secondary)]">
-                  {allErrorRows.filter((row) => row.isActiveFile).length.toLocaleString("it-IT")} su
-                  questo file
+                  {errorsPendingDetail
+                    ? "Apertura elenco errori…"
+                    : `${activeFileErrorRowCount.toLocaleString("it-IT")} su questo file`}
                 </p>
               ) : null}
             </div>
@@ -411,9 +482,22 @@ export function ImportPreviewSidebar({
         <div className="min-h-0 flex-1 overflow-auto p-2" ref={detailScrollRef}>
           {section === "errors" ? (
             allErrorRows.length === 0 ? (
-              <div className="rounded-xl bg-[var(--success-soft)] px-3 py-2.5 text-11px font-semibold text-[var(--success-base)]">
-                Nessun errore bloccante.
-              </div>
+              errorsPendingDetail ? (
+                <div className="rounded-xl border border-[var(--danger-base)]/20 bg-[var(--danger-soft)]/40 px-3 py-2.5 text-11px font-medium text-[var(--text-secondary)]">
+                  <p className="font-semibold text-[var(--danger-base)]">
+                    {displayedErrorCount.toLocaleString("it-IT")}{" "}
+                    {displayedErrorCount === 1 ? "errore rilevato" : "errori rilevati"}
+                  </p>
+                  <p className="mt-1">
+                    Caricamento posizioni nella griglia… Se la lista non compare, attendi qualche
+                    secondo o cambia scheda file.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-[var(--success-soft)] px-3 py-2.5 text-11px font-semibold text-[var(--success-base)]">
+                  Nessun errore bloccante.
+                </div>
+              )
             ) : (
               <div
                 className="relative w-full"
@@ -437,42 +521,56 @@ export function ImportPreviewSidebar({
           ) : null}
 
           {section === "categories" ? (
-            <div className="space-y-1">
+            <div>
               {sections.length === 0 ? (
                 <p className="px-1 py-3 text-center text-11px font-medium text-[var(--text-secondary)]">
                   Indice disponibile dopo il caricamento del ledger.
                 </p>
               ) : (
-                sections.map((item) => (
-                  <button
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-                    key={item.id}
-                    onClick={() => onFocusCategory(item.id)}
-                    type="button"
-                  >
-                    <span
-                      className={`flex size-6 shrink-0 items-center justify-center rounded-md text-10px font-bold ${
-                        item.errorCount > 0
-                          ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
-                          : "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
-                      }`}
-                    >
-                      {item.categoria || "–"}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-11px font-bold text-[var(--text-primary)]">
-                        Cat. {item.categoria || "Altre"}
-                      </span>
-                      <span className="block text-10px text-[var(--text-secondary)]">
-                        {item.rowsCount.toLocaleString("it-IT")} righe
-                        {item.errorCount > 0
-                          ? ` · ${item.errorCount.toLocaleString("it-IT")} err.`
-                          : ""}
-                      </span>
-                    </span>
-                    <List className="size-3 text-[var(--text-tertiary)]" />
-                  </button>
-                ))
+                <div
+                  className="relative w-full"
+                  style={{ height: `${sectionVirtualizer.getTotalSize()}px` }}
+                >
+                  {sectionVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const item = sections[virtualRow.index];
+                    if (!item) return null;
+                    return (
+                      <div
+                        className="absolute left-0 top-0 w-full pb-1"
+                        key={item.id}
+                        style={{ transform: `translateY(${virtualRow.start}px)` }}
+                      >
+                        <button
+                          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+                          onClick={() => onFocusCategory(item.id)}
+                          type="button"
+                        >
+                          <span
+                            className={`flex size-6 shrink-0 items-center justify-center rounded-md text-10px font-bold ${
+                              item.errorCount > 0
+                                ? "bg-[var(--danger-soft)] text-[var(--danger-base)]"
+                                : "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                            }`}
+                          >
+                            {item.categoria || "-"}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-11px font-bold text-[var(--text-primary)]">
+                              Cat. {item.categoria || "Altre"}
+                            </span>
+                            <span className="block text-10px text-[var(--text-secondary)]">
+                              {item.rowsCount.toLocaleString("it-IT")} righe
+                              {item.errorCount > 0
+                                ? ` · ${item.errorCount.toLocaleString("it-IT")} err.`
+                                : ""}
+                            </span>
+                          </span>
+                          <List className="size-3 text-[var(--text-tertiary)]" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
               {errorSections.length > 0 ? (
                 <p className="px-1 pt-1 text-9px font-semibold text-[var(--text-tertiary)]">
@@ -483,7 +581,7 @@ export function ImportPreviewSidebar({
           ) : null}
 
           {section === "notes" ? (
-            <div className="space-y-1">
+            <div>
               <p className="px-1 pb-1 text-10px text-[var(--text-tertiary)]">
                 Note parser — non bloccano l&apos;import.
               </p>
@@ -492,25 +590,39 @@ export function ImportPreviewSidebar({
                   Nessuna nota su questo file.
                 </p>
               ) : (
-                voicesWithWarnings.map((voice) => (
-                  <button
-                    className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-                    key={voice.id}
-                    onClick={() => onShowWarningDetail(voice)}
-                    type="button"
-                  >
-                    <Info className="mt-0.5 size-3 shrink-0 text-[var(--info-base)]" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-11px font-bold text-[var(--text-primary)]">
-                        {voice.officialCode}
-                      </span>
-                      <span className="block text-10px text-[var(--text-secondary)]">
-                        {(voice.warnings?.length ?? 0).toLocaleString("it-IT")} nota/e
-                      </span>
-                    </span>
-                    <ChevronRight className="size-3 shrink-0 text-[var(--text-tertiary)]" />
-                  </button>
-                ))
+                <div
+                  className="relative w-full"
+                  style={{ height: `${notesVirtualizer.getTotalSize()}px` }}
+                >
+                  {notesVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const voice = voicesWithWarnings[virtualRow.index];
+                    if (!voice) return null;
+                    return (
+                      <div
+                        className="absolute left-0 top-0 w-full pb-1"
+                        key={voice.id}
+                        style={{ transform: `translateY(${virtualRow.start}px)` }}
+                      >
+                        <button
+                          className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--bg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
+                          onClick={() => onShowWarningDetail(voice)}
+                          type="button"
+                        >
+                          <Info className="mt-0.5 size-3 shrink-0 text-[var(--info-base)]" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-11px font-bold text-[var(--text-primary)]">
+                              {voice.officialCode}
+                            </span>
+                            <span className="block text-10px text-[var(--text-secondary)]">
+                              {(voice.warnings?.length ?? 0).toLocaleString("it-IT")} nota/e
+                            </span>
+                          </span>
+                          <ChevronRight className="size-3 shrink-0 text-[var(--text-tertiary)]" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           ) : null}

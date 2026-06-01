@@ -145,7 +145,7 @@ export const MeasureStep = memo(function MeasureStep({
       const draft: SalLineDraft = {
         id: `__sal-clip__${line.id}`,
         measurementRows: line.measurementRows.map((r) => ({ ...r, id: createMeasurementId() })),
-        notes: "",
+        notes: line.notes,
         sourceType: line.sourceType,
         surchargePercent: line.surchargePercent,
         voice: line.voice,
@@ -193,6 +193,26 @@ export const MeasureStep = memo(function MeasureStep({
       if (!navigator.clipboard?.writeText) return;
       navigator.clipboard
         .writeText(serializeSalMeasurementsClipboard(rows, line.voice.code, { stationOnly: true }))
+        .catch(() => {});
+    },
+    [lineViews],
+  );
+
+  const handleCopyMeasurementRowFull = useCallback(
+    (lineId: string, rowIndex: number) => {
+      const line = lineViews.find((l) => l.id === lineId);
+      const row = line?.measurementRows[rowIndex];
+      if (!line || !row) return;
+      const rows = [{ ...row, id: createMeasurementId() }];
+      setCopiedMeasurements({ rows, stationOnly: false });
+      setCopiedLine(null);
+      setClipboardScope("measurement");
+      setSelectedMeasurementRow({ lineId, rowIndex });
+      setActiveLineId(lineId);
+      lastInteractedRef.current = lineId;
+      if (!navigator.clipboard?.writeText) return;
+      navigator.clipboard
+        .writeText(serializeSalMeasurementsClipboard(rows, line.voice.code))
         .catch(() => {});
     },
     [lineViews],
@@ -298,7 +318,7 @@ export const MeasureStep = memo(function MeasureStep({
       const draft: SalLineDraft = {
         id: `__sal-clip__${line.id}`,
         measurementRows: line.measurementRows.map((r) => ({ ...r, id: createMeasurementId() })),
-        notes: "",
+        notes: line.notes,
         sourceType: line.sourceType,
         surchargePercent: line.surchargePercent,
         voice: line.voice,
@@ -388,6 +408,36 @@ export const MeasureStep = memo(function MeasureStep({
       );
   }, [activeLineId, copiedLine, handlePasteClipboardText, notify, onPasteLine]);
 
+  const handleDuplicateVoiceDirect = useCallback(
+    (lineId: string) => {
+      const line = lineViews.find((l) => l.id === lineId);
+      if (!line) return;
+      const draft: SalLineDraft = {
+        id: `__sal-dup__${line.id}`,
+        measurementRows: line.measurementRows.map((r) => ({ ...r, id: createMeasurementId() })),
+        notes: line.notes,
+        sourceType: line.sourceType,
+        surchargePercent: line.surchargePercent,
+        voice: line.voice,
+      };
+      onPasteLine(draft);
+    },
+    [lineViews, onPasteLine],
+  );
+
+  const lineViewsRef = useRef(lineViews);
+  lineViewsRef.current = lineViews;
+  const handleCopyLineRef = useRef(handleCopyLine);
+  handleCopyLineRef.current = handleCopyLine;
+  const handleCopyMeasurementRowRef = useRef(handleCopyMeasurementRow);
+  handleCopyMeasurementRowRef.current = handleCopyMeasurementRow;
+  const handlePasteMeasurementsRef = useRef(handlePasteMeasurements);
+  handlePasteMeasurementsRef.current = handlePasteMeasurements;
+  const handlePasteVoiceRef = useRef(handlePasteVoice);
+  handlePasteVoiceRef.current = handlePasteVoice;
+  const copiedMeasurementsRef = useRef(copiedMeasurements);
+  copiedMeasurementsRef.current = copiedMeasurements;
+
   useEffect(() => {
     if (!isActive) return;
     const handler = (e: KeyboardEvent) => {
@@ -403,14 +453,14 @@ export const MeasureStep = memo(function MeasureStep({
         if (
           clipboardScope === "measurement" &&
           selectedMeasurementRow?.lineId === lineId &&
-          lineViews.find((line) => line.id === lineId)?.measurementRows[
+          lineViewsRef.current.find((line) => line.id === lineId)?.measurementRows[
             selectedMeasurementRow.rowIndex
           ]
         ) {
-          handleCopyMeasurementRow(lineId, selectedMeasurementRow.rowIndex);
+          handleCopyMeasurementRowRef.current(lineId, selectedMeasurementRow.rowIndex);
           return;
         }
-        handleCopyLine(lineId);
+        handleCopyLineRef.current(lineId);
         return;
       }
 
@@ -418,27 +468,16 @@ export const MeasureStep = memo(function MeasureStep({
         e.preventDefault();
         const lineId = activeLineId ?? lastInteractedRef.current;
         if (!lineId) return;
-        if (copiedMeasurements && copiedMeasurements.rows.length > 0) {
-          handlePasteMeasurements(lineId);
+        if (copiedMeasurementsRef.current && copiedMeasurementsRef.current.rows.length > 0) {
+          handlePasteMeasurementsRef.current(lineId);
           return;
         }
-        handlePasteVoice();
+        handlePasteVoiceRef.current();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [
-    activeLineId,
-    copiedMeasurements,
-    handleCopyLine,
-    handleCopyMeasurementRow,
-    handlePasteMeasurements,
-    handlePasteVoice,
-    isActive,
-    lineViews,
-    clipboardScope,
-    selectedMeasurementRow,
-  ]);
+  }, [isActive, activeLineId, clipboardScope, selectedMeasurementRow]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -468,6 +507,7 @@ export const MeasureStep = memo(function MeasureStep({
           onCopyLine={handleCopyLine}
           onCopyMeasurements={handleCopyMeasurements}
           onCopyMeasurementRow={handleCopyMeasurementRow}
+          onCopyMeasurementRowFull={handleCopyMeasurementRowFull}
           onPasteMeasurementRowAt={handlePasteMeasurementRowAt}
           selectedMeasurementRow={selectedMeasurementRow}
           onSelectMeasurementRow={handleSelectMeasurementRow}
@@ -481,6 +521,7 @@ export const MeasureStep = memo(function MeasureStep({
           scrollToLineId={scrollToLineId ?? null}
           onAddMeasurementRow={onAddMeasurementRow}
           onDuplicateMeasurementRow={onDuplicateMeasurementRow}
+          onDuplicateVoiceDirect={handleDuplicateVoiceDirect}
           onNotesChange={onNotesChange}
           onRemove={onRemove}
           onRemoveMeasurementRow={onRemoveMeasurementRow}

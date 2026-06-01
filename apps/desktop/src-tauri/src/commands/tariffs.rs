@@ -4,8 +4,9 @@ use tauri::{AppHandle, State};
 use crate::infrastructure::{
     local_storage::{DbConnection, with_db, with_db_mut},
     tariff_repository::{
-        CreateTariffBookRequest, TariffBookRecord, TariffPdfImportPreview, TariffVoiceCountRecord,
-        TariffVoiceRecord, TariffVoiceSearchResult, UpdateTariffBookRequest,
+        ConfirmTariffImportBatchRequest, CreateTariffBookRequest, TariffBookRecord,
+        TariffPdfImportPreview, TariffVoiceCountRecord, TariffVoiceRecord, TariffVoiceSearchResult,
+        UpdateTariffBookRequest,
     },
 };
 
@@ -43,6 +44,76 @@ pub fn update_tariff_book(
         audit_repository::append_event(conn, "tariff_book", &tariff_book_id, "update", None, None)?;
         Ok(book)
     })
+}
+
+#[tauri::command]
+pub fn confirm_tariff_import_batch(
+    state: State<'_, DbConnection>,
+    request: ConfirmTariffImportBatchRequest,
+) -> Result<Vec<TariffBookRecord>, String> {
+    with_db_mut(&state, |conn| {
+        let books =
+            crate::infrastructure::tariff_repository::confirm_tariff_import_batch(conn, request)?;
+        for book in &books {
+            audit_repository::append_event(conn, "tariff_book", &book.id, "update", None, None)?;
+        }
+        Ok(books)
+    })
+}
+
+#[tauri::command]
+pub async fn save_tariff_import_draft(
+    app: tauri::AppHandle,
+    draft_id: String,
+    payload: String,
+    summary: crate::infrastructure::import_draft_storage::ImportDraftSummaryDto,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::infrastructure::import_draft_storage::save_import_draft_file(
+            &app, &draft_id, &payload, summary,
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn load_tariff_import_draft(
+    app: tauri::AppHandle,
+    draft_id: String,
+) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::infrastructure::import_draft_storage::load_import_draft_file(&app, &draft_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_tariff_import_draft_file(
+    app: tauri::AppHandle,
+    draft_id: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::infrastructure::import_draft_storage::delete_import_draft_file(&app, &draft_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn list_tariff_import_draft_summaries(
+    app: tauri::AppHandle,
+) -> Result<Vec<crate::infrastructure::import_draft_storage::ImportDraftSummaryDto>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::infrastructure::import_draft_storage::list_import_draft_summaries(&app)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

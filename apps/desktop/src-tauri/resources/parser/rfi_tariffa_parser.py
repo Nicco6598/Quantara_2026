@@ -80,7 +80,11 @@ CODE_CANDIDATES = [
     re.compile(r"^([A-Z]{2,}\.[A-Z]{2,}\.[A-Z]\.\d+[\s\d]*\.[A-Z]+)(?:\s|$)"),
 ]
 
+# Legacy: PDF books may label a whole section "CATEGORIA MG" but most voices there are normal
+# fixed-price items (e.g. BA.MG.B.3102.C). Do NOT use this set for routing or bucketing.
 MAGGIORAZIONI_CATEGORIES = frozenset({"MG"})
+# True labor surcharges: % on manodopera for night / holiday / service interruption only.
+MG_LABOR_CONDITIONS = frozenset({"notturno", "festivo", "interruzione_esercizio"})
 _CITATION_PUNCT = frozenset({".", ",", ";", ".,", ". "})
 
 # ---------------------------------------------------------------------------
@@ -302,6 +306,21 @@ def _join1(lines: list) -> str:
     if n == 1: return clean(lines[0])
     return clean(" ".join(lines))
 
+# Quantità/testo finito in U.M. (es. "2000 lt") quando manca la descrizione voce
+_MEASURE_DESC_RE = re.compile(
+    r"^[\d][\d.,\s]*[a-zA-ZÀ-ÿ]+(?:\.|\s*)?$",
+    re.IGNORECASE,
+)
+
+def _description_from_unit_fallback(unita_codice: str, unita_label: str) -> str:
+    for candidate in (unita_label, unita_codice):
+        text = (candidate or "").strip()
+        if not text:
+            continue
+        if _MEASURE_DESC_RE.match(text):
+            return clean(text)
+    return ""
+
 def _needs_sanitize(records: list) -> bool:
     for r in records:
         for v in r.values():
@@ -310,7 +329,58 @@ def _needs_sanitize(records: list) -> bool:
     return False
 
 def _is_mag_cat(categoria: str) -> bool:
+    """Legacy helper: MG as PDF category label only. Not used for voice classification."""
     return categoria.upper() in MAGGIORAZIONI_CATEGORIES
+
+
+def _is_semantic_maggiorazione(record: dict) -> bool:
+    """
+    True maggiorazione = labor surcharge applied as PERCENTUALE on manodopera, with
+    night / holiday / service-interruption conditions from linked warnings.
+
+    Codes containing '.MG.' or categoria 'MG' are NOT sufficient (many are normal EURO voices).
+    """
+    if record.get("tipo_valore") != "PERCENTUALE":
+        return False
+    rules = record.get("applicability_rules") or {}
+    if not isinstance(rules, dict):
+        return False
+    conditions = rules.get("conditions") or []
+    return any(c in MG_LABOR_CONDITIONS for c in conditions)
+
+
+def _repartition_maggiorazioni(records: list, maggiorazioni: list) -> tuple[list, list]:
+    """
+    After apply_warnings, split into regular records vs maggiorazioni using semantic rules.
+    All voices are parsed into `records` first; this avoids false MG buckets from code segment.
+    """
+    combined = records + maggiorazioni
+    next_records: list = []
+    next_mags: list = []
+    seen: set = set()
+    for rec in combined:
+        code = (rec.get("codice") or "").strip().lower()
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        if _is_semantic_maggiorazione(rec):
+            next_mags.append(rec)
+        else:
+            next_records.append(rec)
+    return next_records, next_mags
+
+
+def _explicit_subvoice_letter_from_warning(w: dict) -> Optional[str]:
+    """Subvoice letter explicitly cited in warning (e.g. 'sottovoce D' or ref ...01.D)."""
+    text = f"{w.get('title', '')} {w.get('body', '')}"
+    sm = _SUBVOICE_WORD_RE.search(text)
+    if sm:
+        return sm.group(1).upper()
+    ref = (w.get("ref_code") or "").strip()
+    parts = ref.split(".")
+    if len(parts) >= 5 and parts[4]:
+        return parts[4].upper()
+    return None
 
 # ---------------------------------------------------------------------------
 # Estrazione testo PDF
@@ -631,6 +701,8 @@ class RfiParser:
         desc = _join1(self.sv_desc_lines)
         if desc.strip() in (".", ",", "-", ";", ""):
             desc = ""
+        if not desc.strip():
+            desc = _description_from_unit_fallback(self.cur_unita_codice, self.cur_unita_label)
 
         cat_from_code = parts[1] if len(parts) > 1 else ctx.categoria
         grp_from_code = parts[2] if len(parts) > 2 else ctx.gruppo
@@ -654,10 +726,9 @@ class RfiParser:
             "warnings": warnings,  # solo inline; arricchite nel post-process
         }
 
-        if _is_mag_cat(cat_from_code):
-            self.maggiorazioni.append(record)
-        else:
-            self.records.append(record)
+        # All voices go to records first; semantic MG split runs after apply_warnings
+        # (see _repartition_maggiorazioni). Do NOT bucket by cat_from_code == "MG".
+        self.records.append(record)
 
         self._reset_sottovoce()
 
@@ -677,7 +748,8 @@ class RfiParser:
         ctx = self.ctx
         ctx.categoria = cat
         ctx.categoria_desc = clean(desc)
-        ctx.is_maggiorazione = _is_mag_cat(cat)
+        # PDF section "CATEGORIA MG" may contain normal EURO voices; not a semantic MG flag.
+        ctx.is_maggiorazione = False
 
     def _set_gruppo(self, grp: str, desc: str):
         ctx = self.ctx
@@ -719,7 +791,8 @@ class RfiParser:
                 normalized_extracted = re.sub(r"\s+", " ", extracted).strip()
                 if "." in normalized_extracted:
                     self.ctx.tariffa = normalized_extracted.split(".", 1)[0]
-                if (bool(self.cur_code) and rest in _CITATION_PUNCT
+                _rest_is_prose = bool(rest) and rest.split()[0].islower() if rest else False
+                if (bool(self.cur_code) and (rest in _CITATION_PUNCT or _rest_is_prose)
                         and "MISURA" not in s and "IMPORTO" not in s and "PERCENTUALE" not in s):
                     self._dispatch_text(s); return
                 self._flush_warning()
@@ -929,6 +1002,9 @@ def _warnings_for_record(record: dict, idx: dict) -> list:
     """
     code = record["codice"]
     parts = code.split(".")
+    record_sottovoce = (record.get("sottovoce") or "").strip().upper()
+    if not record_sottovoce and len(parts) >= 5:
+        record_sottovoce = parts[4].upper()
     # costruisce i livelli dal più specifico
     lookups = []
     if len(parts) == 5:
@@ -953,10 +1029,21 @@ def _warnings_for_record(record: dict, idx: dict) -> list:
     seen_ids = set()
     result = []
     for lk in lookups_extended:
+        lk_specificity = len(lk.split("."))
         for w in idx.get(lk.upper(), []):
-            if w["id"] not in seen_ids:
-                seen_ids.add(w["id"])
-                result.append(w)
+            if w["id"] in seen_ids:
+                continue
+            # Voce-level (or broader) warnings must not bleed to sibling subvoices (D vs E).
+            explicit_sv = _explicit_subvoice_letter_from_warning(w)
+            if (
+                explicit_sv
+                and record_sottovoce
+                and explicit_sv != record_sottovoce
+                and lk_specificity < 5
+            ):
+                continue
+            seen_ids.add(w["id"])
+            result.append(w)
 
     # Aggiungi anche le avvertenze inline già associate (es. generic scope)
     for w in record.get("warnings", []):
@@ -1234,7 +1321,7 @@ def _record_confidence_and_issues(rec: dict, source_index: dict, mag_codes: set)
         issues.append("missing_value"); conf -= 0.50
     if not rec.get("unita_codice"):
         issues.append("missing_unit"); conf -= 0.15
-    if rec.get("tipo_valore") == "EURO" and rec.get("perc_manodopera") is None and not _is_mag_cat(rec.get("categoria", "")):
+    if rec.get("tipo_valore") == "EURO" and rec.get("perc_manodopera") is None and not _is_semantic_maggiorazione(rec):
         issues.append("missing_manodopera_percent"); conf -= 0.04
     if rec.get("tipo_valore") == "PERCENTUALE" and rec.get("valore", 0) < 0:
         issues.append("negative_percentage_or_deduction")
@@ -1379,6 +1466,9 @@ def parse_pdf(input_path: str, debug: bool = False, embed_record_warnings: bool 
 
     # Pass 2: applica avvertenze gerarchiche compatte
     apply_warnings(records, maggiorazioni, parser.all_warnings, embed_record_warnings=embed_record_warnings)
+
+    # Pass 2b: semantic MG bucket (PERCENTUALE + notturno/festivo/interruzione), not code segment MG
+    records, maggiorazioni = _repartition_maggiorazioni(records, maggiorazioni)
 
     # Pass 3: audit layer: normalizza warning, aggiunge source/confidence/issues e rule resolver.
     warnings = _normalize_warnings_audit(parser.all_warnings)

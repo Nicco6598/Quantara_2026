@@ -275,6 +275,35 @@ export async function updateDesktopTariffBook(
   return invoke<DesktopTariffBook>("update_tariff_book", { tariffBookId, request });
 }
 
+export type ConfirmTariffImportBatchRequest = {
+  duplicateBookIdsToDelete: string[];
+  items: Array<{
+    existingBookId?: string;
+    id: string;
+    name: string;
+    sourceName: string;
+    status: string;
+    voices: DesktopTariffVoice[];
+    year: number;
+  }>;
+};
+
+export async function confirmDesktopTariffImportBatch(
+  request: ConfirmTariffImportBatchRequest,
+): Promise<DesktopTariffBook[]> {
+  if (!isTauriRuntime()) {
+    return request.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      sourceName: item.sourceName,
+      status: item.status,
+      year: item.year,
+    }));
+  }
+
+  return invoke<DesktopTariffBook[]>("confirm_tariff_import_batch", { request });
+}
+
 export async function deleteDesktopTariffBook(tariffBookId: string): Promise<void> {
   if (!isTauriRuntime()) {
     tariffVoiceCache.delete(tariffBookId);

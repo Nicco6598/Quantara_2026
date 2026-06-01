@@ -63,6 +63,20 @@
   [style*="transform"] {
     transform: none;
   }
+  .tariff-import-loader-spin {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
+@keyframes tariff-import-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tariff-import-loader-spin {
+  animation: tariff-import-loader-spin 1.35s linear infinite;
 }
 
 /* ── Micro-interactions via CSS (was framer-motion whileHover/whileTap) ── */
@@ -367,6 +381,10 @@ body,
   height: 100%;
   width: 100%;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 .sal-panel {
@@ -2552,6 +2570,11 @@ select {
   scroll-behavior: auto;
   transition-delay: 0ms;
   transition-duration: 0.01ms;
+}
+
+:root[data-motion="reduced"] .tariff-import-loader-spin {
+  animation: none;
+  opacity: 0.9;
 }
 
 .hue-button {

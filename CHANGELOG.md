@@ -2,6 +2,35 @@
 
 All notable changes to Quantara follow SemVer.
 
+## 0.5.3 — 2026-06-01
+
+### SAL — Copia Incolla
+
+- **Sistemato copia incolla** — applicati fix per rendere sempre funzionante il copia e incolla sulle varie sezioni.
+
+
+### Tariffari — bozze import su disco e ripresa dal catalogo
+
+- **Bozza sessione senza limite del browser** — le bozze di revisione import (molti PDF / migliaia di voci) si salvano nella cartella dati dell’app (`import-drafts/`), non più interamente in `localStorage`. Sparisce l’errore «Spazio locale insufficiente» in uso desktop.
+- **Riprendi dal catalogo** — in **Tariffari → Azioni rapide → Riprendi bozza import** trovi l’elenco delle sessioni salvate (file, voci, avanzamento revisione) con **Riprendi** o **Elimina**, senza dover riselezionare i PDF.
+- **Elenco bozze istantaneo** — indice leggero su disco (`index.json`): aprire o cancellare una bozza non riscarica più tutti i JSON pesanti.
+- **Ripresa più veloce** — un solo caricamento in background, anteprima senza duplicare le voci in memoria; overlay «caricamento» solo durante l’apertura.
+- **Approvazione pulisce la bozza** — dopo **Approva import** la bozza di sessione viene eliminata automaticamente (restano i tariffari salvati nel catalogo).
+- **Fix voci parser** — migliorato l'import su alcune voci che potevano saltare l'import.
+
+### Tariffari — import e revisione (prestazioni)
+
+- **Approvazione batch** — salvataggio di più file in un’unica operazione verso SQLite (meno attese tra un tariffario e l’altro).
+- **Payload bozza compatto (v5)** — le voci vivono solo in `editableVoicesList`; i metadati in bozza non duplicano più l’intero elenco parser.
+
+**Come usarlo in pratica**
+
+1. **Importa PDF/JSON** e revisiona; quando vuoi interrompere, **Bozza sessione** (o scorciatoia da tastiera).
+2. Esci dall’anteprima: in **Tariffari → Riprendi bozza import** scegli la sessione e **Riprendi**.
+3. Termina con **Approva import** — la bozza sparisce; i tariffari compaiono nel catalogo (anche come `draft` se avevi segnato file «in bozza»).
+
+> **Nota** — «Revisiona bozze» nelle azioni rapide riguarda i **tariffari già approvati** con stato `draft` nel database, non le bozze di import PDF in sospeso.
+
 ## 0.5.2 — 2026-05-28
 
 ### Tariffari — import multi-file e revisione molto più fluidi

@@ -6,6 +6,8 @@ import {
   Copy,
   Database,
   FileText,
+  FolderOpen,
+  Loader,
   Plus,
   Save,
 } from "lucide-react";
@@ -32,6 +34,7 @@ import { useActionHandler } from "@/hooks/useAction";
 import { useDataChangedListener } from "@/hooks/useDataChangedListener";
 
 import {
+  confirmDesktopTariffImportBatch,
   createDesktopTariffBook,
   type DesktopContract,
   type DesktopDataResult,
@@ -48,12 +51,14 @@ import {
   updateDesktopTariffBook,
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
+import { isTauriRuntime } from "@/lib/tauri-wrapper";
 import { readJsonFromStorage, writeJsonToStorage } from "@/persistence/json-storage";
 import { STORAGE_KEYS } from "@/persistence/storage-keys";
 
 import { type PendingWorkflowAction, useAppStore } from "@/store/app-store";
 
 import { AddVoiceDialog } from "./components/AddVoiceDialog";
+import { TariffImportDraftResumeDialog } from "./components/TariffImportDraftResumeDialog";
 import { QuickAction } from "./components/QuickAction";
 import {
   TariffImportLoadingModal,
@@ -69,7 +74,10 @@ import {
   initialImportMeta,
   isStringArray,
 } from "./state/import-meta";
-import { clearImportPreviewSessionCache } from "./utils/import-preview-session-cache";
+import {
+  buildImportPreviewPrewarmKey,
+  clearImportPreviewSessionCache,
+} from "./utils/import-preview-session-cache";
 import {
   fallbackContracts,
   fallbackTariffBook,
@@ -86,6 +94,15 @@ import {
   getMetadataKey,
   getProjectTariffBookIds,
 } from "./utils/tariffs-screen-model";
+import { buildConfirmTariffImportItems } from "./utils/tariff-import-confirm";
+import {
+  buildTariffPreviewsFromImportDraft,
+  deleteTariffImportDraftAsync,
+  listTariffImportDraftSummariesAsync,
+  loadImportDraftByIdAsync,
+  type ImportDraft,
+  type TariffImportDraftSummary,
+} from "./utils/tariff-import-drafts";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
 
 function keepLatestImportPerMetadataKey(
@@ -194,12 +211,18 @@ export function TariffsScreen() {
   const [visibleTariffLimit, setVisibleTariffLimit] = useState(TARIFF_PAGE_SIZE);
   const [voiceCountByBookId, setVoiceCountByBookId] = useState<Record<string, number>>({});
   const [isVoicesExplorerOpen, setIsVoicesExplorerOpen] = useState(false);
+  const [preparingVoicesLabel, setPreparingVoicesLabel] = useState<string | null>(null);
   const [isAddVoiceOpen, setIsAddVoiceOpen] = useState(false);
   const { previewIndex: importPreviewIndex } = importMeta;
   const previewValidationCanConfirm = useRef(false);
   const [reviewedFiles, setReviewedFiles] = useState<Set<number>>(() => new Set());
   const [draftedImportFiles, setDraftedImportFiles] = useState<Set<number>>(() => new Set());
   const [yearFilter, setYearFilter] = useState("all");
+  const [importDraftSummaries, setImportDraftSummaries] = useState<TariffImportDraftSummary[]>([]);
+  const [isImportDraftPickerOpen, setIsImportDraftPickerOpen] = useState(false);
+  const [isResumingImportDraft, setIsResumingImportDraft] = useState(false);
+  const [resumingDraftId, setResumingDraftId] = useState<string | null>(null);
+  const [seedImportDraft, setSeedImportDraft] = useState<ImportDraft | null>(null);
   const savedVoiceMap = useRef<Map<string, DesktopTariffVoice[]>>(new Map());
   const catalogRef = useRef<HTMLDivElement>(null);
   const screenRef = useRef<HTMLElement>(null);
@@ -224,6 +247,25 @@ export function TariffsScreen() {
 
     writeJsonToStorage(window.localStorage, FAVORITES_STORAGE_KEY, favoriteBookIds);
   }, [favoriteBookIds]);
+
+  const refreshImportDraftSummaries = useCallback(() => {
+    void listTariffImportDraftSummariesAsync().then(setImportDraftSummaries);
+  }, []);
+
+  useEffect(() => {
+    if (!isImportDraftPickerOpen) return;
+    refreshImportDraftSummaries();
+  }, [isImportDraftPickerOpen, refreshImportDraftSummaries]);
+
+  useEffect(() => {
+    const onDraftsChange = () => {
+      if (isImportDraftPickerOpen) {
+        refreshImportDraftSummaries();
+      }
+    };
+    window.addEventListener("tariff-import-drafts-change", onDraftsChange);
+    return () => window.removeEventListener("tariff-import-drafts-change", onDraftsChange);
+  }, [isImportDraftPickerOpen, refreshImportDraftSummaries]);
 
   const loadTariffsData = useCallback(async () => {
     const [tariffBooks, contracts] = await Promise.all([
@@ -371,6 +413,7 @@ export function TariffsScreen() {
     listDesktopTariffVoices(selectedTariffBook.id, fallbackTariffVoices)
       .then((result) => {
         if (active) {
+          savedVoiceMap.current.set(selectedTariffBook.id, result.data);
           setVoicesState(result);
         }
       })
@@ -418,11 +461,6 @@ export function TariffsScreen() {
     [importPreviews, reviewedFiles],
   );
 
-  const handleImportPreviewReady = useCallback(() => {
-    setShowImportLoadingOverlay(false);
-    setImportLoadingStage("parsing");
-  }, []);
-
   const handlePdfImport = useCallback(async () => {
     setShowImportLoadingOverlay(true);
     setImportLoadingStage("selecting");
@@ -450,14 +488,20 @@ export function TariffsScreen() {
 
       const withVoices = results.filter((metadata) => metadata.voices.length > 0);
       if (withVoices.length > 0) {
+        clearImportPreviewSessionCache();
         editPreviewBookIdMap.current = new Map();
+        setReviewedFiles(new Set());
+        setDraftedImportFiles(new Set());
+        previewValidationCanConfirm.current = false;
         dispatchImport({ type: "SHOW_PREVIEW", previews: results });
         setShowImportLoadingOverlay(false);
         setImportLoadingStage("parsing");
-        notify({
-          message: `${results.length} file pronti per la revisione.`,
-          title: "Importazione completata",
-          tone: "success",
+        window.requestAnimationFrame(() => {
+          notify({
+            message: `${results.length} file pronti per la revisione.`,
+            title: "Importazione completata",
+            tone: "success",
+          });
         });
       } else {
         clearImportPreviewSessionCache();
@@ -481,11 +525,91 @@ export function TariffsScreen() {
     }
   }, [notify]);
 
+  const handleResumeImportDraft = useCallback(
+    async (draftId: string) => {
+      setIsResumingImportDraft(true);
+      setResumingDraftId(draftId);
+      setIsImportDraftPickerOpen(false);
+      setShowImportLoadingOverlay(true);
+      setImportLoadingStage("parsing");
+      try {
+        const draft = await loadImportDraftByIdAsync(draftId);
+        if (!draft) {
+          notify({
+            message: "La bozza non è più disponibile o il file salvato non è valido.",
+            title: "Ripresa non riuscita",
+            tone: "warning",
+          });
+          setIsImportDraftPickerOpen(true);
+          refreshImportDraftSummaries();
+          return;
+        }
+
+        const voicesList = draft.editableVoicesList;
+        const totalVoices = voicesList.reduce((total, voices) => total + voices.length, 0);
+        if (totalVoices === 0) {
+          notify({
+            message: "La bozza non contiene voci da revisionare.",
+            title: "Ripresa non riuscita",
+            tone: "warning",
+          });
+          setIsImportDraftPickerOpen(true);
+          return;
+        }
+
+        const previews = buildTariffPreviewsFromImportDraft(draft);
+        clearImportPreviewSessionCache();
+        editPreviewBookIdMap.current = new Map();
+        setReviewedFiles(new Set(draft.reviewedFiles));
+        setDraftedImportFiles(new Set(draft.draftedFiles));
+        previewValidationCanConfirm.current = false;
+        setSeedImportDraft(draft);
+        startTransition(() => {
+          dispatchImport({ type: "SHOW_PREVIEW", previews });
+        });
+      } catch (error) {
+        notify({
+          message: error instanceof Error ? error.message : String(error),
+          title: "Ripresa bozza non riuscita",
+          tone: "danger",
+        });
+        setIsImportDraftPickerOpen(true);
+      } finally {
+        setShowImportLoadingOverlay(false);
+        setIsResumingImportDraft(false);
+        setResumingDraftId(null);
+      }
+    },
+    [notify, refreshImportDraftSummaries],
+  );
+
+  const handleDeleteImportDraft = useCallback(
+    (draftId: string) => {
+      setImportDraftSummaries((current) => current.filter((draft) => draft.id !== draftId));
+      void deleteTariffImportDraftAsync(draftId).catch((error) => {
+        refreshImportDraftSummaries();
+        notify({
+          message: error instanceof Error ? error.message : String(error),
+          title: "Eliminazione bozza non riuscita",
+          tone: "danger",
+        });
+      });
+    },
+    [notify, refreshImportDraftSummaries],
+  );
+
   async function handleEditVoices(book: DesktopTariffBook) {
+    setPreparingVoicesLabel(book.name);
     try {
       const saved = savedVoiceMap.current.get(book.id);
-      const voiceData =
-        saved ?? (await listDesktopTariffVoices(book.id, fallbackTariffVoices)).data;
+      let voiceData = saved;
+      if (!voiceData && selectedTariffBookId === book.id && voicesState.data.length > 0) {
+        voiceData = voicesState.data;
+      }
+      if (!voiceData) {
+        voiceData = (await listDesktopTariffVoices(book.id, fallbackTariffVoices)).data;
+      }
+      savedVoiceMap.current.set(book.id, voiceData);
       const metadata: TariffPdfMetadata = {
         name: book.name,
         sourceName: book.sourceName,
@@ -504,6 +628,8 @@ export function TariffsScreen() {
         title: "Impossibile caricare le voci",
         tone: "danger",
       });
+    } finally {
+      setPreparingVoicesLabel(null);
     }
   }
 
@@ -739,56 +865,106 @@ export function TariffsScreen() {
       metadatas.filter((metadata) => metadata.voices.length > 0),
     );
 
-    for (const metadata of latestMetadatas) {
+    const voicesByFile = latestMetadatas.map((metadata) => metadata.voices);
+    const existingIdsByFile = latestMetadatas.map((metadata) => {
       const existingBookIds = existingBookIdsByMetadataKey.get(getMetadataKey(metadata)) ?? [];
-      const existingBookId = metadata.existingBookId ?? existingBookIds[0];
+      return metadata.existingBookId ?? existingBookIds[0];
+    });
+
+    for (let index = 0; index < latestMetadatas.length; index++) {
+      const metadata = latestMetadatas[index];
+      if (!metadata) continue;
+      const existingBookIds = existingBookIdsByMetadataKey.get(getMetadataKey(metadata)) ?? [];
+      const existingBookId = existingIdsByFile[index];
       const tariffBookId = existingBookId ?? createTariffBookId(metadata);
-      const voices = metadata.voices.map((voice) => ({
-        ...voice,
-        id: `voice_${tariffBookId}_${sanitizeIdentifier(voice.officialCode)}`,
-        tariffBookId,
-      }));
+      for (const duplicateId of existingBookIds) {
+        if (duplicateId !== tariffBookId) duplicateBookIdsToDelete.add(duplicateId);
+      }
+    }
 
+    const persistSequentially = async () => {
+      for (let index = 0; index < latestMetadatas.length; index++) {
+        const metadata = latestMetadatas[index];
+        if (!metadata) continue;
+        const existingBookId = existingIdsByFile[index];
+        const tariffBookId = existingBookId ?? createTariffBookId(metadata);
+        const voices = (voicesByFile[index] ?? []).map((voice) => ({
+          ...voice,
+          id: `voice_${tariffBookId}_${sanitizeIdentifier(voice.officialCode)}`,
+          tariffBookId,
+        }));
+
+        try {
+          let savedBook: DesktopTariffBook;
+          if (existingBookId) {
+            savedBook = await updateDesktopTariffBook(existingBookId, {
+              name: metadata.name,
+              sourceName: metadata.sourceName,
+              status: metadata.importStatus,
+              voices,
+              year: metadata.year,
+            });
+          } else {
+            savedBook = await createDesktopTariffBook({
+              id: tariffBookId,
+              name: metadata.name,
+              sourceName: metadata.sourceName,
+              status: metadata.importStatus,
+              voices,
+              year: metadata.year,
+            });
+          }
+
+          savedBooks.push(savedBook);
+          savedVoiceEntries.push([tariffBookId, voices]);
+          lastSavedResult = { tariffBookId, voices };
+          importedCount++;
+          totalVoices += voices.length;
+        } catch (error) {
+          notify({
+            message: `${metadata.name}: ${error instanceof Error ? error.message : String(error)}`,
+            title: existingBookId ? "Aggiornamento non riuscito" : "Importazione non riuscita",
+            tone: "danger",
+          });
+        }
+
+        if (latestMetadatas.length > 4) {
+          await yieldToBrowser();
+        }
+      }
+    };
+
+    if (isTauriRuntime()) {
       try {
-        let savedBook: DesktopTariffBook;
-        if (existingBookId) {
-          savedBook = await updateDesktopTariffBook(existingBookId, {
-            name: metadata.name,
-            sourceName: metadata.sourceName,
-            status: metadata.importStatus,
-            voices,
-            year: metadata.year,
-          });
-        } else {
-          savedBook = await createDesktopTariffBook({
-            id: tariffBookId,
-            name: metadata.name,
-            sourceName: metadata.sourceName,
-            status: metadata.importStatus,
-            voices,
-            year: metadata.year,
-          });
-        }
+        const batchItems = buildConfirmTariffImportItems(
+          latestMetadatas,
+          voicesByFile,
+          existingIdsByFile,
+        );
+        const saved = await confirmDesktopTariffImportBatch({
+          duplicateBookIdsToDelete: [...duplicateBookIdsToDelete],
+          items: batchItems,
+        });
 
-        for (const duplicateId of existingBookIds) {
-          if (duplicateId !== tariffBookId) duplicateBookIdsToDelete.add(duplicateId);
+        for (const book of saved) {
+          const index = batchItems.findIndex((item) => item.id === book.id);
+          const voices = batchItems[index]?.voices ?? [];
+          savedBooks.push(book);
+          savedVoiceEntries.push([book.id, voices]);
+          lastSavedResult = { tariffBookId: book.id, voices };
+          importedCount++;
+          totalVoices += voices.length;
         }
-        savedBooks.push(savedBook);
-        savedVoiceEntries.push([tariffBookId, voices]);
-        lastSavedResult = { tariffBookId, voices };
-        importedCount++;
-        totalVoices += voices.length;
       } catch (error) {
         notify({
-          message: `${metadata.name}: ${error instanceof Error ? error.message : String(error)}`,
-          title: existingBookId ? "Aggiornamento non riuscito" : "Importazione non riuscita",
+          message: error instanceof Error ? error.message : String(error),
+          title: "Importazione batch non riuscita",
           tone: "danger",
         });
+        await persistSequentially();
       }
-
-      if (latestMetadatas.length > 4) {
-        await yieldToBrowser();
-      }
+    } else {
+      await persistSequentially();
     }
 
     if (duplicateBookIdsToDelete.size > 0) {
@@ -872,12 +1048,15 @@ export function TariffsScreen() {
     editPreviewBookIdMap.current = new Map();
     setReviewedFiles(new Set());
     setDraftedImportFiles(new Set());
+    setSeedImportDraft(null);
   }, []);
 
   const startPdfImport = useCallback(() => {
+    clearImportPreviewSessionCache();
     editPreviewBookIdMap.current = new Map();
     setDraftedImportFiles(new Set());
     setReviewedFiles(new Set());
+    previewValidationCanConfirm.current = false;
     void handlePdfImport();
   }, [handlePdfImport]);
 
@@ -1123,11 +1302,15 @@ export function TariffsScreen() {
     >
       {importPhase === "preview" && importPreviews.length > 0 ? (
         <TariffImportPreviewPanel
+          key={
+            seedImportDraft
+              ? `resume:${seedImportDraft.id}`
+              : `${buildImportPreviewPrewarmKey(importPreviews)}:${getExistingBookIds().filter(Boolean).join(",") || "import"}`
+          }
           draftedImportFiles={draftedImportFiles}
           getExistingBookIds={getExistingBookIds}
           importPreviewIndex={importPreviewIndex}
           importPreviews={importPreviews}
-          onPreviewReady={handleImportPreviewReady}
           onCancel={clearImport}
           onConfirm={handleConfirmImport}
           onActiveIndexChange={(index) => {
@@ -1160,6 +1343,7 @@ export function TariffsScreen() {
           }}
           onReviewedFilesChange={updateReviewedFiles}
           reviewedFiles={reviewedFiles}
+          seedImportDraft={seedImportDraft}
         />
       ) : (
         <>
@@ -1217,6 +1401,23 @@ export function TariffsScreen() {
                     label="Importa PDF/JSON"
                     onClick={handlePdfImport}
                     tone="info"
+                  />
+                  <QuickAction
+                    {...(importDraftSummaries.length > 0
+                      ? { badge: String(importDraftSummaries.length) }
+                      : {})}
+                    detail={
+                      importDraftSummaries.length > 0
+                        ? `${importDraftSummaries.length} ${importDraftSummaries.length === 1 ? "sessione salvata" : "sessioni salvate"}`
+                        : "Nessuna bozza da riprendere"
+                    }
+                    icon={FolderOpen}
+                    label="Riprendi bozza import"
+                    onClick={() => {
+                      refreshImportDraftSummaries();
+                      setIsImportDraftPickerOpen(true);
+                    }}
+                    tone={importDraftSummaries.length > 0 ? "warning" : "info"}
                   />
                   <QuickAction
                     detail={
@@ -1433,6 +1634,24 @@ export function TariffsScreen() {
         tariffBooks={tariffBooksState.data}
         onSave={handleAddVoiceSave}
       />
+      {preparingVoicesLabel ? (
+        <div
+          aria-busy="true"
+          aria-live="polite"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--surface-base)]/72 backdrop-blur-[2px]"
+          role="status"
+        >
+          <div className="flex max-w-sm flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-8 py-7 shadow-lg">
+            <Loader className="tariff-import-loader-spin size-8 text-[var(--accent-primary)]" />
+            <p className="text-center text-14px font-semibold text-[var(--text-primary)]">
+              Preparazione voci
+            </p>
+            <p className="text-center text-12px font-medium text-[var(--text-secondary)]">
+              {preparingVoicesLabel}
+            </p>
+          </div>
+        </div>
+      ) : null}
       {showImportLoadingOverlay ? (
         <TariffImportLoadingModal files={importFiles} stage={importLoadingStage} />
       ) : null}
@@ -1444,6 +1663,17 @@ export function TariffsScreen() {
           total={voicesState.data.length}
         />
       ) : null}
+      <TariffImportDraftResumeDialog
+        activeDraftId={resumingDraftId}
+        drafts={importDraftSummaries}
+        isOpen={isImportDraftPickerOpen}
+        isResuming={isResumingImportDraft}
+        onClose={() => setIsImportDraftPickerOpen(false)}
+        onDelete={handleDeleteImportDraft}
+        onResume={(draftId) => {
+          void handleResumeImportDraft(draftId);
+        }}
+      />
     </ScreenLayout>
   );
 }

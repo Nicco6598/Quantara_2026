@@ -4,7 +4,7 @@ import { useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ImportFileProgress } from "@/lib/desktopData";
 
-export type TariffImportLoadingStage = "opening-preview" | "parsing" | "selecting";
+export type TariffImportLoadingStage = "parsing" | "selecting";
 
 function statusLabel(file: ImportFileProgress): string {
   if (file.status === "error") return file.error ?? "Errore di lettura";
@@ -19,7 +19,7 @@ function statusLabel(file: ImportFileProgress): string {
   return "Completato";
 }
 
-const SPIN_CLASS = "animate-spin [animation-duration:1.35s]";
+const SPIN_CLASS = "tariff-import-loader-spin";
 
 function FileStatusIcon({ status }: { status: ImportFileProgress["status"] }) {
   switch (status) {
@@ -58,26 +58,22 @@ export function TariffImportLoadingModal({
   const allSettled = total > 0 && completedCount >= total && !processingFile;
 
   const headline =
-    stage === "opening-preview"
-      ? "Apertura anteprima"
-      : stage === "selecting" || total === 0
-        ? "Selezione file"
-        : allSettled
-          ? "Elaborazione completata"
-          : "Importazione tariffari";
+    stage === "selecting" || total === 0
+      ? "Selezione file"
+      : allSettled
+        ? "Lettura PDF completata"
+        : "Importazione tariffari";
 
   const subtitle =
-    stage === "opening-preview"
-      ? "Preparazione griglia voci e controlli di validazione…"
-      : stage === "selecting" || total === 0
-        ? "Attendi la scelta dei PDF dal dialogo di sistema."
-        : processingFile
-          ? `Lettura di ${processingFile.fileName}`
-          : allSettled
-            ? errorCount > 0
-              ? `${doneCount} file pronti, ${errorCount} con errori.`
-              : `${doneCount} file pronti per la revisione.`
-            : `${completedCount} di ${total} file elaborati`;
+    stage === "selecting" || total === 0
+      ? "Attendi la scelta dei PDF dal dialogo di sistema."
+      : processingFile
+        ? `Lettura di ${processingFile.fileName}`
+        : allSettled
+          ? errorCount > 0
+            ? `${doneCount} file letti, ${errorCount} con errori. Apertura anteprima…`
+            : `${doneCount} file letti. Apertura anteprima…`
+          : `${completedCount} di ${total} file elaborati`;
 
   const virtualizer = useVirtualizer({
     count: sortedFiles.length,
@@ -98,14 +94,8 @@ export function TariffImportLoadingModal({
         <div className="border-b border-[var(--border-subtle)]/80 px-5 py-4">
           <div className="flex items-start gap-3">
             <div className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
-              {stage === "opening-preview" ? (
-                <Loader2 className={`size-5 ${SPIN_CLASS}`} />
-              ) : (
-                <>
-                  <FileText className="size-5" />
-                  <ScanLine className="absolute -right-1 -top-1 size-3.5 animate-pulse" />
-                </>
-              )}
+              <FileText className="size-5" />
+              <ScanLine className="absolute -right-1 -top-1 size-3.5 animate-pulse" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -136,7 +126,7 @@ export function TariffImportLoadingModal({
                 <div
                   className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300 ease-out"
                   style={{
-                    width: stage === "opening-preview" ? "100%" : `${progressPercent}%`,
+                    width: `${progressPercent}%`,
                   }}
                 />
               </div>

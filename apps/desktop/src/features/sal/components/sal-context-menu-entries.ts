@@ -32,6 +32,7 @@ export function buildSalContextMenuEntries(options: {
   onCopyVoice: () => void;
   onPasteVoice: () => void;
   onCopyMeasurementRow?: () => void;
+  onCopyMeasurementRowFull?: () => void;
   onPasteMeasurementRowAbove?: () => void;
   onPasteMeasurementRowBelow?: () => void;
   onCopyMeasurements: () => void;
@@ -99,9 +100,16 @@ export function buildSalContextMenuEntries(options: {
         id: "copy-measurement-row",
         icon: Rows3,
         label: "Copia riga",
-        hint: "Una singola riga misura (stile Excel)",
+        hint: "Copia solo stazione (per incollare su riga vuota)",
         shortcut: "Ctrl+C",
         onSelect: () => options.onCopyMeasurementRow?.(),
+      }),
+      contextMenuItem({
+        id: "copy-measurement-row-full",
+        icon: Copy,
+        label: "Copia riga (completa)",
+        hint: "Copia tutti i campi della riga misura",
+        onSelect: () => options.onCopyMeasurementRowFull?.(),
       }),
       contextMenuItem({
         id: "paste-measurement-above",

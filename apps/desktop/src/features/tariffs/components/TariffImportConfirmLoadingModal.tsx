@@ -1,7 +1,7 @@
 import { Loader2, Save } from "lucide-react";
 import { createPortal } from "react-dom";
 
-const SPIN_CLASS = "animate-spin [animation-duration:1.35s]";
+const SPIN_CLASS = "tariff-import-loader-spin";
 
 export function TariffImportConfirmLoadingModal({
   fileCount,

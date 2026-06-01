@@ -4,6 +4,7 @@ import {
   forwardRef,
   memo,
   useCallback,
+  useDeferredValue,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
@@ -22,6 +23,8 @@ import {
 import type { DesktopTariffVoice, TariffWarning } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
 import type { VoiceGroup } from "../utils/tariff-grouping";
+import type { ImportPreviewGridLayout } from "../utils/import-preview-grid-layout";
+import { isImportCustomVoice } from "../utils/import-preview-voice-split";
 import { formatEditablePercent } from "../utils/tariffs-validation";
 
 const CELL_BASE =
@@ -29,6 +32,7 @@ const CELL_BASE =
 const CELL_EDIT =
   "border-[color-mix(in_srgb,var(--border-subtle)_92%,var(--text-secondary)_8%)] hover:border-[var(--accent-primary)]/60 hover:bg-[var(--surface-base)]";
 const GRID_COLS = "grid grid-cols-[180px_minmax(460px,1fr)_78px_92px_108px_34px] gap-2.5 px-3 py-2";
+const LARGE_GRID_SUMMARY_THRESHOLD = 2_500;
 
 export type TariffGridSectionSummary = {
   id: string;
@@ -50,6 +54,7 @@ export type TariffGridDraftChange = {
 };
 
 export type EditableTariffVoicesGridHandle = {
+  discardDraftField: (index: number, field: keyof DesktopTariffVoice) => void;
   drainDraftChanges: () => TariffGridDraftChange[];
   peekDraftChanges: () => TariffGridDraftChange[];
 };
@@ -153,6 +158,7 @@ function ImportCell({
   index,
   invalid = false,
   onDraftChange,
+  onDraftCommit,
   onDraftDiscard,
   value,
   warnings,
@@ -164,6 +170,7 @@ function ImportCell({
   index: number;
   invalid?: boolean;
   onDraftChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  onDraftCommit: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDraftDiscard: (index: number, field: keyof DesktopTariffVoice) => void;
   value: string;
   warnings: TariffWarning[] | undefined;
@@ -187,6 +194,7 @@ function ImportCell({
         id={`import-cell-${index}-${field}`}
         onBlur={() => {
           isFocusedRef.current = false;
+          onDraftCommit(index, field, localValue);
         }}
         onChange={(event) => {
           const nextValue = event.target.value;
@@ -325,6 +333,7 @@ function DescriptionCell({
   index,
   invalid = false,
   onDraftChange,
+  onDraftCommit,
   onDraftDiscard,
   value,
 }: {
@@ -334,6 +343,7 @@ function DescriptionCell({
   index: number;
   invalid?: boolean;
   onDraftChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  onDraftCommit: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDraftDiscard: (index: number, field: keyof DesktopTariffVoice) => void;
   value: string;
 }) {
@@ -369,6 +379,7 @@ function DescriptionCell({
       id={`import-cell-${index}-${field}`}
       onBlur={() => {
         isFocusedRef.current = false;
+        onDraftCommit(index, field, localValue);
       }}
       onChange={(event) => {
         const nextValue = event.target.value;
@@ -404,6 +415,7 @@ type VoiceRowProps = {
   isInvalid: boolean;
   voice: DesktopTariffVoice;
   onDraftChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  onDraftCommit: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDraftDiscard: (index: number, field: keyof DesktopTariffVoice) => void;
   onDelete: (index: number) => void;
 };
@@ -441,6 +453,7 @@ const VoiceRow = memo(function VoiceRow({
   isInvalid,
   voice,
   onDraftChange,
+  onDraftCommit,
   onDraftDiscard,
   onDelete,
 }: VoiceRowProps & { invalidCellKeys: Set<string> }) {
@@ -485,6 +498,7 @@ const VoiceRow = memo(function VoiceRow({
             index={index}
             invalid={isFieldInvalid("officialCode")}
             onDraftChange={onDraftChange}
+            onDraftCommit={onDraftCommit}
             onDraftDiscard={onDraftDiscard}
             value={voice.officialCode}
             warnings={voice.warnings}
@@ -499,6 +513,7 @@ const VoiceRow = memo(function VoiceRow({
             index={index}
             invalid={isFieldInvalid("description")}
             onDraftChange={onDraftChange}
+            onDraftCommit={onDraftCommit}
             onDraftDiscard={onDraftDiscard}
             value={voice.description}
           />
@@ -511,6 +526,7 @@ const VoiceRow = memo(function VoiceRow({
           index={index}
           invalid={isFieldInvalid("unitOfMeasure")}
           onDraftChange={onDraftChange}
+          onDraftCommit={onDraftCommit}
           onDraftDiscard={onDraftDiscard}
           value={voice.unitOfMeasure}
           warnings={undefined}
@@ -523,6 +539,7 @@ const VoiceRow = memo(function VoiceRow({
           index={index}
           invalid={isFieldInvalid("laborPercentage")}
           onDraftChange={onDraftChange}
+          onDraftCommit={onDraftCommit}
           onDraftDiscard={onDraftDiscard}
           value={formatEditablePercent(voice.laborPercentage)}
           warnings={undefined}
@@ -535,6 +552,7 @@ const VoiceRow = memo(function VoiceRow({
           index={index}
           invalid={isFieldInvalid("unitPrice")}
           onDraftChange={onDraftChange}
+          onDraftCommit={onDraftCommit}
           onDraftDiscard={onDraftDiscard}
           value={Number.isFinite(voice.unitPrice) ? String(voice.unitPrice).replace(".", ",") : ""}
           warnings={undefined}
@@ -578,6 +596,7 @@ function areVoiceRowsEqual(
     previous.isInvalid === next.isInvalid &&
     previous.voice === next.voice &&
     previous.onDraftChange === next.onDraftChange &&
+    previous.onDraftCommit === next.onDraftCommit &&
     previous.onDraftDiscard === next.onDraftDiscard &&
     previous.onDelete === next.onDelete
   );
@@ -590,7 +609,9 @@ type EditableTariffVoicesGridProps = {
   onChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDelete: (index: number) => void;
   onDraftActivity?: () => void;
+  onDraftCommit?: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onSectionsChange?: (sections: TariffGridSectionSummary[]) => void;
+  prebuiltLayout?: ImportPreviewGridLayout | null;
   scrollLayout?: "fill" | "viewport";
   scrollTarget?: TariffGridScrollTarget | null;
   validation: ImportValidation;
@@ -605,7 +626,9 @@ export const EditableTariffVoicesGrid = memo(
         onAddVoice,
         onDelete,
         onDraftActivity,
+        onDraftCommit,
         onSectionsChange,
+        prebuiltLayout,
         scrollLayout = "viewport",
         scrollTarget,
         validation,
@@ -661,9 +684,20 @@ export const EditableTariffVoicesGrid = memo(
         draftByCellRef.current.delete(getDraftKey(index, field));
       }, []);
 
+      const handleDraftCommit = useCallback(
+        (index: number, field: keyof DesktopTariffVoice, value: string) => {
+          draftByCellRef.current.delete(getDraftKey(index, field));
+          onDraftCommit?.(index, field, value);
+        },
+        [onDraftCommit],
+      );
+
       useImperativeHandle(
         ref,
         () => ({
+          discardDraftField: (index: number, field: keyof DesktopTariffVoice) => {
+            draftByCellRef.current.delete(getDraftKey(index, field));
+          },
           drainDraftChanges: () => {
             const changes = readDraftChanges();
             draftByCellRef.current.clear();
@@ -674,9 +708,13 @@ export const EditableTariffVoicesGrid = memo(
         [readDraftChanges],
       );
 
+      const deferredGroups = useDeferredValue(groups);
       const sections = useMemo(() => {
+        if (prebuiltLayout?.sections) {
+          return prebuiltLayout.sections;
+        }
         const catMap = new Map<string, Map<string, VoiceGroup[]>>();
-        for (const group of groups) {
+        for (const group of deferredGroups) {
           const cat = group.categoria || "Altre";
           const grp = group.gruppo || "Altro";
           if (!catMap.has(cat)) catMap.set(cat, new Map());
@@ -698,62 +736,96 @@ export const EditableTariffVoicesGrid = memo(
                 voci: [...voci].sort((a, b) => Number(a.voce || "0") - Number(b.voce || "0")),
               })),
           }));
-      }, [groups]);
+      }, [deferredGroups, prebuiltLayout?.sections]);
 
-      const sectionSummaries = useMemo<TariffGridSectionSummary[]>(
-        () =>
-          sections.map((section) => {
-            const rowsCount = section.groups.reduce(
-              (sum, group) =>
-                sum + group.voci.reduce((voiceSum, voice) => voiceSum + voice.children.length, 0),
-              0,
-            );
-            const warningCount = section.groups.reduce(
-              (sum, group) =>
-                sum +
-                group.voci.reduce(
-                  (voiceSum, voice) =>
-                    voiceSum +
-                    voice.children.reduce(
-                      (rowSum, child) => rowSum + (child.voice.warnings?.length ?? 0),
-                      0,
-                    ),
-                  0,
-                ),
-              0,
-            );
-            const errorCount = section.groups.reduce(
-              (sum, group) =>
-                sum +
-                group.voci.reduce(
-                  (voiceSum, voice) =>
-                    voiceSum +
-                    voice.children.reduce(
-                      (rowSum, child) => rowSum + (invalidRowIndices.has(child.index) ? 1 : 0),
-                      0,
-                    ),
-                  0,
-                ),
-              0,
-            );
+      const sectionSummaries = useMemo<TariffGridSectionSummary[]>(() => {
+        const skipHeavyCounts = totalVoices > LARGE_GRID_SUMMARY_THRESHOLD;
+        return sections.map((section) => {
+          const rowsCount = section.groups.reduce(
+            (sum, group) =>
+              sum + group.voci.reduce((voiceSum, voice) => voiceSum + voice.children.length, 0),
+            0,
+          );
+          if (skipHeavyCounts) {
             return {
               id: section.id,
               categoria: section.categoria,
               groupsCount: section.groups.length,
               rowsCount,
-              errorCount,
-              warningCount,
+              errorCount: 0,
+              warningCount: 0,
             };
-          }),
-        [invalidRowIndices, sections],
-      );
+          }
+          const warningCount = section.groups.reduce(
+            (sum, group) =>
+              sum +
+              group.voci.reduce(
+                (voiceSum, voice) =>
+                  voiceSum +
+                  voice.children.reduce(
+                    (rowSum, child) => rowSum + (child.voice.warnings?.length ?? 0),
+                    0,
+                  ),
+                0,
+              ),
+            0,
+          );
+          const errorCount = section.groups.reduce(
+            (sum, group) =>
+              sum +
+              group.voci.reduce(
+                (voiceSum, voice) =>
+                  voiceSum +
+                  voice.children.reduce(
+                    (rowSum, child) => rowSum + (invalidRowIndices.has(child.index) ? 1 : 0),
+                    0,
+                  ),
+                0,
+              ),
+            0,
+          );
+          return {
+            id: section.id,
+            categoria: section.categoria,
+            groupsCount: section.groups.length,
+            rowsCount,
+            errorCount,
+            warningCount,
+          };
+        });
+      }, [invalidRowIndices, sections, totalVoices]);
 
       useLayoutEffect(() => {
         onSectionsChange?.(sectionSummaries);
       }, [onSectionsChange, sectionSummaries]);
 
       const flatItems = useMemo<FlatGridItem[]>(() => {
+        if (prebuiltLayout?.flatItems) {
+          return prebuiltLayout.flatItems;
+        }
+
         const items: FlatGridItem[] = [];
+
+        if (onAddVoice) {
+          items.push({ key: "add-row-top", type: "add" });
+        }
+
+        const pinnedCustom: Array<{ index: number; voice: DesktopTariffVoice }> = [];
+        for (const group of deferredGroups) {
+          for (const child of group.children) {
+            if (isImportCustomVoice(child.voice)) {
+              pinnedCustom.push(child);
+            }
+          }
+        }
+        pinnedCustom.sort((left, right) => left.index - right.index);
+
+        if (pinnedCustom.length > 0) {
+          items.push({ key: "columns-custom", type: "columns" });
+          for (const { index, voice } of pinnedCustom) {
+            items.push({ index, key: `row-${voice.id}`, type: "row", voice });
+          }
+        }
 
         for (const section of sections) {
           const sectionRowsCount = section.groups.reduce(
@@ -808,6 +880,7 @@ export const EditableTariffVoicesGrid = memo(
               items.push({ key: `columns-${voiceGroup.code}`, type: "columns" });
 
               for (const { index, voice } of voiceGroup.children) {
+                if (isImportCustomVoice(voice)) continue;
                 items.push({ index, key: `row-${voice.id}`, type: "row", voice });
               }
             }
@@ -815,14 +888,14 @@ export const EditableTariffVoicesGrid = memo(
         }
 
         items.push({
-          groupCount: groups.length,
+          groupCount: deferredGroups.length,
           key: "footer",
           totalVoices,
           type: "footer",
         });
 
         return items;
-      }, [groups.length, sections, totalVoices]);
+      }, [deferredGroups, onAddVoice, prebuiltLayout?.flatItems, sections, totalVoices]);
 
       const virtualizer = useVirtualizer({
         count: flatItems.length,
@@ -1000,20 +1073,9 @@ export const EditableTariffVoicesGrid = memo(
                   </div>
                   <div className="mt-1 text-13px font-semibold text-[var(--text-secondary)]">
                     {totalVoices.toLocaleString("it-IT")} righe in{" "}
-                    {groups.length.toLocaleString("it-IT")} voci, virtualizzate
+                    {deferredGroups.length.toLocaleString("it-IT")} voci, virtualizzate
                   </div>
                 </div>
-                {onAddVoice ? (
-                  <button
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/56 px-3 text-12px font-bold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
-                    onClick={onAddVoice}
-                    title="Aggiungi voce personalizzata"
-                    type="button"
-                  >
-                    <Plus className="size-3.5" />
-                    Nuova voce
-                  </button>
-                ) : null}
               </div>
               <div
                 data-tariff-virtual-scroll="true"
@@ -1053,6 +1115,7 @@ export const EditableTariffVoicesGrid = memo(
                           onAddVoice={onAddVoice}
                           onDelete={onDelete}
                           onDraftChange={handleDraftChange}
+                          onDraftCommit={handleDraftCommit}
                           onDraftDiscard={handleDraftDiscard}
                         />
                       </div>
@@ -1077,6 +1140,7 @@ function VirtualGridItem({
   onAddVoice,
   onDelete,
   onDraftChange,
+  onDraftCommit,
   onDraftDiscard,
 }: {
   duplicateCodes: Set<string>;
@@ -1087,6 +1151,7 @@ function VirtualGridItem({
   onAddVoice: (() => void) | undefined;
   onDelete: (index: number) => void;
   onDraftChange: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
+  onDraftCommit: (index: number, field: keyof DesktopTariffVoice, value: string) => void;
   onDraftDiscard: (index: number, field: keyof DesktopTariffVoice) => void;
 }) {
   if (item.type === "add") {
@@ -1214,6 +1279,7 @@ function VirtualGridItem({
           isDuplicate={isDuplicate}
           isInvalid={rowInvalid}
           onDraftChange={onDraftChange}
+          onDraftCommit={onDraftCommit}
           onDraftDiscard={onDraftDiscard}
           onDelete={onDelete}
           voice={item.voice}

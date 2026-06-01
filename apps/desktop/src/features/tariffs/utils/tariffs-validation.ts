@@ -38,12 +38,15 @@ function collectMissingFields(voice: DesktopTariffVoice, code: string) {
   return missingFields;
 }
 
-/** Fast path: counts and examples only — no per-row arrays (used during multi-file prewarm). */
+const SUMMARY_DUPLICATE_ROW_CAP = 300;
+
+/** Fast path with row hints for error navigation (full duplicate sweep deferred to getImportValidation). */
 export function getImportValidationSummary(
   voices: readonly DesktopTariffVoice[],
 ): ImportValidation {
   const codeCounts = new Map<string, number>();
   const invalidExamples: string[] = [];
+  const invalidRows: Array<{ field: keyof DesktopTariffVoice; index: number; label: string }> = [];
   let invalidCount = 0;
 
   for (let index = 0; index < voices.length; index++) {
@@ -52,21 +55,43 @@ export function getImportValidationSummary(
     const code = voice.officialCode.trim();
     codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1);
 
-    if (collectMissingFields(voice, code).length > 0) {
+    const missingFields = collectMissingFields(voice, code);
+    if (missingFields.length > 0) {
       invalidCount += 1;
       if (invalidExamples.length < 4) {
         invalidExamples.push(code || voice.id);
+      }
+      for (const field of missingFields) {
+        invalidRows.push({ index, ...field });
       }
     }
   }
 
   const duplicateExamples: string[] = [];
   let duplicateCount = 0;
+  const duplicateCodes = new Set<string>();
   for (const [code, count] of codeCounts) {
     if (count > 1) {
       duplicateCount += count - 1;
+      duplicateCodes.add(code);
       if (duplicateExamples.length < 4) {
         duplicateExamples.push(code);
+      }
+    }
+  }
+
+  const duplicateRows: Array<{ field: "officialCode"; index: number; label: string }> = [];
+  if (duplicateCodes.size > 0) {
+    for (
+      let index = 0;
+      index < voices.length && duplicateRows.length < SUMMARY_DUPLICATE_ROW_CAP;
+      index++
+    ) {
+      const voice = voices[index];
+      if (!voice) continue;
+      const code = voice.officialCode.trim();
+      if (code.length > 0 && duplicateCodes.has(code)) {
+        duplicateRows.push({ field: "officialCode", index, label: "codice duplicato" });
       }
     }
   }
@@ -74,10 +99,10 @@ export function getImportValidationSummary(
   return {
     duplicateCount,
     duplicateExamples,
-    duplicateRows: [],
+    duplicateRows,
     invalidCount,
     invalidExamples,
-    invalidRows: [],
+    invalidRows,
     validCount: Math.max(0, voices.length - invalidCount),
     warningCount: 0,
   };
