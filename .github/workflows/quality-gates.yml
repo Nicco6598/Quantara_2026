@@ -11,8 +11,6 @@ jobs:
       - run: test -f .memory/EXECUTION_PHASES.md
       - run: test -f docs/architecture/overview.md
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.1.1
       - uses: actions/setup-node@v6
         with:
           node-version: 24.11.0
