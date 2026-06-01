@@ -108,8 +108,8 @@ export function AppContextMenu({
         ) : null}
 
         <div className="px-1 pb-0.5 pt-0.5">
-          <p className="px-2 py-1 text-9px font-black uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
-            Azioni · {itemCount}
+          <p className="px-2 py-1 text-9px font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+            Azioni
           </p>
         </div>
 

@@ -32,36 +32,19 @@ import { useActionHandler } from "@/hooks/useAction";
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 
 import type { ImportValidation } from "../tariffs-types";
-import type { VoiceGroup } from "../utils/tariff-grouping";
-import type { ImportDraft } from "../utils/tariff-import-drafts";
-import { resolveImportDraftVoicesList } from "../utils/tariff-import-draft-persistence";
-import {
-  createDraftName,
-  createDraftSignature,
-  deleteTariffImportDraft,
-  deleteTariffImportDraftAsync,
-  loadImportDraftAsync,
-  saveImportDraftRecordAsync,
-} from "../utils/tariff-import-drafts";
-import { splitRegularAndMaggiorazioni } from "../utils/import-preview-voice-split";
-import { getImportValidation, parseOptionalPercent } from "../utils/tariffs-validation";
+import type { ImportPreviewGridLayout } from "../utils/import-preview-grid-layout";
+import type { ImportPreviewFileItem } from "../utils/import-preview-helpers";
 import {
   buildAllImportErrorRows,
   buildImportPreviewFileItems,
   buildInvalidRowsForGrid,
   buildRegularIndexMap,
+  estimateImportBlockingIssues,
   formatMaggiorazioneDisplayCells,
   getGridBlockingCount,
-  estimateImportBlockingIssues,
   useImportPreviewDerivations,
   useImportPreviewSessionPrewarm,
 } from "../utils/import-preview-helpers";
-import { getImportVoiceBreakdown } from "../utils/import-preview-voice-split";
-import {
-  ImportPreviewConfirmLabel,
-  ImportPreviewWorkflowControls,
-} from "./import-preview/ImportPreviewWorkflowControls";
-import type { ImportPreviewGridLayout } from "../utils/import-preview-grid-layout";
 import {
   buildImportPreviewPrewarmKey,
   clearImportPreviewSessionCache,
@@ -73,8 +56,22 @@ import {
   prewarmImportPreviewFile,
   prewarmImportPreviewVoices,
 } from "../utils/import-preview-session-cache";
-import { TariffImportConfirmLoadingModal } from "./TariffImportConfirmLoadingModal";
-import { ImportPreviewActionBar } from "./import-preview/ImportPreviewActionBar";
+import {
+  getImportVoiceBreakdown,
+  splitRegularAndMaggiorazioni,
+} from "../utils/import-preview-voice-split";
+import type { VoiceGroup } from "../utils/tariff-grouping";
+import { resolveImportDraftVoicesList } from "../utils/tariff-import-draft-persistence";
+import type { ImportDraft } from "../utils/tariff-import-drafts";
+import {
+  createDraftName,
+  createDraftSignature,
+  deleteTariffImportDraft,
+  deleteTariffImportDraftAsync,
+  loadImportDraftAsync,
+  saveImportDraftRecordAsync,
+} from "../utils/tariff-import-drafts";
+import { getImportValidation, parseOptionalPercent } from "../utils/tariffs-validation";
 import {
   EditableTariffVoicesGrid,
   type EditableTariffVoicesGridHandle,
@@ -82,9 +79,14 @@ import {
   type TariffGridScrollTarget,
   type TariffGridSectionSummary,
 } from "./EditableTariffVoicesGrid";
+import { ImportPreviewActionBar } from "./import-preview/ImportPreviewActionBar";
 import { ImportPreviewSidebar } from "./import-preview/ImportPreviewSidebar";
+import {
+  ImportPreviewConfirmLabel,
+  ImportPreviewWorkflowControls,
+} from "./import-preview/ImportPreviewWorkflowControls";
 import { ImportPreviewWorkspace } from "./import-preview/ImportPreviewWorkspace";
-import type { ImportPreviewFileItem } from "../utils/import-preview-helpers";
+import { TariffImportConfirmLoadingModal } from "./TariffImportConfirmLoadingModal";
 
 type ExtractionSummary = {
   averageConfidence: number | null;

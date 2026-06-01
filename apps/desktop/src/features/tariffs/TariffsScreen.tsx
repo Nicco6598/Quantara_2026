@@ -58,8 +58,8 @@ import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import { type PendingWorkflowAction, useAppStore } from "@/store/app-store";
 
 import { AddVoiceDialog } from "./components/AddVoiceDialog";
-import { TariffImportDraftResumeDialog } from "./components/TariffImportDraftResumeDialog";
 import { QuickAction } from "./components/QuickAction";
+import { TariffImportDraftResumeDialog } from "./components/TariffImportDraftResumeDialog";
 import {
   TariffImportLoadingModal,
   type TariffImportLoadingStage,
@@ -75,17 +75,26 @@ import {
   isStringArray,
 } from "./state/import-meta";
 import {
-  buildImportPreviewPrewarmKey,
-  clearImportPreviewSessionCache,
-} from "./utils/import-preview-session-cache";
-import {
   fallbackContracts,
   fallbackTariffBook,
   fallbackTariffBooks,
   fallbackTariffVoices,
 } from "./tariffs-data";
 import type { EditTariffBookForm, TariffMetrics } from "./tariffs-types";
+import {
+  buildImportPreviewPrewarmKey,
+  clearImportPreviewSessionCache,
+} from "./utils/import-preview-session-cache";
 import { groupTariffVoices } from "./utils/tariff-grouping";
+import { buildConfirmTariffImportItems } from "./utils/tariff-import-confirm";
+import {
+  buildTariffPreviewsFromImportDraft,
+  deleteTariffImportDraftAsync,
+  type ImportDraft,
+  listTariffImportDraftSummariesAsync,
+  loadImportDraftByIdAsync,
+  type TariffImportDraftSummary,
+} from "./utils/tariff-import-drafts";
 import {
   buildImportPreviewToolbarSummary,
   buildLinkedProjectCountByTariffBookId,
@@ -94,15 +103,6 @@ import {
   getMetadataKey,
   getProjectTariffBookIds,
 } from "./utils/tariffs-screen-model";
-import { buildConfirmTariffImportItems } from "./utils/tariff-import-confirm";
-import {
-  buildTariffPreviewsFromImportDraft,
-  deleteTariffImportDraftAsync,
-  listTariffImportDraftSummariesAsync,
-  loadImportDraftByIdAsync,
-  type ImportDraft,
-  type TariffImportDraftSummary,
-} from "./utils/tariff-import-drafts";
 import { createTariffBookId, sanitizeIdentifier } from "./utils/tariffs-validation";
 
 function keepLatestImportPerMetadataKey(

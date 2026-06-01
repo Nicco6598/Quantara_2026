@@ -360,9 +360,19 @@ export function syncMgVoiceAllocations(
     byVoice[mgLine.voice.id] = resolveTargetLineIdsFromRefs(targetLineIds, lines);
   }
 
+  // Prune stale voice entries no longer backed by an MG line (e.g. after removing an MG voice)
+  const mgVoiceIds = new Set(
+    lines.filter((line) => line.voice && isMgVoice(line.voice)).map((line) => line.voice.id),
+  );
+  for (const voiceId of Object.keys(byVoice)) {
+    if (!mgVoiceIds.has(voiceId)) delete byVoice[voiceId];
+  }
+
   const result: SalEconomicRules = { ...rules };
   if (Object.keys(byVoice).length > 0) {
     result.mgManualAllocationsByVoiceId = byVoice;
+  } else {
+    delete result.mgManualAllocationsByVoiceId;
   }
   return result;
 }

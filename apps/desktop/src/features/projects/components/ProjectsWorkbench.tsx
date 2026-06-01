@@ -3,6 +3,7 @@ import {
   Calendar,
   Eye,
   FileSpreadsheet,
+  FileText,
   FolderKanban,
   MapPin,
   MoreVertical,
@@ -29,6 +30,7 @@ import { MOTION_VARIANTS } from "@/motion";
 type ProjectsWorkbenchProps = {
   children?: ReactNode;
   onCreateProject: () => void;
+  onCreateSal: (project: PortfolioProject) => void;
   onDeleteProject: (projectId: string) => void;
   onEditProject: (project: PortfolioProject) => void;
   onExport: () => void;
@@ -42,6 +44,7 @@ type ProjectsWorkbenchProps = {
 export const ProjectsWorkbench = memo(function ProjectsWorkbench({
   children,
   onCreateProject,
+  onCreateSal,
   onDeleteProject,
   onEditProject,
   onExport,
@@ -132,6 +135,7 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
               isSelected={project.id === selectedProjectId}
               key={project.id}
               onContextMenu={(event) => projectContextMenu.open(event, project)}
+              onCreateSal={onCreateSal}
               onDeleteProject={onDeleteProject}
               onEditProject={onEditProject}
               onOpenProject={onOpenProject}
@@ -155,6 +159,11 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
               const state = projectContextMenu.state;
               if (!state) return;
               onOpenProject(state.context);
+            },
+            onCreateSal: () => {
+              const state = projectContextMenu.state;
+              if (!state) return;
+              onCreateSal(state.context);
             },
             onEdit: () => {
               const state = projectContextMenu.state;
@@ -185,6 +194,7 @@ export const ProjectsWorkbench = memo(function ProjectsWorkbench({
 function WorkbenchRow({
   isSelected,
   onContextMenu,
+  onCreateSal,
   onDeleteProject,
   onEditProject,
   onOpenProject,
@@ -192,6 +202,7 @@ function WorkbenchRow({
 }: {
   isSelected: boolean;
   onContextMenu: (event: MouseEvent) => void;
+  onCreateSal: (project: PortfolioProject) => void;
   onDeleteProject: (projectId: string) => void;
   onEditProject: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
@@ -271,6 +282,7 @@ function WorkbenchRow({
 
       <div className="absolute right-2 top-1/2 -translate-y-1/2">
         <ProjectActionsDropdown
+          onCreateSal={onCreateSal}
           onDeleteProject={onDeleteProject}
           onEditProject={onEditProject}
           onOpenProject={onOpenProject}
@@ -442,11 +454,13 @@ function ProjectProgress({ progress, progressColor }: { progress: number; progre
 }
 
 function ProjectActionsDropdown({
+  onCreateSal,
   onDeleteProject,
   onEditProject,
   onOpenProject,
   project,
 }: {
+  onCreateSal: (project: PortfolioProject) => void;
   onDeleteProject: (projectId: string) => void;
   onEditProject: (project: PortfolioProject) => void;
   onOpenProject: (project: PortfolioProject) => void;
@@ -476,6 +490,14 @@ function ProjectActionsDropdown({
           onClick={() => {
             setIsOpen(false);
             onOpenProject(project);
+          }}
+        />
+        <DropdownItem
+          icon={FileText}
+          label="Nuova SAL"
+          onClick={() => {
+            setIsOpen(false);
+            onCreateSal(project);
           }}
         />
         <DropdownItem

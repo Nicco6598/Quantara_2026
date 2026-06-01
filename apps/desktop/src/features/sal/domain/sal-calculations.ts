@@ -27,29 +27,19 @@ export function isMgCode(code: string): boolean {
 /** True MG voices are percentage-based surcharges (night/holiday/interruption work),
  *  not regular tariff items that happen to have .MG. in their code.
  *
- *  Heuristic (in order):
- *    1. Category suffix `| PERCENTUALE` from the PDF parser → MG.
- *    2. Category suffix `| EURO` → regular (economic MG that was flagged in error).
- *    3. `laborPercentage > 0` → MG (labour‑cost‑proportional surcharge).
- *    4. `unit === "%"` → MG (flat‑percentage surcharge, e.g. 10 % on target line).
- *    5. Otherwise → regular.
+ *  A voice is MG iff `unit === "%"`. The `.MG.` code segment alone is
+ *  insufficient — many tariff voices with `.MG.` in the code have a real
+ *  euro price (e.g. "BA.MG.B.3100.E") and must be treated as regular lines.
  *
- *  Does NOT consult `source.isMaggiorazione` — the DB flag was set for ~100+
+ *  Does NOT consult `voice.isMaggiorazione` — the DB flag was set for ~100+
  *  economic (euro‑priced) MG voices that should be treated as regular lines. */
 export function isMgVoice(voice: {
-  code: string;
+  code?: string;
   category?: string;
   unit?: string;
   laborPercentage?: number | null;
 }): boolean {
-  const hasMgSegment = voice.code.toUpperCase().includes(".MG.");
-  if (!hasMgSegment) return false;
-
-  const cat = voice.category ?? "";
-  if (/\|\s*PERCENTUALE\b/i.test(cat)) return true;
-  if (/\|\s*EURO\b/i.test(cat)) return false;
-
-  return (voice.laborPercentage ?? 0) > 0 || voice.unit === "%";
+  return voice.unit === "%";
 }
 
 export function extractMgTariffPrefix(code: string): string | null {
@@ -166,7 +156,15 @@ export function buildLineViews(
       if (ev.grossAmount <= 0) continue;
 
       const laborPct = ev.voice.laborPercentage ?? 0;
-      const mgShare = computeMgOnLaborPortion(ev.grossAmount, mgPercent, laborPct);
+      // "Normalized" MG voci (.MG. in code, unit !== "%", prezzo fisso)
+      // non hanno laborPct nel tariffario — assumiamo 100% manodopera
+      const effectiveLaborPct =
+        laborPct <= 0 &&
+        (ev.voice.code?.toUpperCase().includes(".MG.") ?? false) &&
+        ev.voice.unit !== "%"
+          ? 100
+          : laborPct;
+      const mgShare = computeMgOnLaborPortion(ev.grossAmount, mgPercent, effectiveLaborPct);
       if (mgShare <= 0) continue;
       totalDistributedMg += mgShare;
 

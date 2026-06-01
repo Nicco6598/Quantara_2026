@@ -1,4 +1,14 @@
-import { ArrowRight, Copy, Database, Eye, Pencil, Star, ThumbsUp, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  Copy,
+  Database,
+  Eye,
+  FileText,
+  Pencil,
+  Star,
+  ThumbsUp,
+  Trash2,
+} from "lucide-react";
 import {
   type AppContextMenuEntry,
   contextMenuItem,
@@ -8,10 +18,17 @@ import {
 export function buildProjectRowContextMenuEntries(actions: {
   onOpen: () => void;
   onEdit: () => void;
+  onCreateSal: () => void;
   onDelete: () => void;
 }): AppContextMenuEntry[] {
   return [
     contextMenuItem({ id: "open", icon: Eye, label: "Apri dossier", onSelect: actions.onOpen }),
+    contextMenuItem({
+      id: "new-sal",
+      icon: FileText,
+      label: "Nuova SAL",
+      onSelect: actions.onCreateSal,
+    }),
     contextMenuItem({
       id: "edit",
       icon: Pencil,

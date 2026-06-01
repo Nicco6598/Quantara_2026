@@ -14,5 +14,14 @@ export function readJsonFromStorage<T>(
 }
 
 export function writeJsonToStorage(storage: Storage, key: string, value: unknown): void {
-  storage.setItem(key, JSON.stringify(value));
+  try {
+    storage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.error(
+      `[writeJsonToStorage] failed to save key="${key}"`,
+      err,
+      typeof value === "object" && value ? { keys: Object.keys(value as object) } : null,
+    );
+    throw err;
+  }
 }

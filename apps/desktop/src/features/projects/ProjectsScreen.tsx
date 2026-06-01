@@ -51,7 +51,11 @@ import {
 } from "@/lib/desktopData";
 import { dispatchDataChanged } from "@/lib/sync-events";
 import { cn } from "@/lib/utils";
-import { beginProjectCreate, selectProjectForWorkflow } from "@/lib/workflow-navigation";
+import {
+  beginProjectCreate,
+  clearResumeSalDraftId,
+  selectProjectForWorkflow,
+} from "@/lib/workflow-navigation";
 import { STORAGE_KEYS } from "@/persistence/storage-keys";
 import {
   type PendingWorkflowAction,
@@ -293,6 +297,12 @@ export function ProjectsScreen() {
     navigate("project-detail");
   }
 
+  function handleCreateSal(project: PortfolioProject) {
+    selectProjectForWorkflow(project.id);
+    clearResumeSalDraftId();
+    navigate("sal-create");
+  }
+
   async function handleCreateContractor(name?: string) {
     const contractorName = normalizeContractorName(name ?? contractorDraft);
 
@@ -499,6 +509,7 @@ export function ProjectsScreen() {
               managerLoadCount={managerLoad.length}
               onBack={handleBackFromContractor}
               onCreateProject={handleOpenCreateProject}
+              onCreateSal={handleCreateSal}
               onExport={openExportDialog}
               onFocusChange={(nextFocus) => startTransition(() => setFocus(nextFocus))}
               onImport={() => fileInputRef.current?.click()}

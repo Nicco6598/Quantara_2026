@@ -1,7 +1,6 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 import type { DesktopTariffVoice, TariffPdfMetadata } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
-import type { VoiceGroup } from "./tariff-grouping";
 import type { ImportPreviewGridLayout } from "./import-preview-grid-layout";
 import {
   getImportPreviewSessionCache,
@@ -10,14 +9,16 @@ import {
 } from "./import-preview-session-cache";
 import {
   formatMaggiorazioneDisplayCells,
-  isMaggiorazioneVoice,
   getImportVoiceBreakdown,
-  splitRegularAndMaggiorazioni,
   type ImportVoiceBreakdown,
+  isMaggiorazioneVoice,
+  splitRegularAndMaggiorazioni,
 } from "./import-preview-voice-split";
+import type { VoiceGroup } from "./tariff-grouping";
 
 export type { ImportVoiceBreakdown };
 export { getImportVoiceBreakdown };
+
 import {
   enrichValidationRows,
   getBlockingIssueCount,
@@ -26,14 +27,12 @@ import {
   type ImportValidationRow,
 } from "./tariffs-validation";
 
-export { formatMaggiorazioneDisplayCells, isMaggiorazioneVoice, splitRegularAndMaggiorazioni };
-
 export {
   prewarmImportPreviewSession,
   prewarmImportPreviewVoices,
 } from "./import-preview-session-cache";
-
 export type { ImportCrossFileErrorRow, ImportValidationRow };
+export { formatMaggiorazioneDisplayCells, isMaggiorazioneVoice, splitRegularAndMaggiorazioni };
 
 export function buildAllImportErrorRows(input: {
   activeFileIndex: number;

@@ -1,6 +1,6 @@
 import type { DesktopTariffVoice } from "@/lib/desktopData";
-import type { VoiceGroup } from "./tariff-grouping";
 import { isImportCustomVoice } from "./import-preview-voice-split";
+import type { VoiceGroup } from "./tariff-grouping";
 
 export type TariffGridSection = {
   categoria: string;

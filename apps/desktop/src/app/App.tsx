@@ -587,6 +587,10 @@ function AppShell() {
     install: { phase: "idle" },
   });
 
+  const prevSidebarBeforeAutoRef = useRef<boolean | null>(null);
+  const isFullscreenAutoRoute =
+    activeRoute === "sal-create" || activeRoute === "project-create" || tariffImportPreviewActive;
+
   useEffect(() => {
     document.documentElement.dataset.motion = motionMode;
   }, [motionMode]);
@@ -917,6 +921,22 @@ function AppShell() {
     media.addEventListener("change", syncSidebarForViewport);
     return () => media.removeEventListener("change", syncSidebarForViewport);
   }, []);
+
+  useEffect(() => {
+    if (isFullscreenAutoRoute) {
+      if (prevSidebarBeforeAutoRef.current === null) {
+        prevSidebarBeforeAutoRef.current = isSidebarCollapsed;
+      }
+      setIsSidebarCollapsed(true);
+    } else {
+      if (prevSidebarBeforeAutoRef.current !== null) {
+        const smallViewport =
+          typeof window !== "undefined" && window.matchMedia?.("(max-width: 899px)").matches;
+        setIsSidebarCollapsed(smallViewport ? true : prevSidebarBeforeAutoRef.current);
+        prevSidebarBeforeAutoRef.current = null;
+      }
+    }
+  }, [isFullscreenAutoRoute, isSidebarCollapsed]);
 
   return (
     <div

@@ -22,9 +22,9 @@ import {
 } from "@/lib/context-menu-presets";
 import type { DesktopTariffVoice, TariffWarning } from "@/lib/desktopData";
 import type { ImportValidation } from "../tariffs-types";
-import type { VoiceGroup } from "../utils/tariff-grouping";
 import type { ImportPreviewGridLayout } from "../utils/import-preview-grid-layout";
 import { isImportCustomVoice } from "../utils/import-preview-voice-split";
+import type { VoiceGroup } from "../utils/tariff-grouping";
 import { formatEditablePercent } from "../utils/tariffs-validation";
 
 const CELL_BASE =

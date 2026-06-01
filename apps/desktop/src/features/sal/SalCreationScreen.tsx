@@ -941,7 +941,14 @@ export function SalCreationScreen() {
 
     try {
       const { serializeSalDetailReportWorkbook } = await import("@quantara/excel-import");
-      const fileName = `quantara-sal-${slugify(salTitle.trim() || suggestedSalTitle)}-${salDate}.xlsx`;
+      const fileName = buildSalExportFileName({
+        applicationContractCode: project.applicationContractCode,
+        date: salDate,
+        extension: "xlsx",
+        frameworkAgreementCode: project.frameworkAgreementCode,
+        salTitle: salTitle.trim() || suggestedSalTitle,
+        variant: "excel",
+      });
       await waitForUiPaint();
       const savedPath = await saveWorkbookAs(
         await serializeSalDetailReportWorkbook({
@@ -1043,7 +1050,14 @@ export function SalCreationScreen() {
           summary,
           title: salTitle.trim() || suggestedSalTitle,
         });
-        const fileBase = `quantara-${kind}-${slugify(salTitle.trim() || suggestedSalTitle)}-${salDate}.pdf`;
+        const fileBase = buildSalExportFileName({
+          applicationContractCode: project.applicationContractCode,
+          date: salDate,
+          extension: "pdf",
+          frameworkAgreementCode: project.frameworkAgreementCode,
+          salTitle: salTitle.trim() || suggestedSalTitle,
+          variant: kind,
+        });
         const bytes =
           kind === "libretto"
             ? serializeMeasurementBookPdf(reportInput)
@@ -1358,7 +1372,14 @@ function buildPdfSalReportInput({
       discountableAmount: line.discountableAmount,
       grossAmount: line.grossAmount,
       id: line.id,
-      linkedCharges: line.linkedCharges,
+      linkedCharges: line.linkedCharges.map((charge) => ({
+        baseAmount: charge.baseAmount,
+        code: charge.code,
+        description: charge.description,
+        id: charge.id,
+        percent: charge.percent,
+        total: charge.total,
+      })),
       measurementRows: line.measurementRows.map((row) => ({
         date: row.date,
         description: row.description,
@@ -1380,6 +1401,10 @@ function buildPdfSalReportInput({
         code: line.voice.code,
         description: line.voice.description,
         isSafetyCost: line.voice.isSafetyCost,
+        // Authoritative flag for fiscal PDF filtering:
+        // excludes real MG voices + normalized surcharge voices (OS/BA etc. treated as MG in this SAL)
+        // while keeping de-normalized voices as normal productive lines.
+        isSurchargeVoice: isMgVoice(line.voice) || line.surchargePercent > 0,
         unit: line.voice.unit,
         unitPrice: line.voice.unitPrice,
       },
@@ -1480,14 +1505,54 @@ function Currency({ value }: { value: number }) {
   );
 }
 
-function slugify(value: string): string {
-  return (
+type SalExportFileVariant = "excel" | "libretto" | "sal" | "stampa";
+
+function buildSalExportFileName(opts: {
+  salTitle: string;
+  applicationContractCode: string;
+  frameworkAgreementCode: string;
+  date: string;
+  extension: "pdf" | "xlsx";
+  variant: SalExportFileVariant;
+}): string {
+  const title = slugifyFileSegment(opts.salTitle, 36);
+  const ca = slugifyFileSegment(opts.applicationContractCode, 28);
+  const cq = slugifyFileSegment(opts.frameworkAgreementCode, 28);
+  const date = formatSalExportDate(opts.date);
+
+  const kindLabel =
+    opts.variant === "libretto"
+      ? "Libretto"
+      : opts.variant === "stampa"
+        ? "Contabile"
+        : opts.variant === "excel"
+          ? "Dettaglio"
+          : "Report";
+
+  return `SAL_${kindLabel}_${title}_${ca}_${cq}_${date}.${opts.extension}`;
+}
+
+function slugifyFileSegment(value: string, maxLength: number): string {
+  const segment =
     value
+      .trim()
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 48) || "sal"
-  );
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, maxLength) || "na";
+  return segment;
+}
+
+function formatSalExportDate(value: string): string {
+  if (!value.trim()) return "senza_data";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return slugifyFileSegment(value, 16);
+  }
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }

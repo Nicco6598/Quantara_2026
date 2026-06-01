@@ -2,6 +2,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { m } from "framer-motion";
 import {
   AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpToLine,
   BookOpen,
   Check,
   ChevronDown,
@@ -9,17 +11,17 @@ import {
   ChevronsDown,
   ChevronsUp,
   Copy,
+  CopyPlus,
   Download,
   FileText,
-  ListChecks,
   Loader2,
   MoreHorizontal,
   Percent,
   Plus,
   Trash2,
-  X,
 } from "lucide-react";
 import {
+  Fragment,
   memo,
   type ClipboardEvent as ReactClipboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -30,17 +32,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
 import { Currency } from "@/components/shared/Currency";
-import { Dialog, DialogActions } from "@/components/shared/Dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DatePicker } from "@/components/shared/form";
-import { Panel } from "@/components/shared/Panel";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { SPRING_EASE } from "@/motion";
 import type { SalTemplate } from "@/store/template-store";
 import type { SalVoiceSearchIndex } from "../hooks/useSalVoiceSearchIndex";
+import { MaggiorazioniHeaderCluster } from "./MaggiorazioniStepPanel";
+import { MgAllocationPanel } from "./MgAllocationPanel";
 import {
   buildSalContextMenuEntries,
   type SalContextMenuScope,
@@ -52,11 +52,7 @@ import { TemplatePicker } from "./TemplatePicker";
 export { Currency };
 
 import { cn } from "@/lib/utils";
-import {
-  extractMgTariffPrefix,
-  getMgAssignableTargetLines,
-  isMgVoice,
-} from "../domain/sal-calculations";
+import { extractMgTariffPrefix, isMgVoice } from "../domain/sal-calculations";
 import { shouldUseNativeClipboard, shouldUseNativePaste } from "../domain/sal-clipboard-events";
 import { buildMeasurementTarget } from "../domain/sal-measurement-target";
 import type {
@@ -106,7 +102,7 @@ const MEASURE_GRID_COLS =
   "grid-cols-[40px_minmax(130px,0.8fr)_minmax(140px,0.9fr)_minmax(240px,1.6fr)_minmax(80px,0.55fr)_minmax(80px,0.55fr)_minmax(80px,0.55fr)_minmax(112px,0.7fr)_minmax(180px,1.1fr)_80px]";
 const MEASURE_MIN_WIDTH = "w-full min-w-[980px]";
 const MEASURE_INPUT_CLASS =
-  "h-9 w-full rounded-md border border-[var(--border-subtle)]/45 bg-[var(--surface-base)]/70 px-2.5 text-14px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] hover:border-[var(--accent-primary)]/35 focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]";
+  "h-9 w-full rounded-md border border-[var(--border-subtle)]/45 bg-[var(--surface-base)]/70 px-2.5 text-14px font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-secondary)] hover:border-[var(--accent-primary)]/35 focus:border-[var(--accent-primary)] focus:bg-[var(--surface-base)] focus:ring-2 focus:ring-[var(--ring-focus)]";
 
 function ColumnHeader({
   columnKey,
@@ -195,8 +191,8 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
   onPasteMeasurementRowAt?: (lineId: string, insertIndex: number) => void;
   selectedMeasurementRow?: { lineId: string; rowIndex: number } | null;
   onSelectMeasurementRow?: (lineId: string, rowIndex: number) => void;
-  canPasteVoice?: boolean;
-  canPasteMeasurements?: boolean;
+  canPasteVoice?: boolean | undefined;
+  canPasteMeasurements?: boolean | undefined;
   getVoiceClipboardText: (lineId: string) => string | null;
   getMeasurementsClipboardText: (lineId: string) => string | null;
   getMeasurementRowClipboardText?: (lineId: string, rowIndex: number) => string | null;
@@ -517,6 +513,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
         onPasteClipboardText={onPasteClipboardText}
         {...(onCopyMeasurements ? { onCopyMeasurements } : {})}
         {...(onCopyMeasurementRow ? { onCopyMeasurementRow } : {})}
+        {...(onCopyMeasurementRowFull ? { onCopyMeasurementRowFull } : {})}
         {...(selectedMeasurementRow ? { selectedMeasurementRow } : {})}
         {...(onSelectMeasurementRow ? { onSelectMeasurementRow } : {})}
         onAddMeasurementRow={onAddMeasurementRow}
@@ -550,6 +547,7 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
       onRemoveMeasurementRow,
       handleToggleRow,
       onUpdateMeasurementRow,
+      onCopyMeasurementRowFull,
     ],
   );
 
@@ -563,37 +561,35 @@ export const SelectedVoicesPanel = memo(function SelectedVoicesPanel({
         }${safetyLines.length > 0 ? `, ${safetyLines.length} OS` : ""}`;
   return (
     <section className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)]/40 bg-[var(--surface-base)]">
-      {mgLines.length > 0 || tariffMgSignals.length > 0 || manualSurchargeLines.length > 0 ? (
-        <div className="border-b border-[var(--border-subtle)]/30 bg-[var(--bg-muted)]/20 p-2">
-          <MaggiorazioniStepPanel
-            economicRules={economicRules}
-            lines={tableLines}
-            manualSurchargeLines={manualSurchargeLines}
-            mgLines={mgLines}
-            suggestedMgVoices={suggestedMgVoices}
-            tariffMgSignals={tariffMgSignals}
-            onAddMgVoice={onAddMgVoice}
-            onApplyAllocation={onAllocateMg}
-            onOpenAllocation={setAllocPanelMgId}
-            onOpenMgContextMenu={(mgLineId, event) =>
-              openSalContextMenu(mgLineId, "mg-line", event)
-            }
-            onRemove={onRemove}
-          />
-        </div>
-      ) : null}
-
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-base)]">
         <div className="z-20 shrink-0 bg-[var(--surface-base)]">
           <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-base)]">
             <div className="grid grid-cols-1 items-center gap-3 px-4 py-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,520px)_minmax(0,1fr)]">
-              <div className="min-w-0 lg:justify-self-start">
-                <span className="text-15px font-bold text-[var(--text-primary)]">
-                  Registro misure
-                </span>
-                <span className="ml-2 text-13px font-semibold text-[var(--text-secondary)]">
-                  {summaryText}
-                </span>
+              <div className="flex min-w-0 flex-col gap-1 lg:justify-self-start">
+                <div className="flex items-center gap-2">
+                  <span className="text-15px font-bold text-[var(--text-primary)]">
+                    Registro misure
+                  </span>
+                  <span className="text-13px font-semibold text-[var(--text-secondary)]">
+                    {summaryText}
+                  </span>
+                </div>
+
+                {/* Maggiorazioni — completely rethought as compact inline cluster (no separate panel) */}
+                <MaggiorazioniHeaderCluster
+                  economicRules={economicRules}
+                  lines={tableLines}
+                  manualSurchargeLines={manualSurchargeLines}
+                  mgLines={mgLines}
+                  suggestedMgVoices={suggestedMgVoices}
+                  tariffMgSignals={tariffMgSignals}
+                  onAddMgVoice={onAddMgVoice}
+                  onOpenAllocation={setAllocPanelMgId}
+                  onOpenMgContextMenu={(mgLineId, event) =>
+                    openSalContextMenu(mgLineId, "mg-line", event)
+                  }
+                  onRemove={onRemove}
+                />
               </div>
 
               {search ? (
@@ -966,552 +962,10 @@ function buildSuggestedMgVoices(
   return suggestions.slice(0, 6);
 }
 
-function getManualSurchargeTotal(line: SalLineView): number {
-  return line.linkedCharges
-    .filter((charge) => !charge.code.startsWith("MG."))
-    .reduce((sum, charge) => sum + charge.total, 0);
-}
-
 function getMgLinkedTotal(line: SalLineView): number {
   return line.linkedCharges
     .filter((charge) => charge.code.startsWith("MG."))
     .reduce((sum, charge) => sum + charge.total, 0);
-}
-
-function MaggiorazioniStepPanel({
-  economicRules,
-  lines,
-  manualSurchargeLines,
-  mgLines,
-  suggestedMgVoices,
-  tariffMgSignals,
-  onAddMgVoice,
-  onApplyAllocation,
-  onOpenAllocation,
-  onOpenMgContextMenu,
-  onRemove,
-}: {
-  economicRules: SalEconomicRules;
-  lines: SalLineView[];
-  manualSurchargeLines: SalLineView[];
-  mgLines: SalLineView[];
-  suggestedMgVoices: SalVoiceDraft[];
-  tariffMgSignals: SalLineView[];
-  onAddMgVoice: (voice: SalVoiceDraft) => void;
-  onApplyAllocation: (mgLineId: string, targetLineIds: string[]) => void;
-  onOpenAllocation: (mgLineId: string) => void;
-  onOpenMgContextMenu?: (mgLineId: string, event: ReactMouseEvent) => void;
-  onRemove: (mgLineId: string) => void;
-}) {
-  const totalMg = lines.reduce((sum, line) => sum + getMgLinkedTotal(line), 0);
-  const manualTotal = manualSurchargeLines.reduce(
-    (sum, line) => sum + getManualSurchargeTotal(line),
-    0,
-  );
-  const pendingSignals = tariffMgSignals.filter(
-    (line) => getMgLinkedTotal(line) <= 0 && line.surchargePercent <= 0,
-  );
-
-  const [collapsed, setCollapsed] = useState(mgLines.length > 3);
-  const visibleMg = collapsed ? mgLines.slice(0, 3) : mgLines;
-  const visibleSignals = tariffMgSignals.slice(0, 2);
-  const hasMoreMg = mgLines.length > 3;
-  const hasMoreSignals = tariffMgSignals.length > visibleSignals.length;
-
-  return (
-    <div className="shrink-0 border-b border-[var(--border-subtle)]/25 bg-[var(--bg-muted)]/30 px-3 py-2.5">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="inline-flex h-6 items-center gap-1 rounded-md bg-[var(--info-soft)] px-2 text-11px font-black uppercase tracking-wider text-[var(--info-base)]">
-          <Percent className="size-3.5" />
-          Maggiorazioni
-        </span>
-        <span className="text-11px text-[var(--text-tertiary)]">
-          Non si applicano finché non scegli le voci destinatarie
-        </span>
-        {pendingSignals.length > 0 ? (
-          <span className="inline-flex h-5 items-center gap-1 rounded bg-[var(--warning-soft)] px-1.5 text-10px font-bold text-[var(--warning-base)]">
-            <AlertTriangle className="size-3" />
-            {pendingSignals.length} da valutare
-          </span>
-        ) : null}
-        <span className="ml-auto font-mono text-11px font-bold tabular-nums text-[var(--info-base)]">
-          +<Currency value={totalMg + manualTotal} />
-        </span>
-      </div>
-
-      {mgLines.length > 0 || tariffMgSignals.length > 0 ? (
-        <div className="flex flex-wrap items-start gap-1.5">
-          {visibleMg.map((mgLine) => (
-            <MgRuleCard
-              compact
-              economicRules={economicRules}
-              key={mgLine.id}
-              lines={lines}
-              mgLine={mgLine}
-              onApplyAllocation={onApplyAllocation}
-              onOpenAllocation={onOpenAllocation}
-              {...(onOpenMgContextMenu ? { onOpenContextMenu: onOpenMgContextMenu } : {})}
-              onRemove={onRemove}
-            />
-          ))}
-          {hasMoreMg ? (
-            <button
-              className="inline-flex h-7 items-center rounded border border-dashed border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/70 px-2 text-10px font-bold text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)]/40 hover:text-[var(--accent-primary)]"
-              onClick={() => setCollapsed(!collapsed)}
-              type="button"
-            >
-              {collapsed ? `+${mgLines.length - 3} MG` : "Meno"}
-            </button>
-          ) : null}
-          {visibleSignals.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {visibleSignals.map((line) => (
-                <span
-                  className="inline-flex h-6 items-center gap-1 rounded bg-[var(--warning-soft)]/40 px-1.5 text-10px font-bold text-[var(--warning-base)]"
-                  key={line.id}
-                >
-                  <AlertTriangle className="size-3" />
-                  {line.voice.code} segnala MG
-                </span>
-              ))}
-              {hasMoreSignals ? (
-                <span className="text-10px font-semibold text-[var(--text-tertiary)]">
-                  +{tariffMgSignals.length - visibleSignals.length}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <EmptyState
-          className="p-3"
-          description="Le maggiorazioni si generano dalle voci collegate nel tariffario."
-          icon={Percent}
-          title="Nessuna voce MG"
-        />
-      )}
-
-      {suggestedMgVoices.length > 0 ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 rounded bg-[var(--info-soft)]/30 px-2 py-1.5">
-          <span className="mr-1 flex items-center gap-1 text-10px font-black uppercase tracking-wider text-[var(--info-base)]">
-            <ListChecks className="size-3" />
-            Suggerite
-          </span>
-          {suggestedMgVoices.map((voice) => (
-            <button
-              className="inline-flex h-7 items-center gap-1.5 rounded bg-[var(--surface-base)] px-2 text-10px font-bold text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]/60 transition-colors hover:bg-[var(--bg-muted)] hover:text-[var(--accent-primary)]"
-              key={voice.id}
-              onClick={() => onAddMgVoice(voice)}
-              type="button"
-            >
-              <Plus className="size-3 text-[var(--info-base)]" />
-              <span className="font-mono">{voice.code}</span>
-              <span className="text-[var(--text-tertiary)]">
-                {voice.unitPrice.toLocaleString("it-IT")}%
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function buildSalLineDisplayMeta(lineViews: readonly SalLineView[]) {
-  const lineNumberById = new Map<string, number>();
-  const countByCode = new Map<string, number>();
-  let rowNumber = 0;
-  for (const line of lineViews) {
-    if (isMgRow(line.voice)) continue;
-    rowNumber += 1;
-    lineNumberById.set(line.id, rowNumber);
-    countByCode.set(line.voice.code, (countByCode.get(line.voice.code) ?? 0) + 1);
-  }
-  return { countByCode, lineNumberById };
-}
-
-function getMgAllocationState(
-  economicRules: SalEconomicRules,
-  mgLineId: string,
-): "active" | "inactive" {
-  const manualAlloc = economicRules.mgManualAllocations?.[mgLineId];
-  if (manualAlloc && manualAlloc.length > 0) return "active";
-  return "inactive";
-}
-
-function MgRuleCard({
-  compact,
-  economicRules,
-  lines,
-  mgLine,
-  onApplyAllocation,
-  onOpenAllocation,
-  onOpenContextMenu,
-  onRemove,
-}: {
-  compact?: boolean;
-  economicRules: SalEconomicRules;
-  lines: SalLineView[];
-  mgLine: SalLineView;
-  onApplyAllocation: (mgLineId: string, targetLineIds: string[]) => void;
-  onOpenAllocation: (mgLineId: string) => void;
-  onOpenContextMenu?: (mgLineId: string, event: ReactMouseEvent) => void;
-  onRemove: (mgLineId: string) => void;
-}) {
-  const manualAlloc = economicRules.mgManualAllocations?.[mgLine.id];
-  const allocState = getMgAllocationState(economicRules, mgLine.id);
-  const eligibleTargets = getMgAssignableTargetLines(lines);
-  const targetCount = manualAlloc?.length ?? 0;
-  const total = mgLine.linkedCharges.find((entry) => entry.code.startsWith("MG."))?.total ?? 0;
-  const isActive = allocState === "active";
-
-  if (compact) {
-    return (
-      <>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: MG allocation chip opens a context menu on right-click */}
-        <div
-          className={cn(
-            "inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1.5 text-11px",
-            isActive
-              ? "border-[var(--accent-primary)]/35 bg-[var(--accent-primary)]/[0.05]"
-              : "border-[var(--border-subtle)]/45 bg-[var(--surface-base)]",
-          )}
-          onContextMenu={
-            onOpenContextMenu ? (event) => onOpenContextMenu(mgLine.id, event) : undefined
-          }
-        >
-          <span className="font-mono text-12px font-black text-[var(--text-primary)]">
-            {mgLine.voice.code}
-          </span>
-          <span className="inline-flex items-center rounded-md bg-[var(--info-soft)] px-1.5 py-0.5 text-10px font-black tabular-nums text-[var(--info-base)]">
-            {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
-          </span>
-          <span
-            className={cn(
-              "rounded-md px-1.5 py-0.5 text-10px font-bold uppercase tracking-wide",
-              isActive
-                ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-                : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
-            )}
-          >
-            {isActive
-              ? `Attiva · ${targetCount} voc${targetCount === 1 ? "e" : "i"}`
-              : "Non applicata"}
-          </span>
-          <span className="font-mono text-12px font-bold tabular-nums text-[var(--accent-primary)]">
-            <Currency value={total} />
-          </span>
-          <Button
-            className={cn(
-              "h-7 px-2 text-10px font-bold",
-              isActive && "text-[var(--accent-primary)]",
-            )}
-            onClick={() => onOpenAllocation(mgLine.id)}
-            size="sm"
-            type="button"
-            variant={isActive ? "secondary" : "primary"}
-          >
-            {isActive ? "Modifica voci" : "Assegna voci"}
-          </Button>
-          {isActive ? (
-            <Button
-              className="h-7 px-2 text-10px text-[var(--text-secondary)]"
-              onClick={() => onApplyAllocation(mgLine.id, [])}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              Disattiva
-            </Button>
-          ) : null}
-          <button
-            aria-label={`Rimuovi ${mgLine.voice.code}`}
-            className="flex size-6 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
-            onClick={() => onRemove(mgLine.id)}
-            type="button"
-          >
-            <X className="size-3.5" />
-          </button>
-        </div>
-      </>
-    );
-  }
-
-  return (
-    <>
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: MG allocation panel opens a context menu on right-click */}
-      <div
-        className={cn(
-          "grid gap-3 rounded-lg border bg-[var(--surface-base)] p-3 shadow-sm md:grid-cols-[minmax(0,1fr)_auto]",
-          isActive ? "border-[var(--accent-primary)]/35" : "border-[var(--border-subtle)]/55",
-        )}
-        onContextMenu={
-          onOpenContextMenu ? (event) => onOpenContextMenu(mgLine.id, event) : undefined
-        }
-      >
-        <div className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="truncate font-mono text-13px font-black text-[var(--text-primary)]">
-              {mgLine.voice.code}
-            </span>
-            <span className="rounded-md bg-[var(--info-soft)] px-2 py-0.5 text-11px font-black text-[var(--info-base)]">
-              {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
-            </span>
-            <span
-              className={cn(
-                "rounded-md px-2 py-0.5 text-10px font-bold uppercase tracking-wide",
-                isActive
-                  ? "bg-[var(--success-soft)] text-[var(--success-base)]"
-                  : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
-              )}
-            >
-              {isActive
-                ? `Attiva su ${targetCount} voc${targetCount === 1 ? "e" : "i"}`
-                : "Non applicata"}
-            </span>
-          </div>
-          <p className="mt-1.5 text-12px text-[var(--text-tertiary)]">
-            {isActive
-              ? `Maggiorazione calcolata sulle ${targetCount} voci selezionate.`
-              : `${eligibleTargets.length} voc${eligibleTargets.length === 1 ? "e operativa" : "i operative"} nel SAL · scegli a quali applicarla.`}
-          </p>
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <Button
-              className={cn(
-                "h-8 px-3 text-11px font-bold",
-                isActive && "text-[var(--accent-primary)]",
-              )}
-              disabled={eligibleTargets.length === 0}
-              onClick={() => onOpenAllocation(mgLine.id)}
-              size="sm"
-              type="button"
-              variant={isActive ? "secondary" : "primary"}
-            >
-              {isActive ? "Modifica voci destinatarie" : "Scegli voci destinatarie"}
-            </Button>
-            {isActive ? (
-              <Button
-                className="h-8 px-3 text-11px"
-                onClick={() => onApplyAllocation(mgLine.id, [])}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                Disattiva maggiorazione
-              </Button>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex min-w-[120px] items-center justify-between gap-2 md:justify-end">
-          <div className="text-right">
-            <div className="text-12px font-black tabular-nums text-[var(--accent-primary)]">
-              <Currency value={total} />
-            </div>
-            <div className="text-10px font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
-              importo MG
-            </div>
-          </div>
-          <button
-            aria-label={`Rimuovi ${mgLine.voice.code}`}
-            className="flex size-8 items-center justify-center rounded-md text-[var(--text-tertiary)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
-            onClick={() => onRemove(mgLine.id)}
-            title="Rimuovi voce MG dal SAL"
-            type="button"
-          >
-            <X className="size-3.5" />
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function MgAllocationPanel({
-  economicRules,
-  lineViews,
-  mgLine,
-  onClose,
-  onSave,
-}: {
-  economicRules: SalEconomicRules;
-  lineViews: SalLineView[];
-  mgLine: SalLineView;
-  onClose: () => void;
-  onSave: (mgLineId: string, targetLineIds: string[]) => void;
-}) {
-  const eligible = useMemo(() => getMgAssignableTargetLines(lineViews), [lineViews]);
-  const { countByCode, lineNumberById } = useMemo(
-    () => buildSalLineDisplayMeta(lineViews),
-    [lineViews],
-  );
-  const tariffPrefix = extractMgTariffPrefix(mgLine.voice.code);
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const selectedRef = useRef(selected);
-  selectedRef.current = selected;
-
-  useEffect(() => {
-    const alloc = economicRules.mgManualAllocations?.[mgLine.id] ?? [];
-    const assignableIds = new Set(eligible.map((line) => line.id));
-    setSelected((prev) => {
-      const next = new Set(alloc.filter((id) => assignableIds.has(id)));
-      if (prev.size === next.size && [...next].every((id) => prev.has(id))) return prev;
-      return next;
-    });
-  }, [eligible, mgLine.id, economicRules.mgManualAllocations]);
-
-  const allSelected = selected.size === eligible.length;
-  const someSelected = selected.size > 0 && !allSelected;
-
-  const handleToggleAll = useCallback(() => {
-    setSelected((prev) => {
-      if (prev.size === eligible.length) return new Set();
-      return new Set(eligible.map((l) => l.id));
-    });
-  }, [eligible]);
-
-  const handleToggle = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const handleSave = useCallback(() => {
-    onSave(mgLine.id, [...selectedRef.current]);
-    onClose();
-  }, [onSave, mgLine.id, onClose]);
-
-  const handleRemove = useCallback(() => {
-    onSave(mgLine.id, []);
-    onClose();
-  }, [onSave, mgLine.id, onClose]);
-
-  return (
-    <Dialog className="max-w-xl" contentClassName="p-0" isOpen onClose={onClose} title="">
-      <Panel padding="none">
-        <div className="border-b border-[var(--border-subtle)]/40 px-5 py-4">
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)]/[0.1]">
-              <ListChecks className="size-5 text-[var(--accent-primary)]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-14px font-bold text-[var(--text-primary)]">
-                {mgLine.voice.code}
-                <span className="ml-2 font-mono text-[var(--accent-primary)]">
-                  {mgLine.voice.unitPrice.toLocaleString("it-IT")}%
-                </span>
-              </h3>
-              <p className="mt-0.5 text-12px text-[var(--text-tertiary)]">
-                Assegnazione sulle voci inserite nel SAL
-                <span className="ml-1.5 inline-flex items-center gap-1">
-                  <Badge variant="info">{eligible.length} disponibili</Badge>
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {eligible.length === 0 ? (
-          <div className="px-5 py-8 text-center text-13px text-[var(--text-tertiary)]">
-            Nessuna voce operativa
-            {tariffPrefix ? ` con prefisso ${tariffPrefix}` : ""} nel SAL disponibile per
-            l&apos;assegnazione.
-          </div>
-        ) : (
-          <>
-            <div className="px-5 py-3">
-              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg bg-[var(--bg-muted)]/25 px-3 py-2.5 text-12px font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-muted)]/40">
-                <input
-                  checked={allSelected}
-                  className="size-4 rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--ring-focus)]"
-                  onChange={handleToggleAll}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected;
-                  }}
-                  type="checkbox"
-                />
-                <span>{allSelected ? "Deseleziona tutto" : "Seleziona tutto"}</span>
-                <span className="ml-auto font-mono text-11px tabular-nums text-[var(--text-tertiary)]">
-                  {selected.size}/{eligible.length}
-                </span>
-              </label>
-            </div>
-
-            <div className="max-h-[300px] overflow-y-auto border-t border-[var(--border-subtle)]/30">
-              {eligible.map((line, idx) => {
-                const rowNumber = lineNumberById.get(line.id);
-                const hasDuplicateCode = (countByCode.get(line.voice.code) ?? 0) > 1;
-                return (
-                  <label
-                    className={cn(
-                      "flex cursor-pointer items-center gap-3 border-b border-[var(--border-subtle)]/20 px-5 py-2.5 text-12px transition-colors hover:bg-[var(--accent-primary)]/[0.03]",
-                      idx % 2 === 0 ? "bg-[var(--surface-base)]" : "bg-[var(--bg-muted)]/15",
-                      selected.has(line.id) && "bg-[var(--accent-primary)]/[0.06]",
-                    )}
-                    key={line.id}
-                  >
-                    <input
-                      checked={selected.has(line.id)}
-                      className="size-4 rounded border-[var(--border-subtle)] text-[var(--accent-primary)] focus:ring-[var(--ring-focus)]"
-                      onChange={() => handleToggle(line.id)}
-                      type="checkbox"
-                    />
-                    {hasDuplicateCode && rowNumber != null ? (
-                      <span className="shrink-0 rounded-md bg-[var(--bg-muted)] px-1.5 py-0.5 font-mono text-10px font-black tabular-nums text-[var(--text-secondary)]">
-                        #{rowNumber}
-                      </span>
-                    ) : null}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold text-[var(--text-primary)]">
-                        {line.voice.code}
-                      </span>
-                      {hasDuplicateCode ? (
-                        <span className="mt-0.5 block truncate text-10px font-medium text-[var(--text-tertiary)]">
-                          Istanza duplicata nel SAL
-                          {line.quantity > 0
-                            ? ` · Qt\u00e0 ${line.quantity.toLocaleString("it-IT", { maximumFractionDigits: 3 })}`
-                            : ""}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="hidden min-w-0 max-w-[220px] truncate text-[var(--text-tertiary)] sm:block">
-                      {line.voice.description}
-                    </span>
-                    <span className="shrink-0 font-mono text-11px font-bold tabular-nums text-[var(--text-secondary)]">
-                      <Currency value={line.grossAmount} />
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-
-            <DialogActions className="items-center justify-between px-5 py-3">
-              <Button onClick={handleRemove} size="sm" variant="ghost">
-                <Trash2 className="size-3.5" />
-                Rimuovi MG
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button onClick={onClose} size="sm" variant="secondary">
-                  Annulla
-                </Button>
-                <Button
-                  disabled={selected.size === 0}
-                  onClick={handleSave}
-                  size="sm"
-                  variant="primary"
-                >
-                  <Check className="size-3.5" />
-                  Applica a {selected.size} voc{selected.size === 1 ? "e" : "i"}
-                </Button>
-              </div>
-            </DialogActions>
-          </>
-        )}
-      </Panel>
-    </Dialog>
-  );
 }
 
 const SelectedVoiceRow = memo(function SelectedVoiceRow({
@@ -1530,6 +984,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   onPasteClipboardText,
   onCopyMeasurements,
   onCopyMeasurementRow,
+  onCopyMeasurementRowFull,
   selectedMeasurementRow,
   onSelectMeasurementRow,
   onAddMeasurementRow,
@@ -1539,6 +994,8 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   onRemoveMeasurementRow,
   onToggle,
   onUpdateMeasurementRow,
+  canPasteMeasurements = false,
+  onPasteMeasurementRowAt,
 }: {
   index: number;
   line: SalLineView;
@@ -1560,6 +1017,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
   onPasteClipboardText: (lineId: string, text: string) => void;
   onCopyMeasurements?: (lineId: string) => void;
   onCopyMeasurementRow?: (lineId: string, rowIndex: number) => void;
+  onCopyMeasurementRowFull?: (lineId: string, rowIndex: number) => void;
   selectedMeasurementRow?: { lineId: string; rowIndex: number } | null;
   onSelectMeasurementRow?: (lineId: string, rowIndex: number) => void;
   onAddMeasurementRow: (lineId: string) => void;
@@ -1573,12 +1031,17 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
     measurementId: string,
     updates: Partial<SalMeasurementRowDraft>,
   ) => void;
+  canPasteMeasurements?: boolean | undefined;
+  onPasteMeasurementRowAt?: (lineId: string, insertIndex: number) => void;
 }) {
   const isIncomplete = line.status !== "complete";
   const hasTariffMgSignal = hasTariffMaggiorazioneSignal(line);
   const mgLinkedTotal = getMgLinkedTotal(line);
   const hasMissingMgDecision =
     hasTariffMgSignal && mgLinkedTotal <= 0 && line.surchargePercent <= 0;
+
+  // Visual scope feedback: this voice is the one whose measurement sub-rows are currently being worked on
+  const hasActiveSubSelection = selectedMeasurementRow?.lineId === line.id;
 
   return (
     <>
@@ -1593,6 +1056,8 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
           index % 2 !== 0 && "bg-[var(--bg-muted)]/5",
           expanded &&
             "shadow-[inset_3px_0_0_var(--accent-primary)] bg-[var(--accent-primary)]/[0.03]",
+          hasActiveSubSelection &&
+            "bg-[var(--accent-primary)]/[0.09] shadow-[inset_3px_0_0_var(--accent-primary)]",
           active && "ring-2 ring-inset ring-[var(--accent-primary)]/35",
           isIncomplete && !expanded && "shadow-[inset_3px_0_0_var(--warning-base)]/60",
         )}
@@ -1747,9 +1212,23 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
 
       {/* Expanded: info bar + measurement rows */}
       {expanded && (
-        <div className="border-b border-[var(--border-subtle)]/40 bg-[var(--bg-muted)]/24 [contain:layout_style]">
+        <div
+          className={cn(
+            "border-b border-[var(--border-subtle)]/40 [contain:layout_style]",
+            hasActiveSubSelection
+              ? "bg-[var(--accent-primary)]/[0.035] border-l-2 border-l-[var(--accent-primary)]/30"
+              : "bg-[var(--bg-muted)]/24",
+          )}
+        >
           {/* Info bar: price, discount, MG% */}
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)]/25 bg-[var(--surface-base)] px-3 py-2">
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)]/25 px-3 py-2",
+              hasActiveSubSelection
+                ? "bg-transparent border-[var(--border-subtle)]/15"
+                : "bg-[var(--surface-base)]",
+            )}
+          >
             <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-muted)] px-2 py-0.5 text-13px font-semibold text-[var(--text-primary)]">
               <span className="text-[var(--text-tertiary)] text-11px uppercase tracking-wider">
                 Prezzo
@@ -1793,6 +1272,7 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             )}
           </div>
 
+          {/* @ts-expect-error - exactOptionalPropertyTypes strictness with many optional callbacks */}
           <MeasurementRowsTable
             lineId={line.id}
             voiceCode={line.voice.code}
@@ -1809,12 +1289,15 @@ const SelectedVoiceRow = memo(function SelectedVoiceRow({
             laborPercentage={line.voice.laborPercentage ?? 0}
             getMeasurementsClipboardText={getMeasurementsClipboardText}
             {...(getMeasurementRowClipboardText ? { getMeasurementRowClipboardText } : {})}
-            {...(onCopyMeasurements ? { onCopyMeasurements } : {})}
-            {...(onCopyMeasurementRow ? { onCopyMeasurementRow } : {})}
+            onCopyMeasurements={onCopyMeasurements}
+            onCopyMeasurementRow={onCopyMeasurementRow}
+            onCopyMeasurementRowFull={onCopyMeasurementRowFull}
             selectedRowIndex={
               selectedMeasurementRow?.lineId === line.id ? selectedMeasurementRow.rowIndex : null
             }
             onSelectRow={(rowIndex) => onSelectMeasurementRow?.(line.id, rowIndex)}
+            canPasteMeasurements={canPasteMeasurements}
+            onPasteMeasurementRowAt={onPasteMeasurementRowAt}
             onOpenContextMenu={onOpenContextMenu}
             onPasteClipboardText={onPasteClipboardText}
             onAddRow={onAddMeasurementRow}
@@ -1962,6 +1445,7 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
   getMeasurementRowClipboardText,
   onCopyMeasurements,
   onCopyMeasurementRow,
+  onCopyMeasurementRowFull,
   selectedRowIndex = null,
   onSelectRow,
   onOpenContextMenu,
@@ -1970,6 +1454,8 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
   onRemoveRow,
   onDuplicateRow,
   onUpdateRow,
+  canPasteMeasurements = false,
+  onPasteMeasurementRowAt,
 }: {
   lineId: string;
   voiceCode: string;
@@ -1988,6 +1474,7 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
   getMeasurementRowClipboardText?: (lineId: string, rowIndex: number) => string | null;
   onCopyMeasurements?: (lineId: string) => void;
   onCopyMeasurementRow?: (lineId: string, rowIndex: number) => void;
+  onCopyMeasurementRowFull?: (lineId: string, rowIndex: number) => void;
   selectedRowIndex?: number | null;
   onSelectRow?: (rowIndex: number) => void;
   onOpenContextMenu: (
@@ -2005,6 +1492,8 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
     measurementId: string,
     updates: Partial<SalMeasurementRowDraft>,
   ) => void;
+  canPasteMeasurements?: boolean | undefined;
+  onPasteMeasurementRowAt?: (lineId: string, insertIndex: number) => void;
 }) {
   const hasMultipleRows = rows.length > 1;
   const [factorDrafts, setFactorDrafts] = useState<Record<string, string>>({});
@@ -2076,9 +1565,85 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
               )}
             </div>
 
+            {/* Compact toolbar for selected measurement row – much more discoverable than right-click only */}
+            {selectedRowIndex != null &&
+              rows[selectedRowIndex] &&
+              (() => {
+                const selIndex = selectedRowIndex;
+                const selRow = rows[selIndex];
+                if (!selRow) return null;
+                const rowTarget = buildMeasurementTarget(selRow.id, selIndex);
+
+                return (
+                  <div className="flex items-center gap-1 border-b border-[var(--border-subtle)]/40 bg-[var(--bg-muted)]/40 px-4 py-1.5">
+                    <span className="mr-2 text-10px font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                      Riga {selIndex + 1}
+                    </span>
+
+                    <button
+                      className="inline-flex h-7 items-center gap-1.5 rounded border border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-2 text-11px font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
+                      onClick={() => onCopyMeasurementRow?.(lineId, selIndex)}
+                      title="Copia riga (stazione)"
+                      type="button"
+                    >
+                      <Copy className="size-3" /> Copia
+                    </button>
+
+                    <button
+                      className="inline-flex h-7 items-center gap-1.5 rounded border border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-2 text-11px font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
+                      onClick={() => onCopyMeasurementRowFull?.(lineId, selIndex)}
+                      title="Copia riga completa"
+                      type="button"
+                    >
+                      <Copy className="size-3" /> Completa
+                    </button>
+
+                    <button
+                      className="inline-flex h-7 items-center gap-1.5 rounded border border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-2 text-11px font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
+                      onClick={() => onDuplicateRow(lineId, rowTarget)}
+                      title="Duplica riga"
+                      type="button"
+                    >
+                      <CopyPlus className="size-3" /> Duplica
+                    </button>
+
+                    <button
+                      className="inline-flex h-7 items-center gap-1.5 rounded border border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-2 text-11px font-semibold text-[var(--text-primary)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-base)]"
+                      onClick={() => onRemoveRow(lineId, rowTarget)}
+                      title="Elimina riga"
+                      type="button"
+                    >
+                      <Trash2 className="size-3" /> Elimina
+                    </button>
+
+                    <div className="mx-1 h-4 w-px bg-[var(--border-subtle)]/40" />
+
+                    <button
+                      className="inline-flex h-7 items-center gap-1 rounded border border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-2 text-11px font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-muted)] disabled:opacity-40"
+                      disabled={!canPasteMeasurements}
+                      onClick={() => onPasteMeasurementRowAt?.(lineId, selIndex)}
+                      title="Incolla sopra questa riga"
+                      type="button"
+                    >
+                      <ArrowUpToLine className="size-3" /> Sopra
+                    </button>
+
+                    <button
+                      className="inline-flex h-7 items-center gap-1 rounded border border-[var(--border-subtle)]/50 bg-[var(--surface-base)] px-2 text-11px font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-muted)] disabled:opacity-40"
+                      disabled={!canPasteMeasurements}
+                      onClick={() => onPasteMeasurementRowAt?.(lineId, selIndex + 1)}
+                      title="Incolla sotto questa riga"
+                      type="button"
+                    >
+                      <ArrowDownToLine className="size-3" /> Sotto
+                    </button>
+                  </div>
+                );
+              })()}
+
             <div
               className={cn(
-                "grid border-b border-[var(--border-subtle)]/40 bg-[var(--surface-base)] text-13px font-bold text-[var(--text-secondary)]",
+                "grid border-b border-[var(--border-subtle)]/40 bg-[var(--surface-base)] text-13px font-bold text-[var(--text-primary)]",
                 MEASURE_GRID_COLS,
               )}
             >
@@ -2116,15 +1681,17 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
               rows.map((row, rowIndex) => {
                 const rowTarget = buildMeasurementTarget(row.id, rowIndex);
                 return (
-                  <>
+                  <Fragment key={`${row.id}-${row.order}`}>
                     {/* biome-ignore lint/a11y/noStaticElementInteractions: measurement row exposes a context menu on right-click */}
                     <div
                       className={cn(
-                        "grid border-b border-[var(--border-subtle)]/35 bg-[var(--surface-base)] text-14px font-medium transition-colors hover:bg-[var(--accent-primary)]/[0.025]",
+                        "grid border-b border-[var(--border-subtle)]/35 text-14px font-medium transition-colors",
+                        selectedRowIndex === rowIndex
+                          ? "bg-[var(--accent-primary)]/[0.11] hover:bg-[var(--accent-primary)]/[0.16] shadow-[inset_3px_0_0_var(--accent-primary)] border-t border-b border-[var(--accent-primary)]/20"
+                          : "bg-[var(--surface-base)] hover:bg-[var(--accent-primary)]/[0.025]",
                         MEASURE_GRID_COLS,
                       )}
                       data-measurement-row
-                      key={`${row.id}-${row.order}`}
                       onContextMenu={(event) => {
                         if (
                           (event.target as HTMLElement).closest("input, textarea, button, select")
@@ -2146,15 +1713,18 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
                       {/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: row index selector for measurement clipboard actions */}
                       <div
                         className={cn(
-                          "flex min-h-11 cursor-cell items-center justify-center border-r border-[var(--border-subtle)]/30 bg-[var(--bg-muted)]/22 font-mono text-13px font-black tabular-nums text-[var(--text-secondary)] transition-colors",
-                          selectedRowIndex === rowIndex &&
-                            "bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] ring-2 ring-inset ring-[var(--accent-primary)]/35",
+                          "flex min-h-11 cursor-cell items-center justify-center border-r border-[var(--border-subtle)]/30 font-mono text-13px font-black tabular-nums transition-all",
+                          selectedRowIndex === rowIndex
+                            ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] ring-2 ring-inset ring-[var(--accent-primary)]/50"
+                            : "bg-[var(--bg-muted)]/30 text-[var(--text-secondary)]",
                         )}
                         onClick={(event) => {
                           event.stopPropagation();
                           onSelectRow?.(rowIndex);
                         }}
-                        title="Seleziona riga · tasto destro per copia/incolla"
+                        title={
+                          selectedRowIndex === rowIndex ? "Riga selezionata" : "Seleziona riga"
+                        }
                       >
                         {rowIndex + 1}
                       </div>
@@ -2223,7 +1793,14 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
                           </MeasureCell>
                         );
                       })}
-                      <MeasureCell className="justify-end bg-[var(--accent-primary)]/[0.06] px-2.5">
+                      <MeasureCell
+                        className={cn(
+                          "justify-end px-2.5",
+                          selectedRowIndex === rowIndex
+                            ? "bg-[var(--accent-primary)]/[0.18]"
+                            : "bg-[var(--accent-primary)]/[0.06]",
+                        )}
+                      >
                         <span className="font-mono text-16px font-black tabular-nums text-[var(--accent-primary)]">
                           {row.partialQuantity.toLocaleString("it-IT", {
                             maximumFractionDigits: 3,
@@ -2274,7 +1851,7 @@ const MeasurementRowsTable = memo(function MeasurementRowsTable({
                         </button>
                       </div>
                     </div>
-                  </>
+                  </Fragment>
                 );
               })
             )}
@@ -2398,7 +1975,7 @@ function VoiceNotes({
           Note
         </span>
         <textarea
-          className="min-h-[44px] w-full resize-y border-0 bg-transparent px-2.5 py-2 text-14px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:bg-[var(--accent-primary)]/[0.025] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
+          className="min-h-[44px] w-full resize-y border-0 bg-transparent px-2.5 py-2 text-14px leading-snug text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-secondary)] focus:bg-[var(--accent-primary)]/[0.025] focus:ring-2 focus:ring-inset focus:ring-[var(--ring-focus)]"
           placeholder={
             linkedTotal > 0
               ? `Annota criterio maggiorazioni: ${linkedTotal.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}`

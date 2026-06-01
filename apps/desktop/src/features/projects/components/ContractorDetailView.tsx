@@ -39,6 +39,7 @@ type ContractorDetailViewProps = {
   managerLoadCount: number;
   onBack: () => void;
   onCreateProject: () => void;
+  onCreateSal: (project: PortfolioProject) => void;
   onExport: () => void;
   onFocusChange: (focus: PortfolioFocus) => void;
   onImport: () => void;
@@ -90,6 +91,7 @@ export function ContractorDetailView({
   managerLoadCount,
   onBack,
   onCreateProject,
+  onCreateSal,
   onExport,
   onFocusChange,
   onImport,
@@ -175,6 +177,7 @@ export function ContractorDetailView({
         <section className="min-w-0">
           <ProjectsWorkbench
             onCreateProject={onCreateProject}
+            onCreateSal={onCreateSal}
             onDeleteProject={onDeleteProject}
             onEditProject={onEditProject}
             onExport={onExport}
